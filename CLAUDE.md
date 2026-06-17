@@ -22,9 +22,11 @@ field-agnostic, NBX + persistent neighborhood-collective engines, overlap-capabl
 host-staged variant); the Lagrangian halo (`tpx::halo::ParticleMigrator` — particle migration +
 `gatherGhosts`); and SDF geometry with scalar/vector VTI I/O. See `transport-core/CLAUDE.md`.
 
-**Consumers:** `cfd-gpu` has a **complete, validated distributed Navier–Stokes solver** on the core
-(branch `mpi-halo-integration`, opt-in `-DCFD_BUILD_MPI=ON`, 37 ctests real multi-rank, a runnable
-VTI-writing demo; production `pnm_backend` untouched — see `cfd-gpu/doc/mpi_parallelization_status.md`).
+**Consumers:** `cfd-gpu` has a **complete, validated distributed Navier–Stokes solver** (`sdflow`) on the
+core (opt-in `-DCFD_BUILD_MPI=ON`, 72 ctests real multi-rank, a runnable VTI-writing demo — see
+`cfd-gpu/doc/mpi_parallelization_status.md`). `sdflow` is now **THE** cfd-gpu solver: the original
+single-GPU `CFDSolver` reference was retired (restore tag `pnm_backend-reference`), and `pnm_backend` is
+now cfd-gpu's pore-network-extraction module only.
 `packing-gpu` (Lagrangian) has its migration + ghost-particle primitives validated on its real `float4`
 layout (branch `mpi-integration`, `packing-gpu/mpi/`). The remaining big pieces are the in-place
 solver integrations (cfd's multigrid + global reductions; packing's per-step loop) — see
@@ -44,7 +46,7 @@ The design contract lives in `docs/`:
 |-----------|------------------|--------------|-------------------|
 | `transport-core/` | Header-only C++20 + MPI | **Shared infrastructure** (new): ORB block decomposition + asynchronous ghost-layer exchange (NBX + persistent engines) + particle migration. The layer every method code will depend on. Tested (13/13, np 1–8). | **Yes — read it** |
 | `morton_arithmetic/` | Header-only C++17 (+ CUDA, Python) | Morton/Z-order codes with **arithmetic in Morton space** (neighbour-find, axis add, Z-order step without decode→re-encode). BMI2/AVX-512 + runtime dispatch; the foundational spatial-index library. | **Yes — read it** |
-| `cfd-gpu/` | CUDA + C++17 + pybind11 (`pnm_backend`) | GPU incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. | **Yes — read it** |
+| `cfd-gpu/` | CUDA + C++17 + pybind11 (`sdflow`) | GPU incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. The `sdflow` module is the solver; `pnm_backend` is now the pore-network-extraction module. | **Yes — read it** |
 | `packing-gpu/` | CUDA + C++17 + pybind11 (`demgpu`) | GPU Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. README still calls it `dem-gpu`. | No |
 | `voronoi_dynamics/` | Header-only C++17 (+ OpenMP, Boost, Voro++) | Dynamic 3D Voronoi tessellation of moving particles; periodic & Lees–Edwards boxes, incremental cell repair, Euler/NS/multiphase dynamics. | No |
 | `block_decomposer/` | C++20 + MPI + Boost + GTest | Recursive block domain decomposition (`pbs::BlockDecomposer<Dim>`) and an ADI solver for distributed-memory grids. Executables, not a library. | No |
@@ -67,10 +69,10 @@ The non-BMI2 build is contractually PDEP/PEXT-free (a test greps the binary). AV
 ### cfd-gpu
 ```bash
 cd cfd-gpu
-mkdir -p build && cd build && cmake .. && cmake --build .   # -> build/pnm_backend.so
-cd .. && source .venv/bin/activate
-python tests/test_cfd_solver.py
-python scripts/verify_poiseuille.py                          # analytical-solution check
+cmake -S . -B build && cmake --build build -j   # -> build/sdflow.so (solver) + build/pnm_backend.so (pore extraction)
+source .venv/bin/activate
+PYTHONPATH=$PWD/build python scripts/verify_poiseuille_sdflow.py        # analytical-solution check
+PYTHONPATH=$PWD/build python scripts/verify_periodic_spheres_sdflow.py  # cut-cell Stokes through spheres
 ```
 
 ### packing-gpu
