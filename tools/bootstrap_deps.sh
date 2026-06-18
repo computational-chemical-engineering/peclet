@@ -29,6 +29,9 @@ common_args=(
   -DCMAKE_CXX_STANDARD=20
   -DCMAKE_INSTALL_PREFIX="$PREFIX"
   -DCMAKE_PREFIX_PATH="$PREFIX"
+  # PIC so the (static) Kokkos can be linked into shared objects, e.g. the
+  # pybind11 Python modules (demgpu_kokkos / sdflow).
+  -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 )
 
 case "$BACKEND" in
