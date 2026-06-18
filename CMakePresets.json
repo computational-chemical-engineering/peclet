@@ -1,0 +1,49 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_STANDARD": "20",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "host-openmp",
+      "displayName": "Host (Kokkos OpenMP backend)",
+      "description": "CPU build; portable everywhere, no GPU. Good for correctness/CI and for voronoi_dynamics. Run tools/bootstrap_deps.sh host-openmp first.",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "${sourceDir}/extern/install/host-openmp"
+      }
+    },
+    {
+      "name": "nvidia-cuda",
+      "displayName": "NVIDIA (Kokkos CUDA backend, Blackwell sm_120)",
+      "description": "Local dev box: RTX 5080 / CUDA 13.2. The primary development target. Run tools/bootstrap_deps.sh nvidia-cuda first.",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "${sourceDir}/extern/install/nvidia-cuda"
+      }
+    },
+    {
+      "name": "lumi-hip",
+      "displayName": "LUMI (Kokkos HIP backend, AMD MI250X gfx90a)",
+      "description": "AMD ROCm target. Not yet exercised (no LUMI access); kept in lockstep so the NVIDIA work stays portable. Run tools/bootstrap_deps.sh lumi-hip first.",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "hipcc",
+        "CMAKE_PREFIX_PATH": "${sourceDir}/extern/install/lumi-hip"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "host-openmp", "configurePreset": "host-openmp" },
+    { "name": "nvidia-cuda", "configurePreset": "nvidia-cuda" },
+    { "name": "lumi-hip",    "configurePreset": "lumi-hip" }
+  ]
+}
