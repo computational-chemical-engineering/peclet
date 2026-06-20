@@ -26,7 +26,7 @@ host-staged variant); the Lagrangian halo (`tpx::halo::ParticleMigrator` — par
 [docs/CUDA_RETIREMENT.md](docs/CUDA_RETIREMENT.md)). `cfd-gpu` has a **complete, validated distributed
 Navier–Stokes solver** (`sdflow`) on the core: the whole cut-cell IBM + MG-PCG step runs multi-rank,
 bit-exact to single-rank (`tests/kokkos_mpi`, 18 ctests np=1,2,4, gated `CFD_MPI`). `sdflow` is **THE**
-cfd-gpu solver; `pnm_backend` is its pore-network-extraction module. `packing-gpu`'s `demgpu` runs the
+cfd-gpu solver; `pnm` is its pore-network-extraction module. `packing-gpu`'s `dem` module runs the
 full XPBD step (ArborX broad-phase) with a validated distributed `step_mpi` (transport-core particle
 halo; `tests/kokkos_mpi` 6 ctests). The single-GPU codes are complete + faster than the retired CUDA at
 scale; remaining work is at-scale multi-GPU tuning — see [docs/ROADMAP.md](docs/ROADMAP.md).
@@ -45,8 +45,8 @@ The design contract lives in `docs/`:
 |-----------|------------------|--------------|-------------------|
 | `transport-core/` | Header-only C++20 + MPI | **Shared infrastructure** (new): ORB block decomposition + asynchronous ghost-layer exchange (NBX + persistent engines) + particle migration. The layer every method code will depend on. Tested (13/13, np 1–8). | **Yes — read it** |
 | `morton_arithmetic/` | Header-only C++17 (+ CUDA, Python) | Morton/Z-order codes with **arithmetic in Morton space** (neighbour-find, axis add, Z-order step without decode→re-encode). BMI2/AVX-512 + runtime dispatch; the foundational spatial-index library. | **Yes — read it** |
-| `cfd-gpu/` | **Kokkos** + C++20 + pybind11 (`sdflow`) | Incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. `sdflow` is the solver; `pnm_backend` is the pore-network-extraction module. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). | **Yes — read it** |
-| `packing-gpu/` | **Kokkos + ArborX** + C++20 + pybind11 (`demgpu`) | Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). README still calls it `dem-gpu`. | No |
+| `cfd-gpu/` | **Kokkos** + C++20 + pybind11 (`sdflow`) | Incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. `sdflow` is the solver; `pnm` is the pore-network-extraction module. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). | **Yes — read it** |
+| `packing-gpu/` | **Kokkos + ArborX** + C++20 + pybind11 (`dem`) | Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). README still calls it `dem-gpu`. | No |
 | `voronoi_dynamics/` | Header-only C++17 (+ OpenMP, Boost, Voro++) | Dynamic 3D Voronoi tessellation of moving particles; periodic & Lees–Edwards boxes, incremental cell repair, Euler/NS/multiphase dynamics. | No |
 | `block_decomposer/` | C++20 + MPI + Boost + GTest | Recursive block domain decomposition (`pbs::BlockDecomposer<Dim>`) and an ADI solver for distributed-memory grids. Executables, not a library. | No |
 
@@ -73,7 +73,7 @@ dependency**). Put `nvcc` on `PATH` for the CUDA backend (`export PATH=/usr/loca
 ```bash
 cd cfd-gpu && source .venv/bin/activate
 cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda;$(python -m pybind11 --cmakedir)"
-cmake --build build -j                          # -> build/sdflow.*.so (solver) + build/pnm_backend.*.so
+cmake --build build -j                          # -> build/sdflow.*.so (solver) + build/pnm.*.so
 PYTHONPATH=$PWD/build python scripts/verify_poiseuille_sdflow.py        # analytical-solution check
 PYTHONPATH=$PWD/build python scripts/verify_periodic_spheres_sdflow.py  # cut-cell Stokes through spheres
 ```
@@ -82,7 +82,7 @@ PYTHONPATH=$PWD/build python scripts/verify_periodic_spheres_sdflow.py  # cut-ce
 ```bash
 cd packing-gpu && python -m venv .venv && source .venv/bin/activate && pip install pybind11 numpy
 cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda;$(python -m pybind11 --cmakedir)"
-cmake --build build -j$(nproc)                  # -> build/demgpu.cpython-*.so  (-DDEMGPU_MPI=ON for the MPI step)
+cmake --build build -j$(nproc)                  # -> build/dem.cpython-*.so  (-DDEM_MPI=ON for the MPI step)
 export PYTHONPATH=$PYTHONPATH:$(pwd)/build
 python verify_packing_spheres.py                # verify_*.py are the test/demo entry points
 ```
