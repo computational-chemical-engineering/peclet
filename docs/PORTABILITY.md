@@ -1,8 +1,8 @@
 # Portability (Kokkos + ArborX)
 
-Status: **Migration complete — Kokkos is canonical, CUDA retired (2026-06-20).** cfd-gpu (`sdflow` +
-`pnm_backend`), packing-gpu (`demgpu`), and transport-core all build and run on Kokkos
-([ArborX](https://github.com/arborx/ArborX) replaced packing-gpu's cuBQL broad-phase); the CUDA
+Status: **Migration complete — Kokkos is canonical, CUDA retired (2026-06-20).** sdflow (`sdflow` +
+`pnm`), dem (`dem`), and transport-core all build and run on Kokkos
+([ArborX](https://github.com/arborx/ArborX) replaced dem's cuBQL broad-phase); the CUDA
 implementations were deleted after a machine-precision / physical-parity validation (see
 `docs/CUDA_RETIREMENT.md`). This document is the contract for the suite's portability across NVIDIA
 (Snellius) and AMD (LUMI/MI250X) GPUs and covers *how the toolchain is provisioned and built* — the
@@ -93,7 +93,7 @@ LUMI (cray-mpich); selectable at runtime so non-GPU-aware stacks still work.
   on a cluster, `module load` Kokkos/ArborX instead of bootstrapping.
 - Kokkos 5.x requires **C++20** (the suite was C++20 host / C++17 device; the device
   side moves to C++20 under Kokkos). The presets set `CMAKE_CXX_STANDARD=20`.
-- `morton_arithmetic` is already `__host__/__device__` + HIP-guarded and is *not* on
+- `morton` is already `__host__/__device__` + HIP-guarded and is *not* on
   the packing broad-phase path — it needs no Kokkos work.
 - `voronoi_dynamics` uses the **OpenMP backend** only for now (its half-edge mesh
   repair stays on the host).

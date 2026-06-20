@@ -1,18 +1,15 @@
 [submodule "transport-core"]
 	path = transport-core
 	url = git@github.com:computational-chemical-engineering/transport-core.git
-[submodule "cfd-gpu"]
-	path = cfd-gpu
-	url = git@github.com:computational-chemical-engineering/cfd-gpu.git
-[submodule "packing-gpu"]
-	path = packing-gpu
-	url = git@github.com:computational-chemical-engineering/packing-gpu.git
-[submodule "morton_arithmetic"]
-	path = morton_arithmetic
-	url = git@github.com:computational-chemical-engineering/morton_artithmetic.git
+[submodule "sdflow"]
+	path = sdflow
+	url = git@github.com:computational-chemical-engineering/sdflow.git
+[submodule "dem"]
+	path = dem
+	url = git@github.com:computational-chemical-engineering/dem.git
+[submodule "morton"]
+	path = morton
+	url = git@github.com:computational-chemical-engineering/morton.git
 [submodule "voronoi_dynamics"]
 	path = voronoi_dynamics
 	url = git@github.com:computational-chemical-engineering/voronoi_dynamics.git
-[submodule "block_decomposer"]
-	path = block_decomposer
-	url = git@github.com:computational-chemical-engineering/block_decomposer.git

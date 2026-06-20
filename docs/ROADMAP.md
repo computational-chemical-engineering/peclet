@@ -4,8 +4,8 @@
 > efficient asynchronous ghost-layer exchange, common SDF/IBM, GPU support, and Python bindings — while
 > keeping each method its own code. See [ARCHITECTURE](ARCHITECTURE.md) for the layering.
 >
-> **2026-06-20 — CUDA retired, Kokkos canonical.** cfd-gpu (`sdflow`/`pnm_backend`), packing-gpu
-> (`demgpu`, ArborX broad-phase), and transport-core now build on Kokkos (CUDA/HIP/OpenMP) with the CUDA
+> **2026-06-20 — CUDA retired, Kokkos canonical.** sdflow (`sdflow`/`pnm`), dem
+> (`dem`, ArborX broad-phase), and transport-core now build on Kokkos (CUDA/HIP/OpenMP) with the CUDA
 > implementations deleted and merged to `main`. Historical phase entries below that name `.cu`/`.cuh`
 > files describe the original CUDA path. See [CUDA_RETIREMENT](CUDA_RETIREMENT.md) and
 > [PORTABILITY](PORTABILITY.md).
@@ -16,7 +16,7 @@
 - **C++20 host / C++17 device** (see [STYLE](STYLE.md)).
 - One `HaloExchange` interface, two engines (NBX for dynamic, persistent-neighbor for static),
   GPU-aware. CPU-correct first, then GPU.
-- First solver wired in: **cfd-gpu** (most grid-native). `morton_arithmetic` is a core dependency.
+- First solver wired in: **sdflow** (most grid-native). `morton` is a core dependency.
 
 ## Phase 0 — Foundations (DONE)
 
@@ -24,7 +24,7 @@
 - [x] Link the documents from the top-level `suite/CLAUDE.md`.
 - [x] Scaffold `transport-core`: header-only C++20, CMake ≥3.24 with install/export target
       (`tpx::core`/`tpx::halo`), `include/tpx/{common,decomp,halo}/` layout, `.clang-format` from
-      `voronoi_dynamics`, auto-detects `morton_arithmetic`. Git repo initialized.
+      `voronoi_dynamics`, auto-detects `morton`. Git repo initialized.
 - [x] Extract the reusable code from `block_decomposer` into `tpx::decomp` + `tpx::halo` (ported &
       modernized): `BlockDecomposer` (+`ownerOf`), `BlockIndexer`, the `MPISync` NBX engine.
       (`GhostLayers`/`CellList` superseded by the owner-based `GridHalo`; `PbsCommon` → `common/types`.)
@@ -58,20 +58,20 @@
       `GridSdf` (trilinear) behind the `tpx::geom::Sdf` concept, shared sign convention, generic
       finite-difference normal, `sample()` to bake analytic → grid. Unit-tested.
       [x] VTI (.vti ImageData) ASCII read/write for sampled fields (`vti_io.hpp`), round-trip tested.
-      [ ] binary/base64 "appended" VTI (existing files) + VTP; consolidate cfd-gpu/packing readers.
+      [ ] binary/base64 "appended" VTI (existing files) + VTP; consolidate sdflow/packing readers.
 
-## Phase 3 — Wire in cfd-gpu (first Eulerian consumer) (working distributed solver)
+## Phase 3 — Wire in sdflow (first Eulerian consumer) (working distributed solver)
 
 A **complete distributed incompressible Navier–Stokes solver** is built on transport-core and
-validated; see `cfd-gpu/doc/mpi_parallelization_status.md` for the 13-step breakdown. Branch
-`mpi-halo-integration`, opt-in `-DCFD_BUILD_MPI=ON`; the production `pnm_backend` module is untouched.
+validated; see `sdflow/doc/mpi_parallelization_status.md` for the 13-step breakdown. Branch
+`mpi-halo-integration`, opt-in `-DCFD_BUILD_MPI=ON`; the production `pnm` module is untouched.
 
-- [x] `cfd-gpu/src/mac_halo.cuh` (`MacGridHalo`) — ORB decomposition + ghost exchange (width 1/2) for
+- [x] `sdflow/src/mac_halo.cuh` (`MacGridHalo`) — ORB decomposition + ghost exchange (width 1/2) for
       `double` MAC cell-fields, on `tpx::halo::DeviceGridExchange`. Validated against cfd's own `get_idx`
       stencils.
-- [x] `cfd-gpu/src/staggered_advection.cuh` — cfd's exact staggered Koren TVD advection (momentum-
+- [x] `sdflow/src/staggered_advection.cuh` — cfd's exact staggered Koren TVD advection (momentum-
       conserving), templated accessor for full-grid / local-block.
-- [x] `cfd-gpu/src/distributed_stokes.cuh` (`dstokes::DistributedStokes`) — reusable solver: implicit
+- [x] `sdflow/src/distributed_stokes.cuh` (`dstokes::DistributedStokes`) — reusable solver: implicit
       diffusion (RB-GS) + Chorin projection + optional nonlinear advection + body force + SDF solids
       (no-slip masking) + `gather_to_root` → VTI. Full Navier–Stokes.
 - [x] Validated **cell-for-cell vs serial** and against analytics (Taylor–Green ~2e-15, Poiseuille,
@@ -81,18 +81,18 @@ validated; see `cfd-gpu/doc/mpi_parallelization_status.md` for the 13-step break
       (restriction/prolongation across blocks) + Robust-Scaled cut-cell IBM (vs masking). The
       `DistributedStokes` solver is the working single-level path that proves the approach.
 
-## Phase 4 — Wire in packing-gpu (Lagrangian)
+## Phase 4 — Wire in dem (Lagrangian)
 
-Concrete plan (packing-gpu's data is SoA `float4` arrays — `d_pos` [.xyz pos, .w inv_mass], `d_vel`,
+Concrete plan (dem's data is SoA `float4` arrays — `d_pos` [.xyz pos, .w inv_mass], `d_vel`,
 `d_quat`, `d_ang_vel`, `d_inv_inertia`, `d_scale`, `d_shape_ids` — with `domain_min/max`, periodic
 flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The shared
 `tpx::halo::ParticleMigrator` (validated in transport-core) and block decomposition map directly:
 
-- [x] **Step 1 — migration (done):** `packing-gpu/mpi/test_particle_migration.cpp` decomposes the
+- [x] **Step 1 — migration (done):** `dem/mpi/test_particle_migration.cpp` decomposes the
       periodic domain, builds a `DomainMap` from packing's domain+periodicity, and migrates
       packing-style particles (full SoA record as opaque payload) with `ParticleMigrator`. Conservation
       + correct placement validated over random-walk steps, np=1,2,4. Standalone build
-      (`packing-gpu/mpi/`), decoupled from the demgpu (Kokkos+ArborX) build. Branch `mpi-integration`.
+      (`dem/mpi/`), decoupled from the dem (Kokkos+ArborX) build. Branch `mpi-integration`.
 - [x] **Step 2 — ghost particles (done):** `ParticleMigrator::gatherGhosts(rcut)` gathers copies within
       one interaction radius of each block boundary (periodic images handled) for a local ArborX
       broadphase. Rigorously validated vs a brute-force reference in transport-core's
@@ -119,6 +119,6 @@ flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The
 
 ## Cross-cutting / ongoing
 
-- Keep `morton_arithmetic` as the spatial-index primitive; adopt its octree where hierarchical indexing
+- Keep `morton` as the spatial-index primitive; adopt its octree where hierarchical indexing
   helps.
 - Each phase lands with tests + docs; no method depends on another method (dependencies point down).

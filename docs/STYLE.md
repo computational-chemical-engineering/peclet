@@ -7,7 +7,7 @@
 
 - **Host C++: C++20.** `block_decomposer` is already C++20; concepts give us compile-checked
   interfaces (see [INTERFACES](INTERFACES.md)), and `<bit>`/`<span>`/ranges are useful.
-- **Device (CUDA) and `morton_arithmetic`: C++17-compatible.** nvcc lags on C++20 and morton pins
+- **Device (CUDA) and `morton`: C++17-compatible.** nvcc lags on C++20 and morton pins
   C++17. The rule: **anything that must compile as device code, or be `#include`d by morton, stays
   within C++17.** Concepts and other C++20-only constructs live in host-only headers.
 - Practically: the core's interface headers are C++20; the parts pulled into `.cu` translation units
@@ -29,24 +29,24 @@ repo and `transport-core`):
 
 - **Namespaces:** lower-case, one per library/module. Suite root namespace `tpx` (transport phenomena);
   modules `tpx::common`, `tpx::decomp`, `tpx::halo`, `tpx::geom`, `tpx::ibm`. Existing method
-  namespaces keep their identity (`vor::`, `pbs::`, `morton::`); cfd-gpu/packing-gpu, currently in the
+  namespaces keep their identity (`vor::`, `pbs::`, `morton::`); sdflow/dem, currently in the
   global namespace, move solver classes into a method namespace (`cfd::`, `dem::`) as they integrate.
 - **CUDA kernels:** `__global__ void <operation>_kernel(...)` — the `_kernel` suffix is already the
-  de-facto convention in cfd-gpu/packing-gpu; make it the rule.
+  de-facto convention in sdflow/dem; make it the rule.
 - **GPU data:** Structure-of-Arrays for hot device data; `d_`-prefixed device pointers
-  (`d_pos`, `d_vel`) as packing-gpu does.
+  (`d_pos`, `d_vel`) as dem does.
 - **Members:** `m_` prefix (voronoi convention). Compile-time template params for `Dim`/`Bits` stay in
   the hot path — never add runtime dimension/bit-width to inner loops (morton lesson).
 
 ## Build system
 
-- **CMake ≥ 3.24** suite-wide (packing-gpu's floor; needed for modern CUDA handling). Each repo
+- **CMake ≥ 3.24** suite-wide (dem's floor; needed for modern CUDA handling). Each repo
   installs/exports a package config so consumers do `find_package(<pkg> CONFIG)` →
   `target_link_libraries(app PRIVATE tpx::core)`.
 - **Dependencies:** prefer `find_package` for system libs (MPI, Boost, CUDAToolkit, OpenMP); use
   `FetchContent` with a pinned tag for source deps (pybind11, cuBQL, Voro++, and `transport-core`
   itself when a method consumes it). Pin versions; don't track `master`.
-- **CUDA architectures:** set an explicit list for release artifacts (cfd-gpu uses `75;80;86;120`);
+- **CUDA architectures:** set an explicit list for release artifacts (sdflow uses `75;80;86;120`);
   `native` is fine for local dev builds only.
 - **Options:** gate tests/benchmarks/docs behind `<PKG>_BUILD_TESTS`/`_BENCHMARKS`/`_DOCS` (voronoi
   pattern), default tests `ON`, docs `OFF`.

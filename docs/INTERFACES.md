@@ -103,8 +103,8 @@ template <class I> concept ImmersedBoundary = requires(const I ib) {
 };
 ```
 
-Models cfd-gpu's Robust-Scaled IBM (per-cut-cell rescale factors baked into stencil coefficients); the
-packing-gpu point-shell-vs-SDF collision is the Lagrangian analog and shares the `SdfGeometry` source.
+Models sdflow's Robust-Scaled IBM (per-cut-cell rescale factors baked into stencil coefficients); the
+dem point-shell-vs-SDF collision is the Lagrangian analog and shares the `SdfGeometry` source.
 
 ## 7. `Stepper` — the time-integration entry point
 

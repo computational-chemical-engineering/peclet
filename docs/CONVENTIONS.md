@@ -13,12 +13,12 @@ the gaps. Two pillars are non-negotiable because they are already shared and loa
 ## 1. Geometry & indexing
 
 - **Canonical axis order:** x fastest, then y, then z. Grid linear index
-  `I = x + y*nx + z*nx*ny`. (cfd-gpu, block_decomposer already use this.)
+  `I = x + y*nx + z*nx*ny`. (sdflow, block_decomposer already use this.)
 - **Cell-centred vs staggered:** scalar fields (pressure, SDF, density) live at cell centres
   `(i+½, j+½, k+½)·spacing`. Staggered velocity components:
-  `u` at `(i, j+½, k+½)`, `v` at `(i+½, j, k+½)`, `w` at `(i+½, j+½, k)`. (MAC grid — cfd-gpu.)
+  `u` at `(i, j+½, k+½)`, `v` at `(i+½, j, k+½)`, `w` at `(i+½, j+½, k)`. (MAC grid — sdflow.)
 - **Periodic wrap:** `wrap(x, N) = (x % N + N) % N`. Applies to grid indices and particle images
-  alike. (Shared across cfd-gpu, packing-gpu, voronoi, block_decomposer.)
+  alike. (Shared across sdflow, dem, voronoi, block_decomposer.)
 - **Lees–Edwards shear:** an x-shift proportional to a y-offset, `xshift = shear · Ly / Lx`, applied in
   the shortest-image computation. (voronoi `BoxLE`.)
 
@@ -28,7 +28,7 @@ the gaps. Two pillars are non-negotiable because they are already shared and loa
 - **Outward normal:** `n = ∇sdf / |∇sdf|` points *into the fluid* (out of the solid).
 - **Sources:** analytic primitives (sphere, hollow cylinder, …) and grid SDFs interchangeably behind
   one descriptor (see [INTERFACES](INTERFACES.md) `SdfGeometry`). A scaled shape evaluates as
-  `dist = sdf_canonical(p / scale) · scale`. (packing-gpu point-shell convention.)
+  `dist = sdf_canonical(p / scale) · scale`. (dem point-shell convention.)
 - **I/O:** grid SDFs and fields exchange via **VTI**; particle/point data via **VTP** (ParaView/Ovito).
 
 ## 3. Numeric precision policy
@@ -36,9 +36,9 @@ the gaps. Two pillars are non-negotiable because they are already shared and loa
 Precision is chosen per role, not globally — but stated explicitly so codes match:
 
 - **Eulerian field state** (pressure, velocity carried across projection/implicit solves): **double**.
-  (cfd-gpu state is double; temporaries may be float.)
+  (sdflow state is double; temporaries may be float.)
 - **GPU particle state** (positions, velocities, quaternions in hot SoA kernels): **float**.
-  (packing-gpu.)
+  (dem.)
 - **Header-only / CPU generic code:** template on `real_t` with a sensible default; pick `double` for
   accuracy-sensitive tests. (voronoi.)
 - **The shared core is precision-agnostic:** decomposition/halo/geometry are templated on the payload
@@ -70,12 +70,12 @@ labels and stay local to voronoi; they are not suite-wide types.
 
 ## 6. Python binding conventions
 
-- **Mechanism:** pybind11 for compiled solvers (cfd-gpu `pnm_backend`, packing-gpu `demgpu`, and
+- **Mechanism:** pybind11 for compiled solvers (sdflow `pnm`, dem `dem`, and
   future voronoi bindings). morton's lightweight ctypes/C-ABI shim stays as is (dependency-free by
   design) but is the exception, not the template.
 - **Array shape/order:** Python sees grids as shape `(nz, ny, nx)`; round-trip to the C++ x-fastest
   layout with `numpy.reshape(..., order='F')` on `(nx, ny, nz)`. Document this once per module and keep
-  it identical across modules. (Matches cfd-gpu today.)
+  it identical across modules. (Matches sdflow today.)
 - **Particle arrays:** shape `(N, 3)` for vector quantities, `(N,)` for scalars, contiguous float/
   double matching the solver's precision.
 - **Lifecycle:** `Solver(...)` construct → `initialize(...)`/`set_*` config → `step(dt)` → `get_*`

@@ -16,11 +16,11 @@ conventions, and the same interfaces.
 
 | Code | Kind | State representation | Status |
 |------|------|----------------------|--------|
-| `cfd-gpu` | **Eulerian** | Structured staggered MAC grid (fields on a fixed grid) | Extensively developed |
-| `packing-gpu` | **Lagrangian** | Particles (DEM/XPBD), SoA on GPU | Extensively developed |
+| `sdflow` | **Eulerian** | Structured staggered MAC grid (fields on a fixed grid) | Extensively developed |
+| `dem` | **Lagrangian** | Particles (DEM/XPBD), SoA on GPU | Extensively developed |
 | `voronoi_dynamics` | **Mixed** | Moving particles + their Voronoi cells (Lagrangian carriers, Eulerian-like fluxes across cell faces) | Developed, no Python yet |
 | `block_decomposer` | Infrastructure | Blocks + ghost layers + particles/cells | Partial; source of the shared MPI layer |
-| `morton_arithmetic` | Primitive | Z-order codes / spatial index | Mature |
+| `morton` | Primitive | Z-order codes / spatial index | Mature |
 
 The Eulerian/Lagrangian/mixed split is the key axis: it determines *what travels in a halo exchange*
 (grid cell slabs vs. migrating particles vs. ghost particles + cell neighbours) but **not** the
@@ -30,7 +30,7 @@ decomposition (all use the same block decomposition) nor the geometry (all use t
 
 ```
             ┌──────────────────────────────────────────────────────────┐
- methods    │  cfd-gpu     packing-gpu     voronoi_dynamics   (future)  │   separate repos
+ methods    │  sdflow     dem     voronoi_dynamics   (future)  │   separate repos
             └──────────────────────────────────────────────────────────┘
                    │             │                │
                    ▼             ▼                ▼
@@ -42,7 +42,7 @@ decomposition (all use the same block decomposition) nor the geometry (all use t
                    │                                        │
                    ▼                                        ▼
             ┌─────────────────────┐                ┌──────────────────┐
- primitives │  morton_arithmetic  │                │ Kokkos, ArborX,  │   external / vendored
+ primitives │  morton  │                │ Kokkos, ArborX,  │   external / vendored
             │  (block/cell index) │                │ Voro++, MPI, ... │
             └─────────────────────┘                └──────────────────┘
 ```
@@ -56,7 +56,7 @@ depends on primitives. No method depends on another method; primitives depend on
   error/logging). Codifies [CONVENTIONS](CONVENTIONS.md).
 - **decomposition** — orthogonal recursive bisection of the global domain into rank-owned blocks
   (`BlockDecomposer`), global↔local indexing with ghost layers (`BlockIndexer`), and morton/Z-order
-  cell indexing (via `morton_arithmetic`). Ported from `block_decomposer`.
+  cell indexing (via `morton`). Ported from `block_decomposer`.
 - **halo** — the asynchronous ghost-layer exchange. One `HaloExchange` interface, two engines: an
   **NBX nonblocking-consensus** loop for dynamic/sparse patterns (particle migration) and a
   **persistent neighborhood-collective** path for static grid halos. Field-agnostic pack/unpack so a
@@ -66,16 +66,16 @@ depends on primitives. No method depends on another method; primitives depend on
   shared sign convention (negative inside solid). All three methods already use SDFs; this unifies
   them.
 - **ibm** — the common Immersed Boundary Method interface: cut-cell / boundary data derived from an
-  SDF, consumed by Eulerian solvers (and the point-shell collision analog in `packing-gpu`).
+  SDF, consumed by Eulerian solvers (and the point-shell collision analog in `dem`).
 - **python** — pybind11 + numpy helpers so every method exposes Python the same way (array shapes,
   ownership, naming).
 
 ## How each method maps onto the core
 
-- **cfd-gpu (Eulerian):** the global MAC grid is partitioned by `decomposition`; each rank owns a block
+- **sdflow (Eulerian):** the global MAC grid is partitioned by `decomposition`; each rank owns a block
   with ghost cells; per-step it exchanges grid-field halos through the **persistent neighborhood**
   path; SDF geometry + IBM come from `geometry`/`ibm`. First solver to be wired in (most grid-native).
-- **packing-gpu (Lagrangian):** particles are owned by the block containing them; per-step it does
+- **dem (Lagrangian):** particles are owned by the block containing them; per-step it does
   **particle migration** (NBX path) + **ghost-particle** exchange near block boundaries; collision
   geometry uses the shared SDF. Reuses its existing cuBQL broadphase locally inside a block.
 - **voronoi_dynamics (mixed):** particles migrate like Lagrangian carriers (NBX path), but each rank
