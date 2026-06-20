@@ -34,13 +34,22 @@ common_args=(
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 )
 
+# GPU architecture is target-specific. Defaults match the local dev box (RTX 5080 = Blackwell sm_120,
+# AMD MI250X = gfx90a); override via env for other hardware — e.g. on Snellius:
+#   KOKKOS_ARCH=AMPERE80 CUDA_ARCH=80 tools/bootstrap_deps.sh nvidia-cuda   # A100
+#   KOKKOS_ARCH=HOPPER90 CUDA_ARCH=90 tools/bootstrap_deps.sh nvidia-cuda   # H100
+# On LUMI the gfx90a default already matches the MI250X.
+KOKKOS_ARCH="${KOKKOS_ARCH:-}"               # Kokkos arch flag suffix: AMPERE80 / HOPPER90 / AMD_GFX90A / ...
+CUDA_ARCH="${CUDA_ARCH:-}"                    # CMAKE_CUDA_ARCHITECTURES: 80 / 90 / ...
+CUDA_COMPILER="${CUDA_COMPILER:-/usr/local/cuda/bin/nvcc}"
+
 case "$BACKEND" in
   nvidia-cuda)
     kokkos_args=(
       -DKokkos_ENABLE_CUDA=ON -DKokkos_ENABLE_SERIAL=ON
-      -DKokkos_ARCH_BLACKWELL120=ON
-      -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc
-      -DCMAKE_CUDA_ARCHITECTURES=120
+      "-DKokkos_ARCH_${KOKKOS_ARCH:-BLACKWELL120}=ON"
+      -DCMAKE_CUDA_COMPILER="$CUDA_COMPILER"
+      -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCH:-120}"
     )
     ;;
   host-openmp)
@@ -49,8 +58,8 @@ case "$BACKEND" in
   lumi-hip)
     kokkos_args=(
       -DKokkos_ENABLE_HIP=ON -DKokkos_ENABLE_SERIAL=ON
-      -DKokkos_ARCH_AMD_GFX90A=ON
-      -DCMAKE_CXX_COMPILER=hipcc
+      "-DKokkos_ARCH_${KOKKOS_ARCH:-AMD_GFX90A}=ON"
+      -DCMAKE_CXX_COMPILER="${CXX:-hipcc}"
     )
     ;;
   *)

@@ -1,0 +1,58 @@
+Bootstrap: docker
+From: rocm/dev-ubuntu-22.04:6.2
+
+# ============================================================================
+# peclet suite — AMD GPU container (Kokkos HIP + Serial), for LUMI.
+#
+# LUMI-G nodes are AMD MI250X (gfx90a) — the default arch below. Build with the
+# ROCm base matching (or older than) the LUMI driver stack.
+#
+# Build:
+#   apptainer build peclet-hip.sif containers/hip.def
+# Run on LUMI (request a GCD, then):
+#   apptainer exec peclet-hip.sif python3 -c "import sdflow; print(sdflow.execution_space)"
+#   srun apptainer exec \
+#     -B /opt/rocm \
+#     --rocm peclet-hip.sif python3 your_script.py
+#
+# LUMI notes: bind the host ROCm + libfabric/Cray-MPICH per the LUMI docs for
+# GPU-aware MPI; the `--rocm` flag binds the GPU devices. See ../docs/DEPLOYMENT.md.
+# ============================================================================
+
+%files
+    . /opt/peclet
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        build-essential cmake ninja-build git ca-certificates \
+        libopenmpi-dev openmpi-bin \
+        python3 python3-dev python3-pip python3-venv
+    rm -rf /var/lib/apt/lists/*
+
+    export PATH=/opt/rocm/bin:$PATH
+    export KOKKOS_ARCH="${KOKKOS_ARCH:-AMD_GFX90A}"   # MI250X
+    export CXX=hipcc
+
+    cd /opt/peclet
+    tools/bootstrap_deps.sh lumi-hip
+
+    PREFIX=/opt/peclet/extern/install/lumi-hip
+    python3 -m pip install --break-system-packages --upgrade pip
+    CMAKE_PREFIX_PATH=$PREFIX CXX=hipcc python3 -m pip install --break-system-packages /opt/peclet/sdflow
+    CMAKE_PREFIX_PATH=$PREFIX CXX=hipcc python3 -m pip install --break-system-packages \
+        --config-settings=cmake.define.DEM_MPI=ON /opt/peclet/dem
+    python3 -m pip install --break-system-packages /opt/peclet/morton
+
+%environment
+    export PATH=/opt/rocm/bin:$PATH
+
+%labels
+    org.opencontainers.title  "peclet (HIP / Kokkos)"
+    backend                   lumi-hip
+    target                    "LUMI-G MI250X (gfx90a)"
+
+%runscript
+    exec python3 "$@"

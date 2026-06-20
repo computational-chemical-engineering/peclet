@@ -41,6 +41,13 @@ reusable parts were extracted into `transport-core/`.
 [INTERFACES](docs/INTERFACES.md) · [ROADMAP](docs/ROADMAP.md) · [CUDA_RETIREMENT](docs/CUDA_RETIREMENT.md) ·
 [PORTABILITY](docs/PORTABILITY.md). See `CLAUDE.md` for an agent-facing overview.
 
+## Install & run (Python)
+
+The method codes expose Python APIs (`import sdflow`, `import dem`, `from mortonarith import encode`).
+Because the GPU backend (Serial / OpenMP / CUDA / HIP) is compiled in, you build for your hardware —
+[**docs/DEPLOYMENT.md**](docs/DEPLOYMENT.md) is the guide: the backend×MPI matrix, `pip install` recipes
+per environment, and **Apptainer containers** for Snellius (CUDA) and LUMI (HIP) in [`containers/`](containers).
+
 ## Continuous integration & docs
 
 Each submodule carries its own `.github/workflows/`: a **CI** workflow (build + test where feasible —
