@@ -100,8 +100,14 @@ and pip-install the packages:
 git submodule update --init --recursive
 apptainer build peclet-cpu.sif containers/cpu.def
 srun apptainer exec --nv peclet-cuda.sif python3 my_run.py      # Snellius
-srun apptainer exec --rocm peclet-hip.sif python3 my_run.py     # LUMI
+# LUMI: Cray-MPICH is injected at runtime by the launcher wrapper —
+module load LUMI partition/G cray-mpich rocm
+srun -n8 --gpus-per-node=8 containers/lumi-run.sh peclet-hip.sif my_run.py   # LUMI
 ```
+
+For LUMI the container is built against vanilla MPICH and the host **Cray-MPICH** + Slingshot stack is
+bound over it at runtime (`containers/lumi-run.sh`) — the MPICH-ABI hybrid model. See
+[`containers/README.md`](../containers/README.md#lumi--cray-mpich-the-hipdef-mpi-model).
 
 See [`containers/README.md`](../containers/README.md) for MPI-ABI, GPU-aware-MPI, and arch details.
 

@@ -1,22 +1,24 @@
 Bootstrap: docker
-From: rocm/dev-ubuntu-22.04:6.2
+From: rocm/dev-ubuntu-22.04:6.2.4-complete
 
 # ============================================================================
-# peclet suite — AMD GPU container (Kokkos HIP + Serial), for LUMI.
+# peclet suite — AMD GPU container (Kokkos HIP + Serial) for LUMI-G (MI250X, gfx90a).
 #
-# LUMI-G nodes are AMD MI250X (gfx90a) — the default arch below. Build with the
-# ROCm base matching (or older than) the LUMI driver stack.
+# MPI on LUMI = HPE Cray-MPICH over the Slingshot-11 interconnect (libfabric `cxi`
+# provider). The portable pattern is the MPICH-ABI ("hybrid") model:
+#   * BUILD the container against vanilla MPICH (Ubuntu 22.04 ships MPICH 4.0, which
+#     exports the MPICH-ABI libmpi.so.12 — the same SONAME Cray-MPICH provides), then
+#   * at RUNTIME bind the host Cray-MPICH + libfabric + GPU-transport-layer (GTL)
+#     libraries over the container's MPICH, so the app uses Slingshot + GPU-aware MPI.
+# The bind/LD_LIBRARY_PATH dance lives in containers/lumi-run.sh — use that to launch.
 #
-# Build:
+# Build (on any machine that can pull the ROCm base; no GPU needed at build time):
 #   apptainer build peclet-hip.sif containers/hip.def
-# Run on LUMI (request a GCD, then):
-#   apptainer exec peclet-hip.sif python3 -c "import sdflow; print(sdflow.execution_space)"
-#   srun apptainer exec \
-#     -B /opt/rocm \
-#     --rocm peclet-hip.sif python3 your_script.py
+# Run on LUMI (request GCDs in your SLURM allocation, then):
+#   srun -n8 --gpus-per-node=8 containers/lumi-run.sh peclet-hip.sif my_run.py
 #
-# LUMI notes: bind the host ROCm + libfabric/Cray-MPICH per the LUMI docs for
-# GPU-aware MPI; the `--rocm` flag binds the GPU devices. See ../docs/DEPLOYMENT.md.
+# Pin the ROCm base tag to <= the LUMI driver's ROCm (check `module show rocm`); a
+# container ROCm newer than the host driver will fail at runtime. See ../docs/DEPLOYMENT.md.
 # ============================================================================
 
 %files
@@ -28,7 +30,7 @@ From: rocm/dev-ubuntu-22.04:6.2
     apt-get update
     apt-get install -y --no-install-recommends \
         build-essential cmake ninja-build git ca-certificates \
-        libopenmpi-dev openmpi-bin \
+        mpich libmpich-dev \
         python3 python3-dev python3-pip python3-venv
     rm -rf /var/lib/apt/lists/*
 
@@ -42,17 +44,21 @@ From: rocm/dev-ubuntu-22.04:6.2
     PREFIX=/opt/peclet/extern/install/lumi-hip
     python3 -m pip install --break-system-packages --upgrade pip
     CMAKE_PREFIX_PATH=$PREFIX CXX=hipcc python3 -m pip install --break-system-packages /opt/peclet/sdflow
+    # dem with the distributed step, built against the container's MPICH (Cray-MPICH ABI at runtime):
     CMAKE_PREFIX_PATH=$PREFIX CXX=hipcc python3 -m pip install --break-system-packages \
         --config-settings=cmake.define.DEM_MPI=ON /opt/peclet/dem
     python3 -m pip install --break-system-packages /opt/peclet/morton
 
 %environment
     export PATH=/opt/rocm/bin:$PATH
+    # Tell (the runtime-injected) Cray-MPICH it may pass GPU buffers directly.
+    export MPICH_GPU_SUPPORT_ENABLED=1
 
 %labels
-    org.opencontainers.title  "peclet (HIP / Kokkos)"
+    org.opencontainers.title  "peclet (HIP / Kokkos) — LUMI Cray-MPICH ABI"
     backend                   lumi-hip
     target                    "LUMI-G MI250X (gfx90a)"
+    mpi                       "build: MPICH 4.0 (libmpi.so.12); run: host Cray-MPICH injected"
 
 %runscript
     exec python3 "$@"
