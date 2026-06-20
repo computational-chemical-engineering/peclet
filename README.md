@@ -23,23 +23,33 @@ git submodule update --init --recursive
 
 | Submodule | Role |
 |-----------|------|
-| `transport-core/` | **Shared infrastructure** (header-only C++20 + CUDA): block decomposition, async grid halo + Lagrangian particle migration/ghosts, SDF geometry, VTI I/O. Every method depends on it. |
-| `cfd-gpu/` | Eulerian CUDA Navier–Stokes (porous media; MAC grid + IBM). Has a complete distributed NS solver on `transport-core` (branch `mpi-halo-integration`). |
-| `packing-gpu/` | Lagrangian CUDA DEM/XPBD particle packing. MPI migration + ghost primitives validated (branch `mpi-integration`). |
-| `voronoi_dynamics/` | Mixed Lagrangian/Eulerian dynamic Voronoi tessellation (header-only). |
-| `morton_arithmetic/` | Morton/Z-order spatial-index primitive (arithmetic in Morton space). |
-| `block_decomposer/` | Original MPI block-decomposition prototype (superseded by `transport-core`; kept for reference). |
+| `transport-core/` | **Shared infrastructure** (header-only C++20 + MPI, optional Kokkos): ORB block decomposition, async grid ghost-layer exchange + Lagrangian particle migration/ghosts, SDF geometry, VTI I/O. Every method depends on it. |
+| `sdflow/` | Eulerian **Kokkos** incompressible Navier–Stokes (porous media; staggered MAC grid + cut-cell IBM). Complete, validated, MPI-optional distributed solver on `transport-core`; `pnm` is its pore-network-extraction module. |
+| `dem/` | Lagrangian **Kokkos + ArborX** DEM/XPBD particle packing. Full XPBD step with a validated distributed `step_mpi` (transport-core particle halo). |
+| `vorflow/` | Mixed Lagrangian/Eulerian dynamic 3D Voronoi tessellation (header-only C++17; periodic & Lees–Edwards). |
+| `morton/` | Morton/Z-order spatial-index primitive — arithmetic directly in Morton space (header-only C++17 + BMI2/AVX-512, Python). |
+
+Both GPU codes are now **Kokkos**-based (CUDA retired — see [docs/CUDA_RETIREMENT.md](docs/CUDA_RETIREMENT.md));
+the same source runs on CUDA, HIP (AMD/LUMI), and OpenMP backends, chosen by the bootstrapped install
+prefix (`tools/bootstrap_deps.sh`). The original `block_decomposer` prototype has been **retired**; its
+reusable parts were extracted into `transport-core/`.
 
 ## Shared design docs
 
 `docs/` is the cross-code contract every method follows:
 [ARCHITECTURE](docs/ARCHITECTURE.md) · [CONVENTIONS](docs/CONVENTIONS.md) · [STYLE](docs/STYLE.md) ·
-[INTERFACES](docs/INTERFACES.md) · [ROADMAP](docs/ROADMAP.md). See `CLAUDE.md` for an agent-facing
-overview, and `cfd-gpu/doc/mpi_parallelization_status.md` / `packing-gpu/mpi/README.md` for the MPI
-integration status.
+[INTERFACES](docs/INTERFACES.md) · [ROADMAP](docs/ROADMAP.md) · [CUDA_RETIREMENT](docs/CUDA_RETIREMENT.md) ·
+[PORTABILITY](docs/PORTABILITY.md). See `CLAUDE.md` for an agent-facing overview.
+
+## Continuous integration & docs
+
+Each submodule carries its own `.github/workflows/`: a **CI** workflow (build + test where feasible —
+`transport-core` and `morton` run full CPU/MPI suites; `sdflow` and `dem` build the Kokkos OpenMP host
+backend) and a **Documentation** workflow that builds the Doxygen API docs and publishes them to that
+repo's GitHub Pages. Enabling Pages once per repo (Settings → Pages → "Source: GitHub Actions") is the
+only manual step.
 
 ## Note on submodule pins
 
-`cfd-gpu` and `packing-gpu` are currently pinned to **feature-branch** commits (`mpi-halo-integration`,
-`mpi-integration`) carrying the in-progress MPI work; re-pin to `main` after those PRs merge with
-`git submodule update --remote` + a commit here.
+This umbrella pins each submodule to a compatible commit on `main`. Update to the latest upstream with
+`git submodule update --remote` followed by a commit here that bumps the pointers.
