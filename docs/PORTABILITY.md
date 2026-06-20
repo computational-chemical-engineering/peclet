@@ -1,11 +1,13 @@
 # Portability (Kokkos + ArborX)
 
-Status: **Phase 0 — toolchain bring-up.** This document is the contract for the
-suite's migration from CUDA to [Kokkos](https://kokkos.org) for performance
-portability across NVIDIA (Snellius) and AMD (LUMI/MI250X) GPUs, with
-[ArborX](https://github.com/arborx/ArborX) replacing packing-gpu's CUDA-only
-cuBQL broad-phase. See the migration plan and `docs/ROADMAP.md` for the phased
-plan; this file covers only *how the toolchain is provisioned and built*.
+Status: **Migration complete — Kokkos is canonical, CUDA retired (2026-06-20).** cfd-gpu (`sdflow` +
+`pnm_backend`), packing-gpu (`demgpu`), and transport-core all build and run on Kokkos
+([ArborX](https://github.com/arborx/ArborX) replaced packing-gpu's cuBQL broad-phase); the CUDA
+implementations were deleted after a machine-precision / physical-parity validation (see
+`docs/CUDA_RETIREMENT.md`). This document is the contract for the suite's portability across NVIDIA
+(Snellius) and AMD (LUMI/MI250X) GPUs and covers *how the toolchain is provisioned and built* — the
+bootstrapped install prefix (`tools/bootstrap_deps.sh`) is now a **hard build dependency** of every
+method code's main build (`cmake -S . -B build -DCMAKE_PREFIX_PATH=extern/install/<backend>;...`).
 
 ## Backend matrix
 

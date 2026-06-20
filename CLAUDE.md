@@ -22,15 +22,14 @@ field-agnostic, NBX + persistent neighborhood-collective engines, overlap-capabl
 host-staged variant); the Lagrangian halo (`tpx::halo::ParticleMigrator` — particle migration +
 `gatherGhosts`); and SDF geometry with scalar/vector VTI I/O. See `transport-core/CLAUDE.md`.
 
-**Consumers:** `cfd-gpu` has a **complete, validated distributed Navier–Stokes solver** (`sdflow`) on the
-core (opt-in `-DCFD_BUILD_MPI=ON`, 72 ctests real multi-rank, a runnable VTI-writing demo — see
-`cfd-gpu/doc/mpi_parallelization_status.md`). `sdflow` is now **THE** cfd-gpu solver: the original
-single-GPU `CFDSolver` reference was retired (restore tag `pnm_backend-reference`), and `pnm_backend` is
-now cfd-gpu's pore-network-extraction module only.
-`packing-gpu` (Lagrangian) has its migration + ghost-particle primitives validated on its real `float4`
-layout (branch `mpi-integration`, `packing-gpu/mpi/`). The remaining big pieces are the in-place
-solver integrations (cfd's multigrid + global reductions; packing's per-step loop) — see
-[docs/ROADMAP.md](docs/ROADMAP.md).
+**Consumers:** both GPU codes are now **Kokkos**-based (CUDA retired — see
+[docs/CUDA_RETIREMENT.md](docs/CUDA_RETIREMENT.md)). `cfd-gpu` has a **complete, validated distributed
+Navier–Stokes solver** (`sdflow`) on the core: the whole cut-cell IBM + MG-PCG step runs multi-rank,
+bit-exact to single-rank (`tests/kokkos_mpi`, 18 ctests np=1,2,4, gated `CFD_MPI`). `sdflow` is **THE**
+cfd-gpu solver; `pnm_backend` is its pore-network-extraction module. `packing-gpu`'s `demgpu` runs the
+full XPBD step (ArborX broad-phase) with a validated distributed `step_mpi` (transport-core particle
+halo; `tests/kokkos_mpi` 6 ctests). The single-GPU codes are complete + faster than the retired CUDA at
+scale; remaining work is at-scale multi-GPU tuning — see [docs/ROADMAP.md](docs/ROADMAP.md).
 
 The design contract lives in `docs/`:
 
@@ -46,12 +45,12 @@ The design contract lives in `docs/`:
 |-----------|------------------|--------------|-------------------|
 | `transport-core/` | Header-only C++20 + MPI | **Shared infrastructure** (new): ORB block decomposition + asynchronous ghost-layer exchange (NBX + persistent engines) + particle migration. The layer every method code will depend on. Tested (13/13, np 1–8). | **Yes — read it** |
 | `morton_arithmetic/` | Header-only C++17 (+ CUDA, Python) | Morton/Z-order codes with **arithmetic in Morton space** (neighbour-find, axis add, Z-order step without decode→re-encode). BMI2/AVX-512 + runtime dispatch; the foundational spatial-index library. | **Yes — read it** |
-| `cfd-gpu/` | CUDA + C++17 + pybind11 (`sdflow`) | GPU incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. The `sdflow` module is the solver; `pnm_backend` is now the pore-network-extraction module. | **Yes — read it** |
-| `packing-gpu/` | CUDA + C++17 + pybind11 (`demgpu`) | GPU Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. README still calls it `dem-gpu`. | No |
+| `cfd-gpu/` | **Kokkos** + C++20 + pybind11 (`sdflow`) | Incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. `sdflow` is the solver; `pnm_backend` is the pore-network-extraction module. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). | **Yes — read it** |
+| `packing-gpu/` | **Kokkos + ArborX** + C++20 + pybind11 (`demgpu`) | Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). README still calls it `dem-gpu`. | No |
 | `voronoi_dynamics/` | Header-only C++17 (+ OpenMP, Boost, Voro++) | Dynamic 3D Voronoi tessellation of moving particles; periodic & Lees–Edwards boxes, incremental cell repair, Euler/NS/multiphase dynamics. | No |
 | `block_decomposer/` | C++20 + MPI + Boost + GTest | Recursive block domain decomposition (`pbs::BlockDecomposer<Dim>`) and an ADI solver for distributed-memory grids. Executables, not a library. | No |
 
-Common threads worth knowing when moving between them: SDFs (signed distance fields) are the shared geometry representation across `cfd-gpu` and `packing-gpu`; VTI/VTP files (ParaView/Ovito) are the shared I/O format; periodic boundary conditions appear everywhere; and most numeric projects pin CUDA to a specific arch (e.g. `sm_90`/`native`) for the dev box's RTX 5080.
+Common threads worth knowing when moving between them: SDFs (signed distance fields) are the shared geometry representation across `cfd-gpu` and `packing-gpu`; VTI/VTP files (ParaView/Ovito) are the shared I/O format; periodic boundary conditions appear everywhere; and the GPU codes (`cfd-gpu`, `packing-gpu`, `transport-core`'s device halo) are now **Kokkos**-based — the backend (CUDA/HIP/OpenMP) and arch are chosen by the `extern/install/<backend>` prefix the build is pointed at, not hard-coded in the sources (`tools/bootstrap_deps.sh` + `CMakePresets.json`).
 
 ## Per-project quick reference
 
@@ -66,23 +65,26 @@ ctest --test-dir build --output-on-failure
 ```
 The non-BMI2 build is contractually PDEP/PEXT-free (a test greps the binary). AVX-512 batch kernels have no local hardware — validate under Intel SDE (`sde64 -skx -- ./build/tests/morton_tests`). See its CLAUDE.md for the runtime-dispatch and wheel-build subtleties.
 
+Both `cfd-gpu` and `packing-gpu` now build via `find_package(Kokkos)` (+`ArborX` for packing) against the
+bootstrapped prefix `extern/install/<backend>` (built once by `tools/bootstrap_deps.sh` — a **hard build
+dependency**). Put `nvcc` on `PATH` for the CUDA backend (`export PATH=/usr/local/cuda-13.2/bin:$PATH`).
+
 ### cfd-gpu
 ```bash
-cd cfd-gpu
-cmake -S . -B build && cmake --build build -j   # -> build/sdflow.so (solver) + build/pnm_backend.so (pore extraction)
-source .venv/bin/activate
+cd cfd-gpu && source .venv/bin/activate
+cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda;$(python -m pybind11 --cmakedir)"
+cmake --build build -j                          # -> build/sdflow.*.so (solver) + build/pnm_backend.*.so
 PYTHONPATH=$PWD/build python scripts/verify_poiseuille_sdflow.py        # analytical-solution check
 PYTHONPATH=$PWD/build python scripts/verify_periodic_spheres_sdflow.py  # cut-cell Stokes through spheres
 ```
 
 ### packing-gpu
 ```bash
-cd packing-gpu
-python -m venv .venv && source .venv/bin/activate && pip install pybind11 numpy
-cmake -B build -S . -DDEMGPU_ENABLE_MPI=OFF                  # MPI is scaffolding only
-cmake --build build -j$(nproc)                               # -> build/demgpu.cpython-*.so
+cd packing-gpu && python -m venv .venv && source .venv/bin/activate && pip install pybind11 numpy
+cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda;$(python -m pybind11 --cmakedir)"
+cmake --build build -j$(nproc)                  # -> build/demgpu.cpython-*.so  (-DDEMGPU_MPI=ON for the MPI step)
 export PYTHONPATH=$PYTHONPATH:$(pwd)/build
-python verify_packing_hollow_cylinders.py                    # verify_*.py are the test/demo entry points
+python verify_packing_spheres.py                # verify_*.py are the test/demo entry points
 ```
 The many root-level `verify_*.py` / `test_*.py` / `plan_*.md` / `build_log*.txt` files are this project's working scratch — verification scripts and design notes, not a packaged test suite.
 
@@ -106,7 +108,7 @@ Core code is header-only templates in `src/*.hpp` (namespace `pbs`); `main.cpp`,
 
 ## Conventions across the suite
 
-- **CUDA C++ projects** pair `.cu`/`.cuh` kernels with a pybind11 binding TU and expose the simulation as an importable Python module; drive simulations from Python, not C++ mains.
+- **Kokkos C++ projects** (`cfd-gpu`, `packing-gpu`) put device kernels in header-only `.hpp` (compiled as C++; the Kokkos launch compiler routes them through `nvcc`/`hipcc` — never `.cu`) and expose the simulation as an importable Python module via a pybind11 binding TU; drive simulations from Python, not C++ mains.
 - **Header-only C++ projects** (`morton_arithmetic`, `voronoi_dynamics`, and `block_decomposer`'s core) put the real logic in templates under `include/` or `src/*.hpp`; there is no library to link.
 - Build artifacts (`build/`, `build_*/`, `.venv/`, `*.so`, `__pycache__/`) and large output assets (`*.vti`, `*.vtp`, `*.png`) are committed/present in several projects — don't treat their existence as something you created, and prefer the project's own out-of-source `build/` directory.
 - Two projects carry `AGENTS.md`/`GEMINI.md` alongside `CLAUDE.md` (cfd-gpu); when editing guidance, the CLAUDE.md is the one that governs Claude Code.

@@ -42,8 +42,8 @@ decomposition (all use the same block decomposition) nor the geometry (all use t
                    │                                        │
                    ▼                                        ▼
             ┌─────────────────────┐                ┌──────────────────┐
- primitives │  morton_arithmetic  │                │ cuBQL, Voro++,   │   external / vendored
-            │  (block/cell index) │                │ MPI, CUDA, ...   │
+ primitives │  morton_arithmetic  │                │ Kokkos, ArborX,  │   external / vendored
+            │  (block/cell index) │                │ Voro++, MPI, ... │
             └─────────────────────┘                └──────────────────┘
 ```
 

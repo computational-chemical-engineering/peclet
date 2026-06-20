@@ -3,6 +3,12 @@
 > Status: living tracker. Long-term plan to give the suite a shared MPI block decomposition with
 > efficient asynchronous ghost-layer exchange, common SDF/IBM, GPU support, and Python bindings — while
 > keeping each method its own code. See [ARCHITECTURE](ARCHITECTURE.md) for the layering.
+>
+> **2026-06-20 — CUDA retired, Kokkos canonical.** cfd-gpu (`sdflow`/`pnm_backend`), packing-gpu
+> (`demgpu`, ArborX broad-phase), and transport-core now build on Kokkos (CUDA/HIP/OpenMP) with the CUDA
+> implementations deleted and merged to `main`. Historical phase entries below that name `.cu`/`.cuh`
+> files describe the original CUDA path. See [CUDA_RETIREMENT](CUDA_RETIREMENT.md) and
+> [PORTABILITY](PORTABILITY.md).
 
 ## Guiding decisions
 
@@ -43,13 +49,11 @@
 
 ## Phase 2 — GPU-aware halo + unified geometry (halo done; geometry next)
 
-- [x] GPU-resident halo (`tpx::halo::DeviceGridExchange`, `grid_halo_cuda.cuh`): on-device
-      pack/unpack/self-copy kernels, **host-staged** MPI of the compact halo buffers (the full field
-      stays on the GPU). Validated bit-for-bit against the CPU path, np=1,2,4 on the RTX 5080.
-      **Note:** direct device-pointer (CUDA-aware) MPI segfaults on this box's OpenMPI build (no
-      working GPUDirect/UCX path), so host-staging is the engine; swap in device-pointer sends later
-      if a CUDA-aware runtime becomes available (the pack/unpack kernels already produce device
-      buffers, so it's a localized change).
+- [x] GPU-resident halo (`tpx::halo::DeviceGridExchangeKokkos`, `grid_halo_kokkos.hpp`): portable
+      (Kokkos: CUDA/HIP/OpenMP) on-device pack/unpack/self-copy, **host-staged** MPI of the compact halo
+      buffers (the full field stays on the device; opt-in GPU-aware via `TPX_GPU_AWARE_MPI`). Validated
+      bit-for-bit against the CPU path, np=1,2,4. *(The original native-CUDA `grid_halo_cuda.cuh`
+      `DeviceGridExchange` was retired when Kokkos became canonical — see `docs/CUDA_RETIREMENT.md`.)*
 - [x] `geometry/SDF`: analytic primitives (`Sphere`, `Box`, `HollowCylinder`, `Complement`) + sampled
       `GridSdf` (trilinear) behind the `tpx::geom::Sdf` concept, shared sign convention, generic
       finite-difference normal, `sample()` to bake analytic → grid. Unit-tested.
@@ -88,9 +92,9 @@ flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The
       periodic domain, builds a `DomainMap` from packing's domain+periodicity, and migrates
       packing-style particles (full SoA record as opaque payload) with `ParticleMigrator`. Conservation
       + correct placement validated over random-walk steps, np=1,2,4. Standalone build
-      (`packing-gpu/mpi/`), decoupled from the demgpu CUDA/pybind build. Branch `mpi-integration`.
+      (`packing-gpu/mpi/`), decoupled from the demgpu (Kokkos+ArborX) build. Branch `mpi-integration`.
 - [x] **Step 2 — ghost particles (done):** `ParticleMigrator::gatherGhosts(rcut)` gathers copies within
-      one interaction radius of each block boundary (periodic images handled) for a local cuBQL
+      one interaction radius of each block boundary (periodic images handled) for a local ArborX
       broadphase. Rigorously validated vs a brute-force reference in transport-core's
       `test_ghost_particles_mpi` (np=1,2,4,8), and exercised on packing's layout.
 - [ ] **Per-step loop** in the solver: predict → migrate → gather ghosts → local broadphase +
