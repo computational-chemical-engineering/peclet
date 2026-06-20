@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`suite/` is the **`peclet`** umbrella repository for GPU-accelerated and parallel scientific computing — particle dynamics, CFD, and the spatial-indexing primitives they build on. It holds **five method/infrastructure projects as git submodules** (`sdflow`, `dem`, `transport-core`, `voronoi_dynamics`, `morton`), each its own self-contained repo with its own `CMakeLists.txt`, build system, and (in some cases) its own `CLAUDE.md`. There is no top-level build or test runner — work happens *inside* a submodule, not at this level.
+`suite/` is the **`peclet`** umbrella repository for GPU-accelerated and parallel scientific computing — particle dynamics, CFD, and the spatial-indexing primitives they build on. It holds **five method/infrastructure projects as git submodules** (`sdflow`, `dem`, `transport-core`, `vorflow`, `morton`), each its own self-contained repo with its own `CMakeLists.txt`, build system, and (in some cases) its own `CLAUDE.md`. There is no top-level build or test runner — work happens *inside* a submodule, not at this level.
 
 **Consequence for any task:** `cd` into the relevant submodule before building, testing, or running git. A `git status` / commit / diff issued from `suite/` itself acts on the **umbrella** (submodule pointers + shared `docs/`), not on a method code — so commit code changes inside the submodule first, then bump the pointer in the umbrella.
 
@@ -47,7 +47,7 @@ The design contract lives in `docs/`:
 | `morton/` | Header-only C++17 (+ CUDA, Python) | Morton/Z-order codes with **arithmetic in Morton space** (neighbour-find, axis add, Z-order step without decode→re-encode). BMI2/AVX-512 + runtime dispatch; the foundational spatial-index library. | **Yes — read it** |
 | `sdflow/` | **Kokkos** + C++20 + pybind11 (`sdflow`) | Incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. `sdflow` is the solver; `pnm` is the pore-network-extraction module. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). | **Yes — read it** |
 | `dem/` | **Kokkos + ArborX** + C++20 + pybind11 (`dem`) | Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). README still calls it `dem-gpu`. | No |
-| `voronoi_dynamics/` | Header-only C++17 (+ OpenMP, Boost, Voro++) | Dynamic 3D Voronoi tessellation of moving particles; periodic & Lees–Edwards boxes, incremental cell repair, Euler/NS/multiphase dynamics. | No |
+| `vorflow/` | Header-only C++17 (+ OpenMP, Boost, Voro++) | Dynamic 3D Voronoi tessellation of moving particles; periodic & Lees–Edwards boxes, incremental cell repair, Euler/NS/multiphase dynamics. | No |
 
 Common threads worth knowing when moving between them: SDFs (signed distance fields) are the shared geometry representation across `sdflow` and `dem`; VTI/VTP files (ParaView/Ovito) are the shared I/O format; periodic boundary conditions appear everywhere; and the GPU codes (`sdflow`, `dem`, `transport-core`'s device halo) are now **Kokkos**-based — the backend (CUDA/HIP/OpenMP) and arch are chosen by the `extern/install/<backend>` prefix the build is pointed at, not hard-coded in the sources (`tools/bootstrap_deps.sh` + `CMakePresets.json`).
 
@@ -87,9 +87,9 @@ python verify_packing_spheres.py                # verify_*.py are the test/demo 
 ```
 The many root-level `verify_*.py` / `test_*.py` / `plan_*.md` / `build_log*.txt` files are this project's working scratch — verification scripts and design notes, not a packaged test suite.
 
-### voronoi_dynamics
+### vorflow
 ```bash
-cd voronoi_dynamics
+cd vorflow
 cmake -B build -DCMAKE_BUILD_TYPE=Release        # FetchContent pulls Voro++ automatically
 cmake --build build --parallel
 ctest --test-dir build -R "test_static_voronoi|test_voro_comparison" --output-on-failure
@@ -100,6 +100,6 @@ Header-only: consumers just add `include/`. Voronoi cells are stored as a half-e
 ## Conventions across the suite
 
 - **Kokkos C++ projects** (`sdflow`, `dem`) put device kernels in header-only `.hpp` (compiled as C++; the Kokkos launch compiler routes them through `nvcc`/`hipcc` — never `.cu`) and expose the simulation as an importable Python module via a pybind11 binding TU; drive simulations from Python, not C++ mains.
-- **Header-only C++ projects** (`morton`, `voronoi_dynamics`, `transport-core`) put the real logic in templates under `include/`; there is no library to link.
+- **Header-only C++ projects** (`morton`, `vorflow`, `transport-core`) put the real logic in templates under `include/`; there is no library to link.
 - Build artifacts (`build/`, `build_*/`, `.venv/`, `*.so`, `__pycache__/`) and large output assets (`*.vti`, `*.vtp`, `*.png`) are committed/present in several projects — don't treat their existence as something you created, and prefer the project's own out-of-source `build/` directory.
 - Two projects carry `AGENTS.md`/`GEMINI.md` alongside `CLAUDE.md` (sdflow); when editing guidance, the CLAUDE.md is the one that governs Claude Code.

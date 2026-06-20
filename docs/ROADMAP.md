@@ -24,7 +24,7 @@
 - [x] Link the documents from the top-level `suite/CLAUDE.md`.
 - [x] Scaffold `transport-core`: header-only C++20, CMake ≥3.24 with install/export target
       (`tpx::core`/`tpx::halo`), `include/tpx/{common,decomp,halo}/` layout, `.clang-format` from
-      `voronoi_dynamics`, auto-detects `morton`. Git repo initialized.
+      `vorflow`, auto-detects `morton`. Git repo initialized.
 - [x] Extract the reusable code from `block_decomposer` into `tpx::decomp` + `tpx::halo` (ported &
       modernized): `BlockDecomposer` (+`ownerOf`), `BlockIndexer`, the `MPISync` NBX engine.
       (`GhostLayers`/`CellList` superseded by the owner-based `GridHalo`; `PbsCommon` → `common/types`.)
@@ -104,7 +104,7 @@ flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The
       driver — same question cfd faces; the standalone tests/driver path avoids touching the pybind
       module first.
 
-## Phase 5 — voronoi_dynamics (mixed) + Python parity
+## Phase 5 — vorflow (mixed) + Python parity
 
 - [ ] Add pybind11 bindings (first Python surface for voronoi) following the binding conventions.
 - [ ] Block decomposition + ghost particles (one interaction radius) so boundary Voronoi cells close

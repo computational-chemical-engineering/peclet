@@ -10,6 +10,6 @@
 [submodule "morton"]
 	path = morton
 	url = git@github.com:computational-chemical-engineering/morton.git
-[submodule "voronoi_dynamics"]
-	path = voronoi_dynamics
-	url = git@github.com:computational-chemical-engineering/voronoi_dynamics.git
+[submodule "vorflow"]
+	path = vorflow
+	url = git@github.com:computational-chemical-engineering/vorflow.git

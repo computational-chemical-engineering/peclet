@@ -1,7 +1,7 @@
 # Suite Style & Tooling
 
 > Status: design document (living). What to standardize, and the rationale. The baseline is
-> `voronoi_dynamics`, the only code that already has formatting, linting, and CI.
+> `vorflow`, the only code that already has formatting, linting, and CI.
 
 ## Language standard
 
@@ -15,7 +15,7 @@
 
 ## Formatting & linting
 
-Adopt `voronoi_dynamics`'s configuration suite-wide (copy `.clang-format` and `.clang-tidy` into each
+Adopt `vorflow`'s configuration suite-wide (copy `.clang-format` and `.clang-tidy` into each
 repo and `transport-core`):
 
 - **clang-format:** `BasedOnStyle: Google`, `ColumnLimit: 100`, `IndentWidth: 2`,

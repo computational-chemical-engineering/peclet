@@ -95,5 +95,5 @@ LUMI (cray-mpich); selectable at runtime so non-GPU-aware stacks still work.
   side moves to C++20 under Kokkos). The presets set `CMAKE_CXX_STANDARD=20`.
 - `morton` is already `__host__/__device__` + HIP-guarded and is *not* on
   the packing broad-phase path — it needs no Kokkos work.
-- `voronoi_dynamics` uses the **OpenMP backend** only for now (its half-edge mesh
+- `vorflow` uses the **OpenMP backend** only for now (its half-edge mesh
   repair stays on the host).

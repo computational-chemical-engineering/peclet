@@ -18,7 +18,7 @@ conventions, and the same interfaces.
 |------|------|----------------------|--------|
 | `sdflow` | **Eulerian** | Structured staggered MAC grid (fields on a fixed grid) | Extensively developed |
 | `dem` | **Lagrangian** | Particles (DEM/XPBD), SoA on GPU | Extensively developed |
-| `voronoi_dynamics` | **Mixed** | Moving particles + their Voronoi cells (Lagrangian carriers, Eulerian-like fluxes across cell faces) | Developed, no Python yet |
+| `vorflow` | **Mixed** | Moving particles + their Voronoi cells (Lagrangian carriers, Eulerian-like fluxes across cell faces) | Developed, no Python yet |
 | `block_decomposer` | Infrastructure | Blocks + ghost layers + particles/cells | Partial; source of the shared MPI layer |
 | `morton` | Primitive | Z-order codes / spatial index | Mature |
 
@@ -30,7 +30,7 @@ decomposition (all use the same block decomposition) nor the geometry (all use t
 
 ```
             ┌──────────────────────────────────────────────────────────┐
- methods    │  sdflow     dem     voronoi_dynamics   (future)  │   separate repos
+ methods    │  sdflow     dem     vorflow   (future)  │   separate repos
             └──────────────────────────────────────────────────────────┘
                    │             │                │
                    ▼             ▼                ▼
@@ -78,7 +78,7 @@ depends on primitives. No method depends on another method; primitives depend on
 - **dem (Lagrangian):** particles are owned by the block containing them; per-step it does
   **particle migration** (NBX path) + **ghost-particle** exchange near block boundaries; collision
   geometry uses the shared SDF. Reuses its existing cuBQL broadphase locally inside a block.
-- **voronoi_dynamics (mixed):** particles migrate like Lagrangian carriers (NBX path), but each rank
+- **vorflow (mixed):** particles migrate like Lagrangian carriers (NBX path), but each rank
   also needs **ghost particles** one interaction radius deep to close the Voronoi cells touching the
   block boundary; fluxes across Voronoi faces are the Eulerian aspect. Gets pybind11 bindings via
   `python`.
