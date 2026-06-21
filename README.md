@@ -8,6 +8,10 @@ boundary** methodology, **GPU** support, and **Python bindings**.
 The name nods to the [Péclet number](https://en.wikipedia.org/wiki/P%C3%A9clet_number) — the ratio of
 advective to diffusive transport, the dimensionless heart of transport phenomena.
 
+📖 **Documentation site:** <https://fantastic-carnival-p3kj6or.pages.github.io/> — the suite's front
+door (design docs + install/deployment guide + links to each code's Doxygen API). Built from `docs/`
+via MkDocs ([mkdocs.yml](mkdocs.yml)).
+
 This is an **umbrella repository**: each code is a git **submodule** (its own repo and history); this
 repo pins compatible commits and holds the shared design docs.
 

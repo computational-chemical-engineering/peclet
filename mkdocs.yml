@@ -1,0 +1,59 @@
+site_name: peclet
+site_description: GPU-accelerated & parallel simulation of transport phenomena (CFD, DEM, Voronoi)
+repo_url: https://github.com/computational-chemical-engineering/peclet
+repo_name: peclet
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - toc.integrate
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.details
+
+# Reuse the in-repo design docs as the single source of truth (also rendered on GitHub).
+# The API references live on each submodule's own Doxygen Pages site (external links).
+nav:
+  - Home: index.md
+  - Install & run: DEPLOYMENT.md
+  - Design:
+      - Architecture: ARCHITECTURE.md
+      - Conventions: CONVENTIONS.md
+      - Interfaces: INTERFACES.md
+      - Style: STYLE.md
+      - Portability: PORTABILITY.md
+      - Roadmap: ROADMAP.md
+      - CUDA retirement: CUDA_RETIREMENT.md
+  - API reference:
+      - transport-core: https://cautious-barnacle-7p9p71w.pages.github.io/
+      - morton: https://congenial-chainsaw-g414wov.pages.github.io/
+      - sdflow: https://miniature-adventure-y7jzg8e.pages.github.io/
+      - dem: https://expert-chainsaw-6qjq213.pages.github.io/
+  - Containers (GitHub): https://github.com/computational-chemical-engineering/peclet/tree/main/containers
+
+# DOC_CI_WORK_NOTES.md is an internal work log; keep it out of the nav.
+not_in_nav: |
+  DOC_CI_WORK_NOTES.md

@@ -89,7 +89,8 @@ quickest way to confirm you imported the build you meant to.
 ## Containers (Snellius, LUMI, other HPC)
 
 For HPC, prefer **Apptainer** (both Snellius and LUMI use it; Docker is barred on compute nodes). The
-[`containers/`](../containers) directory has definition files that bake the toolchain + Kokkos prefix
+[`containers/`](https://github.com/computational-chemical-engineering/peclet/tree/main/containers)
+directory has definition files that bake the toolchain + Kokkos prefix
 and pip-install the packages:
 
 - `containers/cpu.def`  — OpenMP + OpenMPI (laptops, CI, CPU partitions)
@@ -107,9 +108,10 @@ srun -n8 --gpus-per-node=8 containers/lumi-run.sh peclet-hip.sif my_run.py   # L
 
 For LUMI the container is built against vanilla MPICH and the host **Cray-MPICH** + Slingshot stack is
 bound over it at runtime (`containers/lumi-run.sh`) — the MPICH-ABI hybrid model. See
-[`containers/README.md`](../containers/README.md#lumi--cray-mpich-the-hipdef-mpi-model).
+[`containers/README.md`](https://github.com/computational-chemical-engineering/peclet/blob/main/containers/README.md#lumi--cray-mpich-the-hipdef-mpi-model).
 
-See [`containers/README.md`](../containers/README.md) for MPI-ABI, GPU-aware-MPI, and arch details.
+See [`containers/README.md`](https://github.com/computational-chemical-engineering/peclet/blob/main/containers/README.md)
+for MPI-ABI, GPU-aware-MPI, and arch details.
 
 ## Python API surface (what `import` gives you)
 

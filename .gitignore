@@ -1,3 +1,6 @@
 # Phase 0 toolchain artifacts
 /build/
 /extern/
+
+# MkDocs site output (built in CI, published to Pages)
+/site/

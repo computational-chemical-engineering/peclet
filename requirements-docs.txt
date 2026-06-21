@@ -1,0 +1,4 @@
+# Build dependencies for the umbrella MkDocs site (mkdocs.yml). Pinned to the MkDocs 1.x /
+# Material 9.x line — Material for MkDocs has announced a backward-incompatible 2.0; pin until the
+# site is migrated. Build locally with:  pip install -r requirements-docs.txt && mkdocs serve
+mkdocs-material>=9.5,<10
