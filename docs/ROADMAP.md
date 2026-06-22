@@ -37,7 +37,11 @@
       (dist-graph + `MPI_Neighbor_alltoallv`) for static grid halos.
 - [x] **Compute/comm overlap** API (`start` → compute interior → `wait`).
 - [x] Port `BlockDecomposer`/`BlockIndexer` (x-fastest indexing per CONVENTIONS).
-      [ ] morton-based Z-order indexing option (deferred; linear indexing in place).
+      [x] morton-based Z-order indexing option — `tpx::decomp::MortonIndexer` (`decomp/morton_indexer.hpp`,
+          guarded `TPX_HAVE_MORTON`): `codeOf`/`multiIndex` + Morton-space `neighborCode`, device-callable
+          (`MORTON_HD`→`KOKKOS_FUNCTION`). The cache-friendly alternative to x-fastest (which stays the
+          convention). Serial ctest `morton_indexer`. *(morton itself now ships a portable Kokkos backend;
+          `vorflow`'s device tessellator also consumes `morton::Morton` for its Z-order grid ordering.)*
 - [x] **Particle migration** (`ParticleMigrator`) — Lagrangian path, landed early (Phase 4 item).
 - [x] Correctness tests under `mpirun -np {1,2,4,8}`: serial decomposition tiling/ownership; grid-halo
       vs analytic field (NBX≡persistent, periodic/open/mixed); particle migration conservation over
@@ -120,5 +124,7 @@ flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The
 ## Cross-cutting / ongoing
 
 - Keep `morton` as the spatial-index primitive; adopt its octree where hierarchical indexing
-  helps.
+  helps. **Integrated (2026-06-22):** `morton` ships a portable Kokkos backend and is consumed
+  through the Kokkos-MPI build by `transport-core` (`MortonIndexer`) and `vorflow` (device
+  tessellator Z-order grid ordering); raw CUDA in `morton` retired.
 - Each phase lands with tests + docs; no method depends on another method (dependencies point down).
