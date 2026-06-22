@@ -47,6 +47,8 @@ nav:
       - Portability: PORTABILITY.md
       - Roadmap: ROADMAP.md
       - CUDA retirement: CUDA_RETIREMENT.md
+  - Studies:
+      - Staggered vs collocated (sdflow): studies/staggered_vs_colocated.md
   - API reference:
       - transport-core: https://cautious-barnacle-7p9p71w.pages.github.io/
       - morton: https://congenial-chainsaw-g414wov.pages.github.io/
