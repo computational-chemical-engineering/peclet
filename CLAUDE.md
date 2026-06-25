@@ -20,7 +20,9 @@ library (header-only C++20, its own git repo + `CLAUDE.md`) that every method de
 decomposition; the async grid ghost-layer exchange (`tpx::halo::GridHalo` — topology/exchange split,
 field-agnostic, NBX + persistent neighborhood-collective engines, overlap-capable, plus a GPU-resident
 host-staged variant); the Lagrangian halo (`tpx::halo::ParticleMigrator` — particle migration +
-`gatherGhosts`); and SDF geometry with scalar/vector VTI I/O. See `transport-core/CLAUDE.md`.
+`gatherGhosts`); SDF geometry with scalar/vector VTI I/O; and **dynamic load balancing** (weighted ORB
+`BlockDecomposer::init(…, weights)` + `DistributedOctree::rebalance` for AMR leaf/field migration and
+`rebalanceByParticleCount` for the Lagrangian path). See `transport-core/CLAUDE.md`.
 
 **Consumers:** both GPU codes are now **Kokkos**-based (CUDA retired — see
 [docs/CUDA_RETIREMENT.md](docs/CUDA_RETIREMENT.md)). `sdflow` has a **complete, validated distributed
@@ -28,8 +30,10 @@ Navier–Stokes solver** (`sdflow`) on the core: the whole cut-cell IBM + MG-PCG
 bit-exact to single-rank (`tests/kokkos_mpi`, 18 ctests np=1,2,4, gated `CFD_MPI`). `sdflow` is **THE**
 sdflow solver; `pnm` is its pore-network-extraction module. `dem`'s `dem` module runs the
 full XPBD step (ArborX broad-phase) with a validated distributed `step_mpi` (transport-core particle
-halo; `tests/kokkos_mpi` 6 ctests). The single-GPU codes are complete + faster than the retired CUDA at
-scale; remaining work is at-scale multi-GPU tuning — see [docs/ROADMAP.md](docs/ROADMAP.md).
+halo; `tests/kokkos_mpi` 6 ctests) and periodic **load rebalancing** (`enable_mpi_step(rebalance_every=…)`
+/ `Sim.rebalance()` — SoA ownership migration on the weighted ORB). The single-GPU codes are complete +
+faster than the retired CUDA at scale; remaining work is at-scale multi-GPU tuning — see
+[docs/ROADMAP.md](docs/ROADMAP.md).
 
 The design contract lives in `docs/`:
 
@@ -37,14 +41,14 @@ The design contract lives in `docs/`:
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — SDF sign, x-fastest indexing, types, precision policy, periodic/Lees–Edwards, Python array shapes.
 - [docs/STYLE.md](docs/STYLE.md) — C++20 host / C++17 device, clang-format/tidy (from voronoi), namespaces, CMake/CI.
 - [docs/INTERFACES.md](docs/INTERFACES.md) — shared C++20 concepts: `Domain`, `Decomposition`, `Field`, `HaloExchange`, `SdfGeometry`, `ImmersedBoundary`, `Stepper`.
-- [docs/ROADMAP.md](docs/ROADMAP.md) — phased plan; the near-term work is the decomposition + async halo engine.
+- [docs/ROADMAP.md](docs/ROADMAP.md) — phased plan; the decomposition, async halo engine, and dynamic load balancing (Phase 7) are done — remaining work is at-scale multi-GPU tuning.
 
 ## The projects
 
 | Directory | Language / stack | What it does | Has own CLAUDE.md |
 |-----------|------------------|--------------|-------------------|
 | `transport-core/` | Header-only C++20 + MPI | **Shared infrastructure** (new): ORB block decomposition + asynchronous ghost-layer exchange (NBX + persistent engines) + particle migration. The layer every method code will depend on. Tested (13/13, np 1–8). | **Yes — read it** |
-| `morton/` | Header-only C++17 (+ CUDA, Python) | Morton/Z-order codes with **arithmetic in Morton space** (neighbour-find, axis add, Z-order step without decode→re-encode). BMI2/AVX-512 + runtime dispatch; the foundational spatial-index library. | **Yes — read it** |
+| `morton/` | Header-only C++17 (+ **Kokkos**, Python) | Morton/Z-order codes with **arithmetic in Morton space** (neighbour-find, axis add, Z-order step without decode→re-encode). BMI2/AVX-512 + runtime dispatch; the foundational spatial-index library. Portable **Kokkos** GPU backend (`include/morton/kokkos.hpp`, CUDA/HIP/OpenMP) — raw CUDA retired. | **Yes — read it** |
 | `sdflow/` | **Kokkos** + C++20 + pybind11 (`sdflow`) | Incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. `sdflow` is the solver; `pnm` is the pore-network-extraction module. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). | **Yes — read it** |
 | `dem/` | **Kokkos + ArborX** + C++20 + pybind11 (`dem`) | Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). README still calls it `dem-gpu`. | No |
 | `vorflow/` | Header-only C++17 (+ OpenMP, Boost, Voro++) | Dynamic 3D Voronoi tessellation of moving particles; periodic & Lees–Edwards boxes, incremental cell repair, Euler/NS/multiphase dynamics. | No |

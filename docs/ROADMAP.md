@@ -121,6 +121,33 @@ flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The
 - [ ] Unified Python packaging + CI templates across all repos; migrate stragglers to shared
       conventions; reconcile remaining divergences (namespaces, C++ standard, dep management).
 
+## Phase 7 — Dynamic load balancing (cross-cutting infra) — DONE
+
+Both consumers create *non-uniform* work that the equal-cell-count ORB does not balance:
+**AMR** dynamically refines (a feature refined into one block leaves that rank heavier — see
+`docs/AMR.md`, `distributedAdapt`), and **dem** packs particles densely (particle counts per block
+drift far apart). The fix is the same primitive for both, so it lives in `transport-core`.
+
+- [x] **Weighted ORB** — `tpx::decomp::BlockDecomposer::init(numBlocks, globalSize, weights)`. The split
+  position is chosen on the integer cell boundary whose **cumulative weight** along the largest axis is
+  closest to the sub-block's target fraction, balancing total weight per block instead of cell count.
+  Factored through a shared `splitPosition()` helper so the unweighted `init()` is byte-identical and
+  equal weights reduce to it bit-for-bit. (`test_decomposition`.)
+- [x] **AMR rebalance** — `tpx::amr::DistributedOctree::rebalance(fields)`. weight = octree leaf-count per
+  global root cell (SUM-Allreduce) → weighted re-decompose → migrate leaves (global Morton code + level)
+  **and field columns** to new owners over NBX → rebuild each rank's local octree (`BlockOctree::assign`)
+  + swap in the new decomposition/block geometry. A pure migration of the *same* global mesh: exactly
+  conservative, field bit-identical. (`test_amr_distributed_rebalance_mpi`, np=1,2,4,8: WORLD==SELF mesh
+  + field, Σ V·f + leaf count conserved, max/mean imbalance drops.)
+- [x] **Lagrangian rebalance** — `tpx::halo::rebalanceByParticleCount(dec, mig, pos, payload, …)`: bin
+  particles onto the grid → weighted re-decompose in place → migrate with the existing
+  `tpx::halo::ParticleMigrator`. The dem consumer (`KokkosParticleHalo::rebalance`) packs the committed
+  SoA, migrates ownership, and re-uploads; wired into `demStepMpi` via
+  `enable_mpi_step(rebalance_every=N)` / the `rebalance()` binding. (`test_particle_rebalance` np=1,2,4,8;
+  dem `tests/kokkos_mpi/test_rebalance_mpi` np=1,2,4 on OpenMP + CUDA/Blackwell.)
+- [x] **Python**: `tpx_mpi.Migrator.rebalance()` (transport-core, mpi4py) and `Sim.rebalance()` /
+  `enable_mpi_step(rebalance_every=…)` (dem) expose it; validated count-conserving with an imbalance drop.
+
 ## Cross-cutting / ongoing
 
 - Keep `morton` as the spatial-index primitive; adopt its octree where hierarchical indexing
