@@ -55,6 +55,108 @@ Topology mutation is host-side (it rebuilds the sorted leaf arrays); the per-lea
 `TPX_HAVE_MORTON`; the device layer additionally needs a Kokkos build (`MORTON_ENABLE_KOKKOS`
 ⇒ `MORTON_HD == KOKKOS_FUNCTION`).
 
+## Device compute path — Poisson + flow on GPU & multicore
+
+The Poisson half had a device path (operator + V-cycle); the **flow solver** is now on the
+device too, so the whole collocated Stokes step runs in Kokkos kernels (CUDA / HIP / OpenMP)
+instead of the host-serial `AmrFlow::gaussSeidel` + host projection that profiling showed to
+be the bottleneck. New headers (all `TPX_HAVE_MORTON` + Kokkos):
+
+- **`device_pcg.hpp` — `DevicePCG`**: MG-preconditioned CG over the FV Poisson. Matvec =
+  `deviceApplyFv`, preconditioner = the `DeviceMultigrid` V-cycle, dots/updates = Kokkos
+  reductions. `L = D⁻¹S` is SPD in the volume-weighted inner product `⟨u,v⟩_D = Σ V_i u_i v_i`,
+  so CG runs on `A = −L` with volume-weighted dots; the singular periodic (pure-Neumann)
+  nullspace is projected out each iteration (deflated CG), the Dirichlet operator is non-singular.
+- **`device_momentum.hpp` — `DeviceMomentumOp` / `DeviceMomentumSolver`**: the cut-cell momentum
+  operator `(ρ/dt)I − μ∇²` (+ implicit-FOU advection + ξ-overlay Dirichlet) assembled by
+  `AmrCutCell::assembleOperator()` as a per-cell diagonal + face CSR (reproduces `applyOp`
+  exactly), uploaded and applied / solved in device kernels. `A` is non-symmetric (cut-cell
+  `D_rescale` row scaling + upwind advection) ⇒ the Krylov is **BiCGStab** (Jacobi-preconditioned),
+  not CG; for moderate dt the `ρ/dt` reaction makes `A` diagonally dominant and Jacobi suffices.
+- **`device_flow.hpp` — `DeviceAmrFlow`**: reuses the host `AmrCutCell` / `AmrPoisson` to *build*
+  the operators once (geometry, openness, cut stencils), then drives the step on device —
+  momentum predictor (`DeviceMomentumOp` + BiCGStab) carrying `−∇p^n`, pressure projection
+  (`DeviceMultigrid` / `DevicePCG`), and `DeviceFaceGeom` kernels for the openness-weighted
+  divergence + the ABC gradient correction (same `forEachFaceFull` 2:1 sub-face + openness
+  enumeration as the host, so `D`/`G`/`L` stay consistent) + the rotational pressure update.
+  Stokes (advection off) for now; the implicit-FOU advection already rides in the momentum CSR.
+- **`DeviceMomentumMG` — Galerkin velocity multigrid** (the momentum preconditioner, default
+  ON): a geometric MG over the assembled cut-cell momentum CSR whose coarse operators are built
+  by **Galerkin coarsening** `A_c = R·A·P` (R = volume-average over a coarse cell's children,
+  P = piecewise-constant injection — the pressure-MG transfer pair). Galerkin is consistent with
+  the fine operator *by construction*: it inherits the ξ-overlay stencil and the `D_rescale` row
+  scaling, and a coarse cell whose children are all solid (identity rows) stays an identity row
+  (`ε`-solid-on-coarse for free). Used as the BiCGStab preconditioner, it keeps the momentum
+  iteration count ~flat with N. (Two *rediscretised* attempts — openness/Neumann Helmholtz, with
+  and without a reaction-shift floor — were no better than Jacobi because they mismatch the
+  no-slip Dirichlet boundary; only coarsening the *exact* operator works. The geometric immersed-
+  wall velocity operator they motivated survives as `AmrPoisson::setImmersedWall` — the `(1−α)`
+  solid fraction of an interior face as a Dirichlet wall — a backward-compatible, bit-exact-`L`
+  addition.)
+- **Cost-regime note.** The momentum operator is the Helmholtz `(ρ/dt)I − μ∇²`; at a physical
+  (transient/CFL) dt the `ρ/dt` mass term dominates and it is cheap (a handful of iterations,
+  below the pressure solve — the classic profile). At the large dt used for *steady* drag,
+  `ρ/dt → 0` and it degrades to a bare elliptic Laplacian (a steady-Stokes saddle point) — as
+  hard as the pressure Poisson, and solved per velocity component. The velocity-MG makes that
+  regime *scale* (constant iterations); `setMomentumTol` bounds the per-step over-solve.
+
+**Validation.** Convergence/tolerance based, not host bit-exactness: the GPU matvec differs from
+the host in the last bit by FMA contraction (the OpenMP backend is bit-exact and carries the
+determinism tests). `test_amr_device_{pcg,momentum,flow}_kokkos` on OpenMP + an RTX 5080: PCG
+manufactured-RHS → round-off and matches the V-cycle solution; the momentum matvec == host
+`applyOp` (1e-13) and the solves reach the host `gaussSeidel` solution; Poiseuille between
+immersed walls → the analytic parabola (~1e-16) and the host `AmrFlow` (5e-12); an immersed
+sphere reproduces the host permeability (rel 7e-5).
+
+**Benchmark** (`benchmarks/bench_amr_flow`, RTX 5080; flow at the steady dt=1e6):
+
+| size | flow host (serial) | flow device | speedup | device throughput | Poisson MG-PCG vs V-cycle |
+|------|-------------------:|------------:|--------:|------------------:|---------------------------|
+| 16³  |   919 ms/step | 32 ms/step |  29× | 0.1 Mcell/s | 7 it vs 15 cyc (1.8×) |
+| 32³  |  7884 ms/step | 45 ms/step | 176× | 0.7 Mcell/s | 10 it vs 21 cyc (1.7×) |
+| 64³  |  (—)          | 79 ms/step |  —   | 3.3 Mcell/s | 12 it vs 30 cyc (2.0×) |
+| 128³ |  (—)          | 359 ms/step | —  | 5.8 Mcell/s | 14 it vs 45 cyc (2.7×) |
+
+The MG-PCG advantage over stationary V-cycling grows with size (3.2× fewer cycles at 128³).
+
+**Momentum scalability (the velocity-MG).** Profiling first exposed an *inverted* cost profile:
+the **pressure** MG-PCG is flat at 14–16 iters/step across 32³–128³ (textbook multigrid), but the
+**momentum** solve, without its own multigrid, grew 121 → 248 → 471 iters/step (~N^⅓, the
+unpreconditioned-Laplacian rate) and dominated the step — the symptom of a *missing velocity
+multigrid* (the non-AMR sdflow has one; my AMR path did not), exposed by the large steady dt that
+strips the `ρ/dt` mass term. The Galerkin `DeviceMomentumMG` fixes it: momentum drops to
+30 → 38 → 54 iters/step (4.0× / 6.5× / **8.7×** fewer, the gain growing with N) and stays
+near-flat — and the whole-step throughput rises monotonically again (the old 128³ dip is gone),
+**1.9 Mcell/s → 5.8 Mcell/s at 128³ (3.1× faster)**. The dt-sweep confirms the regime story: at a
+physical dt the momentum solve falls to ~12 iters, *below* the pressure's 16. A scalability guard
+(`test_amr_device_flow_kokkos`) asserts the momentum iteration count stays ~flat 16³→32³.
+
+**sdflow-mirror refactor (the device flow path is no longer Stokes-only).** The collocated step now
+mirrors the uniform-grid sdflow solver feature-for-feature, fully device-resident (only MPI staging /
+output gathers touch the host):
+
+- **Navier–Stokes advection** — implicit-FOU in the momentum operator + an explicit ρ(SOU−FOU)
+  deferred correction (vanishes at steady ⇒ exact SOU), rebuilt on device each step from uⁿ; no host
+  round-trip.
+- **Rediscretised staircase velocity-MG** (`DeviceVelocityMG`) beside the Galerkin one, selectable as
+  the momentum preconditioner — coarse = const-coeff Helmholtz from the coarsened openness, with the
+  clean-fluid exclude mask (cut/solid residuals kept out of the coarse defect, the fine smoother owns
+  the cut band) + a pore-scale cap. Competitive at moderate N; Galerkin stays the robust default at
+  scale (the staircase diverges at 64³, like sdflow's at large Δt).
+- **Multicolour Gauss–Seidel smoother** (opt-in, `setMomentumGS`) — a generic symmetrised greedy
+  colouring of any face CSR + a symmetric (forward/reverse) SGS sweep, the RB-GS mirror. Symmetry is
+  required because the momentum MG preconditions BiCGStab (a forward-only GS V-cycle breaks the Krylov
+  recurrence at 64³). ~20–30 % fewer momentum iterations, growing with N.
+- **Velocity-MG as the solver** (opt-in, `setMomentumMGSolver`) — MG-preconditioned defect correction
+  in place of BiCGStab, the Krylov-free path sdflow uses; cannot break down on the non-symmetric
+  operator. Plus an optional **Picard outer loop** over the lagged advection (`setOuterIterations`,
+  projection once per step).
+
+The colouring / smoother / transfers / drivers carry no octree types (they act on an assembled
+face-CSR operator), so the same MG core is reusable for a future Voronoi-cell (unstructured polyhedral)
+grid. Validated on OpenMP + RTX 5080: GS and the MG-solver reach the same converged step as
+Jacobi/BiCGStab (~1e-11); the immersed sphere at finite Re reaches the host `AmrFlow` NS steady field.
+
 ## Status
 
 - **Phase 1 — DONE.** `BlockOctree<Dim,Bits>` (uniform construction, `refineIf`/`coarsenIf`,
