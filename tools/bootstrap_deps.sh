@@ -4,7 +4,7 @@
 # This is the local-dev stand-in for a cluster `module load`.
 #
 # Usage:
-#   tools/bootstrap_deps.sh <nvidia-cuda|host-openmp|lumi-hip>
+#   tools/bootstrap_deps.sh <nvidia-cuda|host-openmp|host-serial|lumi-hip>
 #
 # Installs to:  extern/install/<backend>
 # Sources in:   extern/src/{kokkos,arborx}   (cloned at the pinned tags)
@@ -55,6 +55,12 @@ case "$BACKEND" in
   host-openmp)
     kokkos_args=( -DKokkos_ENABLE_OPENMP=ON -DKokkos_ENABLE_SERIAL=ON )
     ;;
+  host-serial)
+    # Serial-only: Kokkos::Serial is the DefaultExecutionSpace (no OpenMP), so it is the
+    # single-thread device baseline — Kokkos-overhead vs raw serial C++, and the reference
+    # the OpenMP/CUDA backends are measured against.
+    kokkos_args=( -DKokkos_ENABLE_SERIAL=ON )
+    ;;
   lumi-hip)
     kokkos_args=(
       -DKokkos_ENABLE_HIP=ON -DKokkos_ENABLE_SERIAL=ON
@@ -63,7 +69,7 @@ case "$BACKEND" in
     )
     ;;
   *)
-    echo "usage: $0 <nvidia-cuda|host-openmp|lumi-hip>" >&2
+    echo "usage: $0 <nvidia-cuda|host-openmp|host-serial|lumi-hip>" >&2
     exit 2
     ;;
 esac

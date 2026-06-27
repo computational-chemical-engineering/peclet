@@ -22,6 +22,15 @@
       }
     },
     {
+      "name": "host-serial",
+      "displayName": "Host (Kokkos Serial backend, single-thread)",
+      "description": "Single-thread CPU build; Kokkos::Serial is the default execution space. The serial device baseline for benchmarking (Kokkos overhead vs raw serial C++) and a simple debug target. Run tools/bootstrap_deps.sh host-serial first.",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "${sourceDir}/extern/install/host-serial"
+      }
+    },
+    {
       "name": "nvidia-cuda",
       "displayName": "NVIDIA (Kokkos CUDA backend, Blackwell sm_120)",
       "description": "Local dev box: RTX 5080 / CUDA 13.2. The primary development target. Run tools/bootstrap_deps.sh nvidia-cuda first.",
@@ -43,6 +52,7 @@
   ],
   "buildPresets": [
     { "name": "host-openmp", "configurePreset": "host-openmp" },
+    { "name": "host-serial", "configurePreset": "host-serial" },
     { "name": "nvidia-cuda", "configurePreset": "nvidia-cuda" },
     { "name": "lumi-hip",    "configurePreset": "lumi-hip" }
   ]
