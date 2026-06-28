@@ -3,7 +3,8 @@
 > Status: design document (living). The common abstractions every method shares, expressed as **C++20
 > concepts** (host-side). These are *contracts*, not base classes — a type satisfies a concept by
 > having the right members, so existing solvers adopt them incrementally without inheritance. At the
-> CUDA/device boundary, the same shape is expressed with traits/CRTP (C++17). See [STYLE](STYLE.md).
+> Kokkos device boundary, the same shape is carried by functors/Views (the device side is C++20 under
+> Kokkos; CUDA retired). See [STYLE](STYLE.md).
 
 The interfaces are deliberately small. They describe **where data lives and how it moves**, leaving the
 numerics to each method. Signatures below are illustrative sketches in namespace `tpx`.
@@ -79,8 +80,9 @@ Two implementations behind this one concept:
 **Compute/comm overlap** is part of the contract: `start(field)` returns immediately; the caller
 computes the block interior, then `wait(field)` completes before the boundary is computed.
 
-**GPU-awareness:** buffers may be device pointers; the engine detects CUDA-aware MPI and exchanges
-device buffers directly, with `pack`/`unpack` running as device kernels.
+**GPU-awareness:** buffers may be device Views; the engine host-stages by default and, with GPU-aware
+MPI opted in (`TPX_GPU_AWARE_MPI`), exchanges device buffers directly, with `pack`/`unpack` running as
+device kernels.
 
 ## 5. `SdfGeometry` — SDF-described solids
 
@@ -119,7 +121,7 @@ Every method exposes `step(dt)` with identical semantics so drivers and Python b
 
 ## 8. `PythonModule` — binding surface
 
-Not a C++ concept but a contract (see [CONVENTIONS §6](CONVENTIONS.md)): pybind11 module exposing
+Not a C++ concept but a contract (see [CONVENTIONS §6](CONVENTIONS.md)): nanobind module exposing
 `Solver(...)` → `initialize`/`set_*` → `step(dt)` → `get_*` numpy accessors, with the shared array
-shape/order rules. The core's `python` helpers provide the numpy↔core conversions so every module
-implements this identically.
+shape/order rules. The core's `tpx::python` zero-copy View↔ndarray bridge provides the numpy↔core
+conversions so every module implements this identically.

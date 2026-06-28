@@ -17,8 +17,8 @@ deployment** guide, and links to each code's **API reference** (Doxygen).
 | Code | Role | Stack |
 |------|------|-------|
 | [**transport-core**](https://github.com/computational-chemical-engineering/transport-core) | Shared infrastructure: ORB block decomposition, async grid/particle halo, SDF geometry, VTI I/O | header-only C++20 + MPI (optional Kokkos) |
-| [**sdflow**](https://github.com/computational-chemical-engineering/sdflow) | Incompressible Navier–Stokes for porous media (staggered MAC + cut-cell IBM + multigrid); `pnm` pore extraction | Kokkos + pybind11 |
-| [**dem**](https://github.com/computational-chemical-engineering/dem) | Discrete Element Method (XPBD) + SDF point-shell collision for dense packing | Kokkos + ArborX + pybind11 |
+| [**sdflow**](https://github.com/computational-chemical-engineering/sdflow) | Incompressible Navier–Stokes for porous media (staggered MAC + cut-cell IBM + multigrid); `pnm` pore extraction | Kokkos + nanobind |
+| [**dem**](https://github.com/computational-chemical-engineering/dem) | Discrete Element Method (XPBD) + SDF point-shell collision for dense packing | Kokkos + ArborX + nanobind |
 | [**vorflow**](https://github.com/computational-chemical-engineering/vorflow) | Dynamic 3D Voronoi tessellation of moving particles (periodic & Lees–Edwards) | header-only C++17 |
 | [**morton**](https://github.com/computational-chemical-engineering/morton) | Morton/Z-order codes with arithmetic *in Morton space* — the spatial-index primitive | header-only C++17 + BMI2/AVX-512 + Python |
 

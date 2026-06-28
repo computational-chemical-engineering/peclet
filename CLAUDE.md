@@ -39,7 +39,7 @@ The design contract lives in `docs/`:
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — layering, dependency graph, Lagrangian/Eulerian/mixed taxonomy, how each code maps onto the core.
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — SDF sign, x-fastest indexing, types, precision policy, periodic/Lees–Edwards, Python array shapes.
-- [docs/STYLE.md](docs/STYLE.md) — C++20 host / C++17 device, clang-format/tidy (from voronoi), namespaces, CMake/CI.
+- [docs/STYLE.md](docs/STYLE.md) — C++20 host & Kokkos device (morton pins C++17), clang-format/tidy (from voronoi), namespaces, CMake/CI.
 - [docs/INTERFACES.md](docs/INTERFACES.md) — shared C++20 concepts: `Domain`, `Decomposition`, `Field`, `HaloExchange`, `SdfGeometry`, `ImmersedBoundary`, `Stepper`.
 - [docs/ROADMAP.md](docs/ROADMAP.md) — phased plan; the decomposition, async halo engine, and dynamic load balancing (Phase 7) are done — remaining work is at-scale multi-GPU tuning.
 
@@ -47,11 +47,11 @@ The design contract lives in `docs/`:
 
 | Directory | Language / stack | What it does | Has own CLAUDE.md |
 |-----------|------------------|--------------|-------------------|
-| `transport-core/` | Header-only C++20 + MPI | **Shared infrastructure** (new): ORB block decomposition + asynchronous ghost-layer exchange (NBX + persistent engines) + particle migration. The layer every method code will depend on. Tested (13/13, np 1–8). | **Yes — read it** |
+| `transport-core/` | Header-only C++20 + MPI | **Shared infrastructure**: ORB block decomposition + asynchronous ghost-layer exchange (NBX + persistent engines) + particle migration + SDF geometry + dynamic load balancing + AMR octree. The layer every method code depends on. Tested (26 ctests, np 1–8). | **Yes — read it** |
 | `morton/` | Header-only C++17 (+ **Kokkos**, Python) | Morton/Z-order codes with **arithmetic in Morton space** (neighbour-find, axis add, Z-order step without decode→re-encode). BMI2/AVX-512 + runtime dispatch; the foundational spatial-index library. Portable **Kokkos** GPU backend (`include/morton/kokkos.hpp`, CUDA/HIP/OpenMP) — raw CUDA retired. | **Yes — read it** |
-| `sdflow/` | **Kokkos** + C++20 + pybind11 (`sdflow`) | Incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. `sdflow` is the solver; `pnm` is the pore-network-extraction module. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). | **Yes — read it** |
-| `dem/` | **Kokkos + ArborX** + C++20 + pybind11 (`dem`) | Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). README still calls it `dem-gpu`. | No |
-| `vorflow/` | Header-only C++17 (+ OpenMP, Boost, Voro++) | Dynamic 3D Voronoi tessellation of moving particles; periodic & Lees–Edwards boxes, incremental cell repair, Euler/NS/multiphase dynamics. | No |
+| `sdflow/` | **Kokkos** + C++20 + nanobind (`sdflow`) | Incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. `sdflow` is the solver; `pnm` is the pore-network-extraction module. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). | **Yes — read it** |
+| `dem/` | **Kokkos + ArborX** + C++20 + nanobind (`dem`) | Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). README still calls it `dem-gpu`. | No |
+| `vorflow/` | **Kokkos** + C++17/20 (+ transport-core MPI, nanobind; Voro++/Boost for the CPU oracle) | Dynamic 3D Voronoi tessellation of moving particles; periodic & Lees–Edwards boxes, incremental cell repair, Euler/NS/multiphase dynamics. Ported to Kokkos (CUDA/HIP/OpenMP) + transport-core MPI; legacy half-edge engine kept as CPU oracle. | No |
 
 Common threads worth knowing when moving between them: SDFs (signed distance fields) are the shared geometry representation across `sdflow` and `dem`; VTI/VTP files (ParaView/Ovito) are the shared I/O format; periodic boundary conditions appear everywhere; and the GPU codes (`sdflow`, `dem`, `transport-core`'s device halo) are now **Kokkos**-based — the backend (CUDA/HIP/OpenMP) and arch are chosen by the `extern/install/<backend>` prefix the build is pointed at, not hard-coded in the sources (`tools/bootstrap_deps.sh` + `CMakePresets.json`).
 
@@ -74,17 +74,18 @@ dependency**). Put `nvcc` on `PATH` for the CUDA backend (`export PATH=/usr/loca
 
 ### sdflow
 ```bash
-cd sdflow && source .venv/bin/activate
-cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda;$(python -m pybind11 --cmakedir)"
+cd sdflow && source .venv/bin/activate          # nanobind found via the active interpreter (SuiteNanobind)
+cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"
 cmake --build build -j                          # -> build/sdflow.*.so (solver) + build/pnm.*.so
+# (canonical install: CMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda" pip install .)
 PYTHONPATH=$PWD/build python scripts/verify_poiseuille_sdflow.py        # analytical-solution check
 PYTHONPATH=$PWD/build python scripts/verify_periodic_spheres_sdflow.py  # cut-cell Stokes through spheres
 ```
 
 ### dem
 ```bash
-cd dem && python -m venv .venv && source .venv/bin/activate && pip install pybind11 numpy
-cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda;$(python -m pybind11 --cmakedir)"
+cd dem && python -m venv .venv && source .venv/bin/activate && pip install nanobind numpy
+cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"
 cmake --build build -j$(nproc)                  # -> build/dem.cpython-*.so  (-DDEM_MPI=ON for the MPI step)
 export PYTHONPATH=$PYTHONPATH:$(pwd)/build
 python verify_packing_spheres.py                # verify_*.py are the test/demo entry points
@@ -94,16 +95,22 @@ The many root-level `verify_*.py` / `test_*.py` / `plan_*.md` / `build_log*.txt`
 ### vorflow
 ```bash
 cd vorflow
-cmake -B build -DCMAKE_BUILD_TYPE=Release        # FetchContent pulls Voro++ automatically
+# CPU-oracle + tests build (header-only; FetchContent pulls Voro++ automatically):
+cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ctest --test-dir build -R "test_static_voronoi|test_voro_comparison" --output-on-failure
-clang-format --dry-run --Werror include/voronoi_dynamics/*.hpp tests/*.cpp   # Google style, enforced
+# Kokkos device path (CUDA/HIP/OpenMP) + nanobind Python module (vorflow_device), opt-in:
+cmake -B build_dev -DVORFLOW_KOKKOS=ON -DVORFLOW_BUILD_PYTHON=ON \
+  -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"   # add -DVORFLOW_MPI=ON for the distributed path
+clang-format --dry-run --Werror include/*.hpp include/vorflow/**/*.hpp tests/*.cpp   # Google style, enforced
 ```
-Header-only: consumers just add `include/`. Voronoi cells are stored as a half-edge mesh with a packed `makeLabel(facet,vertex,edge)` integer encoding (see README "Data structure overview").
+The legacy header-only `voronoi.hpp` survives only as the CPU oracle. The production device tessellator
+stores each Voronoi cell as a compact **dual-triangle ConvexCell** (a vertex is a triple of plane indices)
+plus a `facetGeometry` CSR — not the old half-edge mesh (see README).
 
 ## Conventions across the suite
 
-- **Kokkos C++ projects** (`sdflow`, `dem`) put device kernels in header-only `.hpp` (compiled as C++; the Kokkos launch compiler routes them through `nvcc`/`hipcc` — never `.cu`) and expose the simulation as an importable Python module via a pybind11 binding TU; drive simulations from Python, not C++ mains.
+- **Kokkos C++ projects** (`sdflow`, `dem`) put device kernels in header-only `.hpp` (compiled as C++; the Kokkos launch compiler routes them through `nvcc`/`hipcc` — never `.cu`) and expose the simulation as an importable Python module via a nanobind binding TU (built with scikit-build-core, on transport-core's zero-copy View↔ndarray bridge); drive simulations from Python, not C++ mains.
 - **Header-only C++ projects** (`morton`, `vorflow`, `transport-core`) put the real logic in templates under `include/`; there is no library to link.
 - Build artifacts (`build/`, `build_*/`, `.venv/`, `*.so`, `__pycache__/`) and large output assets (`*.vti`, `*.vtp`, `*.png`) are committed/present in several projects — don't treat their existence as something you created, and prefer the project's own out-of-source `build/` directory.
 - Two projects carry `AGENTS.md`/`GEMINI.md` alongside `CLAUDE.md` (sdflow); when editing guidance, the CLAUDE.md is the one that governs Claude Code.

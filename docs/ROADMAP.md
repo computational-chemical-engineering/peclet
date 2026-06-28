@@ -53,7 +53,7 @@
 
 ## Phase 2 — GPU-aware halo + unified geometry (halo done; geometry next)
 
-- [x] GPU-resident halo (`tpx::halo::DeviceGridExchangeKokkos`, `grid_halo_kokkos.hpp`): portable
+- [x] GPU-resident halo (`tpx::halo::GridHalo`, `grid_halo.hpp` + `grid_halo_topology.hpp`): portable
       (Kokkos: CUDA/HIP/OpenMP) on-device pack/unpack/self-copy, **host-staged** MPI of the compact halo
       buffers (the full field stays on the device; opt-in GPU-aware via `TPX_GPU_AWARE_MPI`). Validated
       bit-for-bit against the CPU path, np=1,2,4. *(The original native-CUDA `grid_halo_cuda.cuh`
@@ -67,8 +67,8 @@
 ## Phase 3 — Wire in sdflow (first Eulerian consumer) (working distributed solver)
 
 A **complete distributed incompressible Navier–Stokes solver** is built on transport-core and
-validated; see `sdflow/doc/mpi_parallelization_status.md` for the 13-step breakdown. Branch
-`mpi-halo-integration`, opt-in `-DCFD_BUILD_MPI=ON`; the production `pnm` module is untouched.
+validated; see the "MPI / sdflow" section of `sdflow/CLAUDE.md` for the current details. Opt-in
+`-DCFD_BUILD_MPI=ON`; the production `pnm` module is untouched.
 
 - [x] `sdflow/src/mac_halo.cuh` (`MacGridHalo`) — ORB decomposition + ghost exchange (width 1/2) for
       `double` MAC cell-fields, on `tpx::halo::DeviceGridExchange`. Validated against cfd's own `get_idx`
@@ -80,10 +80,11 @@ validated; see `sdflow/doc/mpi_parallelization_status.md` for the 13-step breakd
       (no-slip masking) + `gather_to_root` → VTI. Full Navier–Stokes.
 - [x] Validated **cell-for-cell vs serial** and against analytics (Taylor–Green ~2e-15, Poiseuille,
       NS-around-solid), **36/36 ctests real multi-rank np=1,2,4**.
-- [ ] **In-place `cfd_solver.cu` rewrite** (largest remaining): extended-block state/scratch + MPI
-      global reductions (`max_abs`, `remove_mean`, pressure pin) + distributed **multigrid**
-      (restriction/prolongation across blocks) + Robust-Scaled cut-cell IBM (vs masking). The
-      `DistributedStokes` solver is the working single-level path that proves the approach.
+- [x] **Distributed Navier–Stokes solver (done):** the full cut-cell IBM + MG-PCG step runs
+      multi-rank, bit-exact to single-rank — extended-block state/scratch + MPI global reductions
+      (`max_abs`, `remove_mean`, pressure pin) + distributed **multigrid** (restriction/prolongation
+      across blocks) + Robust-Scaled cut-cell IBM. `tests/kokkos_mpi`, 18 ctests np=1,2,4 (gated
+      `CFD_MPI`).
 
 ## Phase 4 — Wire in dem (Lagrangian)
 
@@ -101,16 +102,17 @@ flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The
       one interaction radius of each block boundary (periodic images handled) for a local ArborX
       broadphase. Rigorously validated vs a brute-force reference in transport-core's
       `test_ghost_particles_mpi` (np=1,2,4,8), and exercised on packing's layout.
-- [ ] **Per-step loop** in the solver: predict → migrate → gather ghosts → local broadphase +
-      narrowphase + XPBD solve. Validate the existing `verify_*` scripts (packing fraction, restitution)
-      match single-rank across ranks.
-- [ ] Decision: keep packing single-process (run distributed under `mpirun` with mpi4py) vs. a C++
-      driver — same question cfd faces; the standalone tests/driver path avoids touching the pybind
-      module first.
+- [x] **Per-step distributed loop (done):** `dem`'s `step_mpi` runs predict → migrate → gather ghosts
+      → local ArborX broadphase + narrowphase + XPBD solve, with periodic **load rebalancing**
+      (`enable_mpi_step(rebalance_every=…)` / `Sim.rebalance()` — SoA ownership migration on the
+      weighted ORB). Validated in `tests/kokkos_mpi` (6 ctests).
+- [x] Decision (resolved): the distributed step lives inside the `dem` module itself
+      (`enable_mpi_step`), driven from Python under `mpirun` — no separate C++ driver.
 
 ## Phase 5 — vorflow (mixed) + Python parity
 
-- [ ] Add pybind11 bindings (first Python surface for voronoi) following the binding conventions.
+- [x] Add nanobind bindings (Kokkos device module) — first Python surface for vorflow, on the shared
+      zero-copy bridge, following the binding conventions.
 - [ ] Block decomposition + ghost particles (one interaction radius) so boundary Voronoi cells close
       correctly; validate vs serial tessellation.
 

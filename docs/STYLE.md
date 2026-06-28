@@ -5,13 +5,14 @@
 
 ## Language standard
 
-- **Host C++: C++20.** `block_decomposer` is already C++20; concepts give us compile-checked
-  interfaces (see [INTERFACES](INTERFACES.md)), and `<bit>`/`<span>`/ranges are useful.
-- **Device (CUDA) and `morton`: C++17-compatible.** nvcc lags on C++20 and morton pins
-  C++17. The rule: **anything that must compile as device code, or be `#include`d by morton, stays
-  within C++17.** Concepts and other C++20-only constructs live in host-only headers.
-- Practically: the core's interface headers are C++20; the parts pulled into `.cu` translation units
-  are C++17. Guard with `__cplusplus`/`__CUDACC__` where a header straddles both.
+- **Host C++: C++20.** `transport-core` is C++20; concepts give us compile-checked interfaces (see
+  [INTERFACES](INTERFACES.md)), and `<bit>`/`<span>`/ranges are useful.
+- **Device code under Kokkos: C++20.** With CUDA retired, GPU kernels are ordinary C++ in `.hpp`
+  headers compiled through the Kokkos launch compiler (which routes them to `nvcc`/`hipcc`) — there are
+  no `.cu` translation units, and the device side moves to C++20 under Kokkos (see
+  [PORTABILITY](PORTABILITY.md)).
+- **`morton`: C++17.** morton pins C++17 by design; **anything `#include`d by morton stays within
+  C++17.** Concepts and other C++20-only constructs live in host-only headers.
 
 ## Formatting & linting
 
@@ -23,7 +24,7 @@ repo and `transport-core`):
 - **clang-tidy:** the curated check set with naming rules — `NamespaceCase: lower_case`,
   `ClassCase: CamelCase`, `FunctionCase: camelBack`, `VariableCase: camelBack`, member prefix `m_`,
   `ConstantCase: kCamelCase`.
-- CUDA `.cu`/`.cuh` follow the same format; clang-tidy coverage of device code is best-effort.
+- Kokkos device headers (`.hpp`) follow the same format; clang-tidy coverage of device code is best-effort.
 
 ## Naming
 
@@ -31,8 +32,8 @@ repo and `transport-core`):
   modules `tpx::common`, `tpx::decomp`, `tpx::halo`, `tpx::geom`, `tpx::ibm`. Existing method
   namespaces keep their identity (`vor::`, `pbs::`, `morton::`); sdflow/dem, currently in the
   global namespace, move solver classes into a method namespace (`cfd::`, `dem::`) as they integrate.
-- **CUDA kernels:** `__global__ void <operation>_kernel(...)` — the `_kernel` suffix is already the
-  de-facto convention in sdflow/dem; make it the rule.
+- **Kokkos kernels:** prefer named functors/tags or descriptive `parallel_*` labels over anonymous
+  lambdas in the hot path; keep the `_kernel`/`_op` suffix on functor types so device work is greppable.
 - **GPU data:** Structure-of-Arrays for hot device data; `d_`-prefixed device pointers
   (`d_pos`, `d_vel`) as dem does.
 - **Members:** `m_` prefix (voronoi convention). Compile-time template params for `Dim`/`Bits` stay in
@@ -40,14 +41,16 @@ repo and `transport-core`):
 
 ## Build system
 
-- **CMake ≥ 3.24** suite-wide (dem's floor; needed for modern CUDA handling). Each repo
-  installs/exports a package config so consumers do `find_package(<pkg> CONFIG)` →
-  `target_link_libraries(app PRIVATE tpx::core)`.
-- **Dependencies:** prefer `find_package` for system libs (MPI, Boost, CUDAToolkit, OpenMP); use
-  `FetchContent` with a pinned tag for source deps (pybind11, cuBQL, Voro++, and `transport-core`
+- **CMake ≥ 3.24** suite-wide (dem's floor). Each repo installs/exports a package config so consumers
+  do `find_package(<pkg> CONFIG)` → `target_link_libraries(app PRIVATE tpx::core)`.
+- **Dependencies:** `find_package` for the GPU/parallel stack (`Kokkos`, `ArborX`, MPI, OpenMP) against
+  the bootstrapped `extern/install/<backend>` prefix; `nanobind` is provisioned via the shared
+  `cmake/SuiteNanobind.cmake` helper (found through the active interpreter, not a pinned tag). Use
+  `FetchContent` with a pinned tag only for the remaining source deps (Voro++, and `transport-core`
   itself when a method consumes it). Pin versions; don't track `master`.
-- **CUDA architectures:** set an explicit list for release artifacts (sdflow uses `75;80;86;120`);
-  `native` is fine for local dev builds only.
+- **GPU architecture:** the backend (CUDA/HIP/OpenMP) and arch are baked into the bootstrapped Kokkos
+  prefix (`KOKKOS_ARCH` at Kokkos build time), not set per-method in CMake; the build is just pointed at
+  `extern/install/<backend>`.
 - **Options:** gate tests/benchmarks/docs behind `<PKG>_BUILD_TESTS`/`_BENCHMARKS`/`_DOCS` (voronoi
   pattern), default tests `ON`, docs `OFF`.
 

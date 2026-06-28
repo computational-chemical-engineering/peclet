@@ -43,15 +43,15 @@ morton  (local codes + arithmetic + hierarchy + Z-order)            [reuse]
        └─ transport-core/amr
             ├─ BlockOctree<Dim,Bits>        host topology: refine/coarsen/balance, queries
             ├─ DeviceBlockOctree<Dim,Bits>  Kokkos View mirror + device-callable queries
-            ├─ DistributedOctree<Dim>       (TODO) ORB collection + cross-block 2:1 balance
-            ├─ LeafField<T>                 (TODO) leaf-indexed fields + VTU export
-            └─ AmrHalo<Dim>                 (TODO) owner-based ghost exchange for graded octrees
+            ├─ DistributedOctree<Dim>       (done) ORB collection + cross-block 2:1 balance + rebalance
+            ├─ LeafField<T>                 (done) leaf-indexed fields + VTU export
+            └─ AmrHalo<Dim>                 (done) owner-based ghost exchange for graded octrees
        └─ sdflow (TODO)  cut-cell IBM on leaves + AMR multigrid + AMR GridLayout
 ```
 
 Topology mutation is host-side (it rebuilds the sorted leaf arrays); the per-leaf hot path
-(point location, face-neighbour walk) is device-callable, mirroring the halo's host
-(`grid_halo.hpp`) vs device (`grid_halo_kokkos.hpp`) split. Headers are guarded by
+(point location, face-neighbour walk) is device-callable, mirroring the halo's host-topology
+(`grid_halo_topology.hpp`) vs device-exchange (`grid_halo.hpp`) split. Headers are guarded by
 `TPX_HAVE_MORTON`; the device layer additionally needs a Kokkos build (`MORTON_ENABLE_KOKKOS`
 ⇒ `MORTON_HD == KOKKOS_FUNCTION`).
 

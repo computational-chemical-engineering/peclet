@@ -16,11 +16,13 @@ conventions, and the same interfaces.
 
 | Code | Kind | State representation | Status |
 |------|------|----------------------|--------|
-| `sdflow` | **Eulerian** | Structured staggered MAC grid (fields on a fixed grid) | Extensively developed |
+| `sdflow` | **Eulerian** | Structured grid: staggered MAC (default) or collocated/cell-centered, via a `GridLayout` policy | Extensively developed |
 | `dem` | **Lagrangian** | Particles (DEM/XPBD), SoA on GPU | Extensively developed |
-| `vorflow` | **Mixed** | Moving particles + their Voronoi cells (Lagrangian carriers, Eulerian-like fluxes across cell faces) | Developed, no Python yet |
-| `block_decomposer` | Infrastructure | Blocks + ghost layers + particles/cells | Partial; source of the shared MPI layer |
+| `vorflow` | **Mixed** | Moving particles + their Voronoi cells (Lagrangian carriers, Eulerian-like fluxes across cell faces) | Developed; Kokkos + nanobind Python |
 | `morton` | Primitive | Z-order codes / spatial index | Mature |
+
+(`block_decomposer`, the original source of the shared MPI layer, has been **retired/archived**; its
+reusable parts now live in `transport-core`.)
 
 The Eulerian/Lagrangian/mixed split is the key axis: it determines *what travels in a halo exchange*
 (grid cell slabs vs. migrating particles vs. ghost particles + cell neighbours) but **not** the
@@ -79,10 +81,10 @@ depends on primitives. No method depends on another method; primitives depend on
   path; SDF geometry + IBM come from `geometry`/`ibm`. First solver to be wired in (most grid-native).
 - **dem (Lagrangian):** particles are owned by the block containing them; per-step it does
   **particle migration** (NBX path) + **ghost-particle** exchange near block boundaries; collision
-  geometry uses the shared SDF. Reuses its existing cuBQL broadphase locally inside a block.
+  geometry uses the shared SDF. Reuses its existing ArborX broad-phase locally inside a block.
 - **vorflow (mixed):** particles migrate like Lagrangian carriers (NBX path), but each rank
   also needs **ghost particles** one interaction radius deep to close the Voronoi cells touching the
-  block boundary; fluxes across Voronoi faces are the Eulerian aspect. Gets pybind11 bindings via
+  block boundary; fluxes across Voronoi faces are the Eulerian aspect. Gets nanobind bindings via
   `python`.
 
 ## What stays method-specific
