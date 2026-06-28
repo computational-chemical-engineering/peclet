@@ -13,7 +13,10 @@
 ## Guiding decisions
 
 - Shared **`transport-core`** library repo; method codes stay separate repos depending on it.
-- **C++20 host / C++17 device** (see [STYLE](STYLE.md)).
+- **C++20 host & Kokkos device; `morton` pins C++17** (see [STYLE](STYLE.md)).
+- **Keep computation on the device; minimize host↔device movement** — the cross-cutting plan for
+  migrating remaining host-only compute to Kokkos and removing avoidable data movement is in
+  [DEVICE_RESIDENCY_PLAN](DEVICE_RESIDENCY_PLAN.md).
 - One `HaloExchange` interface, two engines (NBX for dynamic, persistent-neighbor for static),
   GPU-aware. CPU-correct first, then GPU.
 - First solver wired in: **sdflow** (most grid-native). `morton` is a core dependency.
