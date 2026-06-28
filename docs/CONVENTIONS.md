@@ -70,17 +70,36 @@ labels and stay local to voronoi; they are not suite-wide types.
 
 ## 6. Python binding conventions
 
-- **Mechanism:** pybind11 for compiled solvers (sdflow `pnm`, dem `dem`, and
-  future voronoi bindings). morton's lightweight ctypes/C-ABI shim stays as is (dependency-free by
-  design) but is the exception, not the template.
+- **Mechanism:** **nanobind** for every compiled solver (sdflow + `pnm`, dem `dem`, transport-core
+  `tpx_mpi`/`tpx_amr`, vorflow's device module), built through **scikit-build-core**. nanobind is
+  chosen over pybind11 because its `nb::ndarray` carries a DLPack device tag and arbitrary strides,
+  which is what makes the zero-copy GPU path below possible. morton's lightweight ctypes/C-ABI shim
+  stays as is (dependency-free by design, ships portable PyPI wheels) — the deliberate exception.
+- **The array bridge:** all Kokkos-backed modules cross the C++/Python boundary through one shared
+  header, `tpx::python` (`transport-core/include/tpx/python/ndarray_interop.hpp`), provisioned via
+  `cmake/SuiteNanobind.cmake`. Do **not** re-hand-roll per-module copy helpers.
+  - `view_to_ndarray(View)` exports a Kokkos View **without copying**: a host View becomes a NumPy
+    array referencing the View's memory; a device (CUDA/HIP) View becomes a DLPack array CuPy/PyTorch
+    consume zero-copy (`cupy.from_dlpack(...)`). Lifetime is held by a capsule owning a copy of the
+    (ref-counted) View. `vector_to_ndarray(std::move(v), …)` does the same for a host `std::vector`.
+  - `ndarray_to_view<T>` / `ndarray_to_vector<T>` import: a host array on a GPU build is staged up
+    (`deep_copy`); a device array on the build's backend is wrapped unmanaged (CuPy → device View,
+    zero-copy); an array on an incompatible device raises.
+- **Host vs device array contract:** a NumPy (host) array passed to a GPU-backend solver is copied up
+  with the existing semantics (so NumPy-only scripts keep working unchanged); a CuPy (device) array on
+  the matching backend flows in/out copy-free. Mismatched device/dtype raises rather than silently
+  staging a device array through the host.
 - **Array shape/order:** Python sees grids as shape `(nz, ny, nx)`; round-trip to the C++ x-fastest
-  layout with `numpy.reshape(..., order='F')` on `(nx, ny, nz)`. Document this once per module and keep
-  it identical across modules. (Matches sdflow today.)
+  layout with `numpy.reshape(..., order='F')` on `(nx, ny, nz)`. The bridge preserves this naturally:
+  an x-fastest `tpx::Field3D` (LayoutLeft) exports as a Fortran-order `(nx, ny, nz)` array with element
+  strides `{1, nx, nx*ny}`. Document it once per module and keep it identical across modules.
 - **Particle arrays:** shape `(N, 3)` for vector quantities, `(N,)` for scalars, contiguous float/
   double matching the solver's precision.
 - **Lifecycle:** `Solver(...)` construct → `initialize(...)`/`set_*` config → `step(dt)` → `get_*`
   accessors returning numpy arrays. Keep verb names identical across modules (`step`, `get_positions`,
-  `get_u`, …).
+  `get_u`, …). Kokkos is initialized at import and **left initialized** for the interpreter's lifetime
+  (no atexit `Kokkos::finalize` — a returned array's owning capsule can outlive the hook and finalizing
+  first aborts); modules expose `finalize()` for deterministic teardown when needed.
 
 ## 7. Units
 

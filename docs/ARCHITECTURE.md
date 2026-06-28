@@ -37,7 +37,7 @@ decomposition (all use the same block decomposition) nor the geometry (all use t
             ┌──────────────────────────────────────────────────────────┐
  core       │                   transport-core                         │   new shared repo
             │  decomposition · halo (async MPI) · geometry/SDF · ibm   │
-            │  common types/conventions · python (pybind11 helpers)    │
+            │  common types/conventions · python (nanobind bridge)     │
             └──────────────────────────────────────────────────────────┘
                    │                                        │
                    ▼                                        ▼
@@ -67,8 +67,10 @@ depends on primitives. No method depends on another method; primitives depend on
   them.
 - **ibm** — the common Immersed Boundary Method interface: cut-cell / boundary data derived from an
   SDF, consumed by Eulerian solvers (and the point-shell collision analog in `dem`).
-- **python** — pybind11 + numpy helpers so every method exposes Python the same way (array shapes,
-  ownership, naming).
+- **python** — the shared **nanobind** zero-copy array bridge (`tpx::python`,
+  `include/tpx/python/ndarray_interop.hpp`) so every method exposes Python the same way (array shapes,
+  ownership, naming). Host Views/vectors export as NumPy without a copy; device Views export as DLPack
+  for CuPy/PyTorch. Provisioned via `cmake/SuiteNanobind.cmake`; see CONVENTIONS §6.
 
 ## How each method maps onto the core
 
