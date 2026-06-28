@@ -97,9 +97,16 @@ labels and stay local to voronoi; they are not suite-wide types.
   double matching the solver's precision.
 - **Lifecycle:** `Solver(...)` construct → `initialize(...)`/`set_*` config → `step(dt)` → `get_*`
   accessors returning numpy arrays. Keep verb names identical across modules (`step`, `get_positions`,
-  `get_u`, …). Kokkos is initialized at import and **left initialized** for the interpreter's lifetime
-  (no atexit `Kokkos::finalize` — a returned array's owning capsule can outlive the hook and finalizing
-  first aborts); modules expose `finalize()` for deterministic teardown when needed.
+  `get_u`, …). Kokkos is initialized at import and finalized via a Python **atexit** hook — this is
+  required on CUDA (without it, Kokkos's device state is torn down by static destructors *after* the
+  CUDA runtime unloads → `cudaErrorCudartUnloading` at exit). To avoid the opposite abort ("deallocated
+  after `Kokkos::finalize`"), the hook first releases any live View-holding objects, then finalizes:
+  modules with simulation objects keep a registry and do `releaseAll()` → `finalize()` (dem, vorflow,
+  tpx_amr); modules whose objects are short-lived just `finalize()` (sdflow, pnm) and document that a
+  Solver kept alive to interpreter exit must be released first (`del s`). Getters return host
+  `vector_to_ndarray` arrays (no device Views), so they never block finalize; a zero-copy *device*
+  export (`view_to_ndarray` to CuPy) must be released before exit. Build note: pass `NOMINSIZE` to
+  `nanobind_add_module` for Kokkos modules — nanobind's default `-Os` is rejected by `nvcc`.
 
 ## 7. Units
 
