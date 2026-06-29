@@ -175,7 +175,16 @@ The CFD solver is clean; pnm is where the avoidable host work lives.
 - **Phase 2 — vorflow incremental update (Theme E):** E1 + E2. Biggest per-step compute win for vorflow;
   device code already exists, just unwired.
 - **Phase 3 — distributed device compute + device migration (Themes C, D):** C2, D1, D2, then H1 and at-
-  scale multi-GPU validation. The multi-GPU scaling track.
+  scale multi-GPU validation. The multi-GPU scaling track. **C2 DONE (transport-core 71cd629):** the
+  distributed AMR Poisson + multigrid run device-resident — `DistributedGatherHalo` (value-only octree
+  gather over a once-established NBX topology; `DistributedOctree::buildGatherHaloTopology`) +
+  `DistributedPoissonDevice` + `DistributedMultigridDevice` in `distributed_device.hpp`. The V-cycle is
+  all Kokkos kernels, mirroring only the compact ghost buffer across MPI (à la `grid_halo.hpp`); bit-for-
+  bit vs the host MG (same decomposition) and the single-block reference at np=1,2,4
+  (`amr_distributed_device`). **Remaining:** D1 (device `ParticleMigrator::migrate` — device binning +
+  per-rank pack + GPU-aware NBX, consensus stays host), D2 (dem `gather()` — reuse the halo topology
+  under a Verlet skin instead of a per-substep full-position D2H + host rebuild; needs the dem MPI build
+  to validate), and H1 (make `TPX_GPU_AWARE_MPI` the validated default — needs real multi-GPU hardware).
 - **Phase 4 — pnm + device outputs (Themes F, H2):** F1/F2, H2. Lower frequency, real but one-shot.
 
 ## Validation & correctness invariants
