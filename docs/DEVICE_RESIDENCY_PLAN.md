@@ -155,15 +155,23 @@ The CFD solver is clean; pnm is where the avoidable host work lives.
   (transport-core 25/25 ctests np 1–8; device tessellation/step/viscous bit-exact; Python roundtrips).
 - **Phase 1 — dynamic AMR assembly (Theme A):** build S1, then B2 → B3 → B4 → B5 → B6. Unlocks
   moving-boundary / solution-adaptive AMR with no host round-trip. Largest single payoff.
-  **In progress (transport-core):** S1/D1 + B2/D2 (device FV assembly, `8d32a9e`), B3/D3 (device
-  cut-cell stencil + momentum assembly, `f24d72d`), B4/D4 (device face-geometry assembly, `d1d48ad`)
-  are **DONE** — the S1 CSR-fill primitive (`device_csr.hpp`) + the FV / momentum / face-geometry
-  device assemblers (`device_assembly.hpp`, `device_momentum_assembly.hpp`,
-  `device_facegeom_assembly.hpp`), each bit-exact vs its host oracle on OpenMP (tests
-  `amr_device_assembly` / `amr_device_momentum` / `amr_device_facegeom`; full 57-test AMR suite green
-  np=1–8). SDF/openness sampling stays host-staged (a device SDF sampler is its own item). **Remaining:**
-  B5/D5 (rebuild the MG-hierarchy per-level operators via D2/D3 on adapt) and B6/D6 (wire the
-  dirty-flag dynamic reassembly into `AmrFlow::setSolid`/`step` + benchmark vs the host round-trip).
+  **DONE (transport-core):** S1/D1 + B2/D2 (device FV assembly, `8d32a9e`), B3/D3 (device cut-cell
+  stencil + momentum assembly, `f24d72d`), B4/D4 (device face-geometry assembly, `d1d48ad`), B5/D5 +
+  B6/D6 (MG-hierarchy rebuild + flow wiring). The S1 CSR-fill primitive (`device_csr.hpp`) + the FV /
+  momentum / face-geometry device assemblers (`device_assembly.hpp`, `device_momentum_assembly.hpp`,
+  `device_facegeom_assembly.hpp`) are each bit-exact vs their host oracle on OpenMP (`amr_device_assembly`
+  / `amr_device_momentum` / `amr_device_facegeom`). D5: the FV **pressure multigrid** rebuilds its
+  per-level operators on device (`Multigrid::buildFaceCsr` → `deviceAssembleFv`; `reassembleOperators()`
+  is the adapt-time hook). D6: **`AmrFlow::setSolid`** assembles the momentum operator, face geometry, and
+  pressure hierarchy entirely on device — no host CSR walk, no operator round-trip (`FaceGeom` extracted to
+  `face_geom.hpp` to break the assembler↔flow include cycle). Device flow stays correct
+  (`test_amr_flow_solver`: poiseuille L2 7e-17, advection device==host exactly, sphere rel 7e-5; full
+  57-test AMR suite green np=1–8). SDF/openness sampling stays host-staged (a device SDF sampler is its own
+  item). **Remaining refinements (not blocking):** the momentum *preconditioner* hierarchies still build on
+  host — `MomentumMG` is a Galerkin RAP (needs a device SpMM triple-product), `VelocityMG` staircase is a
+  per-level rediscretize (a device assembler like the FV one); plus a fine-grained `AmrFlow` dirty-flag
+  reassemble (today a moving boundary re-calls `setSolid`, which already assembles on device) and a
+  setSolid host-vs-device assembly benchmark.
 - **Phase 2 — vorflow incremental update (Theme E):** E1 + E2. Biggest per-step compute win for vorflow;
   device code already exists, just unwired.
 - **Phase 3 — distributed device compute + device migration (Themes C, D):** C2, D1, D2, then H1 and at-
