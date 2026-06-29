@@ -181,10 +181,19 @@ The CFD solver is clean; pnm is where the avoidable host work lives.
   `DistributedPoissonDevice` + `DistributedMultigridDevice` in `distributed_device.hpp`. The V-cycle is
   all Kokkos kernels, mirroring only the compact ghost buffer across MPI (à la `grid_halo.hpp`); bit-for-
   bit vs the host MG (same decomposition) and the single-block reference at np=1,2,4
-  (`amr_distributed_device`). **Remaining:** D1 (device `ParticleMigrator::migrate` — device binning +
-  per-rank pack + GPU-aware NBX, consensus stays host), D2 (dem `gather()` — reuse the halo topology
-  under a Verlet skin instead of a per-substep full-position D2H + host rebuild; needs the dem MPI build
-  to validate), and H1 (make `TPX_GPU_AWARE_MPI` the validated default — needs real multi-GPU hardware).
+  (`amr_distributed_device`). **D1 DONE (transport-core 02de4ce):** `ParticleMigratorDevice`
+  (`particle_migrator_device.hpp`) keeps the particle SoA on device — device binning (periodic wrap +
+  ORB ownerOf via `BlockDecomposer::flattenTree`) + device compaction/pack of departing particles; only
+  the compact migrating records host-stage for the NBX consensus. Validated (`particle_migrator_device`,
+  np=1,2,4,8): count conserved, every particle on its owner, id multiset preserved. **D2 DONE (dem
+  5c70aa1):** `KokkosParticleHalo::gather` reuses the owner↔ghost topology under a Verlet skin (build with
+  rcut+skin, rebuild only when a particle moves > skin) — opt-in via `enable_mpi_step(verlet_skin=…)`,
+  skin=0 unchanged. Validated (`test_demstep_mpi`, np=1,2,4, closed+periodic): distributed-with-reuse ==
+  single-rank rebuild-every-substep, reuse triggers (1 rebuild / 8 gathers). **H1 PARTIAL (transport-core
+  346bf0f):** the device distributed gather halo gained the `TPX_GPU_AWARE_MPI` device-pointer-MPI path
+  (host-staged default), validated on OpenMP (both paths pass the bit-exact lock). **Remaining (hardware-
+  gated):** flip GPU-aware to the validated default + at-scale multi-GPU benchmark, and a GPU-aware NBX
+  engine (which would let D1's migrator skip host-staging too) — both need real multi-GPU hardware.
 - **Phase 4 — pnm + device outputs (Themes F, H2):** F1/F2, H2. Lower frequency, real but one-shot.
 
 ## Validation & correctness invariants
