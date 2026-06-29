@@ -144,9 +144,15 @@ The CFD solver is clean; pnm is where the avoidable host work lives.
 
 ## Phased roadmap
 
-- **Phase 0 — quick wins (low risk):** S2a helper, then G1–G2, G4–G7, E3–E4, C1, D3, F3. Mechanical,
-  high-ratio, no algorithm changes. Knocks out the redundant-copy idiom suite-wide and the
-  step-invariant H2D in vorflow.
+- **Phase 0 — quick wins (low risk):** ✅ **DONE** (umbrella 774199b, 2026-06-29). S2a helper, then
+  G1–G2, G4–G7, E3–E4, C1, D3, F3. Mechanical, high-ratio, no algorithm changes. Knocked out the
+  redundant-copy idiom suite-wide and the step-invariant H2D in vorflow. Per-repo commits:
+  transport-core b976351 (S2a `tpx::toVector`, C1 gather-plan memoization, D3 ParticleHalo scratch +
+  reverse-slice, G5 fused fv removeMean, G6 one-D2H `velocities()`), morton 45be8c7 (G7 `MORTON_HD` on
+  comparisons / `wide_uint` / range queries), dem 635b13f (G1 getters, G2 dup pair-count), vorflow
+  3a843b9 (G1 getters, E3 `WorklistCache`, E4 viscous scratch + upload-mass-once), sdflow 7c25b9c
+  (F3/G1 pnm bulk copies, G4 single-rank IBM device wrap). Validated per-repo on host-openmp
+  (transport-core 25/25 ctests np 1–8; device tessellation/step/viscous bit-exact; Python roundtrips).
 - **Phase 1 — dynamic AMR assembly (Theme A):** build S1, then B2 → B3 → B4 → B5 → B6. Unlocks
   moving-boundary / solution-adaptive AMR with no host round-trip. Largest single payoff.
 - **Phase 2 — vorflow incremental update (Theme E):** E1 + E2. Biggest per-step compute win for vorflow;
