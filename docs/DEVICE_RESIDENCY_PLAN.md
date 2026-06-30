@@ -195,6 +195,17 @@ The CFD solver is clean; pnm is where the avoidable host work lives.
   gated):** flip GPU-aware to the validated default + at-scale multi-GPU benchmark, and a GPU-aware NBX
   engine (which would let D1's migrator skip host-staging too) — both need real multi-GPU hardware.
 - **Phase 4 — pnm + device outputs (Themes F, H2):** F1/F2, H2. Lower frequency, real but one-shot.
+  **DONE.** F3 landed in Phase 0; F2 (sdflow `26290b0`) replaces the host `std::map` segmentation
+  relabel with a device dense-remap (the first-encounter id = exclusive prefix sum of a per-label
+  first-occurrence flag — no host map, no labels/roots D2H; proved a fixed point of the host relabel).
+  F1 (sdflow `d793ae5`) splits each pnm stage into a device core + thin host wrapper and adds the fused
+  `extract_pore_network` (SDF uploaded once, segmentation device-resident across extract_pores →
+  segment → topology); also fixes the pre-existing `extract_topology_gpu` `vector<pair>` return via
+  `nanobind/stl/pair.h`. H2 (dem `07a8985`) wires the bridge's `view_to_ndarray` (S2b) into opt-in
+  zero-copy device getters (`get_positions_device`/`get_velocities_device` — NumPy view on host,
+  DLPack/CuPy on GPU; proved zero-copy by shared data pointer); the same pattern applies to
+  sdflow/vorflow. Caveat: a device-export array holds a ref-counted View, so release it before the
+  module's atexit `Kokkos::finalize` (hence opt-in).
 
 ## Validation & correctness invariants
 
