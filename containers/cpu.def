@@ -36,7 +36,6 @@ From: ubuntu:24.04
     tools/bootstrap_deps.sh host-openmp
 
     PREFIX=/opt/peclet/extern/install/host-openmp
-    python3 -m pip install --break-system-packages --upgrade pip
     # Build/install each Python package against the host-openmp prefix.
     CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages /opt/peclet/flow
     CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages \
