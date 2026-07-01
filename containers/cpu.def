@@ -40,7 +40,7 @@ From: ubuntu:24.04
     # Build/install each Python package against the host-openmp prefix.
     CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages /opt/peclet/sdflow
     CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages \
-        --config-settings=cmake.define.DEM_MPI=ON /opt/peclet/dem
+        --config-settings=cmake.define.PECLET_DEM_MPI=ON /opt/peclet/dem
     python3 -m pip install --break-system-packages /opt/peclet/morton
 
 %environment

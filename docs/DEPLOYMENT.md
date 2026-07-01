@@ -12,7 +12,7 @@ There are **two orthogonal choices**, both made at *build* time, not at `pip ins
    [Kokkos](https://kokkos.org); the backend (Serial / OpenMP / CUDA / HIP) is **compiled in**. You do
    not pick it at runtime; you build (or pull a container) for your hardware.
 2. **MPI** — *how many processes.* Orthogonal to the backend: any backend can run single-process or
-   multi-process. It is a build option (`DEM_MPI` for dem; the sdflow Python module is single-rank, its
+   multi-process. It is a build option (`PECLET_DEM_MPI` for dem; the sdflow Python module is single-rank, its
    multi-rank solver lives in the C++ `tests/kokkos_mpi` suite).
 
 So "1 MPI process / multicore / GPU" is really **backend × MPI**:
@@ -67,7 +67,7 @@ pip install peclet-flow            # or any one on its own
 # CPU / multicore — from a source checkout against a bootstrapped prefix (dev, or to add MPI):
 PREFIX=$PWD/extern/install/host-openmp
 CMAKE_PREFIX_PATH=$PREFIX pip install ./sdflow
-CMAKE_PREFIX_PATH=$PREFIX pip install --config-settings=cmake.define.DEM_MPI=ON ./dem
+CMAKE_PREFIX_PATH=$PREFIX pip install --config-settings=cmake.define.PECLET_DEM_MPI=ON ./dem
 pip install ./morton               # pure-CPU, no prefix needed
 
 # NVIDIA GPU (Snellius) — build from source against the CUDA prefix:

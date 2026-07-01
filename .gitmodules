@@ -1,15 +1,15 @@
 [submodule "transport-core"]
 	path = transport-core
-	url = git@github.com:computational-chemical-engineering/transport-core.git
+	url = git@github.com:computational-chemical-engineering/peclet-core.git
 [submodule "sdflow"]
 	path = sdflow
-	url = git@github.com:computational-chemical-engineering/sdflow.git
+	url = git@github.com:computational-chemical-engineering/peclet-flow.git
 [submodule "dem"]
 	path = dem
-	url = git@github.com:computational-chemical-engineering/dem.git
+	url = git@github.com:computational-chemical-engineering/peclet-dem.git
 [submodule "morton"]
 	path = morton
-	url = git@github.com:computational-chemical-engineering/morton.git
+	url = git@github.com:computational-chemical-engineering/peclet-morton.git
 [submodule "vorflow"]
 	path = vorflow
-	url = git@github.com:computational-chemical-engineering/vorflow.git
+	url = git@github.com:computational-chemical-engineering/peclet-voro.git

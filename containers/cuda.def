@@ -48,7 +48,7 @@ From: nvidia/cuda:12.6.2-devel-ubuntu22.04
     python3 -m pip install --break-system-packages --upgrade pip
     CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages /opt/peclet/sdflow
     CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages \
-        --config-settings=cmake.define.DEM_MPI=ON /opt/peclet/dem
+        --config-settings=cmake.define.PECLET_DEM_MPI=ON /opt/peclet/dem
     python3 -m pip install --break-system-packages /opt/peclet/morton
 
 %environment
