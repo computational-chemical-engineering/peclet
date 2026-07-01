@@ -106,8 +106,8 @@ program in `vorflow/docs/dynamic_update_decision_and_plan.md`.
 
 | Item | What | Where | Effort |
 |------|------|-------|--------|
-| E1 | Wire incremental update (reeval + detector + repair) into `ExplicitEulerDevice::buildAndForce` instead of full rebuild | `device_simulation.hpp:128` | L |
-| E2 | Maintain `buildAuxMaps`/reciprocity incrementally rather than rebuilding each step | `transpose.hpp:34` (via `device_simulation.hpp:130`) | M (coupled to E1) |
+| E1 | **DONE** (vorflow `3baf127`, opt-in scaffolding). Wire incremental update into `ExplicitEulerDevice::buildAndForce` instead of full rebuild | `device_simulation.hpp` | L |
+| E2 | *Deferred to the user's physics work.* Maintain `buildAuxMaps`/reciprocity incrementally rather than rebuilding each step | `transpose.hpp:34` (via `device_simulation.hpp`) | M (coupled to E1) |
 | E3 | Cache the **step-invariant** worklist offset table — kill the per-step host `std::sort` + two H2D copies in `buildTessellation` | `tessellator.hpp:516-582` | M |
 | E4 | Hoist per-call scratch: persistent `9*N` viscous scratch; upload the mass array once at init | `viscous.hpp:126`, `vorflow_bindings.cpp:93` | S |
 
@@ -172,8 +172,16 @@ The CFD solver is clean; pnm is where the avoidable host work lives.
   per-level rediscretize (a device assembler like the FV one); plus a fine-grained `AmrFlow` dirty-flag
   reassemble (today a moving boundary re-calls `setSolid`, which already assembles on device) and a
   setSolid host-vs-device assembly benchmark.
-- **Phase 2 — vorflow incremental update (Theme E):** E1 + E2. Biggest per-step compute win for vorflow;
-  device code already exists, just unwired.
+- **Phase 2 — vorflow incremental update (Theme E):** **E1 DONE** (vorflow `3baf127`, opt-in). The
+  fluid step (`ExplicitEulerDevice::buildAndForce`) can now use the moving-point repair
+  (`MovingTessellation`) for the topology + a reeval-publish of the force geometry
+  (`device/reeval_tessellation.hpp` `reevalPublish` — re-eval each cell over its stored topology and
+  pack the same facet-CSR `TessellationView` the full build emits, reusing the repair's volumes)
+  instead of a full rebuild each step. Default OFF (`setRepair(true)` / `Simulation.set_repair(True)`
+  to enable); the full-rebuild path is byte-unchanged. Validated: repair path reproduces the
+  full-rebuild trajectory to round-off (pos 1.5e-11, vol 1.2e-13, internal-E 8.6e-13; ~0.5% of cells
+  flicker ±1 marginal zero-area face, no force effect). **E2 (incremental aux/CSR reuse) deferred to
+  the user's ongoing physics work** — this is scaffolding to build the physics on, per the user.
 - **Phase 3 — distributed device compute + device migration (Themes C, D):** C2, D1, D2, then H1 and at-
   scale multi-GPU validation. The multi-GPU scaling track. **C2 DONE (transport-core 71cd629):** the
   distributed AMR Poisson + multigrid run device-resident — `DistributedGatherHalo` (value-only octree
