@@ -38,7 +38,7 @@ OpenMP, selected at build time. See [CUDA retirement](CUDA_RETIREMENT.md).
 
 Each code publishes its full C++/Python API as Doxygen on its own GitHub Pages site:
 
-- [core API](https://cautious-barnacle-7p9p71w.pages.github.io/)
-- [morton API](https://congenial-chainsaw-g414wov.pages.github.io/)
-- [flow API](https://miniature-adventure-y7jzg8e.pages.github.io/)
-- [dem API](https://expert-chainsaw-6qjq213.pages.github.io/)
+- [core API](https://computational-chemical-engineering.github.io/peclet-core/)
+- [morton API](https://computational-chemical-engineering.github.io/peclet-morton/)
+- [flow API](https://computational-chemical-engineering.github.io/peclet-flow/)
+- [dem API](https://computational-chemical-engineering.github.io/peclet-dem/)

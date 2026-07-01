@@ -50,10 +50,11 @@ nav:
   - Studies:
       - Staggered vs collocated (flow): studies/staggered_vs_colocated.md
   - API reference:
-      - peclet-core: https://cautious-barnacle-7p9p71w.pages.github.io/
-      - peclet-morton: https://congenial-chainsaw-g414wov.pages.github.io/
-      - peclet-flow: https://miniature-adventure-y7jzg8e.pages.github.io/
-      - peclet-dem: https://expert-chainsaw-6qjq213.pages.github.io/
+      - peclet-core: https://computational-chemical-engineering.github.io/peclet-core/
+      - peclet-morton: https://computational-chemical-engineering.github.io/peclet-morton/
+      - peclet-flow: https://computational-chemical-engineering.github.io/peclet-flow/
+      - peclet-dem: https://computational-chemical-engineering.github.io/peclet-dem/
+      - peclet-voro: https://computational-chemical-engineering.github.io/peclet-voro/
   - Containers (GitHub): https://github.com/computational-chemical-engineering/peclet/tree/main/containers
 
 # DOC_CI_WORK_NOTES.md is an internal work log; keep it out of the nav.
