@@ -27,7 +27,8 @@ permissions:
   packages: write
 
 concurrency:
-  group: containers-${{ github.ref }}
+  # per-subset group so cpu / cuda / hip dispatches run in parallel instead of cancelling each other
+  group: containers-${{ github.ref }}-${{ github.event.inputs.only || 'all' }}
   cancel-in-progress: true
 
 jobs:
