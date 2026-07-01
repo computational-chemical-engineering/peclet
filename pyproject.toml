@@ -1,0 +1,48 @@
+# The `peclet` metapackage — `pip install peclet` pulls the self-contained CPU (OpenMP) build of the
+# suite: the Morton index, the Eulerian NS solver, the DEM packer, and the Voronoi engine. It ships NO
+# code of its own (so `peclet` stays an implicit PEP-420 namespace owned by the member packages) — it is
+# purely a convenience dependency set.
+#
+#   pip install peclet          # CPU family: peclet-morton + peclet-flow + peclet-dem + peclet-voro
+#   pip install peclet[mpi]     # + peclet-core (MPI particle halo / AMR — builds from sdist, needs MPI)
+#
+# GPU (CUDA/HIP) and multi-rank MPI are NOT pip-installable as portable wheels (arch x CUDA/ROCm x
+# MPI-ABI): build the member packages from source against a Kokkos prefix, or use the containers.
+# See docs/DEPLOYMENT.md.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "peclet"
+version = "0.1.0"
+description = "GPU-accelerated & parallel simulation of transport phenomena (CFD, DEM, Voronoi) — CPU family metapackage"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Frank Peters", email = "e.a.j.f.peters@gmail.com" }]
+dependencies = [
+  "peclet-morton==0.1.0",
+  "peclet-flow==0.1.0",
+  "peclet-dem==0.1.0",
+  "peclet-voro==0.1.0",
+]
+
+[project.optional-dependencies]
+# peclet-core is sdist-only (MPI particle halo + Kokkos AMR): installing it builds from source and needs
+# an MPI toolchain (+ optional Kokkos prefix for the AMR module).
+mpi = ["peclet-core==0.1.0"]
+
+[project.urls]
+Homepage = "https://github.com/computational-chemical-engineering/peclet"
+Documentation = "https://github.com/computational-chemical-engineering/peclet"
+
+# No Python package is built — this metapackage is dependencies only. Point hatchling at an empty target
+# so it produces a valid (code-free) wheel/sdist.
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.hatch.build.targets.sdist]
+include = ["pyproject.toml", "README.md", "LICENSE"]

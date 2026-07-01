@@ -25,10 +25,15 @@ So "1 MPI process / multicore / GPU" is really **backend × MPI**:
 | NVIDIA GPU | CUDA | off/on | `extern/install/nvidia-cuda` |
 | AMD GPU (LUMI) | HIP | off/on | `extern/install/lumi-hip` |
 
-**Why not just PyPI wheels?** A GPU wheel is pinned to a GPU arch (sm_80 vs sm_90 vs gfx90a), a CUDA/ROCm
-version, *and* an MPI ABI. There is no single portable GPU wheel. The realistic models are (a) **build
-from source** against your site's toolchain, or (b) **a container** for your hardware. `mortonarith` is
-the exception — it is pure CPU with runtime ISA dispatch, so it ships normal PyPI wheels.
+**Why not just PyPI wheels for everything?** A *GPU* wheel is pinned to a GPU arch (sm_80 vs sm_90 vs
+gfx90a), a CUDA/ROCm version, *and* an MPI ABI — there is no single portable GPU wheel. So the split is:
+
+- **Multicore CPU (OpenMP):** `peclet-morton`, `peclet-flow`, `peclet-dem`, `peclet-voro` ship
+  **self-contained PyPI wheels** — the compute ones vendor-build Kokkos (OpenMP+Serial) inside the wheel,
+  so `pip install peclet` (the CPU-family metapackage) or any individual `pip install peclet-flow` runs
+  multi-threaded with no prefix. `peclet-morton` is pure CPU with runtime ISA dispatch.
+- **GPU (CUDA/HIP) or multi-rank MPI:** **build from source** (`pip install` against a Kokkos prefix) or
+  use a **container**. `peclet-core` (MPI particle halo + Kokkos AMR) is **sdist-only** for the same reason.
 
 ## One-time dependency bootstrap
 
@@ -55,16 +60,24 @@ Point `pip` at the prefix you bootstrapped (CMake reads `CMAKE_PREFIX_PATH` from
 backend is whatever that prefix targets:
 
 ```bash
-# CPU / multicore:
+# CPU / multicore — the easy path: portable wheels straight from PyPI, no prefix:
+pip install peclet                 # peclet-morton + peclet-flow + peclet-dem + peclet-voro
+pip install peclet-flow            # or any one on its own
+
+# CPU / multicore — from a source checkout against a bootstrapped prefix (dev, or to add MPI):
 PREFIX=$PWD/extern/install/host-openmp
 CMAKE_PREFIX_PATH=$PREFIX pip install ./sdflow
 CMAKE_PREFIX_PATH=$PREFIX pip install --config-settings=cmake.define.DEM_MPI=ON ./dem
-pip install ./morton          # pure-CPU, no prefix needed
+pip install ./morton               # pure-CPU, no prefix needed
 
-# NVIDIA GPU (Snellius):
+# NVIDIA GPU (Snellius) — build from source against the CUDA prefix:
 PREFIX=$PWD/extern/install/nvidia-cuda
 PATH=/usr/local/cuda/bin:$PATH CMAKE_PREFIX_PATH=$PREFIX pip install ./sdflow ./dem
 ```
+
+The dist names are `peclet-flow` (repo `sdflow`), `peclet-dem` (`dem`), `peclet-voro` (`vorflow`),
+`peclet-morton` (`morton`), `peclet-core` (`transport-core`); a source `pip install ./<repo>` builds the
+matching one.
 
 `pip install` builds the same CMake targets the developer build does; the install rule is gated on
 `SKBUILD`, so a plain `cmake --build build` is unchanged. Use a virtualenv/conda env per backend if you
@@ -80,11 +93,11 @@ OMP_NUM_THREADS=16 python my_run.py
 mpirun -np 4 python my_distributed_run.py
 
 # GPU: just import — the device backend is compiled in
-python -c "import sdflow; print(sdflow.execution_space)"   # -> Cuda / HIP / OpenMP / Serial
+python -c "import peclet.flow as f; print(f.execution_space)"   # -> Cuda / HIP / OpenMP / Serial
 ```
 
-`execution_space` (exposed by both `sdflow` and `dem`) reports the compiled-in Kokkos backend — the
-quickest way to confirm you imported the build you meant to.
+`execution_space` (exposed by `peclet.flow`, `peclet.dem`, `peclet.voro`) reports the compiled-in Kokkos
+backend — the quickest way to confirm you imported the build you meant to.
 
 ## Containers (Snellius, LUMI, other HPC)
 
@@ -117,12 +130,14 @@ for MPI-ABI, GPU-aware-MPI, and arch details.
 
 | Package | Import | Key API |
 |---------|--------|---------|
-| `sdflow` | `import sdflow` | `sdflow.Solver(nx,ny,nz)` — set_rho/mu/dt, set_solid, set_domain_bc, step, get_u/v/w/p; `sdflow.execution_space` |
-| `pnm` (in sdflow) | `import pnm` | `SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu` |
-| `dem` | `import dem` | `dem.Simulation(capacity)` — initialize_shape, set_domain, set_material_params, set_positions, step, get_positions, get_sdf_grid; gated MPI: init_mpi/enable_mpi_step/step_mpi |
-| `mortonarith` | `from mortonarith import encode, decode, shift, box_zorder` | vectorised NumPy Morton ops |
+| `peclet-flow` | `import peclet.flow` | `peclet.flow.Solver(nx,ny,nz)` — set_rho/mu/dt, set_solid, set_domain_bc, step, get_u/v/w/p; `peclet.flow.execution_space` |
+| `peclet-flow` (pnm) | `from peclet.flow import pnm` | `SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu` |
+| `peclet-dem` | `import peclet.dem` | `peclet.dem.Simulation(capacity)` — initialize_shape, set_domain, set_material_params, set_positions, step, get_positions, get_sdf_grid; gated MPI: init_mpi/enable_mpi_step/step_mpi |
+| `peclet-voro` | `import peclet.voro` | `peclet.voro.Tessellation`, `peclet.voro.Simulation` — moving-cell Voronoi + dynamics |
+| `peclet-morton` | `from peclet.morton import encode, decode, shift, box_zorder` | vectorised NumPy Morton ops |
+| `peclet-core` | `from peclet.core import mpi, amr` | MPI particle halo (`mpi.Migrator`) + Kokkos AMR octree (`amr.Flow`) |
 
-Every binding method carries a one-line docstring (`help(sdflow.Solver.step)`); the full C++/Python API
+Every binding method carries a one-line docstring (`help(peclet.flow.Solver.step)`); the full C++/Python API
 is published as Doxygen on each repo's GitHub Pages.
 
 ## Status / caveats

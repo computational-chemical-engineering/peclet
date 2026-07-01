@@ -47,8 +47,23 @@ reusable parts were extracted into `transport-core/`.
 
 ## Install & run (Python)
 
-The method codes expose Python APIs (`import sdflow`, `import dem`, `from mortonarith import encode`).
-Because the GPU backend (Serial / OpenMP / CUDA / HIP) is compiled in, you build for your hardware —
+Everything ships under one **`peclet` namespace** — installable parts of one family:
+
+| PyPI package | Import | Role |
+|---|---|---|
+| `peclet-morton` | `peclet.morton` | Morton/Z-order spatial index |
+| `peclet-flow` | `peclet.flow` (+ `.pnm`) | Eulerian incompressible Navier–Stokes solver |
+| `peclet-dem` | `peclet.dem` | Lagrangian DEM/XPBD particle packing |
+| `peclet-voro` | `peclet.voro` | Dynamic Voronoi tessellation + mesh generator |
+| `peclet-core` | `peclet.core` (`.mpi`, `.amr`) | Shared infra (particle halo, AMR) — sdist only |
+| `peclet` | — | metapackage: `pip install peclet` pulls the CPU family |
+
+**Multicore CPU (OpenMP):** the compute packages ship **self-contained wheels** — `pip install peclet`
+(or an individual `pip install peclet-flow`) just works and runs multi-threaded (`OMP_NUM_THREADS`).
+
+**GPU (CUDA/HIP) and multi-rank MPI:** a portable binary wheel is impossible (arch × CUDA/ROCm × MPI-ABI),
+so you build the packages from source against a Kokkos prefix, or use a container. Because the backend
+(Serial / OpenMP / CUDA / HIP) is compiled in, you build for your hardware —
 [**docs/DEPLOYMENT.md**](docs/DEPLOYMENT.md) is the guide: the backend×MPI matrix, `pip install` recipes
 per environment, and **Apptainer containers** for Snellius (CUDA) and LUMI (HIP) in [`containers/`](containers).
 

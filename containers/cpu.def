@@ -11,7 +11,7 @@ From: ubuntu:24.04
 # Build (from the suite root, so %files can copy the source tree):
 #   apptainer build peclet-cpu.sif containers/cpu.def
 # Run:
-#   apptainer exec peclet-cpu.sif python3 -c "import sdflow, dem, mortonarith"
+#   apptainer exec peclet-cpu.sif python3 -c "import peclet.flow, peclet.dem, peclet.morton"
 #   mpirun -np 4 apptainer exec peclet-cpu.sif python3 your_script.py
 #
 # See ../docs/DEPLOYMENT.md for the environment matrix and HPC notes.

@@ -1,7 +1,7 @@
 # Containers
 
 Apptainer (Singularity) definition files that bake the toolchain + a bootstrapped Kokkos/ArborX prefix
-and pip-install the `sdflow`, `dem`, and `mortonarith` Python packages. Apptainer is the de-facto
+and pip-install the `peclet.flow`, `peclet.dem`, and `peclet.morton` Python packages. Apptainer is the de-facto
 container runtime on HPC (both **Snellius** and **LUMI** use it; Docker is not permitted on the compute
 nodes).
 
@@ -32,7 +32,7 @@ header comment in each `.def`.
 
 ```bash
 # CPU, single process:
-apptainer exec peclet-cpu.sif python3 -c "import sdflow, dem, mortonarith"
+apptainer exec peclet-cpu.sif python3 -c "import peclet.flow, peclet.dem, peclet.morton"
 
 # CPU, 4 MPI ranks (host mpirun launches one container per rank):
 mpirun -np 4 apptainer exec peclet-cpu.sif python3 your_distributed_script.py

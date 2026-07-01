@@ -15,7 +15,7 @@ From: nvidia/cuda:12.6.2-devel-ubuntu22.04
 # Build (on a node/host with the CUDA toolkit base image pullable):
 #   apptainer build peclet-cuda.sif containers/cuda.def
 # Run on Snellius (request a GPU, then):
-#   apptainer exec --nv peclet-cuda.sif python3 -c "import sdflow; print(sdflow.execution_space)"
+#   apptainer exec --nv peclet-cuda.sif python3 -c "import peclet.flow as f; print(f.execution_space)"
 #   srun apptainer exec --nv peclet-cuda.sif python3 your_script.py
 #
 # NOTE: the build COMPILES device code for the chosen arch but does not need a
