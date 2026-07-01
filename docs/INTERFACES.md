@@ -4,7 +4,7 @@
 > concepts** (host-side). These are *contracts*, not base classes — a type satisfies a concept by
 > having the right members, so existing solvers adopt them incrementally without inheritance. At the
 > Kokkos device boundary, the same shape is carried by functors/Views (the device side is C++20 under
-> Kokkos; CUDA retired). See [STYLE](STYLE.md).
+> Kokkos). See [STYLE](STYLE.md).
 
 The interfaces are deliberately small. They describe **where data lives and how it moves**, leaving the
 numerics to each method. Signatures below are illustrative sketches in namespace `tpx`.

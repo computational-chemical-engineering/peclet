@@ -39,6 +39,13 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Install & run: DEPLOYMENT.md
+  - Python API:
+      - Overview: python/index.md
+      - peclet.flow: python/flow.md
+      - peclet.dem: python/dem.md
+      - peclet.voro: python/voro.md
+      - peclet.core: python/core.md
+      - peclet.morton: python/morton.md
   - Design:
       - Architecture: ARCHITECTURE.md
       - Conventions: CONVENTIONS.md
@@ -46,10 +53,9 @@ nav:
       - Style: STYLE.md
       - Portability: PORTABILITY.md
       - Roadmap: ROADMAP.md
-      - CUDA retirement: CUDA_RETIREMENT.md
   - Studies:
       - Staggered vs collocated (flow): studies/staggered_vs_colocated.md
-  - API reference:
+  - C++ API (Doxygen):
       - peclet-core: https://computational-chemical-engineering.github.io/peclet-core/
       - peclet-morton: https://computational-chemical-engineering.github.io/peclet-morton/
       - peclet-flow: https://computational-chemical-engineering.github.io/peclet-flow/

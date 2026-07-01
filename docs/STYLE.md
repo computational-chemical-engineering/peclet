@@ -7,7 +7,7 @@
 
 - **Host C++: C++20.** `core` is C++20; concepts give us compile-checked interfaces (see
   [INTERFACES](INTERFACES.md)), and `<bit>`/`<span>`/ranges are useful.
-- **Device code under Kokkos: C++20.** With CUDA retired, GPU kernels are ordinary C++ in `.hpp`
+- **Device code under Kokkos: C++20.** GPU kernels are ordinary C++ in `.hpp`
   headers compiled through the Kokkos launch compiler (which routes them to `nvcc`/`hipcc`) — there are
   no `.cu` translation units, and the device side moves to C++20 under Kokkos (see
   [PORTABILITY](PORTABILITY.md)).

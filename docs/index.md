@@ -4,41 +4,55 @@
 Eulerian (CFD / Navier–Stokes), Lagrangian (DEM / particle packing) and mixed (Voronoi) methods,
 sharing one MPI **block domain decomposition** with asynchronous **ghost-layer exchange**,
 **SDF**-described solids, a common **immersed-boundary** methodology, **GPU** support (Kokkos:
-CUDA / HIP / OpenMP), and **Python bindings**.
+CUDA / HIP / OpenMP), and **Python bindings** everywhere.
 
 The name nods to the [Péclet number](https://en.wikipedia.org/wiki/P%C3%A9clet_number) — the ratio of
 advective to diffusive transport, the dimensionless heart of transport phenomena.
 
-This site is the front door to the suite: the cross-cutting **design contract**, the **install &
-deployment** guide, and links to each code's **API reference** (Doxygen).
+## Quick start (Python)
+
+The codes are driven from **Python** — one `peclet.*` namespace, installable from PyPI. The multicore-CPU
+(OpenMP) build ships as a self-contained wheel, so this just works:
+
+```bash
+pip install peclet            # the CPU family: peclet-morton + peclet-flow + peclet-dem + peclet-voro
+# or an individual package, e.g.  pip install peclet-flow
+```
+
+```python
+import peclet.flow as flow
+s = flow.Solver(32, 32, 32)
+s.set_rho(1.0); s.set_mu(0.01); s.set_dt(60.0)
+s.set_solid(sdf)                      # SDF geometry (<0 inside solid)
+for _ in range(100):
+    s.step()
+u, p = s.get_u(), s.get_p()           # numpy arrays [x,y,z]
+print(flow.execution_space)           # -> OpenMP / Cuda / HIP / Serial
+```
+
+→ **[Python API reference](python/index.md)** · **[Install & run](DEPLOYMENT.md)** (GPU / MPI / HPC containers).
 
 ## The codes
 
-| Code | Role | Stack |
-|------|------|-------|
-| [**core**](https://github.com/computational-chemical-engineering/peclet-core) | Shared infrastructure: ORB block decomposition, async grid/particle halo, SDF geometry, VTI I/O | header-only C++20 + MPI (optional Kokkos) |
-| [**flow**](https://github.com/computational-chemical-engineering/peclet-flow) | Incompressible Navier–Stokes for porous media (staggered MAC + cut-cell IBM + multigrid); `pnm` pore extraction | Kokkos + nanobind |
-| [**dem**](https://github.com/computational-chemical-engineering/peclet-dem) | Discrete Element Method (XPBD) + SDF point-shell collision for dense packing | Kokkos + ArborX + nanobind |
-| [**voro**](https://github.com/computational-chemical-engineering/peclet-voro) | Dynamic 3D Voronoi tessellation of moving particles (periodic & Lees–Edwards) | header-only C++17 |
-| [**morton**](https://github.com/computational-chemical-engineering/peclet-morton) | Morton/Z-order codes with arithmetic *in Morton space* — the spatial-index primitive | header-only C++17 + BMI2/AVX-512 + Python |
+| Code | PyPI · import | Role |
+|------|---------------|------|
+| [**core**](https://github.com/computational-chemical-engineering/peclet-core) | `peclet-core` · `peclet.core` | Shared infrastructure: ORB block decomposition, async grid/particle halo, SDF geometry, VTI I/O, AMR octree |
+| [**flow**](https://github.com/computational-chemical-engineering/peclet-flow) | `peclet-flow` · `peclet.flow` | Incompressible Navier–Stokes for porous media (staggered MAC + cut-cell IBM + multigrid); `pnm` pore extraction |
+| [**dem**](https://github.com/computational-chemical-engineering/peclet-dem) | `peclet-dem` · `peclet.dem` | Discrete Element Method (XPBD) + SDF point-shell collision for dense packing |
+| [**voro**](https://github.com/computational-chemical-engineering/peclet-voro) | `peclet-voro` · `peclet.voro` | Dynamic 3D Voronoi tessellation of moving particles (periodic & Lees–Edwards) + mesh generation |
+| [**morton**](https://github.com/computational-chemical-engineering/peclet-morton) | `peclet-morton` · `peclet.morton` | Morton/Z-order codes with arithmetic *in Morton space* — the spatial-index primitive |
 
-Both GPU codes are **Kokkos**-based (CUDA retired); the same source runs on CUDA, HIP (AMD/LUMI) and
-OpenMP, selected at build time. See [CUDA retirement](CUDA_RETIREMENT.md).
+The GPU codes are **Kokkos**-based: the same source runs on CUDA, HIP (AMD/LUMI) and OpenMP, chosen at
+build time by the install prefix (or the container).
 
-## Start here
+## Documentation
 
-- **[Install & run](DEPLOYMENT.md)** — the backend × MPI matrix, `pip install` recipes per environment
-  (CPU / Snellius CUDA / LUMI HIP), and Apptainer containers for HPC.
-- **[Architecture](ARCHITECTURE.md)** — layering, dependency graph, and how each code maps onto the core.
-- **[Conventions](CONVENTIONS.md)** — SDF sign, x-fastest indexing, types, precision, periodic/Lees–Edwards.
-- **[Interfaces](INTERFACES.md)** — the shared C++20 concepts (`Domain`, `Field`, `HaloExchange`, …).
-- **[Roadmap](ROADMAP.md)** — the phased plan.
-
-## API reference (Doxygen)
-
-Each code publishes its full C++/Python API as Doxygen on its own GitHub Pages site:
-
-- [core API](https://computational-chemical-engineering.github.io/peclet-core/)
-- [morton API](https://computational-chemical-engineering.github.io/peclet-morton/)
-- [flow API](https://computational-chemical-engineering.github.io/peclet-flow/)
-- [dem API](https://computational-chemical-engineering.github.io/peclet-dem/)
+- **[Python API reference](python/index.md)** — the classes and methods you call from Python (the primary interface).
+- **[Install & run](DEPLOYMENT.md)** — the backend × MPI matrix, `pip install` recipes (CPU / Snellius CUDA / LUMI HIP), and Apptainer containers.
+- **[Architecture](ARCHITECTURE.md)** · **[Conventions](CONVENTIONS.md)** · **[Interfaces](INTERFACES.md)** · **[Roadmap](ROADMAP.md)** — the cross-cutting design contract.
+- **C++ API (Doxygen)** — the full C++ API per code:
+  [core](https://computational-chemical-engineering.github.io/peclet-core/) ·
+  [morton](https://computational-chemical-engineering.github.io/peclet-morton/) ·
+  [flow](https://computational-chemical-engineering.github.io/peclet-flow/) ·
+  [dem](https://computational-chemical-engineering.github.io/peclet-dem/) ·
+  [voro](https://computational-chemical-engineering.github.io/peclet-voro/)

@@ -1,10 +1,7 @@
 # Portability (Kokkos + ArborX)
 
-Status: **Migration complete — Kokkos is canonical, CUDA retired (2026-06-20).** flow (`flow` +
-`pnm`), dem (`dem`), and core all build and run on Kokkos
-([ArborX](https://github.com/arborx/ArborX) replaced dem's cuBQL broad-phase); the CUDA
-implementations were deleted after a machine-precision / physical-parity validation (see
-`docs/CUDA_RETIREMENT.md`). This document is the contract for the suite's portability across NVIDIA
+Status: **Kokkos is canonical.** flow (`flow` + `pnm`), dem (`dem`), and core all build and run on Kokkos
+([ArborX](https://github.com/arborx/ArborX) provides dem's broad-phase). This document is the contract for the suite's portability across NVIDIA
 (Snellius) and AMD (LUMI/MI250X) GPUs and covers *how the toolchain is provisioned and built* — the
 bootstrapped install prefix (`tools/bootstrap_deps.sh`) is now a **hard build dependency** of every
 method code's main build (`cmake -S . -B build -DCMAKE_PREFIX_PATH=extern/install/<backend>;...`).

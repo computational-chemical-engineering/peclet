@@ -4,11 +4,8 @@
 > efficient asynchronous ghost-layer exchange, common SDF/IBM, GPU support, and Python bindings — while
 > keeping each method its own code. See [ARCHITECTURE](ARCHITECTURE.md) for the layering.
 >
-> **2026-06-20 — CUDA retired, Kokkos canonical.** flow (`flow`/`pnm`), dem
-> (`dem`, ArborX broad-phase), and core now build on Kokkos (CUDA/HIP/OpenMP) with the CUDA
-> implementations deleted and merged to `main`. Historical phase entries below that name `.cu`/`.cuh`
-> files describe the original CUDA path. See [CUDA_RETIREMENT](CUDA_RETIREMENT.md) and
-> [PORTABILITY](PORTABILITY.md).
+> **Kokkos is canonical.** flow (`flow`/`pnm`), dem (`dem`, ArborX broad-phase), and core all build on
+> Kokkos (CUDA/HIP/OpenMP). See [PORTABILITY](PORTABILITY.md) for the backend/toolchain contract.
 
 ## Guiding decisions
 
@@ -59,8 +56,7 @@
 - [x] GPU-resident halo (`peclet::core::halo::GridHalo`, `grid_halo.hpp` + `grid_halo_topology.hpp`): portable
       (Kokkos: CUDA/HIP/OpenMP) on-device pack/unpack/self-copy, **host-staged** MPI of the compact halo
       buffers (the full field stays on the device; opt-in GPU-aware via `PECLET_CORE_GPU_AWARE_MPI`). Validated
-      bit-for-bit against the CPU path, np=1,2,4. *(The original native-CUDA `grid_halo_cuda.cuh`
-      `DeviceGridExchange` was retired when Kokkos became canonical — see `docs/CUDA_RETIREMENT.md`.)*
+      bit-for-bit against the CPU path, np=1,2,4.
 - [x] `geometry/SDF`: analytic primitives (`Sphere`, `Box`, `HollowCylinder`, `Complement`) + sampled
       `GridSdf` (trilinear) behind the `peclet::core::geom::Sdf` concept, shared sign convention, generic
       finite-difference normal, `sample()` to bake analytic → grid. Unit-tested.

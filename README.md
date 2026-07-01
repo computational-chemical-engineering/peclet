@@ -33,16 +33,15 @@ git submodule update --init --recursive
 | `voro/` | Mixed Lagrangian/Eulerian dynamic 3D Voronoi tessellation (header-only C++17; periodic & Lees–Edwards). |
 | `morton/` | Morton/Z-order spatial-index primitive — arithmetic directly in Morton space (header-only C++17 + BMI2/AVX-512, Python). |
 
-Both GPU codes are now **Kokkos**-based (CUDA retired — see [docs/CUDA_RETIREMENT.md](docs/CUDA_RETIREMENT.md));
-the same source runs on CUDA, HIP (AMD/LUMI), and OpenMP backends, chosen by the bootstrapped install
-prefix (`tools/bootstrap_deps.sh`). The original `block_decomposer` prototype has been **retired**; its
-reusable parts were extracted into `core/`.
+Both GPU codes are **Kokkos**-based; the same source runs on CUDA, HIP (AMD/LUMI), and OpenMP backends,
+chosen by the bootstrapped install prefix (`tools/bootstrap_deps.sh`). The reusable parts of the original
+`block_decomposer` prototype were extracted into `core/`.
 
 ## Shared design docs
 
 `docs/` is the cross-code contract every method follows:
 [ARCHITECTURE](docs/ARCHITECTURE.md) · [CONVENTIONS](docs/CONVENTIONS.md) · [STYLE](docs/STYLE.md) ·
-[INTERFACES](docs/INTERFACES.md) · [ROADMAP](docs/ROADMAP.md) · [CUDA_RETIREMENT](docs/CUDA_RETIREMENT.md) ·
+[INTERFACES](docs/INTERFACES.md) · [ROADMAP](docs/ROADMAP.md) ·
 [PORTABILITY](docs/PORTABILITY.md). See `CLAUDE.md` for an agent-facing overview.
 
 ## Install & run (Python)
