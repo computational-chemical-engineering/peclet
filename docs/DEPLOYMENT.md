@@ -101,6 +101,8 @@ backend — the quickest way to confirm you imported the build you meant to.
 
 ## Containers (Snellius, LUMI, other HPC)
 
+> **See the [Containers page](containers.md)** for pulling the pre-built GHCR images and full run recipes. This section is the short version.
+
 For HPC, prefer **Apptainer** (both Snellius and LUMI use it; Docker is barred on compute nodes). The
 [`containers/`](https://github.com/computational-chemical-engineering/peclet/tree/main/containers)
 directory has definition files that bake the toolchain + Kokkos prefix

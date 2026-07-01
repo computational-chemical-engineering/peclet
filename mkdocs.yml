@@ -39,6 +39,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Install & run: DEPLOYMENT.md
+  - Containers (HPC): containers.md
   - Python API:
       - Overview: python/index.md
       - peclet.flow: python/flow.md
@@ -61,7 +62,6 @@ nav:
       - peclet-flow: https://computational-chemical-engineering.github.io/peclet-flow/
       - peclet-dem: https://computational-chemical-engineering.github.io/peclet-dem/
       - peclet-voro: https://computational-chemical-engineering.github.io/peclet-voro/
-  - Containers (GitHub): https://github.com/computational-chemical-engineering/peclet/tree/main/containers
 
 # DOC_CI_WORK_NOTES.md is an internal work log; keep it out of the nav.
 not_in_nav: |

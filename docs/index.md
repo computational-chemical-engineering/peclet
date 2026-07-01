@@ -48,7 +48,8 @@ build time by the install prefix (or the container).
 ## Documentation
 
 - **[Python API reference](python/index.md)** — the classes and methods you call from Python (the primary interface).
-- **[Install & run](DEPLOYMENT.md)** — the backend × MPI matrix, `pip install` recipes (CPU / Snellius CUDA / LUMI HIP), and Apptainer containers.
+- **[Install & run](DEPLOYMENT.md)** — the backend × MPI matrix and `pip install` recipes (CPU / Snellius CUDA / LUMI HIP).
+- **[Containers (HPC)](containers.md)** — pull the pre-built Apptainer images from GHCR (or build your own) and run on a laptop, Snellius, or LUMI.
 - **[Architecture](ARCHITECTURE.md)** · **[Conventions](CONVENTIONS.md)** · **[Interfaces](INTERFACES.md)** · **[Roadmap](ROADMAP.md)** — the cross-cutting design contract.
 - **C++ API (Doxygen)** — the full C++ API per code:
   [core](https://computational-chemical-engineering.github.io/peclet-core/) ·
