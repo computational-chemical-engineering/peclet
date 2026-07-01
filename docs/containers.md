@@ -24,6 +24,14 @@ apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.1
 apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-hip:0.1.0-gfx90a
 ```
 
+!!! warning "LUMI / HIP image is work-in-progress"
+    The `peclet-cpu` and `peclet-cuda` images are published and MPI-enabled. The **HIP** image does not
+    yet build: under `hipcc`/`lld` the nanobind modules hit an undefined-vtable link error
+    (`Kokkos::Impl::SharedAllocationRecord<HIPSpace>` + the core halo classes) from nanobind's
+    hidden-visibility + `--exclude-libs`/`--gc-sections` interacting with the static Kokkos libs — stricter
+    under `lld` than the CUDA/`ld` path. It needs on-GPU debugging (the CUDA image proves the multi-GPU
+    flow/voro *code* is correct). Until then, build on LUMI from source, or track the fix.
+
 Each image also carries a moving tag (`peclet-cpu:latest`, `peclet-cuda:sm80`, `peclet-hip:gfx90a`) that
 tracks the newest release.
 
