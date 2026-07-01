@@ -1,15 +1,28 @@
 # Containers
 
 Apptainer (Singularity) definition files that bake the toolchain + a bootstrapped Kokkos/ArborX prefix
-and pip-install the `peclet.flow`, `peclet.dem`, and `peclet.morton` Python packages. Apptainer is the de-facto
+and pip-install the full `peclet.*` family (flow, dem, voro, core, morton). Apptainer is the de-facto
 container runtime on HPC (both **Snellius** and **LUMI** use it; Docker is not permitted on the compute
 nodes).
 
-| File | Backend | Target |
-|------|---------|--------|
-| `cpu.def` | Kokkos OpenMP + Serial | laptops, CI, CPU HPC partitions |
-| `cuda.def` | Kokkos CUDA | **Snellius** (A100 `sm_80` default; H100 `sm_90` via env) |
-| `hip.def` | Kokkos HIP | **LUMI-G** (MI250X `gfx90a`) |
+| File | Backend | Target | Published image |
+|------|---------|--------|-----------------|
+| `cpu.def` | Kokkos OpenMP + Serial | laptops, CI, CPU HPC partitions | `peclet-cpu` |
+| `cuda.def` | Kokkos CUDA | **Snellius** (A100 `sm_80`; H100 `sm_90`) | `peclet-cuda:*-sm80` / `:*-sm90` |
+| `hip.def` | Kokkos HIP | **LUMI-G** (MI250X `gfx90a`) | `peclet-hip:*-gfx90a` |
+
+## Pre-built images (GHCR)
+
+The [`.github/workflows/containers.yml`](../.github/workflows/containers.yml) workflow builds these on
+version tags and publishes them to the GitHub Container Registry. Pull on a login node without building:
+
+```bash
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cpu:0.1.0
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.1.0-sm80   # Snellius A100
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-hip:0.1.0-gfx90a  # LUMI MI250X
+```
+
+Or build them yourself from the `.def` files below.
 
 ## Build
 

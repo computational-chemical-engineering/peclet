@@ -1,0 +1,109 @@
+name: Containers
+
+# Build the Apptainer/Singularity images from containers/*.def and publish them to the GitHub Container
+# Registry (GHCR) as OCI artifacts. Pull on an HPC login node with, e.g.:
+#   apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cpu:0.1.0
+#
+# GPU images are CROSS-COMPILED on ordinary CPU runners (nvcc/hipcc target sm_80/sm_90/gfx90a without a
+# GPU present); only *running* them needs a GPU. Runs on version tags, or on demand (pick a subset).
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Which images to build"
+        type: choice
+        default: all
+        options: [all, cpu, cuda, hip]
+      version:
+        description: "Version tag for the images (e.g. 0.1.0)"
+        type: string
+        default: "0.1.0"
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: containers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: cpu,        group: cpu,  def: containers/cpu.def,  image: peclet-cpu,  suffix: "",        moving: latest,  gpu: false}
+          - {name: cuda-sm80,  group: cuda, def: containers/cuda.def, image: peclet-cuda, suffix: "-sm80",   moving: sm80,    gpu: true,  kokkos_arch: AMPERE80, cuda_arch: "80"}
+          - {name: cuda-sm90,  group: cuda, def: containers/cuda.def, image: peclet-cuda, suffix: "-sm90",   moving: sm90,    gpu: true,  kokkos_arch: HOPPER90, cuda_arch: "90"}
+          - {name: hip-gfx90a, group: hip,  def: containers/hip.def,  image: peclet-hip,  suffix: "-gfx90a", moving: gfx90a,  gpu: true}
+    steps:
+      - name: Skip if not selected
+        id: gate
+        run: |
+          only="${{ github.event.inputs.only || 'all' }}"
+          if [ "$only" = "all" ] || [ "$only" = "${{ matrix.group }}" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"; echo "skipping ${{ matrix.name }} (only=$only)"
+          fi
+
+      - name: Free disk space (GPU images are large)
+        if: steps.gate.outputs.run == 'true' && matrix.gpu
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
+        with:
+          submodules: recursive
+
+      - name: Set up Apptainer
+        if: steps.gate.outputs.run == 'true'
+        uses: eWaterCycle/setup-apptainer@v2
+        with:
+          apptainer-version: 1.3.6
+
+      - name: Compute version
+        if: steps.gate.outputs.run == 'true'
+        id: ver
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then v="${GITHUB_REF_NAME#v}"; else v="${{ github.event.inputs.version }}"; fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Select GPU arch (CUDA)
+        if: steps.gate.outputs.run == 'true' && matrix.kokkos_arch != ''
+        run: |
+          # Bake the target arch into a def copy (the recipe's shell defaults), avoiding build-env plumbing.
+          sed -E 's/\$\{KOKKOS_ARCH:-[A-Z0-9]+\}/${KOKKOS_ARCH:-${{ matrix.kokkos_arch }}}/; s/\$\{CUDA_ARCH:-[0-9]+\}/${CUDA_ARCH:-${{ matrix.cuda_arch }}}/' \
+            "${{ matrix.def }}" > /tmp/build.def
+          echo "DEF=/tmp/build.def" >> "$GITHUB_ENV"
+
+      - name: Build SIF
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          DEF="${DEF:-${{ matrix.def }}}"
+          # %files copies '.', so build from the repo root (submodules included).
+          apptainer build "${{ matrix.image }}.sif" "$DEF"
+
+      - name: Push to GHCR
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "${{ secrets.GITHUB_TOKEN }}" | apptainer registry login -u "${{ github.actor }}" --password-stdin oras://ghcr.io
+          ver="${{ steps.ver.outputs.version }}"
+          for tag in "${ver}${{ matrix.suffix }}" "${{ matrix.moving }}"; do
+            echo ">> pushing ${{ matrix.image }}:${tag}"
+            apptainer push "${{ matrix.image }}.sif" "oras://ghcr.io/${owner}/${{ matrix.image }}:${tag}"
+          done
