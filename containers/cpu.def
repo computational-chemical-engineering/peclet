@@ -33,6 +33,9 @@ From: ubuntu:24.04
 
     # pip on Ubuntu 24.04 is PEP-668 externally-managed (needs --break-system-packages); older bases
     # neither need nor recognise the flag. Detect once and use $PIP everywhere below.
+    # Ensure pip is new enough for --config-settings (22.04 bases ship pip 22.0.2 without it; the 24.04
+    # base already has it — skip there to avoid the PEP-668 self-uninstall RECORD error).
+    python3 -m pip install --help 2>/dev/null | grep -q -- --config-settings || python3 -m pip install --upgrade pip
     PIP="python3 -m pip install"
     python3 -m pip install --help 2>/dev/null | grep -q -- --break-system-packages && PIP="$PIP --break-system-packages"
 
