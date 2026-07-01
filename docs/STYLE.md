@@ -1,7 +1,7 @@
 # Suite Style & Tooling
 
 > Status: design document (living). What to standardize, and the rationale. The baseline is
-> `vorflow`, the only code that already has formatting, linting, and CI.
+> `voro`, the only code that already has formatting, linting, and CI.
 
 ## Language standard
 
@@ -16,7 +16,7 @@
 
 ## Formatting & linting
 
-Adopt `vorflow`'s configuration suite-wide (copy `.clang-format` and `.clang-tidy` into each
+Adopt `voro`'s configuration suite-wide (copy `.clang-format` and `.clang-tidy` into each
 repo and `core`):
 
 - **clang-format:** `BasedOnStyle: Google`, `ColumnLimit: 100`, `IndentWidth: 2`,
@@ -29,8 +29,8 @@ repo and `core`):
 ## Naming
 
 - **Namespaces:** lower-case, one per library/module. Suite root namespace `tpx` (transport phenomena);
-  modules `tpx::common`, `tpx::decomp`, `tpx::halo`, `tpx::geom`, `tpx::ibm`. Existing method
-  namespaces keep their identity (`vor::`, `pbs::`, `morton::`); sdflow/dem, currently in the
+  modules `peclet::core::common`, `peclet::core::decomp`, `peclet::core::halo`, `peclet::core::geom`, `peclet::core::ibm`. Existing method
+  namespaces keep their identity (`peclet::voro::`, `pbs::`, `morton::`); flow/dem, currently in the
   global namespace, move solver classes into a method namespace (`cfd::`, `dem::`) as they integrate.
 - **Kokkos kernels:** prefer named functors/tags or descriptive `parallel_*` labels over anonymous
   lambdas in the hot path; keep the `_kernel`/`_op` suffix on functor types so device work is greppable.
@@ -42,7 +42,7 @@ repo and `core`):
 ## Build system
 
 - **CMake ≥ 3.24** suite-wide (dem's floor). Each repo installs/exports a package config so consumers
-  do `find_package(<pkg> CONFIG)` → `target_link_libraries(app PRIVATE tpx::core)`.
+  do `find_package(<pkg> CONFIG)` → `target_link_libraries(app PRIVATE peclet::core::core)`.
 - **Dependencies:** `find_package` for the GPU/parallel stack (`Kokkos`, `ArborX`, MPI, OpenMP) against
   the bootstrapped `extern/install/<backend>` prefix; `nanobind` is provisioned via the shared
   `cmake/SuiteNanobind.cmake` helper (found through the active interpreter, not a pinned tag). Use

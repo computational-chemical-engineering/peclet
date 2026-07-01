@@ -17,9 +17,9 @@ deployment** guide, and links to each code's **API reference** (Doxygen).
 | Code | Role | Stack |
 |------|------|-------|
 | [**core**](https://github.com/computational-chemical-engineering/core) | Shared infrastructure: ORB block decomposition, async grid/particle halo, SDF geometry, VTI I/O | header-only C++20 + MPI (optional Kokkos) |
-| [**sdflow**](https://github.com/computational-chemical-engineering/sdflow) | Incompressible Navier–Stokes for porous media (staggered MAC + cut-cell IBM + multigrid); `pnm` pore extraction | Kokkos + nanobind |
+| [**flow**](https://github.com/computational-chemical-engineering/flow) | Incompressible Navier–Stokes for porous media (staggered MAC + cut-cell IBM + multigrid); `pnm` pore extraction | Kokkos + nanobind |
 | [**dem**](https://github.com/computational-chemical-engineering/dem) | Discrete Element Method (XPBD) + SDF point-shell collision for dense packing | Kokkos + ArborX + nanobind |
-| [**vorflow**](https://github.com/computational-chemical-engineering/vorflow) | Dynamic 3D Voronoi tessellation of moving particles (periodic & Lees–Edwards) | header-only C++17 |
+| [**voro**](https://github.com/computational-chemical-engineering/voro) | Dynamic 3D Voronoi tessellation of moving particles (periodic & Lees–Edwards) | header-only C++17 |
 | [**morton**](https://github.com/computational-chemical-engineering/morton) | Morton/Z-order codes with arithmetic *in Morton space* — the spatial-index primitive | header-only C++17 + BMI2/AVX-512 + Python |
 
 Both GPU codes are **Kokkos**-based (CUDA retired); the same source runs on CUDA, HIP (AMD/LUMI) and
@@ -40,5 +40,5 @@ Each code publishes its full C++/Python API as Doxygen on its own GitHub Pages s
 
 - [core API](https://cautious-barnacle-7p9p71w.pages.github.io/)
 - [morton API](https://congenial-chainsaw-g414wov.pages.github.io/)
-- [sdflow API](https://miniature-adventure-y7jzg8e.pages.github.io/)
+- [flow API](https://miniature-adventure-y7jzg8e.pages.github.io/)
 - [dem API](https://expert-chainsaw-6qjq213.pages.github.io/)

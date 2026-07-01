@@ -8,11 +8,11 @@ decomposes.
 
 There are **two orthogonal choices**, both made at *build* time, not at `pip install`-from-PyPI time:
 
-1. **Compute backend** — *where the kernels run.* The GPU codes (`sdflow`, `dem`) are
+1. **Compute backend** — *where the kernels run.* The GPU codes (`flow`, `dem`) are
    [Kokkos](https://kokkos.org); the backend (Serial / OpenMP / CUDA / HIP) is **compiled in**. You do
    not pick it at runtime; you build (or pull a container) for your hardware.
 2. **MPI** — *how many processes.* Orthogonal to the backend: any backend can run single-process or
-   multi-process. It is a build option (`PECLET_DEM_MPI` for dem; the sdflow Python module is single-rank, its
+   multi-process. It is a build option (`PECLET_DEM_MPI` for dem; the flow Python module is single-rank, its
    multi-rank solver lives in the C++ `tests/kokkos_mpi` suite).
 
 So "1 MPI process / multicore / GPU" is really **backend × MPI**:
@@ -37,7 +37,7 @@ gfx90a), a CUDA/ROCm version, *and* an MPI ABI — there is no single portable G
 
 ## One-time dependency bootstrap
 
-`sdflow` and `dem` need a Kokkos (+ ArborX for dem) install. Build it **once per backend** into a local
+`flow` and `dem` need a Kokkos (+ ArborX for dem) install. Build it **once per backend** into a local
 prefix — the local stand-in for a cluster `module load`:
 
 ```bash
@@ -75,7 +75,7 @@ PREFIX=$PWD/extern/install/nvidia-cuda
 PATH=/usr/local/cuda/bin:$PATH CMAKE_PREFIX_PATH=$PREFIX pip install ./flow ./dem
 ```
 
-The dist names are `peclet-flow` (repo `sdflow`), `peclet-dem` (`dem`), `peclet-voro` (`vorflow`),
+The dist names are `peclet-flow` (repo `flow`), `peclet-dem` (`dem`), `peclet-voro` (`voro`),
 `peclet-morton` (`morton`), `peclet-core` (`core`); a source `pip install ./<repo>` builds the
 matching one.
 
@@ -131,7 +131,7 @@ for MPI-ABI, GPU-aware-MPI, and arch details.
 | Package | Import | Key API |
 |---------|--------|---------|
 | `peclet-flow` | `import peclet.flow` | `peclet.flow.Solver(nx,ny,nz)` — set_rho/mu/dt, set_solid, set_domain_bc, step, get_u/v/w/p; `peclet.flow.execution_space` |
-| `peclet-flow` (pnm) | `from peclet.flow import pnm` | `SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu` |
+| `peclet-flow` (pnm) | `from peclet.flow from peclet.flow import pnm` | `SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu` |
 | `peclet-dem` | `import peclet.dem` | `peclet.dem.Simulation(capacity)` — initialize_shape, set_domain, set_material_params, set_positions, step, get_positions, get_sdf_grid; gated MPI: init_mpi/enable_mpi_step/step_mpi |
 | `peclet-voro` | `import peclet.voro` | `peclet.voro.Tessellation`, `peclet.voro.Simulation` — moving-cell Voronoi + dynamics |
 | `peclet-morton` | `from peclet.morton import encode, decode, shift, box_zorder` | vectorised NumPy Morton ops |

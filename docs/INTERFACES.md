@@ -81,7 +81,7 @@ Two implementations behind this one concept:
 computes the block interior, then `wait(field)` completes before the boundary is computed.
 
 **GPU-awareness:** buffers may be device Views; the engine host-stages by default and, with GPU-aware
-MPI opted in (`TPX_GPU_AWARE_MPI`), exchanges device buffers directly, with `pack`/`unpack` running as
+MPI opted in (`PECLET_CORE_GPU_AWARE_MPI`), exchanges device buffers directly, with `pack`/`unpack` running as
 device kernels.
 
 ## 5. `SdfGeometry` — SDF-described solids
@@ -105,7 +105,7 @@ template <class I> concept ImmersedBoundary = requires(const I ib) {
 };
 ```
 
-Models sdflow's Robust-Scaled IBM (per-cut-cell rescale factors baked into stencil coefficients); the
+Models flow's Robust-Scaled IBM (per-cut-cell rescale factors baked into stencil coefficients); the
 dem point-shell-vs-SDF collision is the Lagrangian analog and shares the `SdfGeometry` source.
 
 ## 7. `Stepper` — the time-integration entry point
@@ -123,5 +123,5 @@ Every method exposes `step(dt)` with identical semantics so drivers and Python b
 
 Not a C++ concept but a contract (see [CONVENTIONS §6](CONVENTIONS.md)): nanobind module exposing
 `Solver(...)` → `initialize`/`set_*` → `step(dt)` → `get_*` numpy accessors, with the shared array
-shape/order rules. The core's `tpx::python` zero-copy View↔ndarray bridge provides the numpy↔core
+shape/order rules. The core's `peclet::core::python` zero-copy View↔ndarray bridge provides the numpy↔core
 conversions so every module implements this identically.

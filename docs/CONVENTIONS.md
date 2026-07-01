@@ -13,12 +13,12 @@ the gaps. Two pillars are non-negotiable because they are already shared and loa
 ## 1. Geometry & indexing
 
 - **Canonical axis order:** x fastest, then y, then z. Grid linear index
-  `I = x + y*nx + z*nx*ny`. (sdflow, block_decomposer already use this.)
+  `I = x + y*nx + z*nx*ny`. (flow, block_decomposer already use this.)
 - **Cell-centred vs staggered:** scalar fields (pressure, SDF, density) live at cell centres
   `(i+½, j+½, k+½)·spacing`. Staggered velocity components:
-  `u` at `(i, j+½, k+½)`, `v` at `(i+½, j, k+½)`, `w` at `(i+½, j+½, k)`. (MAC grid — sdflow.)
+  `u` at `(i, j+½, k+½)`, `v` at `(i+½, j, k+½)`, `w` at `(i+½, j+½, k)`. (MAC grid — flow.)
 - **Periodic wrap:** `wrap(x, N) = (x % N + N) % N`. Applies to grid indices and particle images
-  alike. (Shared across sdflow, dem, voronoi, block_decomposer.)
+  alike. (Shared across flow, dem, voronoi, block_decomposer.)
 - **Lees–Edwards shear:** an x-shift proportional to a y-offset, `xshift = shear · Ly / Lx`, applied in
   the shortest-image computation. (voronoi `BoxLE`.)
 
@@ -36,7 +36,7 @@ the gaps. Two pillars are non-negotiable because they are already shared and loa
 Precision is chosen per role, not globally — but stated explicitly so codes match:
 
 - **Eulerian field state** (pressure, velocity carried across projection/implicit solves): **double**.
-  (sdflow state is double; temporaries may be float.)
+  (flow state is double; temporaries may be float.)
 - **GPU particle state** (positions, velocities, quaternions in hot SoA kernels): **float**.
   (dem.)
 - **Header-only / CPU generic code:** template on `real_t` with a sensible default; pick `double` for
@@ -48,12 +48,12 @@ Precision is chosen per role, not globally — but stated explicitly so codes ma
 
 To stop every code inventing its own, the core `common` module defines (host side):
 
-- `tpx::Real` — default floating type alias (a build option; double on host, float on device kernels).
-- `tpx::Index` — signed index type for grids/particles (`std::int64_t`; supersedes block_decomposer's
+- `peclet::core::Real` — default floating type alias (a build option; double on host, float on device kernels).
+- `peclet::core::Index` — signed index type for grids/particles (`std::int64_t`; supersedes block_decomposer's
   `long int IndxT`).
-- `tpx::Vec<Dim>` = `std::array<Real, Dim>`; `tpx::IVec<Dim>` = `std::array<Index, Dim>`.
+- `peclet::core::Vec<Dim>` = `std::array<Real, Dim>`; `peclet::core::IVec<Dim>` = `std::array<Index, Dim>`.
 - On the GPU/CUDA side, continue to use the built-in `float3`/`int3`/`float4` vector types; provide
-  thin converters to/from `tpx::Vec`/`tpx::IVec` at the host boundary rather than forcing one type
+  thin converters to/from `peclet::core::Vec`/`peclet::core::IVec` at the host boundary rather than forcing one type
   across the language boundary.
 
 Current divergence to reconcile: voronoi's `uint0/uint1/uint2` (8/16/32-bit) are *internal* topology
@@ -70,13 +70,13 @@ labels and stay local to voronoi; they are not suite-wide types.
 
 ## 6. Python binding conventions
 
-- **Mechanism:** **nanobind** for every compiled solver (sdflow + `pnm`, dem `dem`, core
-  `tpx_mpi`/`tpx_amr`, vorflow's device module), built through **scikit-build-core**. nanobind is
+- **Mechanism:** **nanobind** for every compiled solver (flow + `pnm`, dem `dem`, core
+  `tpx_mpi`/`tpx_amr`, voro's device module), built through **scikit-build-core**. nanobind is
   chosen over pybind11 because its `nb::ndarray` carries a DLPack device tag and arbitrary strides,
   which is what makes the zero-copy GPU path below possible. morton's lightweight ctypes/C-ABI shim
   stays as is (dependency-free by design, ships portable PyPI wheels) — the deliberate exception.
 - **The array bridge:** all Kokkos-backed modules cross the C++/Python boundary through one shared
-  header, `tpx::python` (`core/include/tpx/python/ndarray_interop.hpp`), provisioned via
+  header, `peclet::core::python` (`core/include/tpx/python/ndarray_interop.hpp`), provisioned via
   `cmake/SuiteNanobind.cmake`. Do **not** re-hand-roll per-module copy helpers.
   - `view_to_ndarray(View)` exports a Kokkos View **without copying**: a host View becomes a NumPy
     array referencing the View's memory; a device (CUDA/HIP) View becomes a DLPack array CuPy/PyTorch
@@ -91,7 +91,7 @@ labels and stay local to voronoi; they are not suite-wide types.
   staging a device array through the host.
 - **Array shape/order:** Python sees grids as shape `(nz, ny, nx)`; round-trip to the C++ x-fastest
   layout with `numpy.reshape(..., order='F')` on `(nx, ny, nz)`. The bridge preserves this naturally:
-  an x-fastest `tpx::Field3D` (LayoutLeft) exports as a Fortran-order `(nx, ny, nz)` array with element
+  an x-fastest `peclet::core::Field3D` (LayoutLeft) exports as a Fortran-order `(nx, ny, nz)` array with element
   strides `{1, nx, nx*ny}`. Document it once per module and keep it identical across modules.
 - **Particle arrays:** shape `(N, 3)` for vector quantities, `(N,)` for scalars, contiguous float/
   double matching the solver's precision.
@@ -101,8 +101,8 @@ labels and stay local to voronoi; they are not suite-wide types.
   required on CUDA (without it, Kokkos's device state is torn down by static destructors *after* the
   CUDA runtime unloads → `cudaErrorCudartUnloading` at exit). To avoid the opposite abort ("deallocated
   after `Kokkos::finalize`"), the hook first releases any live View-holding objects, then finalizes:
-  modules with simulation objects keep a registry and do `releaseAll()` → `finalize()` (dem, vorflow,
-  tpx_amr); modules whose objects are short-lived just `finalize()` (sdflow, pnm) and document that a
+  modules with simulation objects keep a registry and do `releaseAll()` → `finalize()` (dem, voro,
+  tpx_amr); modules whose objects are short-lived just `finalize()` (flow, pnm) and document that a
   Solver kept alive to interpreter exit must be released first (`del s`). Getters return host
   `vector_to_ndarray` arrays (no device Views), so they never block finalize; a zero-copy *device*
   export (`view_to_ndarray` to CuPy) must be released before exit. Build note: pass `NOMINSIZE` to

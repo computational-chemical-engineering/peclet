@@ -70,7 +70,7 @@ per environment, and **Apptainer containers** for Snellius (CUDA) and LUMI (HIP)
 ## Continuous integration & docs
 
 Each submodule carries its own `.github/workflows/`: a **CI** workflow (build + test where feasible —
-`core` and `morton` run full CPU/MPI suites; `sdflow` and `dem` build the Kokkos OpenMP host
+`core` and `morton` run full CPU/MPI suites; `flow` and `dem` build the Kokkos OpenMP host
 backend) and a **Documentation** workflow that builds the Doxygen API docs and publishes them to that
 repo's GitHub Pages. Enabling Pages once per repo (Settings → Pages → "Source: GitHub Actions") is the
 only manual step.

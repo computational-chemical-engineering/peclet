@@ -6,7 +6,7 @@ on each repo's `main`. After this, every method code builds and runs on Kokkos (
 backends) with no CUDA-only path.
 
 > **STATUS: COMPLETE (2026-06-20).** All three repos retired CUDA and merged `kokkos-migration → main`:
-> cfd-gpu (`sdflow`/`pnm_backend`), packing-gpu (`demgpu`), core (Kokkos grid + particle
+> cfd-gpu (`flow`/`pnm_backend`), packing-gpu (`demgpu`), core (Kokkos grid + particle
 > halos). Validated on CUDA + host-openmp; `tests/kokkos_mpi` ctests pass np=1,2,4. Not pushed (per the
 > milestone-commit policy). Restore points: the `pre-cuda-retirement` tag on each repo. Phase checklist
 > below is all checked off.
@@ -18,7 +18,7 @@ CUDA + OpenMP backends:
 
 - **core** — Kokkos grid + particle halos (incl. periodic self-ghosts). Legacy CUDA halo
   (`grid_halo_cuda.cuh`) still present.
-- **cfd-gpu `sdflow`** — full cut-cell IBM Navier–Stokes + geometric MG-PCG, all three pressure drivers
+- **cfd-gpu `flow`** — full cut-cell IBM Navier–Stokes + geometric MG-PCG, all three pressure drivers
   (V-cycle / PCG / Chebyshev), implicit-FOU + Picard, velocity-MG (IBM-staircase / domain-BC const-coeff
   / upwind-convective), all domain BCs (cavity / channel / BFS), multi-rank MPI; `pnm_backend` pore
   extraction bit-identical. Kokkos sources in `src/kokkos/`, module `sdflow_kokkos` + `pnm_kokkos` in
@@ -46,7 +46,7 @@ The numerics are done, but the Kokkos *modules* are not yet drop-in replacements
 1. **Naming / build** — modules are `sdflow_kokkos` / `demgpu_kokkos` / `pnm_kokkos`, built as *separate*
    `kokkos_module/` find_package projects. The canonical names and the main `cmake -S . -B build` still
    produce the CUDA modules. `main` has no Kokkos on any repo.
-2. **cfd `sdflow` API** — Kokkos `Solver` is missing, vs CUDA: `set_incremental_pressure`,
+2. **cfd `flow` API** — Kokkos `Solver` is missing, vs CUDA: `set_incremental_pressure`,
    `set_pressure_warmstart`, `set_state` (real features); `get_resolution`, `get_spacing`, `size`
    (trivial getters); `set_velocity_streams` (CUDA-only → drop / no-op shim).
 3. **packing `demgpu` API** — the **MPI step is not exposed in Python** (only in the C++ test): add
@@ -92,11 +92,11 @@ repo's Phase 4. Nothing is pushed until the user says.
 ### Phase 2 — parity sweep (the go/no-go gate)  ✅ DONE
 Run every top-level `verify_*` script + `cfd-gpu/tests/regression/sdflow_regression.py` against the
 Kokkos modules, and record CUDA-vs-Kokkos deltas. Acceptance bar: **machine-precision, or a difference
-explainable purely by roundoff / reduction order** (cfd co-imports the Kokkos-free CUDA `sdflow` for a
+explainable purely by roundoff / reduction order** (cfd co-imports the Kokkos-free CUDA `flow` for a
 direct compare; packing is per-process + physical/roundoff-fuzzy because XPBD accumulates via atomics).
 
 ### Phase 3 — rename + make Kokkos canonical (per repo)  ✅ DONE
-- Rename modules: `sdflow_kokkos → sdflow`, `demgpu_kokkos → demgpu`, `pnm_kokkos → pnm_backend`.
+- Rename modules: `sdflow_kokkos → flow`, `demgpu_kokkos → demgpu`, `pnm_kokkos → pnm_backend`.
 - Strip `kokkos` from filenames (`*_kokkos.hpp → *.hpp`, `src/kokkos/ → src/`) and from
   namespaces/symbols (full de-naming, decision 1).
 - Make the repo's main `cmake -S . -B build` produce the canonical modules via `find_package(Kokkos)` +
@@ -117,7 +117,7 @@ the umbrella docs (`ARCHITECTURE.md`, `ROADMAP.md`, `PORTABILITY.md`). Push when
 
 | Repo | Phase 1 (gaps) | Phase 3 (rename) | Phase 4 (delete) |
 |------|----------------|------------------|------------------|
-| **cfd-gpu** | +3 methods, +3 getters, streams shim | `src/kokkos/*` → `src/`, `cfdk::` → `dns::`/canonical, `sdflow_kokkos`→`sdflow`, `pnm_kokkos`→`pnm_backend` | delete `distributed_ns.cuh`, `mac_*.cuh`, `cut_cell_ibm.cuh`, `staggered_advection.cuh`, `pore_extraction.{cu,cuh}`, `sdflow_bindings.cu`, `bindings.cpp` |
+| **cfd-gpu** | +3 methods, +3 getters, streams shim | `src/kokkos/*` → `src/`, `cfdk::` → `dns::`/canonical, `sdflow_kokkos`→`flow`, `pnm_kokkos`→`pnm_backend` | delete `distributed_ns.cuh`, `mac_*.cuh`, `cut_cell_ibm.cuh`, `staggered_advection.cuh`, `pore_extraction.{cu,cuh}`, `sdflow_bindings.cu`, `bindings.cpp` |
 | **packing-gpu** | MPI binding + build, exports, getters | `*_kokkos.hpp`→`*.hpp`, `dem::` kept, `demgpu_kokkos`→`demgpu` | delete `*.cu`/`*.cuh`, `main_binding.cpp`, `ParticleSystem.cuh`, `src/mpi/*.cu` |
 | **core** | — | — | delete `grid_halo_cuda.cuh` + its test/CMake entry |
 | **voronoi_dynamics** | — (no CUDA; separate later Kokkos-OpenMP effort) | — | — |
@@ -132,9 +132,9 @@ the umbrella docs (`ARCHITECTURE.md`, `ROADMAP.md`, `PORTABILITY.md`). Push when
 
 ## Validation outcome (2026-06-20)
 
-- **cfd-gpu — machine-precision.** Co-import (Kokkos-free CUDA `sdflow` + Kokkos `sdflow`): periodic
+- **cfd-gpu — machine-precision.** Co-import (Kokkos-free CUDA `flow` + Kokkos `flow`): periodic
   sphere Stokes `k` agrees to ~1e-13 (max|Δu| ~1e-12). All `scripts/verify_*_sdflow.py` pass against the
-  renamed `sdflow` (cavity/channel/BFS/poiseuille/implicit-FOU; Zick–Homsy <0.4% vs ground truth;
+  renamed `flow` (cavity/channel/BFS/poiseuille/implicit-FOU; Zick–Homsy <0.4% vs ground truth;
   chebyshev == MG-PCG 0.0000%). `pnm_backend` (incl. the added `SDFReader`) bit-identical. The regression
   metrics (K/k*/order/divergence) are **+0.00%** vs the CUDA baseline — only the MG-PCG *iteration counts*
   differ (float-operator reduction order, same converged solution), so the baseline was re-recorded for
@@ -144,4 +144,4 @@ the umbrella docs (`ARCHITECTURE.md`, `ROADMAP.md`, `PORTABILITY.md`). Push when
   thermostat / precession PASS on both; the `verify_stacking*` scripts FAIL on **both** backends — a
   pre-existing CUDA friction/settling defect (documented; a separate deferred numerics task, not a port
   regression). `tests/kokkos` 8/8, `tests/arborx` 2/2, `tests/kokkos_mpi` 6/6, CUDA + OpenMP.
-- **core** — CPU 27/27; Kokkos halo path (`TPX_ENABLE_KOKKOS`) 33/33, np=1,2,4.
+- **core** — CPU 27/27; Kokkos halo path (`PECLET_CORE_ENABLE_KOKKOS`) 33/33, np=1,2,4.

@@ -48,12 +48,12 @@ nav:
       - Roadmap: ROADMAP.md
       - CUDA retirement: CUDA_RETIREMENT.md
   - Studies:
-      - Staggered vs collocated (sdflow): studies/staggered_vs_colocated.md
+      - Staggered vs collocated (flow): studies/staggered_vs_colocated.md
   - API reference:
-      - transport-core: https://cautious-barnacle-7p9p71w.pages.github.io/
-      - morton: https://congenial-chainsaw-g414wov.pages.github.io/
-      - sdflow: https://miniature-adventure-y7jzg8e.pages.github.io/
-      - dem: https://expert-chainsaw-6qjq213.pages.github.io/
+      - peclet-core: https://cautious-barnacle-7p9p71w.pages.github.io/
+      - peclet-morton: https://congenial-chainsaw-g414wov.pages.github.io/
+      - peclet-flow: https://miniature-adventure-y7jzg8e.pages.github.io/
+      - peclet-dem: https://expert-chainsaw-6qjq213.pages.github.io/
   - Containers (GitHub): https://github.com/computational-chemical-engineering/peclet/tree/main/containers
 
 # DOC_CI_WORK_NOTES.md is an internal work log; keep it out of the nav.

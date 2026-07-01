@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`suite/` is the **`peclet`** umbrella repository for GPU-accelerated and parallel scientific computing — particle dynamics, CFD, and the spatial-indexing primitives they build on. It holds **five method/infrastructure projects as git submodules** (`sdflow`, `dem`, `core`, `vorflow`, `morton`), each its own self-contained repo with its own `CMakeLists.txt`, build system, and (in some cases) its own `CLAUDE.md`. There is no top-level build or test runner — work happens *inside* a submodule, not at this level.
+`suite/` is the **`peclet`** umbrella repository for GPU-accelerated and parallel scientific computing — particle dynamics, CFD, and the spatial-indexing primitives they build on. It holds **five method/infrastructure projects as git submodules** (`flow`, `dem`, `core`, `voro`, `morton`), each its own self-contained repo with its own `CMakeLists.txt`, build system, and (in some cases) its own `CLAUDE.md`. There is no top-level build or test runner — work happens *inside* a submodule, not at this level.
 
 **Consequence for any task:** `cd` into the relevant submodule before building, testing, or running git. A `git status` / commit / diff issued from `suite/` itself acts on the **umbrella** (submodule pointers + shared `docs/`), not on a method code — so commit code changes inside the submodule first, then bump the pointer in the umbrella.
 
@@ -17,18 +17,18 @@ decomposition** with efficient **asynchronous ghost-layer exchange**, common **S
 library (header-only C++20, its own git repo + `CLAUDE.md`) that every method depends on.
 
 **`core/` status:** complete and tested (26 ctests, `mpirun -np 1..8`). Provides ORB block
-decomposition; the async grid ghost-layer exchange (`tpx::halo::GridHalo` — topology/exchange split,
+decomposition; the async grid ghost-layer exchange (`peclet::core::halo::GridHalo` — topology/exchange split,
 field-agnostic, NBX + persistent neighborhood-collective engines, overlap-capable, plus a GPU-resident
-host-staged variant); the Lagrangian halo (`tpx::halo::ParticleMigrator` — particle migration +
+host-staged variant); the Lagrangian halo (`peclet::core::halo::ParticleMigrator` — particle migration +
 `gatherGhosts`); SDF geometry with scalar/vector VTI I/O; and **dynamic load balancing** (weighted ORB
 `BlockDecomposer::init(…, weights)` + `DistributedOctree::rebalance` for AMR leaf/field migration and
 `rebalanceByParticleCount` for the Lagrangian path). See `core/CLAUDE.md`.
 
 **Consumers:** both GPU codes are now **Kokkos**-based (CUDA retired — see
-[docs/CUDA_RETIREMENT.md](docs/CUDA_RETIREMENT.md)). `sdflow` has a **complete, validated distributed
-Navier–Stokes solver** (`sdflow`) on the core: the whole cut-cell IBM + MG-PCG step runs multi-rank,
-bit-exact to single-rank (`tests/kokkos_mpi`, 18 ctests np=1,2,4, gated `CFD_MPI`). `sdflow` is **THE**
-sdflow solver; `pnm` is its pore-network-extraction module. `dem`'s `dem` module runs the
+[docs/CUDA_RETIREMENT.md](docs/CUDA_RETIREMENT.md)). `flow` has a **complete, validated distributed
+Navier–Stokes solver** (`flow`) on the core: the whole cut-cell IBM + MG-PCG step runs multi-rank,
+bit-exact to single-rank (`tests/kokkos_mpi`, 18 ctests np=1,2,4, gated `PECLET_FLOW_MPI`). `flow` is **THE**
+flow solver; `pnm` is its pore-network-extraction module. `dem`'s `dem` module runs the
 full XPBD step (ArborX broad-phase) with a validated distributed `step_mpi` (core particle
 halo; `tests/kokkos_mpi` 6 ctests) and periodic **load rebalancing** (`enable_mpi_step(rebalance_every=…)`
 / `Sim.rebalance()` — SoA ownership migration on the weighted ORB). The single-GPU codes are complete +
@@ -49,15 +49,15 @@ The design contract lives in `docs/`:
 |-----------|------------------|--------------|-------------------|
 | `core/` | Header-only C++20 + MPI | **Shared infrastructure**: ORB block decomposition + asynchronous ghost-layer exchange (NBX + persistent engines) + particle migration + SDF geometry + dynamic load balancing + AMR octree. The layer every method code depends on. Tested (26 ctests, np 1–8). | **Yes — read it** |
 | `morton/` | Header-only C++17 (+ **Kokkos**, Python) | Morton/Z-order codes with **arithmetic in Morton space** (neighbour-find, axis add, Z-order step without decode→re-encode). BMI2/AVX-512 + runtime dispatch; the foundational spatial-index library. Portable **Kokkos** GPU backend (`include/morton/kokkos.hpp`, CUDA/HIP/OpenMP) — raw CUDA retired. | **Yes — read it** |
-| `flow/` | **Kokkos** + C++20 + nanobind (`sdflow`) | Incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. `sdflow` is the solver; `pnm` is the pore-network-extraction module. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). | **Yes — read it** |
-| `dem/` | **Kokkos + ArborX** + C++20 + nanobind (`dem`) | Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). README still calls it `dem-gpu`. | No |
+| `flow/` | **Kokkos** + C++20 + nanobind (`flow`) | Incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. `flow` is the solver; `pnm` is the pore-network-extraction module. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). | **Yes — read it** |
+| `dem/` | **Kokkos + ArborX** + C++20 + nanobind (`dem`) | Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). README still calls it `peclet-dem`. | No |
 | `voro/` | **Kokkos** + C++17/20 (+ core MPI, nanobind; Voro++/Boost for the CPU oracle) | Dynamic 3D Voronoi tessellation of moving particles; periodic & Lees–Edwards boxes, incremental cell repair, Euler/NS/multiphase dynamics. Ported to Kokkos (CUDA/HIP/OpenMP) + core MPI; legacy half-edge engine kept as CPU oracle. | No |
 
-Common threads worth knowing when moving between them: SDFs (signed distance fields) are the shared geometry representation across `sdflow` and `dem`; VTI/VTP files (ParaView/Ovito) are the shared I/O format; periodic boundary conditions appear everywhere; and the GPU codes (`sdflow`, `dem`, `core`'s device halo) are now **Kokkos**-based — the backend (CUDA/HIP/OpenMP) and arch are chosen by the `extern/install/<backend>` prefix the build is pointed at, not hard-coded in the sources (`tools/bootstrap_deps.sh` + `CMakePresets.json`).
+Common threads worth knowing when moving between them: SDFs (signed distance fields) are the shared geometry representation across `flow` and `dem`; VTI/VTP files (ParaView/Ovito) are the shared I/O format; periodic boundary conditions appear everywhere; and the GPU codes (`flow`, `dem`, `core`'s device halo) are now **Kokkos**-based — the backend (CUDA/HIP/OpenMP) and arch are chosen by the `extern/install/<backend>` prefix the build is pointed at, not hard-coded in the sources (`tools/bootstrap_deps.sh` + `CMakePresets.json`).
 
 ## Per-project quick reference
 
-For `morton` and `sdflow`, **defer to their own `CLAUDE.md`** — the entries below are only an entry point.
+For `morton` and `flow`, **defer to their own `CLAUDE.md`** — the entries below are only an entry point.
 
 ### morton
 ```bash
@@ -68,15 +68,15 @@ ctest --test-dir build --output-on-failure
 ```
 The non-BMI2 build is contractually PDEP/PEXT-free (a test greps the binary). AVX-512 batch kernels have no local hardware — validate under Intel SDE (`sde64 -skx -- ./build/tests/morton_tests`). See its CLAUDE.md for the runtime-dispatch and wheel-build subtleties.
 
-Both `sdflow` and `dem` now build via `find_package(Kokkos)` (+`ArborX` for packing) against the
+Both `flow` and `dem` now build via `find_package(Kokkos)` (+`ArborX` for packing) against the
 bootstrapped prefix `extern/install/<backend>` (built once by `tools/bootstrap_deps.sh` — a **hard build
 dependency**). Put `nvcc` on `PATH` for the CUDA backend (`export PATH=/usr/local/cuda-13.2/bin:$PATH`).
 
-### sdflow
+### flow
 ```bash
 cd flow && source .venv/bin/activate          # nanobind found via the active interpreter (SuiteNanobind)
 cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"
-cmake --build build -j                          # -> build/sdflow.*.so (solver) + build/pnm.*.so
+cmake --build build -j                          # -> build/flow.*.so (solver) + build/pnm.*.so
 # (canonical install: CMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda" pip install .)
 PYTHONPATH=$PWD/build python scripts/verify_poiseuille_sdflow.py        # analytical-solution check
 PYTHONPATH=$PWD/build python scripts/verify_periodic_spheres_sdflow.py  # cut-cell Stokes through spheres
@@ -92,7 +92,7 @@ python verify_packing_spheres.py                # verify_*.py are the test/demo 
 ```
 The many root-level `verify_*.py` / `test_*.py` / `plan_*.md` / `build_log*.txt` files are this project's working scratch — verification scripts and design notes, not a packaged test suite.
 
-### vorflow
+### voro
 ```bash
 cd voro
 # CPU-oracle + tests build (header-only; FetchContent pulls Voro++ automatically):
@@ -102,7 +102,7 @@ ctest --test-dir build -R "test_static_voronoi|test_voro_comparison" --output-on
 # Kokkos device path (CUDA/HIP/OpenMP) + nanobind Python module (vorflow_device), opt-in:
 cmake -B build_dev -DVORFLOW_KOKKOS=ON -DVORFLOW_BUILD_PYTHON=ON \
   -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"   # add -DVORFLOW_MPI=ON for the distributed path
-clang-format --dry-run --Werror include/*.hpp include/vorflow/**/*.hpp tests/*.cpp   # Google style, enforced
+clang-format --dry-run --Werror include/*.hpp include/voro/**/*.hpp tests/*.cpp   # Google style, enforced
 ```
 The legacy header-only `voronoi.hpp` survives only as the CPU oracle. The production device tessellator
 stores each Voronoi cell as a compact **dual-triangle ConvexCell** (a vertex is a triple of plane indices)
@@ -110,7 +110,7 @@ plus a `facetGeometry` CSR — not the old half-edge mesh (see README).
 
 ## Conventions across the suite
 
-- **Kokkos C++ projects** (`sdflow`, `dem`) put device kernels in header-only `.hpp` (compiled as C++; the Kokkos launch compiler routes them through `nvcc`/`hipcc` — never `.cu`) and expose the simulation as an importable Python module via a nanobind binding TU (built with scikit-build-core, on core's zero-copy View↔ndarray bridge); drive simulations from Python, not C++ mains.
-- **Header-only C++ projects** (`morton`, `vorflow`, `core`) put the real logic in templates under `include/`; there is no library to link.
+- **Kokkos C++ projects** (`flow`, `dem`) put device kernels in header-only `.hpp` (compiled as C++; the Kokkos launch compiler routes them through `nvcc`/`hipcc` — never `.cu`) and expose the simulation as an importable Python module via a nanobind binding TU (built with scikit-build-core, on core's zero-copy View↔ndarray bridge); drive simulations from Python, not C++ mains.
+- **Header-only C++ projects** (`morton`, `voro`, `core`) put the real logic in templates under `include/`; there is no library to link.
 - Build artifacts (`build/`, `build_*/`, `.venv/`, `*.so`, `__pycache__/`) and large output assets (`*.vti`, `*.vtp`, `*.png`) are committed/present in several projects — don't treat their existence as something you created, and prefer the project's own out-of-source `build/` directory.
-- Two projects carry `AGENTS.md`/`GEMINI.md` alongside `CLAUDE.md` (sdflow); when editing guidance, the CLAUDE.md is the one that governs Claude Code.
+- Two projects carry `AGENTS.md`/`GEMINI.md` alongside `CLAUDE.md` (flow); when editing guidance, the CLAUDE.md is the one that governs Claude Code.

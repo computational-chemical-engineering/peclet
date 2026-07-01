@@ -9,7 +9,7 @@ adaptive tree (e.g. Barnes–Hut for particle methods). Lives in `core`
 
 The textbook linear octree (p4est/Dendro) keeps **one** global space-filling curve and
 partitions it by index ranges. The suite instead keeps the ORB **block** decomposition
-(`tpx::decomp::BlockDecomposer`) and gives **each block its own local Morton coordinate
+(`peclet::core::decomp::BlockDecomposer`) and gives **each block its own local Morton coordinate
 system**. The trade-off — a per-block global-origin offset, and a global ordering that is
 "ORB tree, then local Z-order" rather than one flat curve — buys block independence, narrow
 codes, and direct reuse of the existing **owner-based** `GridHalo` (a ghost cell maps to
@@ -46,13 +46,13 @@ morton  (local codes + arithmetic + hierarchy + Z-order)            [reuse]
             ├─ DistributedOctree<Dim>       (done) ORB collection + cross-block 2:1 balance + rebalance
             ├─ LeafField<T>                 (done) leaf-indexed fields + VTU export
             └─ AmrHalo<Dim>                 (done) owner-based ghost exchange for graded octrees
-       └─ sdflow (TODO)  cut-cell IBM on leaves + AMR multigrid + AMR GridLayout
+       └─ flow (TODO)  cut-cell IBM on leaves + AMR multigrid + AMR GridLayout
 ```
 
 Topology mutation is host-side (it rebuilds the sorted leaf arrays); the per-leaf hot path
 (point location, face-neighbour walk) is device-callable, mirroring the halo's host-topology
 (`grid_halo_topology.hpp`) vs device-exchange (`grid_halo.hpp`) split. Headers are guarded by
-`TPX_HAVE_MORTON`; the device layer additionally needs a Kokkos build (`MORTON_ENABLE_KOKKOS`
+`PECLET_CORE_HAVE_MORTON`; the device layer additionally needs a Kokkos build (`MORTON_ENABLE_KOKKOS`
 ⇒ `MORTON_HD == KOKKOS_FUNCTION`).
 
 ## Device compute path — Poisson + flow on GPU & multicore
@@ -60,7 +60,7 @@ Topology mutation is host-side (it rebuilds the sorted leaf arrays); the per-lea
 The Poisson half had a device path (operator + V-cycle); the **flow solver** is now on the
 device too, so the whole collocated Stokes step runs in Kokkos kernels (CUDA / HIP / OpenMP)
 instead of the host-serial `AmrFlow::gaussSeidel` + host projection that profiling showed to
-be the bottleneck. New headers (all `TPX_HAVE_MORTON` + Kokkos):
+be the bottleneck. New headers (all `PECLET_CORE_HAVE_MORTON` + Kokkos):
 
 - **`device_pcg.hpp` — `DevicePCG`**: MG-preconditioned CG over the FV Poisson. Matvec =
   `deviceApplyFv`, preconditioner = the `DeviceMultigrid` V-cycle, dots/updates = Kokkos
@@ -123,7 +123,7 @@ The MG-PCG advantage over stationary V-cycling grows with size (3.2× fewer cycl
 the **pressure** MG-PCG is flat at 14–16 iters/step across 32³–128³ (textbook multigrid), but the
 **momentum** solve, without its own multigrid, grew 121 → 248 → 471 iters/step (~N^⅓, the
 unpreconditioned-Laplacian rate) and dominated the step — the symptom of a *missing velocity
-multigrid* (the non-AMR sdflow has one; my AMR path did not), exposed by the large steady dt that
+multigrid* (the non-AMR flow has one; my AMR path did not), exposed by the large steady dt that
 strips the `ρ/dt` mass term. The Galerkin `DeviceMomentumMG` fixes it: momentum drops to
 30 → 38 → 54 iters/step (4.0× / 6.5× / **8.7×** fewer, the gain growing with N) and stays
 near-flat — and the whole-step throughput rises monotonically again (the old 128³ dip is gone),
@@ -131,8 +131,8 @@ near-flat — and the whole-step throughput rises monotonically again (the old 1
 physical dt the momentum solve falls to ~12 iters, *below* the pressure's 16. A scalability guard
 (`test_amr_device_flow_kokkos`) asserts the momentum iteration count stays ~flat 16³→32³.
 
-**sdflow-mirror refactor (the device flow path is no longer Stokes-only).** The collocated step now
-mirrors the uniform-grid sdflow solver feature-for-feature, fully device-resident (only MPI staging /
+**flow-mirror refactor (the device flow path is no longer Stokes-only).** The collocated step now
+mirrors the uniform-grid flow solver feature-for-feature, fully device-resident (only MPI staging /
 output gathers touch the host):
 
 - **Navier–Stokes advection** — implicit-FOU in the momentum operator + an explicit ρ(SOU−FOU)
@@ -142,13 +142,13 @@ output gathers touch the host):
   the momentum preconditioner — coarse = const-coeff Helmholtz from the coarsened openness, with the
   clean-fluid exclude mask (cut/solid residuals kept out of the coarse defect, the fine smoother owns
   the cut band) + a pore-scale cap. Competitive at moderate N; Galerkin stays the robust default at
-  scale (the staircase diverges at 64³, like sdflow's at large Δt).
+  scale (the staircase diverges at 64³, like flow's at large Δt).
 - **Multicolour Gauss–Seidel smoother** (opt-in, `setMomentumGS`) — a generic symmetrised greedy
   colouring of any face CSR + a symmetric (forward/reverse) SGS sweep, the RB-GS mirror. Symmetry is
   required because the momentum MG preconditions BiCGStab (a forward-only GS V-cycle breaks the Krylov
   recurrence at 64³). ~20–30 % fewer momentum iterations, growing with N.
 - **Velocity-MG as the solver** (opt-in, `setMomentumMGSolver`) — MG-preconditioned defect correction
-  in place of BiCGStab, the Krylov-free path sdflow uses; cannot break down on the non-symmetric
+  in place of BiCGStab, the Krylov-free path flow uses; cannot break down on the non-symmetric
   operator. Plus an optional **Picard outer loop** over the lagged advection (`setOuterIterations`,
   projection once per step).
 
@@ -170,7 +170,7 @@ Jacobi/BiCGStab (~1e-11); the immersed sphere at finite Re reaches the host `Amr
   leaf + per-leaf CellData) in `include/tpx/amr/{leaf_field,vtu_io}.hpp`. Test
   `tests/test_amr_vtu.cpp` (structure round-trip: cell/point counts, cell-data values).
 - **Phase 3 — DONE.** `refineToSdf` (`include/tpx/amr/refine.hpp`): refine the band the SDF
-  surface crosses down to a target level over the shared `tpx::geom` SDF. Test
+  surface crosses down to a target level over the shared `peclet::core::geom` SDF. Test
   `tests/test_amr_sdf.cpp` (every surface-crossing leaf at target level, genuine adaptivity,
   2:1 balanced, volume conserved).
 - **Phase 4 — DONE.** `DistributedOctree<Dim,Bits>` (`include/tpx/amr/distributed_octree.hpp`):
@@ -203,7 +203,7 @@ Jacobi/BiCGStab (~1e-11); the immersed sphere at finite Re reaches the host `Amr
   per-leaf per-face fluid fraction α∈[0,1] (from a geometry callable `openFn(faceCentreWorld,
   axis)`); the operator (standard + quadratic) weights every face flux by α (taken from the finer
   side, so shared faces are consistent and the operator stays conservative across 2:1 interfaces).
-  `AmrMultigrid::setOpenness` **area-averages** α onto every coarser level (sdflow's
+  `AmrMultigrid::setOpenness` **area-averages** α onto every coarser level (flow's
   `coarsenOpenAvg`), so the per-level operators are rediscretized with consistent openness and the
   openness-weighted quadratic C/F flux applies on each level; `coarseStar` drops the tangential
   correction near a nearly-closed face. Test `tests/test_amr_openness.cpp`: α≡1 reproduces the
@@ -212,7 +212,7 @@ Jacobi/BiCGStab (~1e-11); the immersed sphere at finite Re reaches the host `Amr
   *Remaining follow-ups:* fold into the device/distributed V-cycle; 3D cross-derivative term
   (dropped — affects only the C/F error constant, not the order).
 - **Phase 5d — DONE (cut-cell Dirichlet sub-cell BC + κ).** `AmrCutCell<Bits>`
-  (`include/tpx/amr/cut_cell.hpp`): a **faithful port of sdflow's ξ-polynomial scheme**
+  (`include/tpx/amr/cut_cell.hpp`): a **faithful port of flow's ξ-polynomial scheme**
   (`cut_cell_ibm.hpp`: `poly_*`, `ibmFillEntry`, `ibmModifyStencil`) onto the cell-centered octree.
   Where the openness scheme imposes a *Neumann* wall, this imposes a *Dirichlet* value u=u_bc on
   the immersed boundary at the true sub-cell distance ξ·h (Shortley–Weller), with `D_rescale`
@@ -224,10 +224,10 @@ Jacobi/BiCGStab (~1e-11); the immersed sphere at finite Re reaches the host `Amr
   This is the velocity-diffusion/scalar-Dirichlet half of the cut-cell IBM (the openness scheme is
   the pressure/Neumann half).
 - **Phase 6 — DONE (collocated Stokes momentum+pressure step).** `AmrFlow<Bits>`
-  (`include/tpx/amr/flow.hpp`) wires both cut-cell halves into one sdflow-style projection step:
+  (`include/tpx/amr/flow.hpp`) wires both cut-cell halves into one flow-style projection step:
   **momentum** = implicit backward-Euler viscous solve per component with the Dirichlet
   ξ-polynomial operator (no-slip IBM, `(ρ/dt)I − μ∇²`); **pressure** = the **Almgren–Bell–Colella
-  (ABC) approximate projection**, sdflow's collocated coupling (`src/mac_approx_projection.hpp`):
+  (ABC) approximate projection**, flow's collocated coupling (`src/mac_approx_projection.hpp`):
   average cell velocities to a face (MAC) divergence, solve the openness Poisson `∇²φ = ∇·u*`, then
   correct the cell velocities by `½(g⁻+g⁺)` of the two adjacent FACE φ-gradients (a closed/solid
   face contributes a zero gradient). Stokes only (advection is the follow-up). Test
@@ -238,7 +238,7 @@ Jacobi/BiCGStab (~1e-11); the immersed sphere at finite Re reaches the host `Amr
   **The collocated projection is the ABC method by design — do NOT replace it with Rhie–Chow.** The
   small residual cell divergence is intrinsic to cell-centered velocity placement (the *face* field
   is exactly divergence-free; the *cell* field only approximately), not a defect to engineer away;
-  see `sdflow/doc/sdflow_colocated_plan.md` and the `amr-octree-status` memory note.
+  see `flow/doc/sdflow_colocated_plan.md` and the `amr-octree-status` memory note.
 - **Phase 6b — DONE (momentum advection: SOU + implicit-FOU deferred correction).**
   `AmrFlow::setAdvection(true)` adds conservative `∇·(u u)` momentum advection. The high-order flux
   is **second-order upwind (SOU)** by default (`setAdvectionScheme(1)` ⇒ Koren TVD); the advecting
@@ -397,11 +397,11 @@ Jacobi/BiCGStab (~1e-11); the immersed sphere at finite Re reaches the host `Amr
   here (slightly slower — the prolongation stays plain piecewise-constant, an unmatched transfer pair). Net:
   plain volume-average stays the default everywhere; κ-restrict is safe on non-singular configs but not a
   convergence win in these tests.
-- **Phase 6c — Stokes-drag vs Zick & Homsy (DONE — tight match).** Replicated sdflow's exact drag
+- **Phase 6c — Stokes-drag vs Zick & Homsy (DONE — tight match).** Replicated flow's exact drag
   metric (`validate_zick_homsy_sdflow.py`): `K = f N³/(6πμR U_sup)` for a simple-cubic sphere array,
-  vs Z&H (1982) — the same ground truth sdflow validates against. Test `tests/test_amr_drag.cpp`.
+  vs Z&H (1982) — the same ground truth flow validates against. Test `tests/test_amr_drag.cpp`.
   **Result (uniform grid):** **within ~1% of Z&H**, dt-independent — φ=0.125: N=8 −0.8%, N=16 +0.4%,
-  N=32 +0.3%; φ=0.064 N=16 −0.7%; φ=0.216 N=16 −0.03%. This is within sdflow's own <0.5% accuracy
+  N=32 +0.3%; φ=0.064 N=16 −0.7%; φ=0.216 N=16 −0.03%. This is within flow's own <0.5% accuracy
   (collocated carries the known ~1% per-grid gap vs staggered).
   **Two fixes got there, and they are the lesson, not the cut-cell operator:**
   (1) `buildCutcellOp` is just `A = -div(open·grad)` — the *same* openness-weighted Laplacian we
@@ -485,7 +485,7 @@ Jacobi/BiCGStab (~1e-11); the immersed sphere at finite Re reaches the host `Amr
   `tests/test_amr_transport.cpp`: divergence-free update conserves total scalar to round-off
   (uniform AND graded); a sine mode decays at the analytic rate exp(−D k² t); upwind is monotone
   and preserves a constant. This is the reusable "AMR for scalar transport" core a consumer
-  imports. **Remaining (user-facing):** sdflow-proper wiring — an AMR `GridLayout`-style policy,
+  imports. **Remaining (user-facing):** flow-proper wiring — an AMR `GridLayout`-style policy,
   cut-cell IBM on leaves, and structured-hydro ↔ AMR coupling by leaf point-location — is a large
-  change inside sdflow (whose solver currently assumes a flat structured grid) and is left for a
+  change inside flow (whose solver currently assumes a flat structured grid) and is left for a
   steered session.

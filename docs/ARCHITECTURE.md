@@ -16,9 +16,9 @@ conventions, and the same interfaces.
 
 | Code | Kind | State representation | Status |
 |------|------|----------------------|--------|
-| `sdflow` | **Eulerian** | Structured grid: staggered MAC (default) or collocated/cell-centered, via a `GridLayout` policy | Extensively developed |
+| `flow` | **Eulerian** | Structured grid: staggered MAC (default) or collocated/cell-centered, via a `GridLayout` policy | Extensively developed |
 | `dem` | **Lagrangian** | Particles (DEM/XPBD), SoA on GPU | Extensively developed |
-| `vorflow` | **Mixed** | Moving particles + their Voronoi cells (Lagrangian carriers, Eulerian-like fluxes across cell faces) | Developed; Kokkos + nanobind Python |
+| `voro` | **Mixed** | Moving particles + their Voronoi cells (Lagrangian carriers, Eulerian-like fluxes across cell faces) | Developed; Kokkos + nanobind Python |
 | `morton` | Primitive | Z-order codes / spatial index | Mature |
 
 (`block_decomposer`, the original source of the shared MPI layer, has been **retired/archived**; its
@@ -32,7 +32,7 @@ decomposition (all use the same block decomposition) nor the geometry (all use t
 
 ```
             ┌──────────────────────────────────────────────────────────┐
- methods    │  sdflow     dem     vorflow   (future)  │   separate repos
+ methods    │  flow     dem     voro   (future)  │   separate repos
             └──────────────────────────────────────────────────────────┘
                    │             │                │
                    ▼             ▼                ▼
@@ -69,20 +69,20 @@ depends on primitives. No method depends on another method; primitives depend on
   them.
 - **ibm** — the common Immersed Boundary Method interface: cut-cell / boundary data derived from an
   SDF, consumed by Eulerian solvers (and the point-shell collision analog in `dem`).
-- **python** — the shared **nanobind** zero-copy array bridge (`tpx::python`,
+- **python** — the shared **nanobind** zero-copy array bridge (`peclet::core::python`,
   `include/tpx/python/ndarray_interop.hpp`) so every method exposes Python the same way (array shapes,
   ownership, naming). Host Views/vectors export as NumPy without a copy; device Views export as DLPack
   for CuPy/PyTorch. Provisioned via `cmake/SuiteNanobind.cmake`; see CONVENTIONS §6.
 
 ## How each method maps onto the core
 
-- **sdflow (Eulerian):** the global MAC grid is partitioned by `decomposition`; each rank owns a block
+- **flow (Eulerian):** the global MAC grid is partitioned by `decomposition`; each rank owns a block
   with ghost cells; per-step it exchanges grid-field halos through the **persistent neighborhood**
   path; SDF geometry + IBM come from `geometry`/`ibm`. First solver to be wired in (most grid-native).
 - **dem (Lagrangian):** particles are owned by the block containing them; per-step it does
   **particle migration** (NBX path) + **ghost-particle** exchange near block boundaries; collision
   geometry uses the shared SDF. Reuses its existing ArborX broad-phase locally inside a block.
-- **vorflow (mixed):** particles migrate like Lagrangian carriers (NBX path), but each rank
+- **voro (mixed):** particles migrate like Lagrangian carriers (NBX path), but each rank
   also needs **ghost particles** one interaction radius deep to close the Voronoi cells touching the
   block boundary; fluxes across Voronoi faces are the Eulerian aspect. Gets nanobind bindings via
   `python`.
