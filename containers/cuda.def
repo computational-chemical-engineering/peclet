@@ -31,7 +31,7 @@ From: nvidia/cuda:12.6.2-devel-ubuntu22.04
     apt-get update
     apt-get install -y --no-install-recommends \
         build-essential cmake ninja-build git ca-certificates \
-        libopenmpi-dev openmpi-bin \
+        wget bzip2 file libnuma-dev libucx-dev \
         python3 python3-dev python3-pip python3-venv
     rm -rf /var/lib/apt/lists/*
 
@@ -41,24 +41,48 @@ From: nvidia/cuda:12.6.2-devel-ubuntu22.04
     export CUDA_ARCH="${CUDA_ARCH:-80}"
     export CUDA_COMPILER=/usr/local/cuda/bin/nvcc
 
+    # --- CUDA-aware OpenMPI, matching Snellius's OpenMPI/4.1.x-GCC module -------------------------
+    # Built --with-cuda so GPU buffers pass straight to MPI. Its 4.1.x ABI lets containers/snellius-run.sh
+    # BIND the host OpenMPI + UCX + PMIx at runtime (the Apptainer "hybrid" model) for the real
+    # InfiniBand + GPUDirect transport. Pin OMPI_VER to your site's OpenMPI (module show OpenMPI) if it differs.
+    OMPI_VER=4.1.6
+    cd /tmp
+    wget -q "https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-${OMPI_VER}.tar.bz2"
+    tar xf "openmpi-${OMPI_VER}.tar.bz2" && cd "openmpi-${OMPI_VER}"
+    ./configure --prefix=/opt/openmpi --with-cuda=/usr/local/cuda --with-ucx \
+        --enable-mpi1-compatibility --without-verbs >/tmp/ompi_configure.log 2>&1
+    make -j"$(nproc)" >/tmp/ompi_make.log 2>&1
+    make install >/tmp/ompi_install.log 2>&1
+    cd / && rm -rf "/tmp/openmpi-${OMPI_VER}"*
+    export PATH=/opt/openmpi/bin:$PATH
+    export LD_LIBRARY_PATH=/opt/openmpi/lib:${LD_LIBRARY_PATH:-}
+
     cd /opt/peclet
     tools/bootstrap_deps.sh nvidia-cuda
 
     PREFIX=/opt/peclet/extern/install/nvidia-cuda
-    CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages /opt/peclet/flow
+    # mpi4py built against the CUDA-aware OpenMPI just installed.
+    python3 -m pip install --break-system-packages mpi4py
+
+    # flow / dem / voro with their distributed (MPI) step compiled in (multi-GPU via snellius-run.sh).
+    CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages \
+        --config-settings=cmake.define.PECLET_FLOW_MPI=ON /opt/peclet/flow
     CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages \
         --config-settings=cmake.define.PECLET_DEM_MPI=ON /opt/peclet/dem
-    CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages /opt/peclet/voro
+    CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages \
+        --config-settings=cmake.define.PECLET_VORO_MPI=ON /opt/peclet/voro
     CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages /opt/peclet/core
     python3 -m pip install --break-system-packages /opt/peclet/morton
 
 %environment
-    export PATH=/usr/local/cuda/bin:$PATH
+    export PATH=/opt/openmpi/bin:/usr/local/cuda/bin:$PATH
+    export LD_LIBRARY_PATH=/opt/openmpi/lib:${LD_LIBRARY_PATH:-}
 
 %labels
     org.opencontainers.title  "peclet (CUDA / Kokkos)"
     backend                   nvidia-cuda
-    target                    "Snellius A100 (sm_80) — set KOKKOS_ARCH/CUDA_ARCH for H100"
+    target                    "Snellius A100 (sm_80) / A30 sm_80 / H100 sm_90 (set KOKKOS_ARCH/CUDA_ARCH)"
+    mpi                       "build: CUDA-aware OpenMPI 4.1.6; run: bind host OpenMPI via snellius-run.sh"
 
 %runscript
     exec python3 "$@"

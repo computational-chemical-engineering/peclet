@@ -36,11 +36,18 @@ From: ubuntu:24.04
     tools/bootstrap_deps.sh host-openmp
 
     PREFIX=/opt/peclet/extern/install/host-openmp
-    # Build/install each Python package against the host-openmp prefix.
-    CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages /opt/peclet/flow
+    # mpi4py (built against the container OpenMPI) — the distributed Python drivers use it to MPI_Init.
+    python3 -m pip install --break-system-packages mpi4py
+
+    # Build/install each Python package against the host-openmp prefix; the distributed (MPI) step of
+    # flow / dem / voro is compiled in so multi-rank runs work (single-node here; multi-node via the
+    # host-MPI bind wrapper, see containers/*-run.sh).
+    CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages \
+        --config-settings=cmake.define.PECLET_FLOW_MPI=ON /opt/peclet/flow
     CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages \
         --config-settings=cmake.define.PECLET_DEM_MPI=ON /opt/peclet/dem
-    CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages /opt/peclet/voro
+    CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages \
+        --config-settings=cmake.define.PECLET_VORO_MPI=ON /opt/peclet/voro
     CMAKE_PREFIX_PATH=$PREFIX python3 -m pip install --break-system-packages /opt/peclet/core
     python3 -m pip install --break-system-packages /opt/peclet/morton
 

@@ -39,7 +39,7 @@ tracks the newest release.
 # --- Laptop / CPU node ---
 apptainer exec peclet-cpu_0.1.0.sif python3 -c "import peclet.flow as f; print(f.execution_space)"  # -> OpenMP
 OMP_NUM_THREADS=16 apptainer exec peclet-cpu_0.1.0.sif python3 my_run.py
-mpirun -np 4 apptainer exec peclet-cpu_0.1.0.sif python3 my_distributed_run.py     # multi-rank (dem)
+mpirun -np 4 apptainer exec peclet-cpu_0.1.0.sif python3 my_distributed_run.py   # single-node MPI (flow/dem/voro)
 
 # --- Snellius (NVIDIA) --- request a GPU, then bind the host driver with --nv:
 srun apptainer exec --nv peclet-cuda_0.1.0-sm80.sif python3 my_run.py
@@ -52,15 +52,56 @@ srun -n8 --gpus-per-node=8 containers/lumi-run.sh peclet-hip_0.1.0-gfx90a.sif my
 `--nv` (NVIDIA) / `--rocm` (AMD) binds the host GPU driver into the container. `execution_space`
 (`Cuda` / `HIP` / `OpenMP` / `Serial`) confirms which backend you're running.
 
-### MPI on LUMI
+## 3. Distributed MPI (multi-GPU / multi-node)
 
-The HIP image is built against vanilla **MPICH 4.0** (which exports the MPICH-ABI `libmpi.so.12`), and at
-runtime [`containers/lumi-run.sh`](https://github.com/computational-chemical-engineering/peclet/blob/main/containers/lumi-run.sh)
-binds the host **Cray-MPICH + libfabric + GPU-transport-layer** libraries over it — the MPICH-ABI hybrid
-model, giving Slingshot + GPU-aware MPI without rebuilding. Pin the ROCm base tag `≤` the LUMI driver's
-ROCm (`module show rocm`).
+Every image compiles in the **distributed step of flow, dem and voro** (`PECLET_FLOW_MPI` /
+`PECLET_DEM_MPI` / `PECLET_VORO_MPI`) and ships **`mpi4py`**. A distributed driver imports `mpi4py`
+(which calls `MPI_Init`) then uses the multi-rank API — `Solver.init_mpi(...)` + `peclet.flow.mpi_block(...)`
+for the CFD, `Simulation.step_mpi(...)` for dem, `peclet.voro.VoronoiHalo` for the tessellation.
 
-## 3. Build your own
+**Single node** is trivial — the container's own MPI launches the ranks:
+
+```bash
+mpirun -np 4 apptainer exec peclet-cpu_0.1.0.sif python3 my_run.py
+```
+
+**Multiple nodes / GPUs** use the Apptainer *bind* model: the container is built against a compatible MPI,
+and at runtime the **host** MPI + interconnect libraries are bound in. Each system has a launcher wrapper
++ an example `sbatch` script under [`containers/`](https://github.com/computational-chemical-engineering/peclet/tree/main/containers):
+
+| System | Target | Image | Wrapper | Submit script |
+|---|---|---|---|---|
+| **Snellius** | NVIDIA A100/H100 multi-GPU | `peclet-cuda:*-sm80` / `-sm90` | `snellius-run.sh` (binds host OpenMPI+UCX+PMIx, `--nv`) | `submit/snellius.slurm` |
+| **LUMI-G** | AMD MI250X multi-GPU | `peclet-hip:*-gfx90a` | `lumi-run.sh` (binds host Cray-MPICH/Slingshot, `--rocm`) | `submit/lumi.slurm` |
+| **TU/e SMM** | AMD Genoa multi-node CPU (hybrid MPI+OpenMP) | `peclet-cpu` | `tue-run.sh` (binds host OpenMPI, `OMP_NUM_THREADS`) | `submit/tue-smm.slurm` |
+
+The wrapper is launched **by** `srun`, one container per rank:
+
+```bash
+# Snellius — 4 A100/node, one rank per GPU:
+module load 2023 OpenMPI/4.1.5-GCC-12.3.0 CUDA/12.4.0
+srun --mpi=pmix containers/snellius-run.sh peclet-cuda_0.1.0-sm80.sif benchmarks/profile_mpi_flow.py --L 128
+
+# TU/e SMM (chem.smm03.q) — hybrid 4 ranks × 8 threads/node:
+export OMP_NUM_THREADS=8
+srun --mpi=pmix containers/tue-run.sh peclet-cpu_0.1.0.sif benchmarks/profile_mpi_flow.py --L 96
+```
+
+!!! warning "Match the OpenMPI version"
+    The CUDA & CPU images ship **OpenMPI 4.1.x**; the bind model needs the host `module load OpenMPI/4.1.x`
+    to be the same series. If your site differs, rebuild the image with `OMPI_VER` (cuda.def) set to your
+    `module show OpenMPI` version. LUMI instead uses the **Cray-MPICH ABI** (`libmpi.so.12`) — no version
+    pin, but keep the ROCm base tag `≤` the LUMI driver's ROCm.
+
+### Weak-scaling / communication-overhead benchmark
+
+[`benchmarks/profile_mpi_flow.py`](https://github.com/computational-chemical-engineering/peclet/tree/main/benchmarks)
+is a ready-made profiler: every rank runs an **identical** periodic sphere-packing CFD tile, glued
+periodically, so per-rank work is constant and the per-step-time rise vs `np` is the pure MPI tax (halo
+exchange + global pressure solve). The packing geometry is generated once and not timed. Launch it through
+the wrappers above; see [`benchmarks/README.md`](https://github.com/computational-chemical-engineering/peclet/tree/main/benchmarks).
+
+## 4. Build your own
 
 If you need an arch that isn't published (or want to customise), build from the definition files
 ([details](https://github.com/computational-chemical-engineering/peclet/tree/main/containers)):
