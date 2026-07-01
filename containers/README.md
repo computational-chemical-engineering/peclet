@@ -80,7 +80,7 @@ Notes / gotchas:
   `cuda.def` ship OpenMPI; if your Snellius MPI module is OpenMPI this composes directly, otherwise bind
   the host MPI or rebuild against the matching ABI.
 - **GPU-aware MPI (Snellius).** Use the CUDA-aware OpenMPI module + `--nv`. The codes host-stage the
-  halo by default and opt into GPU-aware MPI explicitly — see `transport-core/docs/cuda-aware-mpi.md`.
+  halo by default and opt into GPU-aware MPI explicitly — see `core/docs/cuda-aware-mpi.md`.
 - **Arch.** `cuda.def` defaults to A100 (`sm_80`); pass `KOKKOS_ARCH=HOPPER90 CUDA_ARCH=90` for H100.
   `hip.def` targets MI250X (`gfx90a`).
 

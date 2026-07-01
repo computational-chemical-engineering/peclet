@@ -6,7 +6,7 @@ on each repo's `main`. After this, every method code builds and runs on Kokkos (
 backends) with no CUDA-only path.
 
 > **STATUS: COMPLETE (2026-06-20).** All three repos retired CUDA and merged `kokkos-migration → main`:
-> cfd-gpu (`sdflow`/`pnm_backend`), packing-gpu (`demgpu`), transport-core (Kokkos grid + particle
+> cfd-gpu (`sdflow`/`pnm_backend`), packing-gpu (`demgpu`), core (Kokkos grid + particle
 > halos). Validated on CUDA + host-openmp; `tests/kokkos_mpi` ctests pass np=1,2,4. Not pushed (per the
 > milestone-commit policy). Restore points: the `pre-cuda-retirement` tag on each repo. Phase checklist
 > below is all checked off.
@@ -16,7 +16,7 @@ backends) with no CUDA-only path.
 The migration is **numerically complete** — every solver, method, and option is ported and validated on
 CUDA + OpenMP backends:
 
-- **transport-core** — Kokkos grid + particle halos (incl. periodic self-ghosts). Legacy CUDA halo
+- **core** — Kokkos grid + particle halos (incl. periodic self-ghosts). Legacy CUDA halo
   (`grid_halo_cuda.cuh`) still present.
 - **cfd-gpu `sdflow`** — full cut-cell IBM Navier–Stokes + geometric MG-PCG, all three pressure drivers
   (V-cycle / PCG / Chebyshev), implicit-FOU + Picard, velocity-MG (IBM-staircase / domain-BC const-coeff
@@ -32,7 +32,12 @@ CUDA + OpenMP backends:
 **Out of scope** (not CUDA, or not in the migrated path):
 - **voronoi_dynamics** — OpenMP/CPU (Boost + Voro++), *no CUDA*. Its Kokkos-OpenMP rebuild is a separate,
   later effort; nothing to retire here.
-- **morton_arithmetic** — already HIP-guarded; not used by the packing broad-phase. Leave as-is.
+- **morton_arithmetic** — ~~Leave as-is~~ **RETIRED (2026-06-22):** the raw-CUDA backend (`cuda/`,
+  `morton::cuda`) was deleted and replaced by a portable **Kokkos** backend (`include/morton/kokkos.hpp`,
+  `morton::kokkos`; CUDA/HIP/OpenMP, opt-in `-DMORTON_ENABLE_KOKKOS=ON`). The core's `MORTON_HD` now
+  resolves to `KOKKOS_FUNCTION`. Device output validated bit-for-bit vs the scalar library on OpenMP +
+  CUDA; device-resident throughput preserved (~51 GMops/s 2D-32 encode). Restore point:
+  `pre-cuda-retirement` tag in the morton repo.
 
 ### Gaps to close before deleting CUDA (the real remaining work)
 
@@ -60,12 +65,12 @@ already a superset of `pnm_backend`.
 3. **Close all gaps** — implement every missing real feature (cfd 3 methods + getters, packing MPI
    binding + exports/getters); `set_velocity_streams` becomes a no-op shim (kept only if a script calls it).
 4. **Sequence** — implementer's choice. Plan does cfd first (most complete → the template), then packing,
-   then transport-core; merge each as it lands.
+   then core; merge each as it lands.
 
 ## Restore points
 
 Tag `pre-cuda-retirement` created on each repo's current `kokkos-migration` HEAD (the full validated
-CUDA + Kokkos state): transport-core `a6ef3fa`, cfd-gpu `47e52c3`, packing-gpu `af3250a`. cfd-gpu also
+CUDA + Kokkos state): core `a6ef3fa`, cfd-gpu `47e52c3`, packing-gpu `af3250a`. cfd-gpu also
 keeps the older `pnm_backend-reference` tag. CUDA is recoverable from these after deletion.
 
 ## Phased plan
@@ -114,9 +119,9 @@ the umbrella docs (`ARCHITECTURE.md`, `ROADMAP.md`, `PORTABILITY.md`). Push when
 |------|----------------|------------------|------------------|
 | **cfd-gpu** | +3 methods, +3 getters, streams shim | `src/kokkos/*` → `src/`, `cfdk::` → `dns::`/canonical, `sdflow_kokkos`→`sdflow`, `pnm_kokkos`→`pnm_backend` | delete `distributed_ns.cuh`, `mac_*.cuh`, `cut_cell_ibm.cuh`, `staggered_advection.cuh`, `pore_extraction.{cu,cuh}`, `sdflow_bindings.cu`, `bindings.cpp` |
 | **packing-gpu** | MPI binding + build, exports, getters | `*_kokkos.hpp`→`*.hpp`, `dem::` kept, `demgpu_kokkos`→`demgpu` | delete `*.cu`/`*.cuh`, `main_binding.cpp`, `ParticleSystem.cuh`, `src/mpi/*.cu` |
-| **transport-core** | — | — | delete `grid_halo_cuda.cuh` + its test/CMake entry |
+| **core** | — | — | delete `grid_halo_cuda.cuh` + its test/CMake entry |
 | **voronoi_dynamics** | — (no CUDA; separate later Kokkos-OpenMP effort) | — | — |
-| **morton_arithmetic** | — (HIP-guarded, leave) | — | — |
+| **morton_arithmetic** | add `morton::kokkos` (`include/morton/kokkos.hpp`) + `MORTON_ENABLE_KOKKOS` build/tests/bench | `MORTON_HD`→`KOKKOS_FUNCTION`; no module rename (header-only) | delete `cuda/` (`morton::cuda`); tag `pre-cuda-retirement` |
 
 ## Validation gate (every phase)
 
@@ -139,4 +144,4 @@ the umbrella docs (`ARCHITECTURE.md`, `ROADMAP.md`, `PORTABILITY.md`). Push when
   thermostat / precession PASS on both; the `verify_stacking*` scripts FAIL on **both** backends — a
   pre-existing CUDA friction/settling defect (documented; a separate deferred numerics task, not a port
   regression). `tests/kokkos` 8/8, `tests/arborx` 2/2, `tests/kokkos_mpi` 6/6, CUDA + OpenMP.
-- **transport-core** — CPU 27/27; Kokkos halo path (`TPX_ENABLE_KOKKOS`) 33/33, np=1,2,4.
+- **core** — CPU 27/27; Kokkos halo path (`TPX_ENABLE_KOKKOS`) 33/33, np=1,2,4.

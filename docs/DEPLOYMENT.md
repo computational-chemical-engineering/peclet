@@ -66,17 +66,17 @@ pip install peclet-flow            # or any one on its own
 
 # CPU / multicore — from a source checkout against a bootstrapped prefix (dev, or to add MPI):
 PREFIX=$PWD/extern/install/host-openmp
-CMAKE_PREFIX_PATH=$PREFIX pip install ./sdflow
+CMAKE_PREFIX_PATH=$PREFIX pip install ./flow
 CMAKE_PREFIX_PATH=$PREFIX pip install --config-settings=cmake.define.PECLET_DEM_MPI=ON ./dem
 pip install ./morton               # pure-CPU, no prefix needed
 
 # NVIDIA GPU (Snellius) — build from source against the CUDA prefix:
 PREFIX=$PWD/extern/install/nvidia-cuda
-PATH=/usr/local/cuda/bin:$PATH CMAKE_PREFIX_PATH=$PREFIX pip install ./sdflow ./dem
+PATH=/usr/local/cuda/bin:$PATH CMAKE_PREFIX_PATH=$PREFIX pip install ./flow ./dem
 ```
 
 The dist names are `peclet-flow` (repo `sdflow`), `peclet-dem` (`dem`), `peclet-voro` (`vorflow`),
-`peclet-morton` (`morton`), `peclet-core` (`transport-core`); a source `pip install ./<repo>` builds the
+`peclet-morton` (`morton`), `peclet-core` (`core`); a source `pip install ./<repo>` builds the
 matching one.
 
 `pip install` builds the same CMake targets the developer build does; the install rule is gated on

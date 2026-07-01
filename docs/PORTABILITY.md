@@ -1,7 +1,7 @@
 # Portability (Kokkos + ArborX)
 
 Status: **Migration complete — Kokkos is canonical, CUDA retired (2026-06-20).** sdflow (`sdflow` +
-`pnm`), dem (`dem`), and transport-core all build and run on Kokkos
+`pnm`), dem (`dem`), and core all build and run on Kokkos
 ([ArborX](https://github.com/arborx/ArborX) replaced dem's cuBQL broad-phase); the CUDA
 implementations were deleted after a machine-precision / physical-parity validation (see
 `docs/CUDA_RETIREMENT.md`). This document is the contract for the suite's portability across NVIDIA
@@ -82,7 +82,7 @@ On a cluster, `module load` the deps instead of bootstrapping and drop the
 
 ## GPU-aware MPI (relevant from Phase 1 on)
 
-transport-core's halo exchange will offer two paths: host-staged (portable
+core's halo exchange will offer two paths: host-staged (portable
 fallback) and **GPU-aware MPI** (`Kokkos::View::data()` passed straight to
 `MPI_Isend/Irecv`). GPU-aware transport is available on Snellius (OpenMPI+UCX) and
 LUMI (cray-mpich); selectable at runtime so non-GPU-aware stacks still work.

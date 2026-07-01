@@ -70,13 +70,13 @@ labels and stay local to voronoi; they are not suite-wide types.
 
 ## 6. Python binding conventions
 
-- **Mechanism:** **nanobind** for every compiled solver (sdflow + `pnm`, dem `dem`, transport-core
+- **Mechanism:** **nanobind** for every compiled solver (sdflow + `pnm`, dem `dem`, core
   `tpx_mpi`/`tpx_amr`, vorflow's device module), built through **scikit-build-core**. nanobind is
   chosen over pybind11 because its `nb::ndarray` carries a DLPack device tag and arbitrary strides,
   which is what makes the zero-copy GPU path below possible. morton's lightweight ctypes/C-ABI shim
   stays as is (dependency-free by design, ships portable PyPI wheels) — the deliberate exception.
 - **The array bridge:** all Kokkos-backed modules cross the C++/Python boundary through one shared
-  header, `tpx::python` (`transport-core/include/tpx/python/ndarray_interop.hpp`), provisioned via
+  header, `tpx::python` (`core/include/tpx/python/ndarray_interop.hpp`), provisioned via
   `cmake/SuiteNanobind.cmake`. Do **not** re-hand-roll per-module copy helpers.
   - `view_to_ndarray(View)` exports a Kokkos View **without copying**: a host View becomes a NumPy
     array referencing the View's memory; a device (CUDA/HIP) View becomes a DLPack array CuPy/PyTorch

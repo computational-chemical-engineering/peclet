@@ -16,7 +16,7 @@ deployment** guide, and links to each code's **API reference** (Doxygen).
 
 | Code | Role | Stack |
 |------|------|-------|
-| [**transport-core**](https://github.com/computational-chemical-engineering/transport-core) | Shared infrastructure: ORB block decomposition, async grid/particle halo, SDF geometry, VTI I/O | header-only C++20 + MPI (optional Kokkos) |
+| [**core**](https://github.com/computational-chemical-engineering/core) | Shared infrastructure: ORB block decomposition, async grid/particle halo, SDF geometry, VTI I/O | header-only C++20 + MPI (optional Kokkos) |
 | [**sdflow**](https://github.com/computational-chemical-engineering/sdflow) | Incompressible Navier–Stokes for porous media (staggered MAC + cut-cell IBM + multigrid); `pnm` pore extraction | Kokkos + nanobind |
 | [**dem**](https://github.com/computational-chemical-engineering/dem) | Discrete Element Method (XPBD) + SDF point-shell collision for dense packing | Kokkos + ArborX + nanobind |
 | [**vorflow**](https://github.com/computational-chemical-engineering/vorflow) | Dynamic 3D Voronoi tessellation of moving particles (periodic & Lees–Edwards) | header-only C++17 |
@@ -38,7 +38,7 @@ OpenMP, selected at build time. See [CUDA retirement](CUDA_RETIREMENT.md).
 
 Each code publishes its full C++/Python API as Doxygen on its own GitHub Pages site:
 
-- [transport-core API](https://cautious-barnacle-7p9p71w.pages.github.io/)
+- [core API](https://cautious-barnacle-7p9p71w.pages.github.io/)
 - [morton API](https://congenial-chainsaw-g414wov.pages.github.io/)
 - [sdflow API](https://miniature-adventure-y7jzg8e.pages.github.io/)
 - [dem API](https://expert-chainsaw-6qjq213.pages.github.io/)

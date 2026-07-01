@@ -27,16 +27,16 @@ git submodule update --init --recursive
 
 | Submodule | Role |
 |-----------|------|
-| `transport-core/` | **Shared infrastructure** (header-only C++20 + MPI, optional Kokkos): ORB block decomposition, async grid ghost-layer exchange + Lagrangian particle migration/ghosts, SDF geometry, VTI I/O. Every method depends on it. |
-| `sdflow/` | Eulerian **Kokkos** incompressible Navier–Stokes (porous media; staggered MAC grid + cut-cell IBM). Complete, validated, MPI-optional distributed solver on `transport-core`; `pnm` is its pore-network-extraction module. |
-| `dem/` | Lagrangian **Kokkos + ArborX** DEM/XPBD particle packing. Full XPBD step with a validated distributed `step_mpi` (transport-core particle halo). |
-| `vorflow/` | Mixed Lagrangian/Eulerian dynamic 3D Voronoi tessellation (header-only C++17; periodic & Lees–Edwards). |
+| `core/` | **Shared infrastructure** (header-only C++20 + MPI, optional Kokkos): ORB block decomposition, async grid ghost-layer exchange + Lagrangian particle migration/ghosts, SDF geometry, VTI I/O. Every method depends on it. |
+| `flow/` | Eulerian **Kokkos** incompressible Navier–Stokes (porous media; staggered MAC grid + cut-cell IBM). Complete, validated, MPI-optional distributed solver on `core`; `pnm` is its pore-network-extraction module. |
+| `dem/` | Lagrangian **Kokkos + ArborX** DEM/XPBD particle packing. Full XPBD step with a validated distributed `step_mpi` (core particle halo). |
+| `voro/` | Mixed Lagrangian/Eulerian dynamic 3D Voronoi tessellation (header-only C++17; periodic & Lees–Edwards). |
 | `morton/` | Morton/Z-order spatial-index primitive — arithmetic directly in Morton space (header-only C++17 + BMI2/AVX-512, Python). |
 
 Both GPU codes are now **Kokkos**-based (CUDA retired — see [docs/CUDA_RETIREMENT.md](docs/CUDA_RETIREMENT.md));
 the same source runs on CUDA, HIP (AMD/LUMI), and OpenMP backends, chosen by the bootstrapped install
 prefix (`tools/bootstrap_deps.sh`). The original `block_decomposer` prototype has been **retired**; its
-reusable parts were extracted into `transport-core/`.
+reusable parts were extracted into `core/`.
 
 ## Shared design docs
 
@@ -70,7 +70,7 @@ per environment, and **Apptainer containers** for Snellius (CUDA) and LUMI (HIP)
 ## Continuous integration & docs
 
 Each submodule carries its own `.github/workflows/`: a **CI** workflow (build + test where feasible —
-`transport-core` and `morton` run full CPU/MPI suites; `sdflow` and `dem` build the Kokkos OpenMP host
+`core` and `morton` run full CPU/MPI suites; `sdflow` and `dem` build the Kokkos OpenMP host
 backend) and a **Documentation** workflow that builds the Doxygen API docs and publishes them to that
 repo's GitHub Pages. Enabling Pages once per repo (Settings → Pages → "Source: GitHub Actions") is the
 only manual step.

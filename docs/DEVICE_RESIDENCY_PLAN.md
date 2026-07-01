@@ -28,7 +28,7 @@ The audit confirmed the steady-state hot paths are device-resident:
   requires. No per-step field copies.
 - **dem** — the single-GPU `demStep` (predict / ArborX broad-phase / narrow-phase / velocity+friction /
   position / commit) runs entirely on device; ArborX consumes device Views directly.
-- **transport-core AMR** — for a *static* geometry, `AmrFlow::step()` (momentum BiCGStab/MG, pressure
+- **core AMR** — for a *static* geometry, `AmrFlow::step()` (momentum BiCGStab/MG, pressure
   MG-PCG, divergence/grad/correct, per-step FOU/SOU advection rebuild) is all device kernels.
 - **vorflow** — the tessellation CSR stays device-resident within a step; all physics
   (`euler_pressure`, `viscous`, `interface`) are device kernels.
@@ -41,7 +41,7 @@ vorflow's *unused* incremental updater, the *pnm* pipeline, and a recurring redu
 
 ## Shared infrastructure to build first
 
-Two reusable pieces in `transport-core` unblock most of the per-repo work and prevent re-solving the
+Two reusable pieces in `core` unblock most of the per-repo work and prevent re-solving the
 same problem five times:
 
 - **S1 — Device CSR-fill primitive** (`tpx::` device util): the canonical
@@ -58,7 +58,7 @@ same problem five times:
 
 ## Themes & workstreams
 
-### Theme A — Dynamic AMR assembly on device (transport-core) — biggest structural gap
+### Theme A — Dynamic AMR assembly on device (core) — biggest structural gap
 All AMR operator/geometry **assembly** is host-serial (the existing `amr_device_assembly_plan.md`
 D1–D6). For a static run this is cold; the moment the SDF moves or the mesh `adapt`s, every step becomes
 host-bound (host walk + re-upload). Port, on top of **S1**, keeping the host geometric oracles:
@@ -75,7 +75,7 @@ Caveats: keep `applyOpGeometric`/`applyLaplacian`/host `transferField` as oracle
 match `forEachFaceFull`/`forEachFaceNeighbor` emit order; `greedyColoring` may stay host but must not
 force the device CSR back to host (`velocity_mg.hpp:103-106` currently does).
 
-### Theme C — Distributed compute on device (transport-core) — multi-GPU scaling
+### Theme C — Distributed compute on device (core) — multi-GPU scaling
 The `distributed_*` solvers are labelled "the distributed compute path" but run per-cell apply/jacobi/
 residual/vcycle on host `std::vector` every matvec; only the MPI byte exchange need be host.
 
@@ -87,7 +87,7 @@ residual/vcycle on host `std::vector` every matvec; only the MPI byte exchange n
 Caveat: bit-identical across rank counts is the contract; each cell sums its own faces, so a per-cell
 device reduction is safe.
 
-### Theme D — Particle migration on device (transport-core ⇒ dem, vorflow)
+### Theme D — Particle migration on device (core ⇒ dem, vorflow)
 `ParticleMigrator`/`rebalance`/`ParticleHaloTopology::build` are 100% host, so dem must copy its device
 particle SoA host→migrate→host→device on every migration; dem's `gather()` additionally rebuilds the
 neighbour topology on the CPU **every distributed substep**.
@@ -130,8 +130,8 @@ The CFD solver is clean; pnm is where the avoidable host work lives.
 | G2 | dem: drop the duplicate pair-count D2H (`broadphase_arborx.hpp:88` vs the `readInt` in `sim.hpp:76`) | dem | S |
 | G3 | dem: reduce per-substep scalar count read-backs (4 device fences/substep) via device-side launch sizing or fused kernels — latency, not bandwidth | `dem/src/sim.hpp:69,77,85,88` | M |
 | G4 | sdflow: move `setSolid`/`uploadVelocity` single-rank periodic ghost wrap to device (mirror the distributed inner-fill + device `fillGhosts`) | `sdflow_ibm.hpp:196,128` | S–M (cold) |
-| G5 | transport-core: `deviceRemoveMeanFv` recomputes each diagonal 3×; cache fluid-mask+volume once | `fv_op.hpp:149` | S |
-| G6 | transport-core: batch the 3 separate D2H copies in Python `Flow::velocities()` into one | `tpx_amr.cpp:359` | S |
+| G5 | core: `deviceRemoveMeanFv` recomputes each diagonal 3×; cache fluid-mask+volume once | `fv_op.hpp:149` | S |
+| G6 | core: batch the 3 separate D2H copies in Python `Flow::velocities()` into one | `tpx_amr.cpp:359` | S |
 | G7 | morton: add `MORTON_HD` to `operator== != <= >=` (`morton.hpp:458-463`), `wide_uint` operators, and the range-query primitives `bigmin`/`litmax_bigmin`/`in_box` (`iterate.hpp:64,106,186`) so consumers can do device sort/search/range-scan and build a device-resident octree query path | morton | S–M |
 
 ### Theme H — GPU-aware MPI & device outputs (cross-cutting)
@@ -147,15 +147,15 @@ The CFD solver is clean; pnm is where the avoidable host work lives.
 - **Phase 0 — quick wins (low risk):** ✅ **DONE** (umbrella 774199b, 2026-06-29). S2a helper, then
   G1–G2, G4–G7, E3–E4, C1, D3, F3. Mechanical, high-ratio, no algorithm changes. Knocked out the
   redundant-copy idiom suite-wide and the step-invariant H2D in vorflow. Per-repo commits:
-  transport-core b976351 (S2a `tpx::toVector`, C1 gather-plan memoization, D3 ParticleHalo scratch +
+  core b976351 (S2a `tpx::toVector`, C1 gather-plan memoization, D3 ParticleHalo scratch +
   reverse-slice, G5 fused fv removeMean, G6 one-D2H `velocities()`), morton 45be8c7 (G7 `MORTON_HD` on
   comparisons / `wide_uint` / range queries), dem 635b13f (G1 getters, G2 dup pair-count), vorflow
   3a843b9 (G1 getters, E3 `WorklistCache`, E4 viscous scratch + upload-mass-once), sdflow 7c25b9c
   (F3/G1 pnm bulk copies, G4 single-rank IBM device wrap). Validated per-repo on host-openmp
-  (transport-core 25/25 ctests np 1–8; device tessellation/step/viscous bit-exact; Python roundtrips).
+  (core 25/25 ctests np 1–8; device tessellation/step/viscous bit-exact; Python roundtrips).
 - **Phase 1 — dynamic AMR assembly (Theme A):** build S1, then B2 → B3 → B4 → B5 → B6. Unlocks
   moving-boundary / solution-adaptive AMR with no host round-trip. Largest single payoff.
-  **DONE (transport-core):** S1/D1 + B2/D2 (device FV assembly, `8d32a9e`), B3/D3 (device cut-cell
+  **DONE (core):** S1/D1 + B2/D2 (device FV assembly, `8d32a9e`), B3/D3 (device cut-cell
   stencil + momentum assembly, `f24d72d`), B4/D4 (device face-geometry assembly, `d1d48ad`), B5/D5 +
   B6/D6 (MG-hierarchy rebuild + flow wiring). The S1 CSR-fill primitive (`device_csr.hpp`) + the FV /
   momentum / face-geometry device assemblers (`device_assembly.hpp`, `device_momentum_assembly.hpp`,
@@ -183,13 +183,13 @@ The CFD solver is clean; pnm is where the avoidable host work lives.
   flicker ±1 marginal zero-area face, no force effect). **E2 (incremental aux/CSR reuse) deferred to
   the user's ongoing physics work** — this is scaffolding to build the physics on, per the user.
 - **Phase 3 — distributed device compute + device migration (Themes C, D):** C2, D1, D2, then H1 and at-
-  scale multi-GPU validation. The multi-GPU scaling track. **C2 DONE (transport-core 71cd629):** the
+  scale multi-GPU validation. The multi-GPU scaling track. **C2 DONE (core 71cd629):** the
   distributed AMR Poisson + multigrid run device-resident — `DistributedGatherHalo` (value-only octree
   gather over a once-established NBX topology; `DistributedOctree::buildGatherHaloTopology`) +
   `DistributedPoissonDevice` + `DistributedMultigridDevice` in `distributed_device.hpp`. The V-cycle is
   all Kokkos kernels, mirroring only the compact ghost buffer across MPI (à la `grid_halo.hpp`); bit-for-
   bit vs the host MG (same decomposition) and the single-block reference at np=1,2,4
-  (`amr_distributed_device`). **D1 DONE (transport-core 02de4ce):** `ParticleMigratorDevice`
+  (`amr_distributed_device`). **D1 DONE (core 02de4ce):** `ParticleMigratorDevice`
   (`particle_migrator_device.hpp`) keeps the particle SoA on device — device binning (periodic wrap +
   ORB ownerOf via `BlockDecomposer::flattenTree`) + device compaction/pack of departing particles; only
   the compact migrating records host-stage for the NBX consensus. Validated (`particle_migrator_device`,
@@ -197,7 +197,7 @@ The CFD solver is clean; pnm is where the avoidable host work lives.
   5c70aa1):** `KokkosParticleHalo::gather` reuses the owner↔ghost topology under a Verlet skin (build with
   rcut+skin, rebuild only when a particle moves > skin) — opt-in via `enable_mpi_step(verlet_skin=…)`,
   skin=0 unchanged. Validated (`test_demstep_mpi`, np=1,2,4, closed+periodic): distributed-with-reuse ==
-  single-rank rebuild-every-substep, reuse triggers (1 rebuild / 8 gathers). **H1 PARTIAL (transport-core
+  single-rank rebuild-every-substep, reuse triggers (1 rebuild / 8 gathers). **H1 PARTIAL (core
   346bf0f):** the device distributed gather halo gained the `TPX_GPU_AWARE_MPI` device-pointer-MPI path
   (host-staged default), validated on OpenMP (both paths pass the bit-exact lock). **Remaining (hardware-
   gated):** flip GPU-aware to the validated default + at-scale multi-GPU benchmark, and a GPU-aware NBX

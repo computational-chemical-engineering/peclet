@@ -5,14 +5,14 @@
 > keeping each method its own code. See [ARCHITECTURE](ARCHITECTURE.md) for the layering.
 >
 > **2026-06-20 — CUDA retired, Kokkos canonical.** sdflow (`sdflow`/`pnm`), dem
-> (`dem`, ArborX broad-phase), and transport-core now build on Kokkos (CUDA/HIP/OpenMP) with the CUDA
+> (`dem`, ArborX broad-phase), and core now build on Kokkos (CUDA/HIP/OpenMP) with the CUDA
 > implementations deleted and merged to `main`. Historical phase entries below that name `.cu`/`.cuh`
 > files describe the original CUDA path. See [CUDA_RETIREMENT](CUDA_RETIREMENT.md) and
 > [PORTABILITY](PORTABILITY.md).
 
 ## Guiding decisions
 
-- Shared **`transport-core`** library repo; method codes stay separate repos depending on it.
+- Shared **`core`** library repo; method codes stay separate repos depending on it.
 - **C++20 host & Kokkos device; `morton` pins C++17** (see [STYLE](STYLE.md)).
 - **Keep computation on the device; minimize host↔device movement** — the cross-cutting plan for
   migrating remaining host-only compute to Kokkos and removing avoidable data movement is in
@@ -25,7 +25,7 @@
 
 - [x] Architecture, conventions, style, interfaces, roadmap documents (`suite/docs/`).
 - [x] Link the documents from the top-level `suite/CLAUDE.md`.
-- [x] Scaffold `transport-core`: header-only C++20, CMake ≥3.24 with install/export target
+- [x] Scaffold `core`: header-only C++20, CMake ≥3.24 with install/export target
       (`tpx::core`/`tpx::halo`), `include/tpx/{common,decomp,halo}/` layout, `.clang-format` from
       `vorflow`, auto-detects `morton`. Git repo initialized.
 - [x] Extract the reusable code from `block_decomposer` into `tpx::decomp` + `tpx::halo` (ported &
@@ -69,7 +69,7 @@
 
 ## Phase 3 — Wire in sdflow (first Eulerian consumer) (working distributed solver)
 
-A **complete distributed incompressible Navier–Stokes solver** is built on transport-core and
+A **complete distributed incompressible Navier–Stokes solver** is built on core and
 validated; see the "MPI / sdflow" section of `sdflow/CLAUDE.md` for the current details. Opt-in
 `-DCFD_BUILD_MPI=ON`; the production `pnm` module is untouched.
 
@@ -94,7 +94,7 @@ validated; see the "MPI / sdflow" section of `sdflow/CLAUDE.md` for the current 
 Concrete plan (dem's data is SoA `float4` arrays — `d_pos` [.xyz pos, .w inv_mass], `d_vel`,
 `d_quat`, `d_ang_vel`, `d_inv_inertia`, `d_scale`, `d_shape_ids` — with `domain_min/max`, periodic
 flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The shared
-`tpx::halo::ParticleMigrator` (validated in transport-core) and block decomposition map directly:
+`tpx::halo::ParticleMigrator` (validated in core) and block decomposition map directly:
 
 - [x] **Step 1 — migration (done):** `dem/mpi/test_particle_migration.cpp` decomposes the
       periodic domain, builds a `DomainMap` from packing's domain+periodicity, and migrates
@@ -103,7 +103,7 @@ flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The
       (`dem/mpi/`), decoupled from the dem (Kokkos+ArborX) build. Branch `mpi-integration`.
 - [x] **Step 2 — ghost particles (done):** `ParticleMigrator::gatherGhosts(rcut)` gathers copies within
       one interaction radius of each block boundary (periodic images handled) for a local ArborX
-      broadphase. Rigorously validated vs a brute-force reference in transport-core's
+      broadphase. Rigorously validated vs a brute-force reference in core's
       `test_ghost_particles_mpi` (np=1,2,4,8), and exercised on packing's layout.
 - [x] **Per-step distributed loop (done):** `dem`'s `step_mpi` runs predict → migrate → gather ghosts
       → local ArborX broadphase + narrowphase + XPBD solve, with periodic **load rebalancing**
@@ -131,7 +131,7 @@ flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The
 Both consumers create *non-uniform* work that the equal-cell-count ORB does not balance:
 **AMR** dynamically refines (a feature refined into one block leaves that rank heavier — see
 `docs/AMR.md`, `distributedAdapt`), and **dem** packs particles densely (particle counts per block
-drift far apart). The fix is the same primitive for both, so it lives in `transport-core`.
+drift far apart). The fix is the same primitive for both, so it lives in `core`.
 
 - [x] **Weighted ORB** — `tpx::decomp::BlockDecomposer::init(numBlocks, globalSize, weights)`. The split
   position is chosen on the integer cell boundary whose **cumulative weight** along the largest axis is
@@ -150,13 +150,13 @@ drift far apart). The fix is the same primitive for both, so it lives in `transp
   SoA, migrates ownership, and re-uploads; wired into `demStepMpi` via
   `enable_mpi_step(rebalance_every=N)` / the `rebalance()` binding. (`test_particle_rebalance` np=1,2,4,8;
   dem `tests/kokkos_mpi/test_rebalance_mpi` np=1,2,4 on OpenMP + CUDA/Blackwell.)
-- [x] **Python**: `tpx_mpi.Migrator.rebalance()` (transport-core, mpi4py) and `Sim.rebalance()` /
+- [x] **Python**: `tpx_mpi.Migrator.rebalance()` (core, mpi4py) and `Sim.rebalance()` /
   `enable_mpi_step(rebalance_every=…)` (dem) expose it; validated count-conserving with an imbalance drop.
 
 ## Cross-cutting / ongoing
 
 - Keep `morton` as the spatial-index primitive; adopt its octree where hierarchical indexing
   helps. **Integrated (2026-06-22):** `morton` ships a portable Kokkos backend and is consumed
-  through the Kokkos-MPI build by `transport-core` (`MortonIndexer`) and `vorflow` (device
+  through the Kokkos-MPI build by `core` (`MortonIndexer`) and `vorflow` (device
   tessellator Z-order grid ordering); raw CUDA in `morton` retired.
 - Each phase lands with tests + docs; no method depends on another method (dependencies point down).

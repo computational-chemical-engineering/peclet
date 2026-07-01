@@ -5,7 +5,7 @@
 
 ## Language standard
 
-- **Host C++: C++20.** `transport-core` is C++20; concepts give us compile-checked interfaces (see
+- **Host C++: C++20.** `core` is C++20; concepts give us compile-checked interfaces (see
   [INTERFACES](INTERFACES.md)), and `<bit>`/`<span>`/ranges are useful.
 - **Device code under Kokkos: C++20.** With CUDA retired, GPU kernels are ordinary C++ in `.hpp`
   headers compiled through the Kokkos launch compiler (which routes them to `nvcc`/`hipcc`) — there are
@@ -17,7 +17,7 @@
 ## Formatting & linting
 
 Adopt `vorflow`'s configuration suite-wide (copy `.clang-format` and `.clang-tidy` into each
-repo and `transport-core`):
+repo and `core`):
 
 - **clang-format:** `BasedOnStyle: Google`, `ColumnLimit: 100`, `IndentWidth: 2`,
   `NamespaceIndentation: None`.
@@ -46,7 +46,7 @@ repo and `transport-core`):
 - **Dependencies:** `find_package` for the GPU/parallel stack (`Kokkos`, `ArborX`, MPI, OpenMP) against
   the bootstrapped `extern/install/<backend>` prefix; `nanobind` is provisioned via the shared
   `cmake/SuiteNanobind.cmake` helper (found through the active interpreter, not a pinned tag). Use
-  `FetchContent` with a pinned tag only for the remaining source deps (Voro++, and `transport-core`
+  `FetchContent` with a pinned tag only for the remaining source deps (Voro++, and `core`
   itself when a method consumes it). Pin versions; don't track `master`.
 - **GPU architecture:** the backend (CUDA/HIP/OpenMP) and arch are baked into the bootstrapped Kokkos
   prefix (`KOKKOS_ARCH` at Kokkos build time), not set per-method in CMake; the build is just pointed at

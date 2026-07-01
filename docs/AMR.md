@@ -2,7 +2,7 @@
 
 A block-local octree AMR for the suite, intended as a grid for geometric multigrid,
 able to coexist with the existing uniform structured grid, and reusable as a general
-adaptive tree (e.g. Barnes–Hut for particle methods). Lives in `transport-core`
+adaptive tree (e.g. Barnes–Hut for particle methods). Lives in `core`
 (`include/tpx/amr/`), built on the `morton` primitive and the ORB `BlockDecomposer`.
 
 ## The non-standard choice: per-block local Morton, not one global SFC
@@ -39,8 +39,8 @@ whoever owns its wrapped global cell — no Cartesian assumption) and ORB decomp
 
 ```
 morton  (local codes + arithmetic + hierarchy + Z-order)            [reuse]
-  └─ transport-core/decomp  (ORB assigns root cells to ranks)        [reuse]
-       └─ transport-core/amr
+  └─ core/decomp  (ORB assigns root cells to ranks)        [reuse]
+       └─ core/amr
             ├─ BlockOctree<Dim,Bits>        host topology: refine/coarsen/balance, queries
             ├─ DeviceBlockOctree<Dim,Bits>  Kokkos View mirror + device-callable queries
             ├─ DistributedOctree<Dim>       (done) ORB collection + cross-block 2:1 balance + rebalance
@@ -164,7 +164,7 @@ Jacobi/BiCGStab (~1e-11); the immersed sphere at finite Re reaches the host `Amr
   (Kokkos mirror, device `locate`/`faceNeighbor`). Tests: `tests/test_block_octree.cpp`
   (cross-checked against the `morton_octree::Octree` oracle; tiling/volume, sorted invariant,
   balance idempotence) and `tests/test_block_octree_kokkos.cpp` (device == host bit-for-bit on
-  the OpenMP backend). Build per `transport-core/CLAUDE.md`; `ctest -R block_octree`.
+  the OpenMP backend). Build per `core/CLAUDE.md`; `ctest -R block_octree`.
 - **Phase 2 — DONE.** `AmrGeometry<Dim>` (fine-unit ↔ world mapping), `LeafField<T>` (value per
   leaf in Z-order slot order), and `writeVtu` (VTK UnstructuredGrid, one hexahedron/quad per
   leaf + per-leaf CellData) in `include/tpx/amr/{leaf_field,vtu_io}.hpp`. Test
@@ -478,7 +478,7 @@ Jacobi/BiCGStab (~1e-11); the immersed sphere at finite Re reaches the host `Amr
     max/mean leaf imbalance drops. This is the AMR half of the **cross-cutting** weighted-ORB load balancing
     (shared with dem's particle imbalance via `rebalanceByParticleCount`); see `docs/ROADMAP.md` Phase 7.
     *Remaining:* the on-device counterpart.
-- **Phase 6 — PARTIAL (transport-core piece DONE).** `ScalarTransport<Dim,Bits>`
+- **Phase 6 — PARTIAL (core piece DONE).** `ScalarTransport<Dim,Bits>`
   (`include/tpx/amr/scalar_transport.hpp`): explicit FV advection–diffusion on the octree —
   monotone upwind advection + the conservative two-point diffusion flux, 2:1 interfaces summed on
   the coarse side, face-normal velocity sampled from a user callable. Test

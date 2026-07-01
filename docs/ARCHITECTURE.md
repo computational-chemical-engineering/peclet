@@ -22,7 +22,7 @@ conventions, and the same interfaces.
 | `morton` | Primitive | Z-order codes / spatial index | Mature |
 
 (`block_decomposer`, the original source of the shared MPI layer, has been **retired/archived**; its
-reusable parts now live in `transport-core`.)
+reusable parts now live in `core`.)
 
 The Eulerian/Lagrangian/mixed split is the key axis: it determines *what travels in a halo exchange*
 (grid cell slabs vs. migrating particles vs. ghost particles + cell neighbours) but **not** the
@@ -37,7 +37,7 @@ decomposition (all use the same block decomposition) nor the geometry (all use t
                    │             │                │
                    ▼             ▼                ▼
             ┌──────────────────────────────────────────────────────────┐
- core       │                   transport-core                         │   new shared repo
+ core       │                   core                         │   new shared repo
             │  decomposition · halo (async MPI) · geometry/SDF · ibm   │
             │  common types/conventions · python (nanobind bridge)     │
             └──────────────────────────────────────────────────────────┘
@@ -49,10 +49,10 @@ decomposition (all use the same block decomposition) nor the geometry (all use t
             └─────────────────────┘                └──────────────────┘
 ```
 
-**Rule:** dependencies point downward only. A method depends on `transport-core`; `transport-core`
+**Rule:** dependencies point downward only. A method depends on `core`; `core`
 depends on primitives. No method depends on another method; primitives depend on nothing in the suite.
 
-## `transport-core` modules
+## `core` modules
 
 - **common** — shared types and conventions in code form (vector/index aliases, axis order, units,
   error/logging). Codifies [CONVENTIONS](CONVENTIONS.md).

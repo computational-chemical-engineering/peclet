@@ -43,7 +43,7 @@ From: rocm/dev-ubuntu-22.04:6.2.4-complete
 
     PREFIX=/opt/peclet/extern/install/lumi-hip
     python3 -m pip install --break-system-packages --upgrade pip
-    CMAKE_PREFIX_PATH=$PREFIX CXX=hipcc python3 -m pip install --break-system-packages /opt/peclet/sdflow
+    CMAKE_PREFIX_PATH=$PREFIX CXX=hipcc python3 -m pip install --break-system-packages /opt/peclet/flow
     # dem with the distributed step, built against the container's MPICH (Cray-MPICH ABI at runtime):
     CMAKE_PREFIX_PATH=$PREFIX CXX=hipcc python3 -m pip install --break-system-packages \
         --config-settings=cmake.define.PECLET_DEM_MPI=ON /opt/peclet/dem
