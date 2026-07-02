@@ -1,7 +1,7 @@
 # Peclet
 
 [![PyPI version](https://img.shields.io/pypi/v/peclet.svg)](https://pypi.org/project/peclet/)
-[![Python versions](https://img.shields.io/pypi/pyversions/peclet.svg)](https://pypi.org/project/peclet/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://pypi.org/project/peclet/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://computational-chemical-engineering.github.io/peclet/)
 [![Docs build](https://github.com/computational-chemical-engineering/peclet/actions/workflows/site.yml/badge.svg)](https://github.com/computational-chemical-engineering/peclet/actions/workflows/site.yml)
