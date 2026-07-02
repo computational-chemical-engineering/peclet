@@ -12,9 +12,17 @@ authors:
     given-names: Frank
     email: e.a.j.f.peters@gmail.com
     affiliation: "Eindhoven University of Technology"
-version: 0.1.0
+version: 0.2.0
 date-released: "2026-07-02"
 license: MIT
+doi: 10.5281/zenodo.21132445
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.21132445
+    description: "Concept DOI (all versions) — always resolves to the latest release"
+  - type: doi
+    value: 10.5281/zenodo.21132446
+    description: "Version DOI for v0.2.0"
 repository-code: "https://github.com/computational-chemical-engineering/peclet"
 url: "https://computational-chemical-engineering.github.io/peclet/"
 keywords:

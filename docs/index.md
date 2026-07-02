@@ -4,6 +4,7 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/peclet.svg)](https://pypi.org/project/peclet/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/computational-chemical-engineering/peclet/blob/main/LICENSE)
 [![Docs build](https://github.com/computational-chemical-engineering/peclet/actions/workflows/site.yml/badge.svg)](https://github.com/computational-chemical-engineering/peclet/actions/workflows/site.yml)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21132445.svg)](https://doi.org/10.5281/zenodo.21132445)
 
 **A suite of GPU-accelerated and parallel codes for the simulation of transport phenomena** —
 Eulerian (CFD / Navier–Stokes), Lagrangian (DEM / particle packing) and mixed (Voronoi) methods,
@@ -62,3 +63,13 @@ build time by the install prefix (or the container).
   [flow](https://computational-chemical-engineering.github.io/peclet-flow/) ·
   [dem](https://computational-chemical-engineering.github.io/peclet-dem/) ·
   [voro](https://computational-chemical-engineering.github.io/peclet-voro/)
+
+## Citing
+
+If you use Peclet in your research, please cite it. Each release is archived on Zenodo:
+
+- **All versions (concept DOI):** [10.5281/zenodo.21132445](https://doi.org/10.5281/zenodo.21132445) — always resolves to the latest release.
+- **This release (v0.2.0):** [10.5281/zenodo.21132446](https://doi.org/10.5281/zenodo.21132446).
+
+Machine-readable metadata lives in [`CITATION.cff`](https://github.com/computational-chemical-engineering/peclet/blob/main/CITATION.cff)
+— use GitHub's "Cite this repository" button for ready-made BibTeX/APA.

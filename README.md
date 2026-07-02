@@ -5,6 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://computational-chemical-engineering.github.io/peclet/)
 [![Docs build](https://github.com/computational-chemical-engineering/peclet/actions/workflows/site.yml/badge.svg)](https://github.com/computational-chemical-engineering/peclet/actions/workflows/site.yml)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21132445.svg)](https://doi.org/10.5281/zenodo.21132445)
 
 A suite of codes for **simulation of transport phenomena** — Eulerian (CFD/Navier–Stokes), Lagrangian
 (DEM/particle packing) and mixed (Voronoi) methods — sharing one MPI **block domain decomposition**
@@ -85,8 +86,19 @@ only manual step.
 Contributions are welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)** for the submodule dev setup,
 build/test, and PR flow. Participation is governed by the [Contributor Covenant](CODE_OF_CONDUCT.md).
 Report security issues privately per the [Security Policy](SECURITY.md). Release history lives in the
-[CHANGELOG](CHANGELOG.md); please cite the suite via [CITATION.cff](CITATION.cff) (GitHub's "Cite this
-repository" button).
+[CHANGELOG](CHANGELOG.md).
+
+## Citing
+
+If you use Peclet in your research, please cite it. Each release is archived on Zenodo:
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21132445.svg)](https://doi.org/10.5281/zenodo.21132445)
+
+- **All versions (concept DOI):** [10.5281/zenodo.21132445](https://doi.org/10.5281/zenodo.21132445) — always resolves to the latest release; use this unless you need to pin an exact version.
+- **This release (v0.2.0):** [10.5281/zenodo.21132446](https://doi.org/10.5281/zenodo.21132446).
+
+Machine-readable metadata is in [CITATION.cff](CITATION.cff) — use GitHub's "Cite this repository"
+button for ready-made BibTeX/APA.
 
 ## Note on submodule pins
 
