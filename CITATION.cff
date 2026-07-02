@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "peclet: GPU-accelerated, parallel codes for the simulation of transport phenomena"
+abstract: >-
+  A suite of GPU-accelerated and MPI-parallel scientific-computing codes for transport phenomena —
+  Eulerian CFD (incompressible cut-cell IBM Navier–Stokes), Lagrangian DEM (XPBD particle packing) and
+  mixed Voronoi methods — sharing one block domain decomposition with asynchronous ghost-layer exchange,
+  SDF-described solids, a common immersed-boundary methodology, Kokkos GPU backends, and Python bindings.
+type: software
+authors:
+  - family-names: Peters
+    given-names: Frank
+    email: e.a.j.f.peters@gmail.com
+    affiliation: "Eindhoven University of Technology"
+version: 0.1.0
+date-released: "2026-07-02"
+license: MIT
+repository-code: "https://github.com/computational-chemical-engineering/peclet"
+url: "https://computational-chemical-engineering.github.io/peclet/"
+keywords:
+  - computational fluid dynamics
+  - discrete element method
+  - Voronoi tessellation
+  - immersed boundary method
+  - signed distance function
+  - Kokkos
+  - GPU computing
+  - MPI
+  - porous media

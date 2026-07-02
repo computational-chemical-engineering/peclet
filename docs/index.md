@@ -1,5 +1,10 @@
 # peclet
 
+[![PyPI version](https://img.shields.io/pypi/v/peclet.svg)](https://pypi.org/project/peclet/)
+[![Python versions](https://img.shields.io/pypi/pyversions/peclet.svg)](https://pypi.org/project/peclet/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/computational-chemical-engineering/peclet/blob/main/LICENSE)
+[![Docs build](https://github.com/computational-chemical-engineering/peclet/actions/workflows/site.yml/badge.svg)](https://github.com/computational-chemical-engineering/peclet/actions/workflows/site.yml)
+
 **A suite of GPU-accelerated and parallel codes for the simulation of transport phenomena** —
 Eulerian (CFD / Navier–Stokes), Lagrangian (DEM / particle packing) and mixed (Voronoi) methods,
 sharing one MPI **block domain decomposition** with asynchronous **ghost-layer exchange**,

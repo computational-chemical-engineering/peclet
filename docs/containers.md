@@ -10,7 +10,8 @@ definition files. Every image bakes the Kokkos/ArborX toolchain and the full `pe
 
 ## 1. Pull a pre-built image (recommended)
 
-No toolchain, no build — just pull on the login node:
+The `peclet-cpu` and `peclet-cuda` images are **public** on GHCR — no login or token required. No
+toolchain, no build; just pull on the login node:
 
 ```bash
 # CPU (laptops, CI, CPU partitions) — Kokkos OpenMP + Serial:

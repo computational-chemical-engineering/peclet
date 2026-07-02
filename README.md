@@ -1,5 +1,11 @@
 # peclet
 
+[![PyPI version](https://img.shields.io/pypi/v/peclet.svg)](https://pypi.org/project/peclet/)
+[![Python versions](https://img.shields.io/pypi/pyversions/peclet.svg)](https://pypi.org/project/peclet/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://computational-chemical-engineering.github.io/peclet/)
+[![Docs build](https://github.com/computational-chemical-engineering/peclet/actions/workflows/site.yml/badge.svg)](https://github.com/computational-chemical-engineering/peclet/actions/workflows/site.yml)
+
 A suite of codes for **simulation of transport phenomena** — Eulerian (CFD/Navier–Stokes), Lagrangian
 (DEM/particle packing) and mixed (Voronoi) methods — sharing one MPI **block domain decomposition**
 with efficient **asynchronous ghost-layer exchange**, **SDF**-described solids, a common **immersed
@@ -73,6 +79,14 @@ Each submodule carries its own `.github/workflows/`: a **CI** workflow (build + 
 backend) and a **Documentation** workflow that builds the Doxygen API docs and publishes them to that
 repo's GitHub Pages. Enabling Pages once per repo (Settings → Pages → "Source: GitHub Actions") is the
 only manual step.
+
+## Contributing & community
+
+Contributions are welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)** for the submodule dev setup,
+build/test, and PR flow. Participation is governed by the [Contributor Covenant](CODE_OF_CONDUCT.md).
+Report security issues privately per the [Security Policy](SECURITY.md). Release history lives in the
+[CHANGELOG](CHANGELOG.md); please cite the suite via [CITATION.cff](CITATION.cff) (GitHub's "Cite this
+repository" button).
 
 ## Note on submodule pins
 
