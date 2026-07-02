@@ -1,0 +1,31 @@
+name: Bug report
+description: Report a problem with the Peclet suite (build, install, docs, or a specific code)
+labels: [bug]
+body:
+  - type: dropdown
+    id: component
+    attributes:
+      label: Which part?
+      options: [peclet.flow, peclet.dem, peclet.voro, peclet.core, peclet.morton, containers, docs, install/packaging, other]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what actually happened.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproducer
+      description: Smallest script/inputs that reproduce it (grid size, backend, np).
+      render: shell
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: OS, install method (pip/container/source), Kokkos backend (Serial/OpenMP/CUDA/HIP), GPU/MPI, version.
+    validations:
+      required: true

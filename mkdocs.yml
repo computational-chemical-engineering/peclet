@@ -1,4 +1,4 @@
-site_name: peclet
+site_name: Peclet
 site_description: GPU-accelerated & parallel simulation of transport phenomena (CFD, DEM, Voronoi)
 repo_url: https://github.com/computational-chemical-engineering/peclet
 repo_name: peclet
