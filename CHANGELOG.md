@@ -4,6 +4,35 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-07-02
+
+Feature release: multi-rank Python API + HPC MPI containers.
+
+### Added
+- **Multi-rank (MPI) `flow` and `voro` exposed to Python**: `peclet.flow.Solver.init_mpi(gnx,gny,gnz)` +
+  `peclet.flow.mpi_block(...)` for the distributed Navier–Stokes solve; `peclet.voro.VoronoiHalo` for the
+  distributed tessellation (both validated bit-exact / Σvol-exact at np=1/2/4). Gated on
+  `PECLET_FLOW_MPI` / `PECLET_VORO_MPI` (on in the containers).
+- **MPI-enabled Apptainer containers** on GHCR (public): `peclet-cpu` and `peclet-cuda` (`-sm80`/`-sm90`),
+  with `mpi4py` + distributed flow/dem/voro; the CUDA image bundles a from-source **CUDA-aware OpenMPI**.
+- **Per-site launch**: MPI bind wrappers `snellius-run.sh` / `tue-run.sh` / `lumi-run.sh` + SLURM submit
+  scripts for Snellius, TU/e SMM (`chem.smm03.q`), and LUMI.
+- **Weak-scaling communication-overhead benchmark** `benchmarks/profile_mpi_flow.py`.
+- Open-source hygiene: status badges, `CITATION.cff`, `CONTRIBUTING`/`CODE_OF_CONDUCT`/`SECURITY`,
+  issue/PR templates, Dependabot, repo descriptions + topics.
+
+### Fixed
+- nvcc: an extended `__host__ __device__` lambda in a private dem method (`maxOwnedDisplacement`).
+- Container builds on the Ubuntu-22.04 GPU bases: conditional `pip` upgrade for `--config-settings` /
+  `--break-system-packages`.
+
+### Changed
+- Project display name capitalized to **Peclet** in the documentation (package/import/CLI names remain
+  lowercase `peclet`).
+
+### Known limitations
+- The **LUMI / HIP** container still does not build (hipcc/lld undefined-vtable link error); needs on-GPU debugging.
+
 ## [0.1.0] — 2026-07-02
 
 First public release.
@@ -36,4 +65,5 @@ First public release.
 - Multi-node / multi-GPU container runs on Snellius/LUMI/TU-e have not been validated on-cluster (match
   your site's exact OpenMPI module for the bind model).
 
+[0.2.0]: https://github.com/computational-chemical-engineering/peclet/releases/tag/v0.2.0
 [0.1.0]: https://github.com/computational-chemical-engineering/peclet/releases/tag/v0.1.0
