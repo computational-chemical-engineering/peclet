@@ -225,3 +225,31 @@ The CFD solver is clean; pnm is where the avoidable host work lives.
 - Topology/geometry decisions that need it stay in FP64 (voro marginal faces).
 - Add per-step **D2H-byte counters** (debug build) so regressions in data movement are caught the way
   the bit-exact ctests catch numerical regressions.
+
+## Outstanding: the voro mesh / OT optimisers (2026-07-03)
+
+The energy-minimisation mesh optimiser (`voro/include/peclet/voro/mesh_optimizer.hpp`,
+`ot_optimizer.hpp`) was landed **host-orchestrated** — each Newton step downloads the facet CSR to
+host, assembles the gradient + Gauss-Newton Hessian on host, runs a host CG with a host
+Jacobi/colored-GS preconditioner, and host line search. This VIOLATES the device-residency contract
+above (per-iteration D2H of the whole CSR + host assembly + host solve) and does not distribute.
+
+Required (device-resident + MPI, per the goal/principles at the top):
+
+- **Assembly on device** — gradient (`parallel_for` over cells, atomic-scatter into device `g`),
+  Gauss-Newton diagonal, and either a matrix-free `H` apply (two facet-CSR passes with atomics) or an
+  assembled device CSR (needed for an efficient colored-GS sweep). Residual/energy via
+  `parallel_reduce`.
+- **Device Krylov** — reuse `peclet::core::amr::MomentumOp`/`MomentumSolver` (BiCGStab/CG) on the
+  assembled operator, or a small device CG; dots/norms are `parallel_reduce`.
+- **Device preconditioners** — Jacobi (device diagonal) and multicolour Gauss–Seidel via
+  `peclet::core::amr::greedyColoring` (device colour `idx`) + a per-colour GS point kernel
+  (`faceCsrPointUpdate`). MG on the cell graph needs a graph-aggregation coarsening (no in-suite AMG
+  yet).
+- **Device line search + DOF update** — `x ← x + α δq` as a `parallel_for`; `E(α)` by reduction;
+  the tessellation rebuild is already on device.
+- **MPI** — partition cells (owned + ghost); halo-exchange the optimiser DOFs each step via
+  `voro/include/peclet/voro/mpi/voronoi_halo.hpp` (extend `refreshPositions` to weights/DOFs);
+  assemble owned rows only (CSR references ghost columns); global dots via `MPI_Allreduce`.
+
+The current host version is retained as the **validation oracle** (device == host to tolerance).
