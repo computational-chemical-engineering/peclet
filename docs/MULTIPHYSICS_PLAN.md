@@ -1,6 +1,6 @@
 # Peclet multiphase / multiphysics framework — implementation plan
 
-Status: **Phases 1–4 IMPLEMENTED, validated, committed (2026-07-04); Phases 5–8 remain.**
+Status: **Phases 1–5 IMPLEMENTED, validated, committed (2026-07-04); Phases 6–8 remain.**
 Audience: a coding agent executing this plan phase by phase. Read `CLAUDE.md` (umbrella),
 `flow/CLAUDE.md`, `core/CLAUDE.md`, and `docs/{ARCHITECTURE,CONVENTIONS,INTERFACES}.md` first.
 
@@ -28,14 +28,28 @@ ctests, on the `host-openmp` backend:
   the fully consistent shear-rate projection = deferred upgrade). Velocity-MG off under varProps_.
   Tests `variable_mu`, `tests/study/two_layer_couette.py`.
 
+- **Phase 5 — Variable-density projection** (`ab5ae43`; design doc
+  `flow/doc/variable_density_projection.md`). One arithmetic face mean ρ_f everywhere (momentum
+  time term via `VarFaceProps`, face-interpolated cell force in `buildRhsVar`/`buildAdvStencilVar`,
+  projection coefficient `open_f·ρ₀/ρ_f` + `projectCorrectVar`); coefficients ride the openness
+  rails (`copyBlockShifted` ρ-bridge incl. g=1 ghost ring + `setOpenness`, zero CutcellMG changes).
+  **Pressure driver = Chebyshev by default under varRho** — MG-PCG stalls on ρ-scaled coefficient
+  operators (transfer pair loses CG's SPD structure; 5000 its stuck vs Chebyshev ~20; MG-transfer
+  symmetry fix = follow-up). Validated: hydrostatic acid test ratio 3 AND 1000 (steady max|u|
+  ~1e-16, ∂P/∂z = −ρ_f g to ~4e-16, cheb ≤ 32 its); uniform-ρ reduction 2e-14; Rayleigh–Taylor
+  13× monotone growth via the full transported-c → ρ-closure → gravity chain; regression bit-exact;
+  all 19 kokkos ctests green. Tests `vardensity_projection`, `tests/study/rayleigh_taylor.py`.
+  Staggered-only v1; collocated `set_density_mode` throws.
+
 Build/test used: `flow/build_mphys` (host-openmp), `flow/build_ktest_mphys` (kokkos ctests),
 `core/build_mphys`. NOT yet: CUDA-backend validation, MPI ctests for the new paths (deferred with
-the phases), umbrella pointer bump beyond this checkpoint.
+the phases).
 
-Remaining: **Phase 5** (variable-density projection — inject `open/ρ_face` into the CutcellMG
-coefficient + `projectCorrectVar` 1/ρ_face correction; hydrostatic acid test), **Phase 6** (CFD-DEM
-single-rank — dem force array, core P2G/G2P, new `coupling/` component), **Phase 7** (MPI coupling +
-`GridHalo::exchangeAdd`), **Phase 8** (grid redistribution + co-rebalancing). Details below unchanged.
+Remaining: **Phase 6** (CFD-DEM single-rank — dem force array, core P2G/G2P, new `coupling/`
+component), **Phase 7** (MPI coupling + `GridHalo::exchangeAdd`), **Phase 8** (grid redistribution
++ co-rebalancing). Details below unchanged. New follow-up from Phase 5: make the CutcellMG
+transfer pair symmetric for arbitrary positive coefficient fields so MG-PCG works under varRho
+(Chebyshev covers it meanwhile).
 
 ## 1. Goal and constraints
 
