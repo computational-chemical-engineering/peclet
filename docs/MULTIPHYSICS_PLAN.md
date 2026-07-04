@@ -1,6 +1,7 @@
 # Peclet multiphase / multiphysics framework — implementation plan
 
-Status: **Phases 1–6 IMPLEMENTED, validated, committed (2026-07-04); Phases 7–8 remain.**
+Status: **Phases 1–6 done; Phase 7 + Phase 8 CORE PRIMITIVES done + validated; the Phase 7/8
+MPI-integration WIRING remains (2026-07-04).**
 Audience: a coding agent executing this plan phase by phase. Read `CLAUDE.md` (umbrella),
 `flow/CLAUDE.md`, `core/CLAUDE.md`, and `docs/{ARCHITECTURE,CONVENTIONS,INTERFACES}.md` first.
 
@@ -59,11 +60,32 @@ Build/test used: `flow/build_mphys` (host-openmp), `flow/build_ktest_mphys` (kok
 `core/build_mphys`, `dem/build_mphys`, `coupling/build_mphys`. NOT yet: CUDA-backend validation,
 MPI ctests for the new paths (deferred with the phases).
 
-Remaining: **Phase 7** (MPI coupling — shared `BlockDecomposer` for flow+dem + `GridHalo::exchangeAdd`
-for ghost-layer deposits), **Phase 8** (grid redistribution + co-rebalancing). Details below
-unchanged. Follow-ups: Phase 5 — make the CutcellMG transfer pair symmetric for arbitrary positive
-coefficient fields so MG-PCG works under varRho (Chebyshev covers it meanwhile); Phase 6 — Model-A
-porous terms, kernel-width deposition, drag×cut-cell-IBM interaction.
+- **Phase 7/8 CORE PRIMITIVES** (core `0e32f3a`, validated MPI np 1/2/4):
+  - **Phase 8a — `redistributeGridFields`** (`core/include/peclet/core/decomp/grid_redistribute.hpp`):
+    moves N structured grid fields between two ORB decompositions (box-intersection + NBX brick
+    exchange, field-major messages, bit-exact inner-cell movement). Test `test_grid_redistribute_mpi`:
+    forward + old→new→old round-trip bit-exact against a known global function, with genuinely moved
+    (weighted) block boundaries.
+  - **Phase 7 add-reduce — `GridHaloTopology::reverseAdd`** (+ `GridFieldView::addFrom`): the adjoint
+    forward-exchange with accumulate (ghost deposits fold onto owners + periodic self-fold). Test in
+    `test_grid_halo` (conservation: global inner sum == global ghost count, np 1/2/4).
+
+Remaining = the **MPI-integration WIRING** on top of those primitives:
+- **Phase 7 wiring**: `Solver::initMpi` + dem `ParticleHalo::initMpi` overloads taking a shared
+  `BlockDecomposer<3>` (a module-level `Decomposition` passed to both); `CfdDem` MPI path (each rank
+  couples its owned block, ghost-particle deposits folded by `reverseAdd`); `coupling/tests/
+  test_coupled_mpi.py` np1/2/4. Needs the `PECLET_FLOW_MPI` + `PECLET_DEM_MPI` builds of all three
+  modules + the coupling under MPI.
+- **Phase 8b wiring**: `Solver::redistribute(dec)` (enumerate the FieldSet, call
+  `redistributeGridFields`, reallocate the G=2/g=1 blocks, rebuild halos/MG folds/stencils/IBM
+  overlay from the migrated sdf, invalidate Chebyshev/warm-start — trap §7.10); dem `migrateTo(dec)`
+  (split `rebalance()` into weight-ORB compute vs migration); `CfdDem` combined-weight loop
+  (`w = w_fluid + γ·particle_count`). Acceptance: a mid-run redistribution matches the
+  never-redistributed run bit-exactly.
+
+Follow-ups: Phase 5 — symmetric CutcellMG transfers for arbitrary coefficients so MG-PCG works under
+varRho (Chebyshev covers it meanwhile); Phase 6 — Model-A porous terms, kernel-width deposition,
+drag×cut-cell-IBM interaction; Phase 7/8 — device-staged `redistributeGridFields` (mirror GridHalo).
 
 ## 1. Goal and constraints
 
