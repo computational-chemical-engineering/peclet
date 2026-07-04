@@ -1,6 +1,6 @@
 # Peclet multiphase / multiphysics framework — implementation plan
 
-Status: **Phases 1–5 IMPLEMENTED, validated, committed (2026-07-04); Phases 6–8 remain.**
+Status: **Phases 1–6 IMPLEMENTED, validated, committed (2026-07-04); Phases 7–8 remain.**
 Audience: a coding agent executing this plan phase by phase. Read `CLAUDE.md` (umbrella),
 `flow/CLAUDE.md`, `core/CLAUDE.md`, and `docs/{ARCHITECTURE,CONVENTIONS,INTERFACES}.md` first.
 
@@ -41,15 +41,29 @@ ctests, on the `host-openmp` backend:
   all 19 kokkos ctests green. Tests `vardensity_projection`, `tests/study/rayleigh_taylor.py`.
   Staggered-only v1; collocated `set_density_mode` throws.
 
-Build/test used: `flow/build_mphys` (host-openmp), `flow/build_ktest_mphys` (kokkos ctests),
-`core/build_mphys`. NOT yet: CUDA-backend validation, MPI ctests for the new paths (deferred with
-the phases).
+- **Phase 6 — CFD-DEM single-rank** (dem `a04f999`, core `5cad36a`, flow `14ad683`, new top-level
+  `coupling/` component; doc `coupling/README.md`). dem: per-particle `extForce` SoA +
+  set/clear/get_external_forces_view. core: `interp/particle_grid.hpp` trilinear gather/scatter
+  (gather exact 1e-13, scatter conserves + adjoint 1e-11). flow: `enable_cell_force()` (external
+  RHS force) + `enable_drag()` — **implicit (semi-implicit) linear drag**: a `drag_beta` field on
+  the momentum diagonal, so `(ρ/dt+β)u = …+β u_p` (an explicit −βu diverges for a bed's stiff β~1e3;
+  implicit is unconditionally stable). New `coupling/` (`peclet.coupling`, DLPack-only, no C++ link
+  between flow/dem): `drag.hpp` (Stokes/Schiller/Ergun/DiFelice), `coupling_kernels.hpp` (ε deposit,
+  drag+feedback explicit & implicit), `CfdDem` Python driver (periodic fold/fill in NumPy).
+  Validated: single-particle terminal slip vs Stokes 0.10% / Schiller 1.4%; uniform fixed-bed
+  (1 particle/cell, ε=0.6) Ergun ΔP 0.0% across viscous→inertial (Re_p~6). Regression bit-exact.
+  Model B (drag-only, ε in the correlation), atomic deposition (tolerance- not bit-exact),
+  single-rank. NOTE: `coupling/` is a plain umbrella dir (not yet its own submodule/PyPI package).
 
-Remaining: **Phase 6** (CFD-DEM single-rank — dem force array, core P2G/G2P, new `coupling/`
-component), **Phase 7** (MPI coupling + `GridHalo::exchangeAdd`), **Phase 8** (grid redistribution
-+ co-rebalancing). Details below unchanged. New follow-up from Phase 5: make the CutcellMG
-transfer pair symmetric for arbitrary positive coefficient fields so MG-PCG works under varRho
-(Chebyshev covers it meanwhile).
+Build/test used: `flow/build_mphys` (host-openmp), `flow/build_ktest_mphys` (kokkos ctests),
+`core/build_mphys`, `dem/build_mphys`, `coupling/build_mphys`. NOT yet: CUDA-backend validation,
+MPI ctests for the new paths (deferred with the phases).
+
+Remaining: **Phase 7** (MPI coupling — shared `BlockDecomposer` for flow+dem + `GridHalo::exchangeAdd`
+for ghost-layer deposits), **Phase 8** (grid redistribution + co-rebalancing). Details below
+unchanged. Follow-ups: Phase 5 — make the CutcellMG transfer pair symmetric for arbitrary positive
+coefficient fields so MG-PCG works under varRho (Chebyshev covers it meanwhile); Phase 6 — Model-A
+porous terms, kernel-width deposition, drag×cut-cell-IBM interaction.
 
 ## 1. Goal and constraints
 
