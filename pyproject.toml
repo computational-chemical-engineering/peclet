@@ -34,6 +34,9 @@ dependencies = [
 # peclet-core is sdist-only (MPI particle halo + Kokkos AMR): installing it builds from source and needs
 # an MPI toolchain (+ optional Kokkos prefix for the AMR module).
 mpi = ["peclet-core==0.2.0"]
+# peclet-coupling is the unresolved point-particle CFD-DEM coupling of peclet.flow + peclet.dem
+# (sdist-only: builds its Kokkos kernels from source against a bootstrapped prefix).
+cfd-dem = ["peclet-coupling==0.1.0"]
 
 [project.urls]
 Homepage = "https://github.com/computational-chemical-engineering/peclet"

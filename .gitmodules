@@ -13,3 +13,6 @@
 [submodule "vorflow"]
 	path = voro
 	url = git@github.com:computational-chemical-engineering/peclet-voro.git
+[submodule "coupling"]
+	path = coupling
+	url = git@github.com:computational-chemical-engineering/peclet-coupling.git

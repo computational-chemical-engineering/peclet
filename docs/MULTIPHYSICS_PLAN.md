@@ -54,7 +54,11 @@ ctests, on the `host-openmp` backend:
   Validated: single-particle terminal slip vs Stokes 0.10% / Schiller 1.4%; uniform fixed-bed
   (1 particle/cell, ε=0.6) Ergun ΔP 0.0% across viscous→inertial (Re_p~6). Regression bit-exact.
   Model B (drag-only, ε in the correlation), atomic deposition (tolerance- not bit-exact),
-  single-rank. NOTE: `coupling/` is a plain umbrella dir (not yet its own submodule/PyPI package).
+  single-rank. `coupling/` is now its own `peclet-coupling` package + submodule
+  (github.com/computational-chemical-engineering/peclet-coupling); the driver is backend-agnostic
+  (CuPy device / NumPy host). **CUDA-validated on an RTX 5080**: flow regression bit-exact, all
+  multiphysics kokkos tests (scalar/closures/variable-mu/variable-density incl. hydrostatic ratio
+  3 & 1000), core P2G/G2P, and the CFD-DEM terminal-velocity + Ergun tests all pass on GPU.
 
 Build/test used: `flow/build_mphys` (host-openmp), `flow/build_ktest_mphys` (kokkos ctests),
 `core/build_mphys`, `dem/build_mphys`, `coupling/build_mphys`. NOT yet: CUDA-backend validation,
