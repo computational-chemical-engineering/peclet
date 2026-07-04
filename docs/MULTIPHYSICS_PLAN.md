@@ -19,11 +19,14 @@ ctests, on the `host-openmp` backend:
   buildRhsForced (`94dc0b3`). Validated: closures vs numpy; de Vahl Davis heated cavity conduction
   Nu=1.0000, Ra=1e4 Nu=2.30 (2.5%) with velocity extrema ~2% vs benchmark. Tests `closures`,
   `tests/study/dvd_cavity.py`. (Also fixed: scalar Dirichlet faces re-opened after set_domain_bc.)
-- **Phase 4 — Variable viscosity.** `flow/src/face_props.hpp` + `ibmBuildDiffusionVar` (`e3cb678`).
-  Validated: two-layer Couette (10× μ jump) harmonic 0.001% vs analytic, arithmetic 1.9%; uniform-μ
-  varProps == constant path. Under varProps_: velocity-MG off + classical projection (rotational-
-  incremental is inconsistent at strongly variable μ → Phase 5). Tests `variable_mu`,
-  `tests/study/two_layer_couette.py`.
+- **Phase 4 — Variable viscosity.** `flow/src/face_props.hpp` + `ibmBuildDiffusionVar` (`e3cb678`),
+  rotational fix (`54e25b1`). Validated: two-layer Couette (10× μ jump) harmonic 0.0006% vs
+  analytic, arithmetic 1.9%; **incremental-rotational KEPT under varProps** (large-dt/steady-Stokes
+  retained: dt=100 conv@200 steps) — the Timmermans term is homogeneous-viscosity-only (Deteix &
+  Yakoubi 2018), so the rotational coefficient defaults to the provably-stable constant χ·μ_min
+  (`set_variable_rotational('min'|'full'|'off', chi)`; 'full' = pointwise μ(i), diverges at 10×;
+  the fully consistent shear-rate projection = deferred upgrade). Velocity-MG off under varProps_.
+  Tests `variable_mu`, `tests/study/two_layer_couette.py`.
 
 Build/test used: `flow/build_mphys` (host-openmp), `flow/build_ktest_mphys` (kokkos ctests),
 `core/build_mphys`. NOT yet: CUDA-backend validation, MPI ctests for the new paths (deferred with
