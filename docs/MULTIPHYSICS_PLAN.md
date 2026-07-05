@@ -9,10 +9,17 @@ the reverse (add-reduce) halo `exchange_field_add`, and the ergonomic `rebalance
 from one weight field). The **multi-rank coupled physics benchmark** is validated: the fixed-bed Ergun
 case run distributed (`test_mpi_fixed_bed_ergun.py`) lands on the Ergun curve to 0.0% and is
 bit-identical at np=1/2/4 — the distributed void-fraction deposition, the reverse-halo drag-reaction
-fold, and the distributed flow solve reproduce the coupled physics exactly. Remaining follow-up: the
-GraphAMG coarse solver for multilevel-MG-under-weighted-decomposition (only pure RB-GS is
-decomposition-agnostic today), and the moving-particle (`move_particles=True`) distributed-dem-step
-coupled path (the fixed-bed benchmark uses static particles).
+fold, and the distributed flow solve reproduce the coupled physics exactly. **Both follow-ups are now
+done:** (1) the **agglomerated GraphAMG bottom solve** (`Solver::setPressureGraphAmg`) makes the
+pressure solve decomposition-agnostic + mesh-independent under a WEIGHTED ORB — the coarsest level is
+assembled as a global CSR and solved by `core::solver::GraphAMG`, validated `test_graphamg_mpi` np
+1/2/4 (permeability == single-rank on a weighted ORB); (2) the **moving-particle distributed coupled
+path** (`CfdDem` migrates dem onto flow's partition + `dem.step_mpi` each fluid step) reproduces
+single-rank across a migration window (`test_mpi_moving_suspension` np 1/2). Two dem distributed-step
+limitations remain (not the coupling — every distributed coupling op is bit-identical to single-rank
+in isolation): a rank with zero owned particles + an incoming ghost deadlocks the dem step, and a
+sustained ill-posed dilute settling suspension is numerically unstable (seeded at np>1 by the solve's
+reduction floor).
 Audience: a coding agent executing this plan phase by phase. Read `CLAUDE.md` (umbrella),
 `flow/CLAUDE.md`, `core/CLAUDE.md`, and `docs/{ARCHITECTURE,CONVENTIONS,INTERFACES}.md` first.
 
