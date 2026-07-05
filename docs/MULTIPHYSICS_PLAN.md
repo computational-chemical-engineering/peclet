@@ -6,9 +6,13 @@ and the shared-decomposition MPI integration with dynamic load balancing — flo
 (bit-exact mid-run redistribute, np 1/2/4), dem `ParticleHalo::migrateTo` (count-conserving, np 1/2/4),
 the reverse (add-reduce) halo `exchange_field_add`, and the ergonomic `rebalance_by_weights` /
 `migrate_to_weights` / `CfdDem.rebalance` Python entry points (both codes rebuild the SAME weighted ORB
-from one weight field). Remaining follow-up: a full multi-rank *coupled* physics benchmark + the
+from one weight field). The **multi-rank coupled physics benchmark** is validated: the fixed-bed Ergun
+case run distributed (`test_mpi_fixed_bed_ergun.py`) lands on the Ergun curve to 0.0% and is
+bit-identical at np=1/2/4 — the distributed void-fraction deposition, the reverse-halo drag-reaction
+fold, and the distributed flow solve reproduce the coupled physics exactly. Remaining follow-up: the
 GraphAMG coarse solver for multilevel-MG-under-weighted-decomposition (only pure RB-GS is
-decomposition-agnostic today — see below).
+decomposition-agnostic today), and the moving-particle (`move_particles=True`) distributed-dem-step
+coupled path (the fixed-bed benchmark uses static particles).
 Audience: a coding agent executing this plan phase by phase. Read `CLAUDE.md` (umbrella),
 `flow/CLAUDE.md`, `core/CLAUDE.md`, and `docs/{ARCHITECTURE,CONVENTIONS,INTERFACES}.md` first.
 
