@@ -1,7 +1,14 @@
 # Peclet multiphase / multiphysics framework — implementation plan
 
-Status: **Phases 1–6 done; Phase 7 + Phase 8 CORE PRIMITIVES done + validated; the Phase 7/8
-MPI-integration WIRING remains (2026-07-04).**
+Status: **Phases 1–8 done + validated (2026-07-05).** All 8 phases complete: the multiphysics
+solver (variable ρ/μ, scalar transport, closures), single-rank CFD-DEM coupling (CUDA-validated),
+and the shared-decomposition MPI integration with dynamic load balancing — flow `Solver::redistribute`
+(bit-exact mid-run redistribute, np 1/2/4), dem `ParticleHalo::migrateTo` (count-conserving, np 1/2/4),
+the reverse (add-reduce) halo `exchange_field_add`, and the ergonomic `rebalance_by_weights` /
+`migrate_to_weights` / `CfdDem.rebalance` Python entry points (both codes rebuild the SAME weighted ORB
+from one weight field). Remaining follow-up: a full multi-rank *coupled* physics benchmark + the
+GraphAMG coarse solver for multilevel-MG-under-weighted-decomposition (only pure RB-GS is
+decomposition-agnostic today — see below).
 Audience: a coding agent executing this plan phase by phase. Read `CLAUDE.md` (umbrella),
 `flow/CLAUDE.md`, `core/CLAUDE.md`, and `docs/{ARCHITECTURE,CONVENTIONS,INTERFACES}.md` first.
 
