@@ -71,8 +71,11 @@ ctests, on the `host-openmp` backend:
   drag+feedback explicit & implicit), `CfdDem` Python driver (periodic fold/fill in NumPy).
   Validated: single-particle terminal slip vs Stokes 0.10% / Schiller 1.4%; uniform fixed-bed
   (1 particle/cell, ε=0.6) Ergun ΔP 0.0% across viscous→inertial (Re_p~6). Regression bit-exact.
-  Model B (drag-only, ε in the correlation), atomic deposition (tolerance- not bit-exact),
-  single-rank. `coupling/` is now its own `peclet-coupling` package + submodule
+  Since extended with the **volume-averaged (porous) fluid** (`porous=True`: full continuity
+  ∂ε/∂t+∇·(εu)=0, SIMPLE-like drag-weighted projection, Model-B β/ε drag conversion — see
+  `flow/doc/porous_drag_scheme.md`; porous Ergun ΔP ~3%); the original drag-only mode
+  (`porous=False`, div(u)=0, a dilute simplification — NOT "Model B") remains for suspensions.
+  Atomic deposition (tolerance- not bit-exact). `coupling/` is now its own `peclet-coupling` package + submodule
   (github.com/computational-chemical-engineering/peclet-coupling); the driver is backend-agnostic
   (CuPy device / NumPy host). **CUDA-validated on an RTX 5080**: flow regression bit-exact, all
   multiphysics kokkos tests (scalar/closures/variable-mu/variable-density incl. hydrostatic ratio
@@ -258,9 +261,10 @@ gravity source.
 
 ### 3.6 CFD-DEM: unresolved point-particle, two-way, Python-composed
 
-- Scope v1: drag + equal-opposite momentum feedback; void fraction ε enters the **drag
-  correlation only** (Model-A porous continuity/momentum terms deferred — valid dilute to
-  moderate; the fixed-bed Ergun test still closes via the feedback source).
+- Scope v1 was drag-only (ε in the correlation, incompressible fluid); the volume-averaged
+  porous fluid (full continuity + drag-weighted projection, Model B) is now implemented and
+  validated — see `flow/doc/porous_drag_scheme.md`. The drag-only mode remains as the dilute
+  simplification.
 - Drag laws: Stokes, Schiller–Naumann, Di Felice, Wen-Yu/Ergun — selectable, double math.
 - Generic **trilinear P2G/G2P** kernels in core (`interp/particle_grid.hpp`):
   `trilinearGather` (grid→particle) and `trilinearScatterAtomic` (particle→grid,
@@ -492,8 +496,9 @@ time after Phase 1.
 ## 8. Explicitly deferred (do not scope-creep into phases)
 
 VOF / level-set interface capturing + surface tension; Dirichlet/Robin scalar BCs at IBM
-surfaces / conjugate heat transfer; Model-A porous momentum/continuity (dense
-fluidization); JIT/user device closures; batched or start/wait-async multi-field device
+surfaces / conjugate heat transfer; ρε-weighted inertia + full deviatoric εμ viscous stress in the
+porous momentum (accuracy; the Model-B volume-averaged fluid itself is DONE); JIT/user device
+closures; batched or start/wait-async multi-field device
 halo (only `exchangeAdd` is in scope); VelocityMG variable-coefficient support; AMR
 (`core/amr`) unification with structured flow; compressible / low-Mach; energy-conserving
 formulations.
