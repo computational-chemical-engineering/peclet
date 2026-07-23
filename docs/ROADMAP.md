@@ -107,6 +107,13 @@ flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The
       weighted ORB). Validated in `tests/kokkos_mpi` (6 ctests).
 - [x] Decision (resolved): the distributed step lives inside the `dem` module itself
       (`enable_mpi_step`), driven from Python under `mpirun` — no separate C++ driver.
+- [ ] **Event-level (Poisson) restitution** for the impulse solver: per-pair compression-impulse
+      bank (warm-carried like λt/posImpulse), released as a budget-capped separation-velocity
+      target during unloading. Closes the structural rebound gap of per-substep Newton
+      restitution on multi-substep impacts (25k Dosta impact: e_eff ≈ 0.13 with the multilevel
+      stabilizer vs ≈ 0.40 for MUSEN/Hertz) and should lift the drum-amplitude residual.
+      Bookkeeping is per-contact local (GPU-trivial); the care items are the energy-bomb gate
+      (bank kinetic compression only) and binary-impact exactness (test_colored_gs contract).
 
 ## Phase 5 — voro (mixed) + Python parity
 
