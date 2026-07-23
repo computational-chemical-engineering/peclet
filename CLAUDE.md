@@ -29,9 +29,12 @@ host-staged variant); the Lagrangian halo (`peclet::core::halo::ParticleMigrator
 Navier–Stokes solver** (`flow`) on the core: the whole cut-cell IBM + MG-PCG step runs multi-rank,
 bit-exact to single-rank (`tests/kokkos_mpi`, 18 ctests np=1,2,4, gated `PECLET_FLOW_MPI`). `flow` is **THE**
 flow solver; `pnm` is its pore-network-extraction module. `dem`'s `dem` module runs the
-full XPBD step (ArborX broad-phase) with a validated distributed `step_mpi` (core particle
-halo; `tests/kokkos_mpi` 6 ctests) and periodic **load rebalancing** (`enable_mpi_step(rebalance_every=…)`
-/ `Sim.rebalance()` — SoA ownership migration on the weighted ORB). The single-GPU codes are complete +
+full XPBD step (ArborX broad-phase) with a validated distributed `step_mpi` that drives the SAME
+modern solver stack as the single-GPU step (shared `demSolveContacts` driver, processor-block
+Gauss–Seidel: rank-local coloring + warm-started PGS with gid-keyed persistent contacts +
+statics/stabilization; `tests/kokkos_mpi` 18 ctests, host + CUDA) and periodic **load rebalancing**
+(`enable_mpi_step(rebalance_every=…)` / `Sim.rebalance()` — SoA ownership migration on the weighted
+ORB, persistent-contact ledger carried). The single-GPU codes are complete +
 faster than the retired CUDA at scale; remaining work is at-scale multi-GPU tuning — see
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
