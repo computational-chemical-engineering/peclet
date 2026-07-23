@@ -47,6 +47,11 @@ case "$BACKEND" in
   nvidia-cuda)
     kokkos_args=(
       -DKokkos_ENABLE_CUDA=ON -DKokkos_ENABLE_SERIAL=ON
+      # --expt-relaxed-constexpr on the Kokkos interface: device code may call constexpr host
+      # functions (std::array::operator[] etc.). REQUIRED by core's AMR device assembly (the
+      # morton encode/decode on device); without it nvcc only WARNS (#20013/#20015) and the
+      # device call yields garbage (returns 0) — a silent-corruption failure mode.
+      -DKokkos_ENABLE_CUDA_CONSTEXPR=ON
       "-DKokkos_ARCH_${KOKKOS_ARCH:-BLACKWELL120}=ON"
       -DCMAKE_CUDA_COMPILER="$CUDA_COMPILER"
       -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCH:-120}"
