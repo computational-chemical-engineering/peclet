@@ -16,3 +16,6 @@
 [submodule "coupling"]
 	path = coupling
 	url = git@github.com:computational-chemical-engineering/peclet-coupling.git
+[submodule "pnm"]
+	path = pnm
+	url = git@github.com:computational-chemical-engineering/peclet-pnm.git

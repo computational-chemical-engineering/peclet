@@ -32,9 +32,11 @@ flow solver; `pnm` is its pore-network-extraction module. `dem`'s `dem` module r
 full XPBD step (ArborX broad-phase) with a validated distributed `step_mpi` that drives the SAME
 modern solver stack as the single-GPU step (shared `demSolveContacts` driver, processor-block
 Gauss–Seidel: rank-local coloring + warm-started PGS with gid-keyed persistent contacts +
-statics/stabilization; `tests/kokkos_mpi` 18 ctests, host + CUDA) and periodic **load rebalancing**
-(`enable_mpi_step(rebalance_every=…)` / `Sim.rebalance()` — SoA ownership migration on the weighted
-ORB, persistent-contact ledger carried). The single-GPU codes are complete +
+statics/stabilization), a distributed **force-based** engine (`step_hertz_mpi` — explicit
+Hertz–Mindlin as the first law of the generalized `demStepForce` driver, domain-decomposed MD-style
+with gid-keyed Mindlin history; `tests/kokkos_mpi` 24 ctests, host + CUDA) and periodic **load
+rebalancing** (`enable_mpi_step(rebalance_every=…)` / `Sim.rebalance()` — SoA ownership migration on
+the weighted ORB, both engines' contact ledgers carried). The single-GPU codes are complete +
 faster than the retired CUDA at scale; remaining work is at-scale multi-GPU tuning — see
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
