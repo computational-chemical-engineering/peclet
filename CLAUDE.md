@@ -56,7 +56,7 @@ The design contract lives in `docs/`:
 | `core/` | Header-only C++20 + MPI | **Shared infrastructure**: ORB block decomposition + asynchronous ghost-layer exchange (NBX + persistent engines) + particle migration + SDF geometry + dynamic load balancing + AMR octree. The layer every method code depends on. Tested (26 ctests, np 1–8). | **Yes — read it** |
 | `morton/` | Header-only C++17 (+ **Kokkos**, Python) | Morton/Z-order codes with **arithmetic in Morton space** (neighbour-find, axis add, Z-order step without decode→re-encode). BMI2/AVX-512 + runtime dispatch; the foundational spatial-index library. Portable **Kokkos** GPU backend (`include/morton/kokkos.hpp`, CUDA/HIP/OpenMP) — raw CUDA retired. | **Yes — read it** |
 | `flow/` | **Kokkos** + C++20 + nanobind (`flow`) | Incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). | **Yes — read it** |
-| `pnm/` | **Kokkos** + C++20 + nanobind (`peclet.pnm`) | Pore-network extraction from SDF geometry: pore detection, marker-controlled watershed segmentation, throat topology (`SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu`, fused `extract_pore_network`). Split out of `flow` (2026-07) with its git history. | Yes (brief) |
+| `pnm/` | **Kokkos** + C++20 + nanobind (`peclet.pnm`) | Pore-network extraction from SDF geometry: pore detection, marker-controlled watershed segmentation, throat topology (`SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu`, fused `extract_pore_network`). **Distributed MPI extraction** on the core ORB (`extract_pore_network_mpi`, gated `PECLET_PNM_MPI`) — bit-exact to single-rank, `tests/kokkos_mpi` ctests np=1,2,4 host+CUDA. Split out of `flow` (2026-07) with its git history. | Yes (brief) |
 | `dem/` | **Kokkos + ArborX** + C++20 + nanobind (`dem`) | Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). README still calls it `peclet-dem`. | No |
 | `voro/` | **Kokkos** + C++17/20 (+ core MPI, nanobind; Voro++/Boost for the CPU oracle) | Dynamic 3D Voronoi tessellation of moving particles; periodic & Lees–Edwards boxes, incremental cell repair, Euler/NS/multiphase dynamics. Ported to Kokkos (CUDA/HIP/OpenMP) + core MPI; legacy half-edge engine kept as CPU oracle. | No |
 
@@ -96,6 +96,8 @@ cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"
 cmake --build build -j                          # -> build/peclet/pnm/_pnm.*.so (import peclet.pnm)
 PYTHONPATH=$PWD/build python scripts/test_extraction.py ../flow/data/packing_ring.vti
 PYTHONPATH=$PWD/build python scripts/verify_segmentation.py ../flow/data/packing_ring.vti
+# Distributed extraction (-DPECLET_PNM_MPI=ON): mpi_block + extract_pore_network_mpi, bit-exact
+# to single-rank; MPI ctests: cmake -S tests/kokkos_mpi -B build_kmpi -DMPIEXEC_EXECUTABLE=/usr/bin/mpirun ...
 ```
 
 ### dem
