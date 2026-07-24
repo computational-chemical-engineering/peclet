@@ -4,7 +4,7 @@
 > efficient asynchronous ghost-layer exchange, common SDF/IBM, GPU support, and Python bindings — while
 > keeping each method its own code. See [ARCHITECTURE](ARCHITECTURE.md) for the layering.
 >
-> **Kokkos is canonical.** flow (`flow`/`pnm`), dem (`dem`, ArborX broad-phase), and core all build on
+> **Kokkos is canonical.** flow (`flow`), pnm, dem (`dem`, ArborX broad-phase), and core all build on
 > Kokkos (CUDA/HIP/OpenMP). See [PORTABILITY](PORTABILITY.md) for the backend/toolchain contract.
 
 ## Guiding decisions

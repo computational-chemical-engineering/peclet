@@ -70,7 +70,7 @@ labels and stay local to voronoi; they are not suite-wide types.
 
 ## 6. Python binding conventions
 
-- **Mechanism:** **nanobind** for every compiled solver (flow + `pnm`, dem `dem`, core
+- **Mechanism:** **nanobind** for every compiled solver (flow, `pnm` (own project), dem `dem`, core
   `tpx_mpi`/`tpx_amr`, voro's device module), built through **scikit-build-core**. nanobind is
   chosen over pybind11 because its `nb::ndarray` carries a DLPack device tag and arbitrary strides,
   which is what makes the zero-copy GPU path below possible. morton's lightweight ctypes/C-ABI shim

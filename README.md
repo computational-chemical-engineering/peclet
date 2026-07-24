@@ -35,7 +35,8 @@ git submodule update --init --recursive
 | Submodule | Role |
 |-----------|------|
 | `core/` | **Shared infrastructure** (header-only C++20 + MPI, optional Kokkos): ORB block decomposition, async grid ghost-layer exchange + Lagrangian particle migration/ghosts, SDF geometry, VTI I/O. Every method depends on it. |
-| `flow/` | Eulerian **Kokkos** incompressible Navier–Stokes (porous media; staggered MAC grid + cut-cell IBM). Complete, validated, MPI-optional distributed solver on `core`; `pnm` is its pore-network-extraction module. |
+| `flow/` | Eulerian **Kokkos** incompressible Navier–Stokes (porous media; staggered MAC grid + cut-cell IBM). Complete, validated, MPI-optional distributed solver on `core`. |
+| `pnm/` | **Kokkos** pore-network extraction from SDF geometry (pores, watershed segmentation, throat topology). Split out of `flow`. |
 | `dem/` | Lagrangian **Kokkos + ArborX** DEM/XPBD particle packing. Full XPBD step with a validated distributed `step_mpi` (core particle halo). |
 | `voro/` | Mixed Lagrangian/Eulerian dynamic 3D Voronoi tessellation (header-only C++17; periodic & Lees–Edwards). |
 | `morton/` | Morton/Z-order spatial-index primitive — arithmetic directly in Morton space (header-only C++17 + BMI2/AVX-512, Python). |
@@ -58,7 +59,8 @@ Everything ships under one **`peclet` namespace** — installable parts of one f
 | PyPI package | Import | Role |
 |---|---|---|
 | `peclet-morton` | `peclet.morton` | Morton/Z-order spatial index |
-| `peclet-flow` | `peclet.flow` (+ `.pnm`) | Eulerian incompressible Navier–Stokes solver |
+| `peclet-flow` | `peclet.flow` | Eulerian incompressible Navier–Stokes solver |
+| `peclet-pnm` | `peclet.pnm` | Pore-network extraction from SDF geometry |
 | `peclet-dem` | `peclet.dem` | Lagrangian DEM/XPBD particle packing |
 | `peclet-voro` | `peclet.voro` | Dynamic Voronoi tessellation + mesh generator |
 | `peclet-core` | `peclet.core` (`.mpi`, `.amr`) | Shared infra (particle halo, AMR) — sdist only |

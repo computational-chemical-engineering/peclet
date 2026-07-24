@@ -133,7 +133,7 @@ for MPI-ABI, GPU-aware-MPI, and arch details.
 | Package | Import | Key API |
 |---------|--------|---------|
 | `peclet-flow` | `import peclet.flow` | `peclet.flow.Solver(nx,ny,nz)` — set_rho/mu/dt, set_solid, set_domain_bc, step, get_u/v/w/p; `peclet.flow.execution_space` |
-| `peclet-flow` (pnm) | `from peclet.flow from peclet.flow import pnm` | `SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu` |
+| `peclet-pnm` | `import peclet.pnm` | `SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu`, `extract_pore_network` |
 | `peclet-dem` | `import peclet.dem` | `peclet.dem.Simulation(capacity)` — initialize_shape, set_domain, set_material_params, set_positions, step, get_positions, get_sdf_grid; gated MPI: init_mpi/enable_mpi_step/step_mpi |
 | `peclet-voro` | `import peclet.voro` | `peclet.voro.Tessellation`, `peclet.voro.Simulation` — moving-cell Voronoi + dynamics |
 | `peclet-morton` | `from peclet.morton import encode, decode, shift, box_zorder` | vectorised NumPy Morton ops |

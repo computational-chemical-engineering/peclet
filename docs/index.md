@@ -43,7 +43,8 @@ print(flow.execution_space)           # -> OpenMP / Cuda / HIP / Serial
 | Code | PyPI · import | Role |
 |------|---------------|------|
 | [**core**](https://github.com/computational-chemical-engineering/peclet-core) | `peclet-core` · `peclet.core` | Shared infrastructure: ORB block decomposition, async grid/particle halo, SDF geometry, VTI I/O, AMR octree |
-| [**flow**](https://github.com/computational-chemical-engineering/peclet-flow) | `peclet-flow` · `peclet.flow` | Incompressible Navier–Stokes for porous media (staggered MAC + cut-cell IBM + multigrid); `pnm` pore extraction |
+| [**flow**](https://github.com/computational-chemical-engineering/peclet-flow) | `peclet-flow` · `peclet.flow` | Incompressible Navier–Stokes for porous media (staggered MAC + cut-cell IBM + multigrid) |
+| [**pnm**](https://github.com/computational-chemical-engineering/peclet-pnm) | `peclet-pnm` · `peclet.pnm` | Pore-network extraction from SDF geometry (pores, watershed segmentation, throat topology) |
 | [**dem**](https://github.com/computational-chemical-engineering/peclet-dem) | `peclet-dem` · `peclet.dem` | Discrete Element Method (XPBD) + SDF point-shell collision for dense packing |
 | [**voro**](https://github.com/computational-chemical-engineering/peclet-voro) | `peclet-voro` · `peclet.voro` | Dynamic 3D Voronoi tessellation of moving particles (periodic & Lees–Edwards) + mesh generation |
 | [**morton**](https://github.com/computational-chemical-engineering/peclet-morton) | `peclet-morton` · `peclet.morton` | Morton/Z-order codes with arithmetic *in Morton space* — the spatial-index primitive |
