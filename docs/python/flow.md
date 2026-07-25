@@ -10,24 +10,43 @@ The incompressible cut-cell IBM Navier–Stokes solver on a staggered MAC grid. 
 peclet.flow — the Eulerian incompressible Navier–Stokes solver.
 
 A Kokkos cut-cell Immersed-Boundary-Method solver on a staggered MAC grid (grid-agnostic by design:
-Cartesian cut-cell today, able to consume an unstructured Voronoi grid from `peclet.voro`). The
-compiled backend (Serial / OpenMP / CUDA / HIP) is chosen at build time — `peclet.flow.execution_space`
+Cartesian cut-cell today, able to consume an unstructured Voronoi grid from :mod:`peclet.voro`). The
+compiled backend (Serial / OpenMP / CUDA / HIP) is chosen at build time — ``peclet.flow.execution_space``
 reports which one this build has.
 
-* `peclet.flow.Solver` — the staggered MAC solver.
-* `peclet.flow.SolverColocated` — the collocated/cell-centered variant.
-* `peclet.flow.pnm` — pore-network extraction from SDF pore geometry.
+* :class:`peclet.flow.Solver` — the staggered MAC solver.
+* :class:`peclet.flow.SolverColocated` — the collocated/cell-centered variant.
 
-`peclet` is an implicit (PEP 420) namespace shared with the other `peclet-*` packages, so it has no
-top-level `__init__.py`.
+Pore-network extraction lives in the companion :mod:`peclet.pnm` package (peclet-pnm; it was
+``peclet.flow.pnm`` before 2026-07).
+
+``peclet`` is an implicit (PEP 420) namespace shared with the other ``peclet-*`` packages, so it has no
+top-level ``__init__.py``.
 
 ### `Solver`
 
 | Method / property | Description |
 |---|---|
+| `add_field` | add_field(self, name: str) -> None  Register a new zero-initialised cell-centred field on the grid (for transported scalars or material properties). Idempotent. |
+| `add_scalar` | add_scalar(self, name: str, diffusivity: float = 0.0, scheme: int = 1, iters: int = 50) -> None  Register a transported scalar (temperature/concentration/…): constant diffusivity (grid units), advection scheme 0=FOU/1=Koren TVD/2=SOU, and RB-GS diffusion sweeps. The scalar is a registered field (get_field/set_field/field_view). Requires geometry (set_solid/set_pressure_geometry) for the openness-weighted operators. |
+| `advance_scalars` | advance_scalars(self) -> None  Advance all registered scalars one dt with the current velocity (also done by step()). |
 | `bcast_from_root` | bcast_from_root(self, value: object) -> object  Broadcast a value from rank 0 (identity in the single-rank module; mirrors the MPI API). |
+| `block_origin` | block_origin(self) -> list[int]  This rank's inner-block origin in GLOBAL cells ([0,0,0] single-rank). Shift the coupling deposit origin by this so particles in global coordinates land in the local block. |
+| `enable_cell_force` | enable_cell_force(self) -> None  Allocate + register the per-cell body-force fields force_x/force_y/force_z and route them into the momentum RHS, for an external writer (e.g. CFD-DEM drag feedback) to fill directly via field_view('force_z'). They persist across steps until overwritten. |
+| `enable_drag` | enable_drag(self) -> None  Enable implicit (semi-implicit) linear drag for CFD-DEM: allocate the per-cell 'drag_beta' field (added to the momentum diagonal so a -beta*(u-u_p) source is treated implicitly -> unconditionally stable for the stiff beta of a dense bed) plus force_x/y/z (which carry beta*u_p, the RHS target). Fill 'drag_beta' and 'force_*' via field_view each step. |
+| `exchange_field` | exchange_field(self, name: str) -> None  Fill a registered field's ghost cells (cross-rank + periodic under MPI; periodic single-rank). |
+| `exchange_field_add` | exchange_field_add(self, name: str) -> None  Add-reduce halo: fold ghost-layer deposits back onto their owner (cross-rank + periodic). The particle->grid deposition primitive for MPI CFD-DEM; single-rank non-periodic no-op. |
+| `field_names` | field_names(self) -> list[str]  Names of all registered fields (velocity u/v/w, p, sdf, plus any added), sorted. |
+| `field_view` | field_view(self, name: str) -> ndarray[dtype=float64]  Zero-copy view of a registered field's full padded buffer as a Fortran-order (nx+2g, ny+2g, nz+2g) array (g = ghost_width); host → NumPy, device → DLPack (CuPy). |
+| `get_field` | get_field(self, name: str) -> numpy.ndarray[dtype=float64]  Return a registered field's inner region as a Fortran-order (nx,ny,nz) float64 array. |
+| `get_ox` | get_ox(self) -> numpy.ndarray[dtype=float64]  TEMP: -x face openness (fluid area fraction) per inner cell, (nx,ny,nz). |
+| `get_ox_proj` | get_ox_proj(self) -> numpy.ndarray[dtype=float64]  -x face openness whose fluxes the projection CONSERVES (binary/COUPLED under set_ghost_projection, geometric cut-cell otherwise). Use for flux bookkeeping (peclet.pnm extract_network_flow). |
+| `get_oy` | get_oy(self) -> numpy.ndarray[dtype=float64]  TEMP: -y face openness per inner cell, (nx,ny,nz). |
+| `get_oy_proj` | get_oy_proj(self) -> numpy.ndarray[dtype=float64]  -y face openness the projection conserves (see get_ox_proj). |
+| `get_oz` | get_oz(self) -> numpy.ndarray[dtype=float64]  TEMP: -z face openness per inner cell, (nx,ny,nz). |
+| `get_oz_proj` | get_oz_proj(self) -> numpy.ndarray[dtype=float64]  -z face openness the projection conserves (see get_ox_proj). |
 | `get_p` | get_p(self) -> numpy.ndarray[dtype=float64]  Return the physical pressure as a Fortran-order (nx,ny,nz) float64 array (index [x,y,z]). |
-| `get_resolution` | get_resolution(self) -> list[int]  Return the grid resolution [nx, ny, nz]. |
+| `get_resolution` | get_resolution(self) -> list[int]  Return the LOCAL grid resolution [nx, ny, nz] (this rank's block under MPI). |
 | `get_spacing` | get_spacing(self) -> list[float]  Return the grid spacing [dx, dy, dz] (always unit on this grid). |
 | `get_u` | get_u(self) -> numpy.ndarray[dtype=float64]  Return the x-velocity component as a Fortran-order (nx,ny,nz) float64 array (index [x,y,z]). |
 | `get_uf` | get_uf(self) -> numpy.ndarray[dtype=float64]  Return the divergence-free FACE x-velocity (collocated: projected MAC field; staggered: == get_u). |
@@ -35,43 +54,87 @@ top-level `__init__.py`.
 | `get_vf` | get_vf(self) -> numpy.ndarray[dtype=float64]  Return the divergence-free FACE y-velocity (collocated: projected MAC field; staggered: == get_v). |
 | `get_w` | get_w(self) -> numpy.ndarray[dtype=float64]  Return the z-velocity component as a Fortran-order (nx,ny,nz) float64 array (index [x,y,z]). |
 | `get_wf` | get_wf(self) -> numpy.ndarray[dtype=float64]  Return the divergence-free FACE z-velocity (collocated: projected MAC field; staggered: == get_w). |
+| `ghost_width` | ghost_width(self) -> int  Ghost-layer width g of the velocity block (field_view returns an (n+2g) buffer). |
+| `global_resolution` | global_resolution(self) -> list[int]  Return the GLOBAL grid resolution [gnx, gny, gnz] (== local single-rank). For the CFD-DEM co-decomposition weight field. |
+| `has_cutcell_pressure` | has_cutcell_pressure(self) -> bool  True once the cut-cell pressure operator exists (set_solid or set_pressure_geometry was called). The porous continuity requires it; the coupling driver auto-sets an all-fluid geometry when absent. |
+| `has_field` | has_field(self, name: str) -> bool  Whether a field of this name is registered. |
+| `has_scalar` | has_scalar(self, name: str) -> bool  Whether a transported scalar of this name is registered. |
 | `last_outer_iterations` | last_outer_iterations(self) -> int  Return the outer-iteration count from the last step(). |
 | `last_pressure_iterations` | last_pressure_iterations(self) -> int  Return the pressure-solver iteration count from the last step(). |
-| `max_open_divergence` | max_open_divergence(self) -> float  Return the max cut-cell flux divergence (the incompressibility residual; ~0 when converged). |
+| `max_open_divergence` | max_open_divergence(self) -> float  Return the max cut-cell velocity-flux divergence max|div(open*u)|. With porous continuity this is NOT ~0 -- it equals -d(eps)/dt (the bed expanding). Use max_porous_residual() for the continuity residual. |
+| `max_porous_residual` | max_porous_residual(self) -> float  Residual of the volume-averaged continuity max|div(open*eps*u) + d(eps)/dt| -- the quantity the porous projection drives to zero. 0 unless set_porous_continuity(True). |
 | `rank` | rank(self) -> int  MPI rank (always 0 in the single-rank Python module; the multi-rank path is the tests/kokkos_mpi suite). |
 | `set_advection` | set_advection(self, on: bool) -> None  Enable/disable explicit high-order momentum advection (default scheme SOU). Off ⇒ Stokes. |
 | `set_advection_scheme` | set_advection_scheme(self, scheme: int) -> None  High-order advection scheme: 0 = second-order upwind (SOU, default), 1 = Koren TVD. |
+| `set_backflow_stabilization` | set_backflow_stabilization(self, beta: float) -> None  Outflow backflow-stabilization coefficient (Bazilevs 2009 / Esmaily-Moghadam 2011): beta in [0,1] scales the dissipative outflow term that prevents backflow divergence when flow reverses at the outlet (e.g. a separated wake / BFS recirculation). Default 0.2; 0 = off. Inert where the outlet is purely outgoing. |
 | `set_body_force` | set_body_force(self, fx: float, fy: float, fz: float) -> None  Set the body force per unit volume (fx, fy, fz) — e.g. a mean pressure gradient. |
+| `set_deferred_correction` | set_deferred_correction(self, on: bool) -> None  Deferred-correction advection: True (default) = 2nd order (implicit FOU + explicit high-order correction, the high-order scheme being SOU by default or Koren TVD via set_advection_scheme); False = pure implicit FOU (1st-order upwind, more dissipative but unconditionally stable at sharp shear layers). |
+| `set_density_mode` | set_density_mode(self, mode: str = 'variable') -> None  Enable variable density (staggered solver only): binds the 'rho' field (get/set_field('rho'), created seeded with set_rho's value if absent) into the momentum time term, the advection weight, the per-cell body force (face-interpolated), and the pressure projection (face coefficient openness*rho0/rho_f with the matching 1/rho_f velocity correction; rho0 = set_rho's value, so a uniform field reduces exactly to the constant solver). A closure targeting 'rho' (e.g. a linear mixture of a transported phase fraction) enables this automatically. For gravity, register a closure force_z = linear(rho, params=[0, -g]). |
 | `set_domain_bc` | set_domain_bc(self, face: int, type: int, vx: float = 0.0, vy: float = 0.0, vz: float = 0.0) -> None  Set a per-face domain BC (face 0..5 = -x,+x,-y,+y,-z,+z; type 0 periodic/1 wall/2 inflow/3 outflow). |
 | `set_domain_bc_profile` | set_domain_bc_profile(self, face: int, profile: ndarray[dtype=float64, order='C']) -> None  Prescribe a per-position inlet velocity profile (Nb,Nc,3) over a face (sets it to inflow). |
 | `set_dt` | set_dt(self, dt: float) -> None  Set the time step dt; the momentum solve is scaled by 1/dt (well-conditioned at large dt). |
+| `set_exact_crossings` | set_exact_crossings(self, t: collections.abc.Sequence[float]) -> None  Analytic-SDF capability: exact wall-crossing fractions overriding the linear-interpolated theta in the momentum cut-cell overlay AND the ghost-projection closures. Flat array of 9*nx*ny*nz values, blocks [(c*3+k)]: component c's staggered point at inner cell i toward its +k neighbour; NaN = no crossing. Call BEFORE set_solid; empty list clears. Single-rank, staggered momentum placement. |
+| `set_face_interp` | set_face_interp(self, mode: int) -> None  Collocated cut-cell projection treatment: 0 = plain averaging + central-difference grad(P) (default), 1 = wall-aware cell->face map only (ablation), 2 = wall-aware map + its transpose (face-centre; ablation), 3 = mode 2 at the open-face-centroid (FV constraint, FD momentum), 4 = fully-FV (mode-3 projection + second-order wall viscous-flux deferred correction on the momentum), 5/6/7 = Basilisk-embed ablations, 9 = CUTCELL-GHOST HYBRID: mode-0 aperture projection + the directional gpCenterGrad -grad(P)/cell correction (recommended for tight-throat porous media: throat-throttling apertures, symmetric MG-PCG, ~7-20x below mode-0 drag error; not clean 2nd order), 10 = dead ablation (diverges), do not use. No effect on the staggered solver. |
+| `set_field` | set_field(self, name: str, array: ndarray[dtype=float64, order='F']) -> None  Write a Fortran-order (nx,ny,nz) float64 array into a registered field's inner region (ghosts refilled on the next exchange_field/step). |
+| `set_fv_relax` | set_fv_relax(self, w: float) -> None  Mode-4 FV wall-flux defect-correction under-relaxation (1=full; <1 damps the stiff explicit-lagged wall term). Steady state is independent of w. |
+| `set_ghost_projection` | set_ghost_projection(self, on: bool, matrix_order: int = 2, rhs_order: int = 2) -> None  EXPERIMENTAL directional ghost-cell projection (second staggered IBM): point-based FD divergence with wall-anchored directional closures instead of the openness-weighted cut-cell projection; solved by MG-preconditioned BiCGStab. Call BEFORE set_solid. Closure orders (1=linear, 2=quadratic): (matrix_order, rhs_order) = (2,2) full quadratic 13-point matrix; (1,1) linear 7-point; (1,2) mixed/deferred — 2nd-order steady constraint on a 7-point matrix. Collocated: the same closures/matrix on the face-averaged field, plus a directional (one-sided 2nd-order) cell gradient for the -grad(P) predictor and cell correction; requires face_interp 0. v1: single-rank, periodic + IBM, stationary walls; incompatible with porous/variable-rho/domain-BC/Chebyshev. |
 | `set_implicit_advection` | set_implicit_advection(self, on: bool) -> None  Use implicit-FOU advection with deferred-correction TVD. |
 | `set_incremental_pressure` | set_incremental_pressure(self, on: bool) -> None  Toggle the rotational incremental-pressure projection. |
 | `set_mu` | set_mu(self, mu: float) -> None  Set dynamic viscosity mu (physical units). |
+| `set_openness_override` | set_openness_override(self, ox: collections.abc.Sequence[float], oy: collections.abc.Sequence[float], oz: collections.abc.Sequence[float]) -> None  Analytic-SDF capability: exact face-aperture (openness) fields for the cut-cell projection, overriding the sampled-SDF openness. Inner nx*ny*nz arrays, x-fastest; ox[i] = fluid fraction of the -x face of cell i. Call BEFORE set_solid; empty ox clears. Single-rank. |
 | `set_outer_iterations` | set_outer_iterations(self, n: int) -> None  Set the number of Picard/outer iterations per step. |
 | `set_outer_tolerance` | set_outer_tolerance(self, tol: float) -> None  Set the outer (Picard) convergence tolerance. |
+| `set_porous_conservative` | set_porous_conservative(self, on: bool) -> None  eps-conservative porous momentum + projection pair (default True): time term (eps_f rho/dt) u, eps rho-weighted advective form, projection coefficients open*(eps rho idt)/(eps rho idt+beta) with matching correction. False = the legacy plain-u pair (A/B only; it lets the projection drag gas with the moving porosity at zero inertia cost — a spurious late-time energy source in clustering flows). |
+| `set_porous_continuity` | set_porous_continuity(self, on: bool = True) -> None  Enable the volume-averaged (porous) continuity for unresolved CFD-DEM (staggered only): the projection enforces d(eps)/dt + div(eps u) = 0 instead of div(u)=0, so the fluid velocity is NOT solenoidal where the void fraction changes (bubbling/expansion). Binds the 'eps' field (void fraction from the particle deposition, created seeded to 1 if absent; the coupling writes it each step BEFORE step()). eps=1 everywhere reduces exactly to div(u)=0. Pair with max_porous_residual() for the meaningful convergence check. |
+| `set_porous_deps_dt` | set_porous_deps_dt(self, on: bool) -> None  Include (default True) or drop the d(eps)/dt source in the porous projection RHS. Drop it to enforce div(eps u)=0 when the per-cell eps deposit's time-derivative is too jagged and destabilizes the eps-weighted pressure solve. |
 | `set_pressure_chebyshev` | set_pressure_chebyshev(self, on: bool, max_iter: int = 120, rtol: float = 1e-09) -> None  Use the communication-light Chebyshev pressure accelerator (exclusive with PCG). |
-| `set_pressure_geometry` | set_pressure_geometry(self, sdf: ndarray[dtype=float64, order='F']) -> None  Set an all-fluid SDF for the cut-cell pressure operator without an immersed solid. |
+| `set_pressure_geometry` | set_pressure_geometry(self, sdf: ndarray[dtype=float64, order='F']) -> None  Set an all-fluid SDF for the cut-cell pressure operator without an immersed solid (the channel/BFS domain-BC path). For a no-slip immersed BODY in an inflow/outflow domain, call set_solid(sdf, cutcell_pressure=True) instead -- do NOT also call this (a second geometry setter overwrites the SDF and wipes the solid). |
+| `set_pressure_graph_amg` | set_pressure_graph_amg(self, on: bool) -> None  Solve the pressure MG's coarsest level with an agglomerated mesh-agnostic algebraic multigrid (core GraphAMG), decomposition-agnostic: with levels=1 this gives a mesh-independent pressure solve that works under a WEIGHTED ORB (where the geometric coarse levels can't cleanly coarsen). Applied at the next set_solid. |
 | `set_pressure_multigrid` | set_pressure_multigrid(self, on: bool, levels: int = 4) -> None  Set the pressure multigrid depth (levels=1 => pure RB-GS, no coarse grid). |
 | `set_pressure_pcg` | set_pressure_pcg(self, on: bool, max_iter: int = 200, rtol: float = 1e-08) -> None  Use the MG-PCG pressure accelerator (single-GPU default; exclusive with Chebyshev). |
 | `set_pressure_solver_params` | set_pressure_solver_params(self, iters: int) -> None  Set the pressure smoother iteration count. |
+| `set_pressure_underrelax` | set_pressure_underrelax(self, omega: float) -> None  Pressure under-relaxation factor omega_p in (0,1] for the incremental accumulation (MFIX §10.1); 1.0 = off (default). <1 damps the incremental predictor overshoot on stiff porous+drag. |
 | `set_pressure_warmstart` | set_pressure_warmstart(self, on: bool) -> None  Seed each pressure solve from the previous step's phi (default off). |
+| `set_property_mode` | set_property_mode(self, mode: str = 'variable', harmonic: bool = False) -> None  Enable variable-coefficient momentum (variable viscosity): mode 'variable' binds the 'mu' field (get/set_field('mu')) into the diffusion operator; 'constant' reverts. harmonic = harmonic face-viscosity mean (continuous shear stress across a jump) vs arithmetic. A closure targeting 'mu' enables this automatically. The incremental-rotational pressure scheme (large-dt / steady-Stokes) stays active — see set_variable_rotational. |
+| `set_property_model` | set_property_model(self, target: str, kind: str, field: str, params: collections.abc.Sequence[float] = [], field2: str = '') -> None  Register a device closure writing a property/body-force field from input field(s). target: a registered field (a property 'mu'/'rho'/… or a body-force component 'force_x'/'force_y'/'force_z'). kind: 'linear' (params [p0,p1,p2]: p0+p1*field+p2*field2), 'boussinesq' (params [rho0,g,beta,T0]: rho0*g*beta*(field-T0) buoyancy), 'arrhenius' (params [mu_ref,B,Tref]: mu_ref*exp(B*(1/field-1/Tref))). Applied at the top of step(). |
+| `set_property_table` | set_property_table(self, target: str, field: str, x: collections.abc.Sequence[float], y: collections.abc.Sequence[float]) -> None  Register a tabulated property: target = piecewise-linear interpolation of (x, y) at the input field value (x ascending, clamped at the ends). |
 | `set_rho` | set_rho(self, rho: float) -> None  Set fluid density rho (physical units). Set before geometry/first step. |
-| `set_solid` | set_solid(self, sdf: ndarray[dtype=float64, order='F'], cutcell_pressure: bool = False, pressure_coarse: str = 'const') -> None  Set the solid SDF as a Fortran-order (nx,ny,nz) float64 array (negative inside the solid, positive in fluid); optionally enable the cut-cell pressure operator. |
+| `set_scalar_bc` | set_scalar_bc(self, name: str, face: int, type: int, value: float = 0.0) -> None  Scalar boundary condition on a domain face (0..5 = -x,+x,-y,+y,-z,+z): type 0 periodic, 1 Neumann zero-flux (adiabatic), 2 Dirichlet value. Single-rank. |
+| `set_solid` | set_solid(self, sdf: ndarray[dtype=float64, order='F'], cutcell_pressure: bool = False, pressure_coarse: str = 'const') -> None  Set the solid SDF as a Fortran-order (nx,ny,nz) float64 array (negative inside the solid, positive in fluid). cutcell_pressure=True enables the open-face-weighted cut-cell pressure operator (proper no-slip); it composes with domain BCs, so this is the single call for a no-slip immersed body in an inflow/outflow domain. |
 | `set_state` | set_state(self, u: ndarray[dtype=float64, order='F'], v: ndarray[dtype=float64, order='F'], w: ndarray[dtype=float64, order='F']) -> None  Upload an initial velocity field (u,v,w each a Fortran-order (nx,ny,nz) float64 array). |
+| `set_variable_rotational` | set_variable_rotational(self, mode: str = 'min', chi: float = 1.0) -> None  Rotational-pressure term under variable viscosity (the constant-mu Timmermans term -mu*div(u*) is only valid for homogeneous viscosity — Deteix & Yakoubi 2018). 'min' (default): constant coefficient chi*mu_min — provably stable at any contrast, exact fallback to the constant-mu scheme for uniform mu. 'full': pointwise chi*mu(i) — better pressure consistency at MILD contrast only. 'off': plain incremental (no rotational term). All modes keep the incremental predictor (large-dt / steady-Stokes capability). |
 | `set_velocity_multigrid` | set_velocity_multigrid(self, on: bool, levels: int = 4, vcycles: int = 8) -> None  Enable velocity (momentum) multigrid for the implicit diffusion solve. |
 | `set_velocity_solver_params` | set_velocity_solver_params(self, iters: int) -> None  Set the velocity (diffusion) smoother iteration count. |
 | `set_velocity_streams` | set_velocity_streams(self, on: bool) -> None  Toggle overlapped per-component velocity solves. |
 | `size` | size(self) -> int  MPI size (1 in the single-rank Python module). |
 | `step` | step(self) -> None  Advance the solver one time step (semi-implicit: diffusion + projection). |
+| `sync_porous_prev` | sync_porous_prev(self) -> None  Reseed eps^n = eps^{n+1} (d(eps)/dt=0 this step) — call once after the first void-fraction deposition so step 0 has no spurious source. |
+| `update_properties` | update_properties(self) -> None  Apply all registered property/force closures now (also done at the top of step()). |
 
 ### `SolverColocated`
 
 | Method / property | Description |
 |---|---|
+| `add_field` | add_field(self, name: str) -> None  Register a new zero-initialised cell-centred field on the grid (for transported scalars or material properties). Idempotent. |
+| `add_scalar` | add_scalar(self, name: str, diffusivity: float = 0.0, scheme: int = 1, iters: int = 50) -> None  Register a transported scalar (temperature/concentration/…): constant diffusivity (grid units), advection scheme 0=FOU/1=Koren TVD/2=SOU, and RB-GS diffusion sweeps. The scalar is a registered field (get_field/set_field/field_view). Requires geometry (set_solid/set_pressure_geometry) for the openness-weighted operators. |
+| `advance_scalars` | advance_scalars(self) -> None  Advance all registered scalars one dt with the current velocity (also done by step()). |
 | `bcast_from_root` | bcast_from_root(self, value: object) -> object  Broadcast a value from rank 0 (identity in the single-rank module; mirrors the MPI API). |
+| `block_origin` | block_origin(self) -> list[int]  This rank's inner-block origin in GLOBAL cells ([0,0,0] single-rank). Shift the coupling deposit origin by this so particles in global coordinates land in the local block. |
+| `enable_cell_force` | enable_cell_force(self) -> None  Allocate + register the per-cell body-force fields force_x/force_y/force_z and route them into the momentum RHS, for an external writer (e.g. CFD-DEM drag feedback) to fill directly via field_view('force_z'). They persist across steps until overwritten. |
+| `enable_drag` | enable_drag(self) -> None  Enable implicit (semi-implicit) linear drag for CFD-DEM: allocate the per-cell 'drag_beta' field (added to the momentum diagonal so a -beta*(u-u_p) source is treated implicitly -> unconditionally stable for the stiff beta of a dense bed) plus force_x/y/z (which carry beta*u_p, the RHS target). Fill 'drag_beta' and 'force_*' via field_view each step. |
+| `exchange_field` | exchange_field(self, name: str) -> None  Fill a registered field's ghost cells (cross-rank + periodic under MPI; periodic single-rank). |
+| `exchange_field_add` | exchange_field_add(self, name: str) -> None  Add-reduce halo: fold ghost-layer deposits back onto their owner (cross-rank + periodic). The particle->grid deposition primitive for MPI CFD-DEM; single-rank non-periodic no-op. |
+| `field_names` | field_names(self) -> list[str]  Names of all registered fields (velocity u/v/w, p, sdf, plus any added), sorted. |
+| `field_view` | field_view(self, name: str) -> ndarray[dtype=float64]  Zero-copy view of a registered field's full padded buffer as a Fortran-order (nx+2g, ny+2g, nz+2g) array (g = ghost_width); host → NumPy, device → DLPack (CuPy). |
+| `get_field` | get_field(self, name: str) -> numpy.ndarray[dtype=float64]  Return a registered field's inner region as a Fortran-order (nx,ny,nz) float64 array. |
+| `get_ox` | get_ox(self) -> numpy.ndarray[dtype=float64]  TEMP: -x face openness (fluid area fraction) per inner cell, (nx,ny,nz). |
+| `get_ox_proj` | get_ox_proj(self) -> numpy.ndarray[dtype=float64]  -x face openness whose fluxes the projection CONSERVES (binary/COUPLED under set_ghost_projection, geometric cut-cell otherwise). Use for flux bookkeeping (peclet.pnm extract_network_flow). |
+| `get_oy` | get_oy(self) -> numpy.ndarray[dtype=float64]  TEMP: -y face openness per inner cell, (nx,ny,nz). |
+| `get_oy_proj` | get_oy_proj(self) -> numpy.ndarray[dtype=float64]  -y face openness the projection conserves (see get_ox_proj). |
+| `get_oz` | get_oz(self) -> numpy.ndarray[dtype=float64]  TEMP: -z face openness per inner cell, (nx,ny,nz). |
+| `get_oz_proj` | get_oz_proj(self) -> numpy.ndarray[dtype=float64]  -z face openness the projection conserves (see get_ox_proj). |
 | `get_p` | get_p(self) -> numpy.ndarray[dtype=float64]  Return the physical pressure as a Fortran-order (nx,ny,nz) float64 array (index [x,y,z]). |
-| `get_resolution` | get_resolution(self) -> list[int]  Return the grid resolution [nx, ny, nz]. |
+| `get_resolution` | get_resolution(self) -> list[int]  Return the LOCAL grid resolution [nx, ny, nz] (this rank's block under MPI). |
 | `get_spacing` | get_spacing(self) -> list[float]  Return the grid spacing [dx, dy, dz] (always unit on this grid). |
 | `get_u` | get_u(self) -> numpy.ndarray[dtype=float64]  Return the x-velocity component as a Fortran-order (nx,ny,nz) float64 array (index [x,y,z]). |
 | `get_uf` | get_uf(self) -> numpy.ndarray[dtype=float64]  Return the divergence-free FACE x-velocity (collocated: projected MAC field; staggered: == get_u). |
@@ -79,55 +142,60 @@ top-level `__init__.py`.
 | `get_vf` | get_vf(self) -> numpy.ndarray[dtype=float64]  Return the divergence-free FACE y-velocity (collocated: projected MAC field; staggered: == get_v). |
 | `get_w` | get_w(self) -> numpy.ndarray[dtype=float64]  Return the z-velocity component as a Fortran-order (nx,ny,nz) float64 array (index [x,y,z]). |
 | `get_wf` | get_wf(self) -> numpy.ndarray[dtype=float64]  Return the divergence-free FACE z-velocity (collocated: projected MAC field; staggered: == get_w). |
+| `ghost_width` | ghost_width(self) -> int  Ghost-layer width g of the velocity block (field_view returns an (n+2g) buffer). |
+| `global_resolution` | global_resolution(self) -> list[int]  Return the GLOBAL grid resolution [gnx, gny, gnz] (== local single-rank). For the CFD-DEM co-decomposition weight field. |
+| `has_cutcell_pressure` | has_cutcell_pressure(self) -> bool  True once the cut-cell pressure operator exists (set_solid or set_pressure_geometry was called). The porous continuity requires it; the coupling driver auto-sets an all-fluid geometry when absent. |
+| `has_field` | has_field(self, name: str) -> bool  Whether a field of this name is registered. |
+| `has_scalar` | has_scalar(self, name: str) -> bool  Whether a transported scalar of this name is registered. |
 | `last_outer_iterations` | last_outer_iterations(self) -> int  Return the outer-iteration count from the last step(). |
 | `last_pressure_iterations` | last_pressure_iterations(self) -> int  Return the pressure-solver iteration count from the last step(). |
-| `max_open_divergence` | max_open_divergence(self) -> float  Return the max cut-cell flux divergence (the incompressibility residual; ~0 when converged). |
+| `max_open_divergence` | max_open_divergence(self) -> float  Return the max cut-cell velocity-flux divergence max|div(open*u)|. With porous continuity this is NOT ~0 -- it equals -d(eps)/dt (the bed expanding). Use max_porous_residual() for the continuity residual. |
+| `max_porous_residual` | max_porous_residual(self) -> float  Residual of the volume-averaged continuity max|div(open*eps*u) + d(eps)/dt| -- the quantity the porous projection drives to zero. 0 unless set_porous_continuity(True). |
 | `rank` | rank(self) -> int  MPI rank (always 0 in the single-rank Python module; the multi-rank path is the tests/kokkos_mpi suite). |
 | `set_advection` | set_advection(self, on: bool) -> None  Enable/disable explicit high-order momentum advection (default scheme SOU). Off ⇒ Stokes. |
 | `set_advection_scheme` | set_advection_scheme(self, scheme: int) -> None  High-order advection scheme: 0 = second-order upwind (SOU, default), 1 = Koren TVD. |
+| `set_backflow_stabilization` | set_backflow_stabilization(self, beta: float) -> None  Outflow backflow-stabilization coefficient (Bazilevs 2009 / Esmaily-Moghadam 2011): beta in [0,1] scales the dissipative outflow term that prevents backflow divergence when flow reverses at the outlet (e.g. a separated wake / BFS recirculation). Default 0.2; 0 = off. Inert where the outlet is purely outgoing. |
 | `set_body_force` | set_body_force(self, fx: float, fy: float, fz: float) -> None  Set the body force per unit volume (fx, fy, fz) — e.g. a mean pressure gradient. |
+| `set_deferred_correction` | set_deferred_correction(self, on: bool) -> None  Deferred-correction advection: True (default) = 2nd order (implicit FOU + explicit high-order correction, the high-order scheme being SOU by default or Koren TVD via set_advection_scheme); False = pure implicit FOU (1st-order upwind, more dissipative but unconditionally stable at sharp shear layers). |
+| `set_density_mode` | set_density_mode(self, mode: str = 'variable') -> None  Enable variable density (staggered solver only): binds the 'rho' field (get/set_field('rho'), created seeded with set_rho's value if absent) into the momentum time term, the advection weight, the per-cell body force (face-interpolated), and the pressure projection (face coefficient openness*rho0/rho_f with the matching 1/rho_f velocity correction; rho0 = set_rho's value, so a uniform field reduces exactly to the constant solver). A closure targeting 'rho' (e.g. a linear mixture of a transported phase fraction) enables this automatically. For gravity, register a closure force_z = linear(rho, params=[0, -g]). |
 | `set_domain_bc` | set_domain_bc(self, face: int, type: int, vx: float = 0.0, vy: float = 0.0, vz: float = 0.0) -> None  Set a per-face domain BC (face 0..5 = -x,+x,-y,+y,-z,+z; type 0 periodic/1 wall/2 inflow/3 outflow). |
 | `set_domain_bc_profile` | set_domain_bc_profile(self, face: int, profile: ndarray[dtype=float64, order='C']) -> None  Prescribe a per-position inlet velocity profile (Nb,Nc,3) over a face (sets it to inflow). |
 | `set_dt` | set_dt(self, dt: float) -> None  Set the time step dt; the momentum solve is scaled by 1/dt (well-conditioned at large dt). |
+| `set_exact_crossings` | set_exact_crossings(self, t: collections.abc.Sequence[float]) -> None  Analytic-SDF capability: exact wall-crossing fractions overriding the linear-interpolated theta in the momentum cut-cell overlay AND the ghost-projection closures. Flat array of 9*nx*ny*nz values, blocks [(c*3+k)]: component c's staggered point at inner cell i toward its +k neighbour; NaN = no crossing. Call BEFORE set_solid; empty list clears. Single-rank, staggered momentum placement. |
+| `set_face_interp` | set_face_interp(self, mode: int) -> None  Collocated cut-cell projection treatment: 0 = plain averaging + central-difference grad(P) (default), 1 = wall-aware cell->face map only (ablation), 2 = wall-aware map + its transpose (face-centre; ablation), 3 = mode 2 at the open-face-centroid (FV constraint, FD momentum), 4 = fully-FV (mode-3 projection + second-order wall viscous-flux deferred correction on the momentum), 5/6/7 = Basilisk-embed ablations, 9 = CUTCELL-GHOST HYBRID: mode-0 aperture projection + the directional gpCenterGrad -grad(P)/cell correction (recommended for tight-throat porous media: throat-throttling apertures, symmetric MG-PCG, ~7-20x below mode-0 drag error; not clean 2nd order), 10 = dead ablation (diverges), do not use. No effect on the staggered solver. |
+| `set_field` | set_field(self, name: str, array: ndarray[dtype=float64, order='F']) -> None  Write a Fortran-order (nx,ny,nz) float64 array into a registered field's inner region (ghosts refilled on the next exchange_field/step). |
+| `set_fv_relax` | set_fv_relax(self, w: float) -> None  Mode-4 FV wall-flux defect-correction under-relaxation (1=full; <1 damps the stiff explicit-lagged wall term). Steady state is independent of w. |
+| `set_ghost_projection` | set_ghost_projection(self, on: bool, matrix_order: int = 2, rhs_order: int = 2) -> None  EXPERIMENTAL directional ghost-cell projection (second staggered IBM): point-based FD divergence with wall-anchored directional closures instead of the openness-weighted cut-cell projection; solved by MG-preconditioned BiCGStab. Call BEFORE set_solid. Closure orders (1=linear, 2=quadratic): (matrix_order, rhs_order) = (2,2) full quadratic 13-point matrix; (1,1) linear 7-point; (1,2) mixed/deferred — 2nd-order steady constraint on a 7-point matrix. Collocated: the same closures/matrix on the face-averaged field, plus a directional (one-sided 2nd-order) cell gradient for the -grad(P) predictor and cell correction; requires face_interp 0. v1: single-rank, periodic + IBM, stationary walls; incompatible with porous/variable-rho/domain-BC/Chebyshev. |
 | `set_implicit_advection` | set_implicit_advection(self, on: bool) -> None  Use implicit-FOU advection with deferred-correction TVD. |
 | `set_incremental_pressure` | set_incremental_pressure(self, on: bool) -> None  Toggle the rotational incremental-pressure projection. |
 | `set_mu` | set_mu(self, mu: float) -> None  Set dynamic viscosity mu (physical units). |
+| `set_openness_override` | set_openness_override(self, ox: collections.abc.Sequence[float], oy: collections.abc.Sequence[float], oz: collections.abc.Sequence[float]) -> None  Analytic-SDF capability: exact face-aperture (openness) fields for the cut-cell projection, overriding the sampled-SDF openness. Inner nx*ny*nz arrays, x-fastest; ox[i] = fluid fraction of the -x face of cell i. Call BEFORE set_solid; empty ox clears. Single-rank. |
 | `set_outer_iterations` | set_outer_iterations(self, n: int) -> None  Set the number of Picard/outer iterations per step. |
 | `set_outer_tolerance` | set_outer_tolerance(self, tol: float) -> None  Set the outer (Picard) convergence tolerance. |
+| `set_porous_conservative` | set_porous_conservative(self, on: bool) -> None  eps-conservative porous momentum + projection pair (default True): time term (eps_f rho/dt) u, eps rho-weighted advective form, projection coefficients open*(eps rho idt)/(eps rho idt+beta) with matching correction. False = the legacy plain-u pair (A/B only; it lets the projection drag gas with the moving porosity at zero inertia cost — a spurious late-time energy source in clustering flows). |
+| `set_porous_continuity` | set_porous_continuity(self, on: bool = True) -> None  Enable the volume-averaged (porous) continuity for unresolved CFD-DEM (staggered only): the projection enforces d(eps)/dt + div(eps u) = 0 instead of div(u)=0, so the fluid velocity is NOT solenoidal where the void fraction changes (bubbling/expansion). Binds the 'eps' field (void fraction from the particle deposition, created seeded to 1 if absent; the coupling writes it each step BEFORE step()). eps=1 everywhere reduces exactly to div(u)=0. Pair with max_porous_residual() for the meaningful convergence check. |
+| `set_porous_deps_dt` | set_porous_deps_dt(self, on: bool) -> None  Include (default True) or drop the d(eps)/dt source in the porous projection RHS. Drop it to enforce div(eps u)=0 when the per-cell eps deposit's time-derivative is too jagged and destabilizes the eps-weighted pressure solve. |
 | `set_pressure_chebyshev` | set_pressure_chebyshev(self, on: bool, max_iter: int = 120, rtol: float = 1e-09) -> None  Use the communication-light Chebyshev pressure accelerator (exclusive with PCG). |
-| `set_pressure_geometry` | set_pressure_geometry(self, sdf: ndarray[dtype=float64, order='F']) -> None  Set an all-fluid SDF for the cut-cell pressure operator without an immersed solid. |
+| `set_pressure_geometry` | set_pressure_geometry(self, sdf: ndarray[dtype=float64, order='F']) -> None  Set an all-fluid SDF for the cut-cell pressure operator without an immersed solid (the channel/BFS domain-BC path). For a no-slip immersed BODY in an inflow/outflow domain, call set_solid(sdf, cutcell_pressure=True) instead -- do NOT also call this (a second geometry setter overwrites the SDF and wipes the solid). |
+| `set_pressure_graph_amg` | set_pressure_graph_amg(self, on: bool) -> None  Solve the pressure MG's coarsest level with an agglomerated mesh-agnostic algebraic multigrid (core GraphAMG), decomposition-agnostic: with levels=1 this gives a mesh-independent pressure solve that works under a WEIGHTED ORB (where the geometric coarse levels can't cleanly coarsen). Applied at the next set_solid. |
 | `set_pressure_multigrid` | set_pressure_multigrid(self, on: bool, levels: int = 4) -> None  Set the pressure multigrid depth (levels=1 => pure RB-GS, no coarse grid). |
 | `set_pressure_pcg` | set_pressure_pcg(self, on: bool, max_iter: int = 200, rtol: float = 1e-08) -> None  Use the MG-PCG pressure accelerator (single-GPU default; exclusive with Chebyshev). |
 | `set_pressure_solver_params` | set_pressure_solver_params(self, iters: int) -> None  Set the pressure smoother iteration count. |
+| `set_pressure_underrelax` | set_pressure_underrelax(self, omega: float) -> None  Pressure under-relaxation factor omega_p in (0,1] for the incremental accumulation (MFIX §10.1); 1.0 = off (default). <1 damps the incremental predictor overshoot on stiff porous+drag. |
 | `set_pressure_warmstart` | set_pressure_warmstart(self, on: bool) -> None  Seed each pressure solve from the previous step's phi (default off). |
+| `set_property_mode` | set_property_mode(self, mode: str = 'variable', harmonic: bool = False) -> None  Enable variable-coefficient momentum (variable viscosity): mode 'variable' binds the 'mu' field (get/set_field('mu')) into the diffusion operator; 'constant' reverts. harmonic = harmonic face-viscosity mean (continuous shear stress across a jump) vs arithmetic. A closure targeting 'mu' enables this automatically. The incremental-rotational pressure scheme (large-dt / steady-Stokes) stays active — see set_variable_rotational. |
+| `set_property_model` | set_property_model(self, target: str, kind: str, field: str, params: collections.abc.Sequence[float] = [], field2: str = '') -> None  Register a device closure writing a property/body-force field from input field(s). target: a registered field (a property 'mu'/'rho'/… or a body-force component 'force_x'/'force_y'/'force_z'). kind: 'linear' (params [p0,p1,p2]: p0+p1*field+p2*field2), 'boussinesq' (params [rho0,g,beta,T0]: rho0*g*beta*(field-T0) buoyancy), 'arrhenius' (params [mu_ref,B,Tref]: mu_ref*exp(B*(1/field-1/Tref))). Applied at the top of step(). |
+| `set_property_table` | set_property_table(self, target: str, field: str, x: collections.abc.Sequence[float], y: collections.abc.Sequence[float]) -> None  Register a tabulated property: target = piecewise-linear interpolation of (x, y) at the input field value (x ascending, clamped at the ends). |
 | `set_rho` | set_rho(self, rho: float) -> None  Set fluid density rho (physical units). Set before geometry/first step. |
-| `set_solid` | set_solid(self, sdf: ndarray[dtype=float64, order='F'], cutcell_pressure: bool = False, pressure_coarse: str = 'const') -> None  Set the solid SDF as a Fortran-order (nx,ny,nz) float64 array (negative inside the solid, positive in fluid); optionally enable the cut-cell pressure operator. |
+| `set_scalar_bc` | set_scalar_bc(self, name: str, face: int, type: int, value: float = 0.0) -> None  Scalar boundary condition on a domain face (0..5 = -x,+x,-y,+y,-z,+z): type 0 periodic, 1 Neumann zero-flux (adiabatic), 2 Dirichlet value. Single-rank. |
+| `set_solid` | set_solid(self, sdf: ndarray[dtype=float64, order='F'], cutcell_pressure: bool = False, pressure_coarse: str = 'const') -> None  Set the solid SDF as a Fortran-order (nx,ny,nz) float64 array (negative inside the solid, positive in fluid). cutcell_pressure=True enables the open-face-weighted cut-cell pressure operator (proper no-slip); it composes with domain BCs, so this is the single call for a no-slip immersed body in an inflow/outflow domain. |
 | `set_state` | set_state(self, u: ndarray[dtype=float64, order='F'], v: ndarray[dtype=float64, order='F'], w: ndarray[dtype=float64, order='F']) -> None  Upload an initial velocity field (u,v,w each a Fortran-order (nx,ny,nz) float64 array). |
+| `set_variable_rotational` | set_variable_rotational(self, mode: str = 'min', chi: float = 1.0) -> None  Rotational-pressure term under variable viscosity (the constant-mu Timmermans term -mu*div(u*) is only valid for homogeneous viscosity — Deteix & Yakoubi 2018). 'min' (default): constant coefficient chi*mu_min — provably stable at any contrast, exact fallback to the constant-mu scheme for uniform mu. 'full': pointwise chi*mu(i) — better pressure consistency at MILD contrast only. 'off': plain incremental (no rotational term). All modes keep the incremental predictor (large-dt / steady-Stokes capability). |
 | `set_velocity_multigrid` | set_velocity_multigrid(self, on: bool, levels: int = 4, vcycles: int = 8) -> None  Enable velocity (momentum) multigrid for the implicit diffusion solve. |
 | `set_velocity_solver_params` | set_velocity_solver_params(self, iters: int) -> None  Set the velocity (diffusion) smoother iteration count. |
 | `set_velocity_streams` | set_velocity_streams(self, on: bool) -> None  Toggle overlapped per-component velocity solves. |
 | `size` | size(self) -> int  MPI size (1 in the single-rank Python module). |
 | `step` | step(self) -> None  Advance the solver one time step (semi-implicit: diffusion + projection). |
-
-## `peclet.flow.pnm`
-
-peclet.flow.pnm — pore-network extraction from SDF pore geometry.
-
-`SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu` — the "pnm_from_sdf"
-feature, distinct from the CFD solve in `peclet.flow`.
-
-### `SDFReader`
-
-| Method / property | Description |
-|---|---|
-| `read_vti` | read_vti(arg: str, /) -> tuple  Reads VTI; returns (sdf_3d[nz,ny,nx], origin_zyx, spacing_zyx) |
-
-### `Pore`
-
-| Method / property | Description |
-|---|---|
-| `radius` | (self) -> float |
-| `x` | (self) -> float |
-| `y` | (self) -> float |
-| `z` | (self) -> float |
+| `sync_porous_prev` | sync_porous_prev(self) -> None  Reseed eps^n = eps^{n+1} (d(eps)/dt=0 this step) — call once after the first void-fraction deposition so step 0 has no spurious source. |
+| `update_properties` | update_properties(self) -> None  Apply all registered property/force closures now (also done at the top of step()). |
 

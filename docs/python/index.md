@@ -5,7 +5,8 @@ from PyPI (`pip install peclet` for the CPU family, or an individual `pip instal
 
 | Package | Import | What you get |
 |---|---|---|
-| [**peclet.flow**](flow.md) | `import peclet.flow` | `Solver` / `SolverColocated` — the Eulerian Navier–Stokes solver; `peclet.flow.pnm` pore extraction |
+| [**peclet.flow**](flow.md) | `import peclet.flow` | `Solver` / `SolverColocated` — the Eulerian Navier–Stokes solver |
+| [**peclet.pnm**](pnm.md) | `import peclet.pnm` | Pore-network extraction + per-throat flow rates / pore pressures from a flow DNS |
 | [**peclet.dem**](dem.md) | `import peclet.dem` | `Simulation` — Lagrangian DEM/XPBD packing |
 | [**peclet.voro**](voro.md) | `import peclet.voro` | `Tessellation`, `Simulation` — moving-cell Voronoi + dynamics |
 | [**peclet.core**](core.md) | `from peclet.core import mpi, amr` | particle halo (MPI) + Kokkos AMR octree |

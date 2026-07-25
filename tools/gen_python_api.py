@@ -9,8 +9,13 @@ PAGES = [
     ("flow.md", "peclet.flow — Eulerian Navier–Stokes solver",
      "The incompressible cut-cell IBM Navier–Stokes solver on a staggered MAC grid. "
      "`execution_space` reports the compiled-in Kokkos backend.",
-     [("peclet.flow", ["Solver", "SolverColocated"]),
-      ("peclet.flow.pnm", ["SDFReader", "Pore"])]),
+     [("peclet.flow", ["Solver", "SolverColocated"])]),
+    ("pnm.md", "peclet.pnm — pore-network extraction",
+     "Pore-network extraction from SDF geometry (pores, watershed segmentation, throat topology) "
+     "and pore-network FLOW data (per-throat flow rates + pore pressures) from a peclet.flow DNS. "
+     "Split out of peclet-flow (was `peclet.flow.pnm`).",
+     [("peclet.pnm", ["SDFReader", "Pore"]),
+      ("peclet.pnm", None)]),
     ("dem.md", "peclet.dem — Lagrangian DEM/XPBD packing",
      "XPBD discrete-element packing with SDF point-shell collision. The distributed (MPI) methods "
      "are present only in an MPI-enabled build.",

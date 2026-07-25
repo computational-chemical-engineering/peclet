@@ -28,6 +28,10 @@ dependencies = [
   "peclet-flow==0.3.0",
   "peclet-dem==0.3.2",
   "peclet-voro==0.3.3",
+  # NOTE next release cycle: the published peclet-flow 0.3.0 wheel still CONTAINS peclet.flow.pnm;
+  # pore-network extraction was split into its own repo (peclet-pnm, import peclet.pnm) on
+  # 2026-07-24. When peclet-flow is next released (without pnm), add "peclet-pnm==0.1.0" here
+  # (after registering its PyPI trusted publisher + tagging v0.1.0).
 ]
 
 [project.optional-dependencies]
