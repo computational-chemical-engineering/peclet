@@ -47,6 +47,7 @@ The design contract lives in `docs/`:
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — SDF sign, x-fastest indexing, types, precision policy, periodic/Lees–Edwards, Python array shapes.
 - [docs/STYLE.md](docs/STYLE.md) — C++20 host & Kokkos device (morton pins C++17), clang-format/tidy (from voronoi), namespaces, CMake/CI.
 - [docs/INTERFACES.md](docs/INTERFACES.md) — shared C++20 concepts: `Domain`, `Decomposition`, `Field`, `HaloExchange`, `SdfGeometry`, `ImmersedBoundary`, `Stepper`.
+- [docs/DECOMPOSITION_AND_MULTIGRID.md](docs/DECOMPOSITION_AND_MULTIGRID.md) — how the MPI decomposition and the pressure multigrid constrain each other: the per-axis coarsening rule, why grid dimensions' factors of two decide solver cost, aligned vs coarse-first partitions, the measured evidence, and the open problems. **Read before touching decomposition, load balancing or MG depth.**
 - [docs/ROADMAP.md](docs/ROADMAP.md) — phased plan; the decomposition, async halo engine, and dynamic load balancing (Phase 7) are done — remaining work is at-scale multi-GPU tuning.
 
 ## The projects
