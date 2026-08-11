@@ -128,7 +128,47 @@ decouples the halves at the centreline; the driver aborts). That leaves the ORB 
 a 12H×2H×4H box is exhausted at **16 ranks** — at 32 the blocks are cube-like and the last bisection
 takes `y`. Reaching 32 needs a longer box (16H), i.e. a different physics problem.
 
----
+### 2.7 The coarse level decides whether a V-cycle is domain-independent
+
+A V-cycle converges at a rate independent of the domain only if its **coarsest level is effectively
+solved**. A geometric hierarchy cannot always get there — §1.1 and §1.2 both put floors on the depth —
+and under MPI the floor is roughly **one cell per rank**, so at fixed cells/rank the coarsest *global*
+grid grows with the rank count no matter how many levels are requested.
+
+Single GPU, 2048 × 64 × 64 channel, everything else held:
+
+| levels | smoothed bottom | agglomerated (exact) bottom |
+|---|---|---|
+| 4 | 13.5 iters, 167 ms | **4.0 iters, 112 ms** |
+| 6 | 6.0 iters, 91 ms | **4.0 iters, 69.5 ms** |
+| 8 | 4.4 iters, 75.5 ms | **4.0 iters, 72.2 ms** |
+| 12 (full depth) | 4.4 iters, 77.2 ms | 4.4 iters, 77.1 ms |
+
+Two things follow. **An exact agglomerated bottom is depth-independent** — 4.0 iterations at 4 levels
+and at 8. And it is *faster than full geometric depth*, because the extra levels cost more than the
+coarse solve they replace; the best configuration is a shallow hierarchy over an exact bottom.
+
+Independently: with enough depth the multigrid is **domain-length-independent**. Lengthening a
+256 × 64 × 64 box by 8× at full depth holds 4.0 iterations, while at 4 levels it climbs 4.0 → 13.5.
+So iteration growth in a weak-scaling curve is a coarse-level artefact, not physics.
+
+**The criterion is the coarsest grid's largest EXTENT, not its cell count.** What smoothing cannot fix
+is a mode spanning many cells along an axis (Gauss–Seidel needs O(L²) sweeps for a wavelength of L
+cells). A 64 × 2 × 2 bottom is only 256 cells and still costs 6.0 iterations against 4.0.
+
+`set_pressure_bottom("auto")` agglomerates whenever the coarsest global grid exceeds
+`PECLET_FLOW_AGGLOM_EXTENT` (4) cells on any axis; `"smoother"` is the legacy cheap bottom,
+`"agglomerated"` forces it. The agglomerated bottom is decomposition-independent by construction (the
+gathered operator is keyed by global cell id) and measures as such: np=6 against np=1 agrees to
+**4.5e-16**.
+
+**`"smoother"` is still the default, and that is a deliberate hold.** On the cut-cell sphere-packing
+regression (`random_spheres`, N=48) switching to the agglomerated bottom makes the OUTER iteration
+count *worse* — 442 → 622 total, +41 % — at bit-identical accuracy. An exact coarse solve cannot
+legitimately slow the outer iteration down, so the assembled coarse operator is evidently not
+consistent with the V-cycle's on the IBM path (prime suspects: the identity rows given to solid
+cells, or the null-space/mean handling when cut cells are present). Until that is understood, `auto`
+is opt-in. It is unambiguously right on the all-fluid domain-BC path, which is what the channel uses.
 
 ## 3. Design rules
 
@@ -157,29 +197,49 @@ Roughly in order of expected value.
    once a sub-box drops below `2*align` (`initImpl`), which silently costs a level — visible as np=7,
    12, 16, 24 dropping from 6 levels to 5 in §2.3. Snapping to the largest power of two that still
    fits would keep the depth.
-3. **Agglomeration at coarse levels (telescoping).** The block-local hierarchy cannot get coarser than
+3. **Why the agglomerated bottom hurts the IBM path** (§2.7). This blocks making `auto` the default,
+   and the default is what most runs get. Reproduce with
+   `tests/regression/sdflow_regression.py` (random_spheres N=48) against
+   `PECLET_FLOW_AGGLOM_EXTENT=1000000`. Look first at the identity rows `buildAmg` gives solid cells
+   and at `pcgAmg`'s mean projection when cut cells make the operator's null space differ from the
+   pure all-Neumann case.
+4. **A direct solve at the bottom.** The agglomerated bottom already converges (AMG-preconditioned CG
+   to 1e-10), so this buys cost rather than iterations: it replaces ~20 CG iterations of serial host
+   code per V-cycle with two triangular solves. For a few-hundred-to-few-thousand-DOF coarse grid a
+   DENSE Cholesky is the pragmatic choice — ~100 lines, no new dependency, factor once per operator
+   build (the existing `amg_.reset()` on operator change is the hook). Sparse direct (SuiteSparse /
+   MUMPS) is not worth a dependency at this size. Note the all-Neumann operator is singular: pin one
+   DOF or factor a regularised operator, then project the mean out (`pcgAmg`'s `meanZero`).
+   Beware the porous / variable-ρ paths, which rebuild coefficients every step and so would
+   refactorise every step.
+5. **Cost of the redundant gather.** Today every rank receives the whole coarse problem
+   (`Allgatherv`) and solves it with serial HOST code — a device→host→device round trip inside a GPU
+   solve, once per V-cycle. Fine at an 800-cell bottom; measure at 32 GPUs before assuming. If it
+   bites: agglomerate onto a subset of ranks, keep the factorisation on device, or agglomerate one
+   level earlier (§2.7 shows a shallower hierarchy over an exact bottom is *faster*).
+6. **Agglomeration for the other multigrids.** The block-local hierarchy cannot get coarser than
    one cell per rank, so under weak scaling the coarsest global grid grows with the rank count. The
    agglomerated `GraphAMG` bottom (`set_pressure_graph_amg`) addresses this algebraically; a geometric
    redistribute-onto-fewer-ranks variant does not exist. This is the main structural lever at scale,
    and the TGV ablation that rejected GraphAMG was run where iterations were already 4 — i.e. where
    there was nothing to fix. Re-test it where the hierarchy is actually starved.
-4. **Padding to friendly sizes with masked cells.** `flow` already carries openness/masking, so
+7. **Padding to friendly sizes with masked cells.** `flow` already carries openness/masking, so
    503 → 512 with 9 solid layers costs 1.8 % more cells and buys 8 levels of coarsening. Probably the
    cheapest large win available, and it needs no new numerics — but it does need the padding to be
    invisible to diagnostics and to the physical box definition.
-5. **Coarse-first vs the weighted ORB.** Weighted decomposition (load balancing, CFD-DEM
+8. **Coarse-first vs the weighted ORB.** Weighted decomposition (load balancing, CFD-DEM
    co-decomposition) and nested coarse levels are currently incompatible beyond `levels=1`: a weighted
    level-0 has no reason to be alignable. Coarse-first offers a way out — weight the *coarse* grid and
    refine upward — which would make dynamic load balancing and multigrid coexist. Not attempted.
-6. **Wall-normal decomposition.** Would lift the ceiling in §2.6. Needs the pressure solve and the
+9. **Wall-normal decomposition.** Would lift the ceiling in §2.6. Needs the pressure solve and the
    velocity BC handling to tolerate an internal boundary in the wall-normal direction.
-7. **Line relaxation for anisotropic levels.** Once only one axis is still coarsening, the coarse
+10. **Line relaxation for anisotropic levels.** Once only one axis is still coarsening, the coarse
    operator is strongly anisotropic and a point Red-Black Gauss-Seidel smoother is a poor smoother for
    it. Line relaxation in the strong direction is the textbook remedy, and would make deep
    semi-coarsened hierarchies actually pay off.
-8. **Odd-grid coarsening.** Allowing `n → (n+1)/2` with matched transfer operators removes the
+11. **Odd-grid coarsening.** Allowing `n → (n+1)/2` with matched transfer operators removes the
    divisibility constraint at the root. Larger change; padding (4) buys most of the benefit first.
-9. **Should coarse-first become the default?** It is opt-in today. It changes the partition for every
+12. **Should coarse-first become the default?** It is opt-in today. It changes the partition for every
    existing MPI run, so this needs a bit-exactness and performance sweep across the suite first.
 
 ---
