@@ -198,11 +198,32 @@ Roughly in order of expected value.
    12, 16, 24 dropping from 6 levels to 5 in §2.3. Snapping to the largest power of two that still
    fits would keep the depth.
 3. **Why the agglomerated bottom hurts the IBM path** (§2.7). This blocks making `auto` the default,
-   and the default is what most runs get. Reproduce with
-   `tests/regression/sdflow_regression.py` (random_spheres N=48) against
-   `PECLET_FLOW_AGGLOM_EXTENT=1000000`. Look first at the identity rows `buildAmg` gives solid cells
-   and at `pcgAmg`'s mean projection when cut cells make the operator's null space differ from the
-   pure all-Neumann case.
+   and the default is what most runs get. Reproduce with `tests/regression/sdflow_regression.py`
+   (random_spheres, N=48) against `PECLET_FLOW_AGGLOM_EXTENT=1000000`: 442 → 622 total pressure
+   iterations, accuracy bit-identical, step count unchanged.
+
+   **The shape of the anomaly is the clue.** Making a coarse solve *exact* cannot increase a PCG
+   iteration count if the preconditioner stays symmetric, constant and consistent with the fine
+   operator. So one of those three properties is being broken, and the all-fluid path happens not to
+   expose it. Three concrete hypotheses, in the order I would test them — all unverified:
+
+   - **The null-space projection is taken over the wrong set.** `pcgAmg`'s `meanZero` averages over
+     all `amgGlobalN_` cells. With cut cells, solid rows are identity rows and are *not* part of the
+     singular block — the operator's null space is the constant over FLUID cells only. Projecting
+     over fluid+solid then subtracts the wrong constant and contaminates the fluid solution. This
+     fits the symptom precisely: harmless when every cell is fluid, wrong as soon as solids appear.
+   - **Solid rows may receive a non-zero restricted rhs.** `buildAmg` gives solid cells an identity
+     row so `D^-1` is finite, on the assumption their rhs is 0. If restriction deposits anything
+     there, an identity row returns `x = rhs` at solid cells — a spurious correction prolonged back
+     onto the fine grid. Check what the restriction actually puts in solid cells at the coarsest
+     level.
+   - **The inner solve makes the preconditioner NONLINEAR.** The bottom is an AMG-preconditioned CG
+     run to a tolerance, so the number of inner iterations depends on the right-hand side, and the
+     V-cycle is therefore not a fixed linear operator. Outer PCG assumes a constant preconditioner;
+     violating it degrades convergence and can make it worse than a cheaper but *fixed* bottom. If
+     this is the cause, **open problem 4 is the same fix** — a direct factorisation is linear and
+     constant by construction. A cheap discriminator: fix the inner iteration count instead of using
+     a tolerance and see whether the anomaly disappears.
 4. **A direct solve at the bottom.** The agglomerated bottom already converges (AMG-preconditioned CG
    to 1e-10), so this buys cost rather than iterations: it replaces ~20 CG iterations of serial host
    code per V-cycle with two triangular solves. For a few-hundred-to-few-thousand-DOF coarse grid a
