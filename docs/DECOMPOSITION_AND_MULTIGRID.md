@@ -162,13 +162,38 @@ cells). A 64 × 2 × 2 bottom is only 256 cells and still costs 6.0 iterations a
 gathered operator is keyed by global cell id) and measures as such: np=6 against np=1 agrees to
 **4.5e-16**.
 
-**`"smoother"` is still the default, and that is a deliberate hold.** On the cut-cell sphere-packing
-regression (`random_spheres`, N=48) switching to the agglomerated bottom makes the OUTER iteration
-count *worse* — 442 → 622 total, +41 % — at bit-identical accuracy. An exact coarse solve cannot
-legitimately slow the outer iteration down, so the assembled coarse operator is evidently not
-consistent with the V-cycle's on the IBM path (prime suspects: the identity rows given to solid
-cells, or the null-space/mean handling when cut cells are present). Until that is understood, `auto`
-is opt-in. It is unambiguously right on the all-fluid domain-BC path, which is what the channel uses.
+**The IBM anomaly is RESOLVED (2026-08-13).** On the cut-cell sphere-packing regression
+(`random_spheres`, N=48) the agglomerated bottom used to make the OUTER iteration count *worse* —
+442 → 622 total, +41 % — at bit-identical accuracy. Instrumentation (`PECLET_FLOW_AGMG_DEBUG`)
+showed every inner bottom solve hitting its iteration cap with residuals as bad as it started; the
+per-step outer counts were erratic (median unchanged, intermittent 3–10× spikes), i.e. an
+intermittently *failing* preconditioner, not a uniformly worse one. Three stacked causes, in order
+of severity, all in `pcgAmg`/`buildAmg`:
+
+1. **Wrong null-space projector** (the dominant one). The bottom operator's null space is the
+   constant over the FLUID cells of each connected component — solid cells are identity rows,
+   non-singular. `meanZero` projected out the ALL-cell mean instead: that leaves part of the null
+   component alive and writes a spurious value onto every solid coordinate; the next matvec
+   (identity rows) feeds it back into the residual, the effective preconditioner turns nonsymmetric,
+   and the inner CG stalls at its cap. One solid cell in a 216-cell bottom was enough. The all-fluid
+   channel never saw it because there the two projectors coincide. Fixed: per-fluid-component mean
+   removal (a union-find over the assembled operator graph labels the components — a coarse level
+   can pinch fluid into pockets, each with its own constant).
+2. **Float row-sum defect.** The level coefficients are stored in float (`MReal`), so the assembled
+   double CSR had fluid row sums of ~5e-8 (relative) instead of 0 — the true near-null vector was
+   not the constant the projector (and the AMG's prolongator) assume, flooring the inner CG at
+   ~1e-5. Fixed: the singular path resums each fluid diagonal in double from its off-diagonals
+   (exactly the operator the discretization means), restoring `A·1 = 0` per row.
+3. **Overtight inner tolerance.** 1e-10 sits at/below the double-precision floor of the projected
+   solve for some right-hand sides, costing the full iteration cap for nothing; the outer count is
+   unchanged from a far looser bottom (measured: parity even at 1e-5). Now 1e-8, cap 100.
+
+After the fix: `random_spheres` 441 vs 442 (parity, flat per-step trace), inner solves converge in
+~7 median iterations, wall-clock equal to the smoothed bottom; `zh_sphere` and `hollow_rings` at
+parity; the long-box win-configuration (512×16×16, one sphere, 4 levels — bottom 64×2×2) runs
+25 iters/step smoothed vs a flat **7.0** agglomerated. The full single-GPU regression is unchanged
+to +0.00 % on the default path. `"smoother"` remains the default until a suite-wide sweep promotes
+`auto` (see open problem 3).
 
 ## 3. Design rules
 
@@ -197,33 +222,17 @@ Roughly in order of expected value.
    once a sub-box drops below `2*align` (`initImpl`), which silently costs a level — visible as np=7,
    12, 16, 24 dropping from 6 levels to 5 in §2.3. Snapping to the largest power of two that still
    fits would keep the depth.
-3. **Why the agglomerated bottom hurts the IBM path** (§2.7). This blocks making `auto` the default,
-   and the default is what most runs get. Reproduce with `tests/regression/sdflow_regression.py`
-   (random_spheres, N=48) against `PECLET_FLOW_AGGLOM_EXTENT=1000000`: 442 → 622 total pressure
-   iterations, accuracy bit-identical, step count unchanged.
-
-   **The shape of the anomaly is the clue.** Making a coarse solve *exact* cannot increase a PCG
-   iteration count if the preconditioner stays symmetric, constant and consistent with the fine
-   operator. So one of those three properties is being broken, and the all-fluid path happens not to
-   expose it. Three concrete hypotheses, in the order I would test them — all unverified:
-
-   - **The null-space projection is taken over the wrong set.** `pcgAmg`'s `meanZero` averages over
-     all `amgGlobalN_` cells. With cut cells, solid rows are identity rows and are *not* part of the
-     singular block — the operator's null space is the constant over FLUID cells only. Projecting
-     over fluid+solid then subtracts the wrong constant and contaminates the fluid solution. This
-     fits the symptom precisely: harmless when every cell is fluid, wrong as soon as solids appear.
-   - **Solid rows may receive a non-zero restricted rhs.** `buildAmg` gives solid cells an identity
-     row so `D^-1` is finite, on the assumption their rhs is 0. If restriction deposits anything
-     there, an identity row returns `x = rhs` at solid cells — a spurious correction prolonged back
-     onto the fine grid. Check what the restriction actually puts in solid cells at the coarsest
-     level.
-   - **The inner solve makes the preconditioner NONLINEAR.** The bottom is an AMG-preconditioned CG
-     run to a tolerance, so the number of inner iterations depends on the right-hand side, and the
-     V-cycle is therefore not a fixed linear operator. Outer PCG assumes a constant preconditioner;
-     violating it degrades convergence and can make it worse than a cheaper but *fixed* bottom. If
-     this is the cause, **open problem 4 is the same fix** — a direct factorisation is linear and
-     constant by construction. A cheap discriminator: fix the inner iteration count instead of using
-     a tolerance and see whether the anomaly disappears.
+3. **Promote `auto` to the default.** The IBM anomaly that blocked this is resolved (§2.7): the
+   cause was the null-space projection taken over all cells instead of per fluid component, plus a
+   float row-sum defect and an overtight inner tolerance — of the original hypotheses, the first
+   (wrong projection set) was right in substance, though the damage path was nonsymmetry injected
+   through the solid identity rows rather than rhs contamination; the second (solid rhs deposits)
+   was measured to be exactly zero; the third (nonlinearity) was the *consequence* of the first two,
+   not an independent cause. What remains before flipping the default is a bit-exactness +
+   performance sweep across the suite (same bar as open problem 12), since `auto` changes the
+   bottom solve for every run whose coarsest grid exceeds the extent threshold. Instrumentation to
+   reuse: `PECLET_FLOW_AGMG_DEBUG=1` prints per-build operator anatomy (solid rows, components,
+   row-sum defect) and per-call inner-CG behaviour.
 4. **A direct solve at the bottom.** The agglomerated bottom already converges (AMG-preconditioned CG
    to 1e-10), so this buys cost rather than iterations: it replaces ~20 CG iterations of serial host
    code per V-cycle with two triangular solves. For a few-hundred-to-few-thousand-DOF coarse grid a
