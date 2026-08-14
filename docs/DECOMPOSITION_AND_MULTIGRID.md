@@ -191,9 +191,32 @@ of severity, all in `pcgAmg`/`buildAmg`:
 After the fix: `random_spheres` 441 vs 442 (parity, flat per-step trace), inner solves converge in
 ~7 median iterations, wall-clock equal to the smoothed bottom; `zh_sphere` and `hollow_rings` at
 parity; the long-box win-configuration (512×16×16, one sphere, 4 levels — bottom 64×2×2) runs
-25 iters/step smoothed vs a flat **7.0** agglomerated. The full single-GPU regression is unchanged
-to +0.00 % on the default path. `"smoother"` remains the default until a suite-wide sweep promotes
-`auto` (see open problem 3).
+25 iters/step smoothed vs a flat **7.0** agglomerated. The ghost-projection staggered IBM is also
+verified: its nonsymmetric gp matrix never reaches the bottom (the MG preconditioner hierarchy is
+the binary-openness surrogate, whose bottom even assembles with row-sum defect exactly 0), and
+smoother/agglomerated totals are identical.
+
+**`auto` is the default since 2026-08-13 — gated to the SINGULAR path.** The promotion sweep:
+staggered regression +0.00 % on every metric (auto only engages where the bottom exceeds the
+extent threshold; elsewhere it is byte-identical to the smoothed bottom); the colocated solver
+improves outright — **13–27 % fewer total pressure iterations at identical accuracy** on all
+three cut-cell cases (the ABC projection engages the bottom at more grids and benefits more);
+MPI ctests green.
+
+The sweep also caught a regression, and the gate is its containment: on the **Dirichlet-anchored
+(outflow) path the exact bottom LOWERS the attainable floor** of the outer solve — 128×32×32
+inflow/outflow channel, identical budgets: flux-divergence floor 8e-8 smoothed vs 2e-5
+agglomerated. It is *not* either of the fixed bugs: the inner CG converges (6 iters to 1e-9) and
+the assembled CSR satisfies the V-cycle's own bottom operator to 1e-9 (the `AGMG_DEBUG`
+consistency check). The suspected mechanism — unproven — is that the anchored operator's
+near-null mode makes the exact bottom return O(10³·|b|) corrections whose float-hierarchy
+round-off the weak smoothed bottom never generates (see open problem 4). So `auto` engages only
+when the operator is singular (`removeMean_`: periodic / all-Neumann / IBM — where every measured
+win lives); anchored operators keep the smoothed bottom, byte-identical to legacy, and
+`"agglomerated"` still forces agglomeration anywhere. Caveat: porous / variable-ρ rebuild the
+operator — and therefore the bottom AMG — every step; fine for the intended few-cells-per-axis
+bottoms, but do not pair `auto` with a badly-factored grid (a huge bottom) on those paths.
+`PECLET_FLOW_AGGLOM_EXTENT=1000000` restores the legacy behaviour without a code change.
 
 ## 3. Design rules
 
@@ -222,17 +245,15 @@ Roughly in order of expected value.
    once a sub-box drops below `2*align` (`initImpl`), which silently costs a level — visible as np=7,
    12, 16, 24 dropping from 6 levels to 5 in §2.3. Snapping to the largest power of two that still
    fits would keep the depth.
-3. **Promote `auto` to the default.** The IBM anomaly that blocked this is resolved (§2.7): the
-   cause was the null-space projection taken over all cells instead of per fluid component, plus a
-   float row-sum defect and an overtight inner tolerance — of the original hypotheses, the first
-   (wrong projection set) was right in substance, though the damage path was nonsymmetry injected
-   through the solid identity rows rather than rhs contamination; the second (solid rhs deposits)
-   was measured to be exactly zero; the third (nonlinearity) was the *consequence* of the first two,
-   not an independent cause. What remains before flipping the default is a bit-exactness +
-   performance sweep across the suite (same bar as open problem 12), since `auto` changes the
-   bottom solve for every run whose coarsest grid exceeds the extent threshold. Instrumentation to
-   reuse: `PECLET_FLOW_AGMG_DEBUG=1` prints per-build operator anatomy (solid rows, components,
-   row-sum defect) and per-call inner-CG behaviour.
+3. **The anchored (outflow) path degrades under the exact bottom** — the gate in §2.7 contains it,
+   understanding it would lift it. Measured: divergence floor 8e-8 → 2e-5 on the inflow/outflow
+   channel; inner solve converged, assembled operator consistent with the V-cycle's to 1e-9. The
+   float-noise-from-large-near-null-corrections hypothesis is unproven — a clean discriminator
+   would be a double-precision (or double-diagonal) bottom level, or damping the bottom
+   correction's near-null component before prolongation. Until then `auto` is singular-path-only.
+   (The original problem 3 — the IBM anomaly — is resolved: null-space projection per fluid
+   component, float row-sum resummation, inner tolerance 1e-8; `auto` is the default on the
+   singular path since 2026-08-13.)
 4. **A direct solve at the bottom.** The agglomerated bottom already converges (AMG-preconditioned CG
    to 1e-10), so this buys cost rather than iterations: it replaces ~20 CG iterations of serial host
    code per V-cycle with two triangular solves. For a few-hundred-to-few-thousand-DOF coarse grid a
