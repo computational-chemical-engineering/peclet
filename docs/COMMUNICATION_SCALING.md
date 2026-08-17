@@ -56,16 +56,10 @@ Expectation: per-iteration halo surface grows 4× while compute grows 8× → th
 throughput should recover substantially toward the np=1 number; whatever gap remains is latency
 (factor 1), which the code items below attack.
 
-### 2.2 Halo–compute overlap in the RB-GS sweeps (async computation)
+### 2.2 Halo–compute overlap in the RB-GS sweeps (async computation) — DONE
 
-`peclet::core::halo::GridHalo` is already overlap-capable (post/finish split); the smoother call
-sites use it synchronously. Change the sweep structure in
-
-- `flow/src/flow_ibm.hpp` — implicit-diffusion RB-GS (the momentum phase; the biggest
-  single win: dozens of sweeps/step on the Stokes march), and
-- `flow/src/mac_cutcell_mg.hpp` — the per-level RB-GS smoother of `CutcellMG`
-
-from `exchange; smooth(all)` to
+`peclet::core::halo::GridHalo` is already overlap-capable (post/finish split). The sweep structure
+is
 
 ```
 post_exchange(color A results)
@@ -74,25 +68,51 @@ finish_exchange
 smooth boundary shell of color B
 ```
 
-The boundary shell reads exactly the same operand values as today, only later — the update is
-**bit-identical** by construction, and the existing `tests/kokkos_mpi` bit-exactness ctests
-(np=1,2,4 vs single-rank) are the acceptance gate, unchanged. Fine levels overlap well (the
+The boundary shell reads exactly the same operand values as the blocking form, only later — the
+update is **bit-identical** by construction, and the existing `tests/kokkos_mpi` bit-exactness
+ctests (np=1,2,4 vs single-rank) are the acceptance gate, unchanged. Fine levels overlap well (the
 interior dwarfs the shell); coarse levels have no interior to hide behind — they are factor-1
 territory (below).
 
-### 2.3 Communication-avoiding smoothing (wider ghosts, fewer events)
+Status: the `CutcellMG`/`VelocityMG` per-level smoothers, the V-cycle residual and the level-0
+matvec had this since flow `3ace962`/`5d77deb`/`d548ccc` (the note's original "call sites use it
+synchronously" was stale for them); the remaining synchronous site — the implicit-diffusion RB-GS
+of the momentum phase (`flow_ibm.hpp` `smoothComp`, the biggest single win: dozens of sweeps/step
+on the Stokes march) — was overlapped in flow `1e9c5db`, on the periodic/IBM path (the domain-BC
+paths keep the blocking order they depend on, mirroring the VelocityMG decision).
 
-Attack factor 1's event count: exchange a **2-deep ghost layer every second sweep** instead of
-1-deep every sweep. Between exchanges, the sweep redundantly re-smooths the 1-deep shell of the
-neighbour's cells it holds, so after two sweeps the block's own cells are bit-identical to the
-exchange-every-sweep result (standard CA-smoothing; the RB ordering must be preserved across
-the ghost seam — smooth ghost reds before own blacks that read them). Halves the event count
-in momentum and in the MG smoother; on coarse levels — where messages are pure latency — the
-ghost width is bounded by the level's block extent, so apply where `block_dim ≥ 4` and fall
-back to per-sweep exchange below that. Requires `GridHalo` topologies with ghost width 2
-(the topology/exchange split already parameterizes width). Numerics: bit-identical for the
-diffusion sweeps (linear, fixed stencil); for the MG smoother the redundant shell work changes
-nothing observable — same ctest gate as 2.2.
+### 2.3 Communication-avoiding smoothing (wider ghosts, fewer events) — DONE
+
+Attack factor 1's event count: exchange a **2-deep ghost layer once per red-black pair** instead
+of 1-deep before every colour. Within a pair, the first colour redundantly re-smooths the 1-deep
+ghost ring of the neighbour's cells it holds — computed from the same operands the neighbour uses,
+so the ring values come out bit-identical to what a fresh exchange would deliver — and the second
+colour then sweeps with **no exchange at all** (its boundary cells read only first-colour ring
+cells; a colour never reads its own colour). Standard CA-smoothing with the RB ordering preserved
+across the seam; the block's own cells are bit-identical to the exchange-every-sweep result.
+
+Implemented (flow, second commit after `1e9c5db`), gated by `PECLET_FLOW_CA` (default ON, `=0`
+kills it) and applied only where every rank's block extent is ≥ 4 (below that: per-colour
+exchange). Halves the event count where it engages:
+
+- **Momentum** (`flow_ibm.hpp` `smoothComp`, periodic/IBM path): the velocity block is g=2
+  already, so no new topology. The ring rows of the float stencil + mask are halo-exchanged once
+  per operator (re)build (per solve on the per-step-rebuild paths: implicit-FOU Picard, variable
+  properties, implicit drag), the rhs once per solve — bit-exact owner values.
+- **`CutcellMG` coarse levels** (L ≥ 1, where every message is pure latency): per-level ghost
+  width is now a runtime `Level::g` — width-2 topologies (the `GridHaloTopology` width parameter)
+  on eligible levels, and the rediscretized operator build box is widened by 1 so the ring rows
+  are assembled locally from the exchanged openness (bit-identical to the owner's inner rows).
+  Level 0 keeps g=1 (its exchange is already overlapped and the solver's g=1 bridge assumes it);
+  domain-BC (non-periodic) hierarchies keep g=1 everywhere — byte-identical to the pre-CA code.
+  A parity subtlety: with mixed ghost widths the red-black colour of a cell must be derived from a
+  g-independent origin (`parityOg`), or the colours on g=2 levels come out swapped vs the g=1
+  reference (3 axes → parity flips).
+
+Numerics: bit-identical by construction; gate = the same `tests/kokkos_mpi` ctests (np=1,2,4,
+CUDA + OpenMP, 33 tests) + `sdflow_regression.py` at +0.00 %, plus a trace-verified check that the
+CA path actually engages (MG levels g=2 and momentum pairs active in the np=2 Stokes test, results
+unchanged to the last printed digit with `PECLET_FLOW_CA=0/1`).
 
 Order of implementation: 2.1 (script only, run now) → 2.2 (mechanical, bit-exact) → 2.3
 (needs width-2 topologies + seam-ordering care). Expected combined effect at 256³/GPU:
@@ -105,5 +125,7 @@ was amortization all along.
 
 - [ ] 2.1 fat rung: script support merged; run pending (`sbatch --nodes=8 --time=01:30:00
       spheres_weak_gpu.sh fat`)
-- [ ] 2.2 overlap in flow_ibm diffusion + CutcellMG smoother
-- [ ] 2.3 CA smoothing (width-2 ghosts)
+- [x] 2.2 overlap in flow_ibm diffusion (flow `1e9c5db`; the MG smoothers had it since `3ace962`)
+- [x] 2.3 CA smoothing (width-2 ghosts, exchange once per RB pair; `PECLET_FLOW_CA`)
+- [ ] performance validation on Snellius: rerun the porous weak ladder with a result tag
+      (`sbatch … spheres_weak_gpu.sh 32 overlap`) — locally only correctness was proven
