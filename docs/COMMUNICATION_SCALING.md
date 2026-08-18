@@ -127,5 +127,13 @@ was amortization all along.
       spheres_weak_gpu.sh fat`)
 - [x] 2.2 overlap in flow_ibm diffusion (flow `1e9c5db`; the MG smoothers had it since `3ace962`)
 - [x] 2.3 CA smoothing (width-2 ghosts, exchange once per RB pair; `PECLET_FLOW_CA`)
-- [ ] performance validation on Snellius: rerun the porous weak ladder with a result tag
-      (`sbatch … spheres_weak_gpu.sh 32 overlap`) — locally only correctness was proven
+- [x] performance validation on Snellius (2026-08-18, peclet-examples `d139d2d`): np=32 cut-cell
+      **1323 → 759 ms/step, 12.7 → 22.1 Mcell/s/GPU, weak efficiency 35 % → 62 %**; np=16
+      14.8 → 23.6. Iterations and k/R² identical to every printed digit at every rung. The CA-off
+      ablation (np=32, 13.8 Mcell/s/GPU) shows the gain is almost entirely 2.3's event-count
+      halving — the latency diagnosis was right. Ghost IBM: np=16 6966 → 4281, np=32
+      11689 → 6349 ms/step (its np≥16 march instability is unchanged, a separate open bug).
+      Open oddity: the np=8 rungs' projection phase got *slower* under CA (cut-cell 342 → 465 ms;
+      the step is still net faster) while np=16/32 improved — untraced.
+- [ ] 2.1 fat rung result (`spheres_weak_gpu.sh fat overlap`) — still pending in the queue at
+      the time of the ladder analysis
