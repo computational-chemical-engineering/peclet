@@ -134,6 +134,26 @@ was amortization all along.
       halving — the latency diagnosis was right. Ghost IBM: np=16 6966 → 4281, np=32
       11689 → 6349 ms/step (its np≥16 march instability is unchanged, a separate open bug).
       Open oddity: the np=8 rungs' projection phase got *slower* under CA (cut-cell 342 → 465 ms;
-      the step is still net faster) while np=16/32 improved — untraced.
+      the step is still net faster) while np=16/32 improved — traced below.
+- [x] np=8 anomaly traced (2026-08-18, attribution matrix on Snellius via `PECLET_FLOW_CA=mom|mg`):
+      **reproducible** (repeat run identical to 1 %), **bisected to the MG coarse-level CA** —
+      `CA=mom` leaves projection exactly at baseline (14.6 ms/iter) while keeping the full
+      momentum win; `CA=mg` alone reproduces the full regression (19.7 vs 19.9 ms/iter).
+      **Transport-independent**: host-staged MPI still shows it (19.0), and forcing
+      `UCX_RNDV_THRESH=256k` makes it 2× worse (36.1) — the eager/rendezvous-threshold hypothesis
+      is falsified; leave UCX defaults alone. All modes bit-identical (iterations, k, march steps
+      equal across the whole matrix). Interpretation: MG-CA carries a per-V-cycle overhead
+      (~5 ms/iter at 256³ blocks) that every rung pays; at np=16/32 the event-halving saves
+      11–16 ms/iter so CA wins big, at np=8 — two nodes, anomalously cheap baseline events
+      (14.6 vs 27.3 ms/iter at np=16) — there is nothing to save and only the overhead shows.
+      What the overhead physically is (candidate: the per-smooth rhs exchange + doubled-volume
+      events on the fine CA levels) is still unattributed per level — a
+      `PECLET_FLOW_MG_DEBUG=3` rung pair (`camg` vs `0`) would name the level, since on CUDA the
+      per-level times are host-side and thus dominated by exactly the MPI waits in question.
+      Consequences: cut-cell full CA is still net faster at np=8 (988 vs 1239 ms/step) — no
+      action needed; the ghost IBM at np=8 is net slower under full CA (6337 vs 5312) because
+      projection dominates its step — at ≤2 nodes `PECLET_FLOW_CA=mom` is the better setting
+      (cut-cell 867, ghost 4917 ms/step, the best measured configs there), and host-staged MPI
+      remains the better transport at this scale (momentum 520 → 391).
 - [ ] 2.1 fat rung result (`spheres_weak_gpu.sh fat overlap`) — still pending in the queue at
       the time of the ladder analysis
