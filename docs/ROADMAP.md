@@ -156,6 +156,31 @@ drift far apart). The fix is the same primitive for both, so it lives in `core`.
 - [x] **Python**: `tpx_mpi.Migrator.rebalance()` (core, mpi4py) and `Sim.rebalance()` /
   `enable_mpi_step(rebalance_every=…)` (dem) expose it; validated count-conserving with an imbalance drop.
 
+## Phase 8 — At-scale multi-GPU tuning (2026-08 status)
+
+The "remaining work is at-scale tuning" phase now has measured campaigns behind it
+(peclet-examples `benchmarks/porous-scaling` + `parallel-scaling`, Snellius gpu_h100 1→32):
+
+- [x] **Coarse-level solve**: agglomerated bottom fixed on the IBM path (per-component null-space
+      projection) and promoted to the default, gated to singular operators (flow `3493a89`;
+      [DECOMPOSITION_AND_MULTIGRID](DECOMPOSITION_AND_MULTIGRID.md) §2.7).
+- [x] **Porous-bed weak-scaling + permeability study** — cut-cell iterations flat to 537 M cells;
+      refine ladder: cut-cell/ghost k∞ agree to 0.1 %; study page live in peclet-examples.
+- [x] **Communication scaling** ([COMMUNICATION_SCALING](COMMUNICATION_SCALING.md)): the porous
+      35 % weak-efficiency toll diagnosed as latency-bound halo events; halo–compute overlap in
+      every distributed RB-GS sweep + communication-avoiding smoothing (2-deep ghosts, one
+      exchange per RB pair, `PECLET_FLOW_CA`) shipped bit-exact — np=32 cut-cell 1323→759 ms/step,
+      **35 % → 62 %** weak efficiency, numerics identical to every digit.
+- [x] **dem H100 packing corruption** root-caused by a 7-round on-cluster probe ladder +
+      compute-sanitizer: `ensureCapacity` missed `materialId` → silent OOB ghost-slot writes with
+      allocator-layout-dependent damage (dem `17288f8`). Voxel-fraction gates remain at both ends
+      of the packing→flow pipeline.
+- [ ] **Open**: fat-block ablation rung (512³ cells/GPU, script ready); ghost-projection march
+      instability at large elongated rungs + ghost hardening phases B/C
+      (`flow/doc/ghost_hardening_plan.md` — active); warmstart divergence on steady marches;
+      anchored-path (outflow) agglomerated-bottom floor (open problem 3); dem main build has no
+      ctests — a memcheck'd periodic-packing smoke test is the suggested CI gate.
+
 ## Cross-cutting / ongoing
 
 - Keep `morton` as the spatial-index primitive; adopt its octree where hierarchical indexing
