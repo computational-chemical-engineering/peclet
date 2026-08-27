@@ -82,17 +82,18 @@ dependency**). Put `nvcc` on `PATH` for the CUDA backend (`export PATH=/usr/loca
 
 ### flow
 ```bash
-cd flow && source .venv/bin/activate          # nanobind found via the active interpreter (SuiteNanobind)
+cd flow && source ../.venv/bin/activate       # THE suite venv (see "One venv" below); nanobind
+                                              # is found via the active interpreter (SuiteNanobind)
 cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"
 cmake --build build -j                          # -> build/peclet/flow/_flow.*.so (the solver)
 # (canonical install: CMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda" pip install .)
-PYTHONPATH=$PWD/build python scripts/verify_poiseuille_sdflow.py        # analytical-solution check
+PYTHONPATH=$PWD/build python scripts/verify_poiseuille_flow.py        # analytical-solution check
 PYTHONPATH=$PWD/build python scripts/verify_periodic_spheres_sdflow.py  # cut-cell Stokes through spheres
 ```
 
 ### pnm
 ```bash
-cd pnm && source ../flow/.venv/bin/activate   # same interpreter/nanobind as flow
+cd pnm && source ../.venv/bin/activate        # same interpreter/nanobind as every other project
 cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"
 cmake --build build -j                          # -> build/peclet/pnm/_pnm.*.so (import peclet.pnm)
 PYTHONPATH=$PWD/build python scripts/test_extraction.py ../flow/data/packing_ring.vti
@@ -103,7 +104,7 @@ PYTHONPATH=$PWD/build python scripts/verify_segmentation.py ../flow/data/packing
 
 ### dem
 ```bash
-cd dem && python -m venv .venv && source .venv/bin/activate && pip install nanobind numpy
+cd dem && source ../.venv/bin/activate        # the suite venv already has nanobind + numpy
 cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"
 cmake --build build -j$(nproc)                  # -> build/dem.cpython-*.so  (-DDEM_MPI=ON for the MPI step)
 export PYTHONPATH=$PYTHONPATH:$(pwd)/build
@@ -119,13 +120,44 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ctest --test-dir build -R "test_static_voronoi|test_voro_comparison" --output-on-failure
 # Kokkos device path (CUDA/HIP/OpenMP) + nanobind Python module (vorflow_device), opt-in:
-cmake -B build_dev -DVORFLOW_KOKKOS=ON -DVORFLOW_BUILD_PYTHON=ON \
-  -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"   # add -DVORFLOW_MPI=ON for the distributed path
+cmake -B build_dev -DPECLET_VORO_KOKKOS=ON -DPECLET_VORO_BUILD_PYTHON=ON \
+  -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"   # add -DPECLET_VORO_MPI=ON for the distributed path
 clang-format --dry-run --Werror include/*.hpp include/voro/**/*.hpp tests/*.cpp   # Google style, enforced
 ```
 The legacy header-only `voronoi.hpp` survives only as the CPU oracle. The production device tessellator
 stores each Voronoi cell as a compact **dual-triangle ConvexCell** (a vertex is a triple of plane indices)
 plus a `facetGeometry` CSR — not the old half-edge mesh (see README).
+
+### One venv for the whole suite
+
+There is **one** development virtualenv, `suite/.venv` (gitignored), and every project uses it:
+
+```bash
+source /path/to/suite/.venv/bin/activate    # or ../.venv from inside a submodule
+```
+
+It carries nanobind, numpy/scipy/numba/h5py/pandas, matplotlib/pyvista/scikit-image, mpi4py,
+cupy-cuda12x, scikit-build-core/hatchling/build, pytest, clang-format and the Jupyter stack — the
+union of what the per-project venvs held.
+
+**Why one.** `coupling` composes `flow` + `dem` in a single interpreter by design, and `pnm` already
+borrowed flow's venv, so a shared interpreter was the de-facto requirement. The per-project venvs had
+also drifted (three nanobind copies; numpy 2.3.5 vs 2.5.0; scipy 1.16.3 vs 1.17.0), and nanobind's
+version wants to be consistent across extensions that interoperate.
+
+**Do not `mv` or rename a venv.** A venv bakes absolute paths into `bin/activate*` and every console
+script. The retired per-project venvs had been moved repeatedly (`~/Codes/dem-gpu` →
+`suite/packing-gpu` → `suite/dem`, and `~/Codes/pnm_from_sdf` → `suite/cfd-gpu` → `suite/flow`), which
+left `activate` exporting a dead `VIRTUAL_ENV` and prepending a non-existent `PATH` entry. The failure
+is SILENT and nasty: `python` disappears, while `python3` and `pip` fall through to `/usr/bin` — so
+everything after `activate` runs against system Python and a `pip install` targets the system
+interpreter. If the suite directory ever moves, delete `.venv` and recreate it.
+
+**Local dev imports** come from the build tree, not an install: `PYTHONPATH=<build-dir>`. The
+`coupling` module additionally needs its two pure-Python files staged beside the extension
+(`cp coupling/python/peclet_coupling/{__init__,driver}.py <build>/peclet/coupling/`), because the
+importable package is `peclet.coupling` — the `python/peclet_coupling/` directory is only the source
+location that the wheel install maps into place.
 
 ## Conventions across the suite
 

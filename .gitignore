@@ -4,3 +4,8 @@
 
 # MkDocs site output (built in CI, published to Pages)
 /site/
+
+# The single suite-level development virtualenv (see CLAUDE.md). One venv serves every
+# submodule: coupling composes flow+dem in one interpreter, pnm already borrowed flow's, and
+# the per-project venvs had drifted (three nanobind copies, three numpy versions).
+/.venv/
