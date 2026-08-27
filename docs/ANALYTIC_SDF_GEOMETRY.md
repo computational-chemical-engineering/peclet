@@ -366,11 +366,7 @@ delegate to the `double` leaf instantiations (no behaviour change to host consum
   unrelated**: the repair-stats dict gained `extra`/`surgical`/`verify_passes` and the test's strict
   set-equality was never updated. clang-format 18.1.8: 22 violations before, 22 after — zero
   introduced (all pre-existing unicode-in-comment lines).
-  **`SdfGrid` deliberately NOT ported** — it is a different function from core's `sampleGrid`: it
-  stores *spacing* and divides where `sampleGrid` stores the inverse and multiplies
-  (`a/s ≠ a·(1/s)`), and it clamps flat off-grid where `sampleGrid` applies a signed residual.
-  Unifying needs a third `GridExtension` policy (`kClamp`) plus a divide-form option — a deliberate
-  numerics change, not a relocation. `SdfSpheres` is a composite, not a leaf.
+  **`SdfGrid` was deferred here and consolidated immediately after** — see §6.2.
 
   > **Note on the rung-3 FMA trap:** it did *not* recur here. voro's providers build tiny value-type
   > leaves from already-loaded members with no long contraction chain, unlike dem's per-call
@@ -384,6 +380,38 @@ delegate to the `double` leaf instantiations (no behaviour change to host consum
 > gates. Any numerics improvement (exact normals in contacts, unified hollow cylinder) lands *after*,
 > as its own attributable change. Otherwise every regression moves at once and nothing is
 > attributable.
+
+#### 6.0 Grid-SDF consolidation (post-rung-4; core `525d996`, voro `40e21e1`)
+
+The suite carried **three** trilinear grid-SDF implementations, not two: core's device
+`sampleGrid` (inverse-spacing multiply, signed clamp residual), core's **host** `GridSdf::eval`
+(spacing divide, flat clamp), and voro's `SdfGrid` (spacing divide, flat clamp). All three are now
+one routine.
+
+- `GridExtension` gains **`kClamp`** — nearest-valid-sample extrapolation, the field flattens at the
+  box face. Its early return is hoisted above the residual so it also skips three unused divisions.
+  `kClamp` has by construction the failure mode that cost dem 71k grains, so it is only for fields
+  whose stored box genuinely bounds the domain.
+- Unified on **multiply-by-inverse**, because that is what dem's bit-exactness contract is written
+  against and it is cheaper on device. The host `GridSdf` and voro's `SdfGrid` therefore move ~1 ULP
+  (2.2e-16 relative in the lattice coordinate; on CUDA, 81/3000 voro probes at max 1.3e-15).
+  dem is untouched and byte-identical on both backends; core 92/92; voro 12/12.
+- **A fixture can silently fail to detect this.** Spacing `0.3` gives bit-identical results for
+  `(p−o)/s` and `(p−o)·(1/s)` on every probe tested — the first capture showed zero difference and
+  looked like proof of no change. Other spacings differ on 8–37 % of coordinates. Pick the fixture
+  value deliberately when testing a divide↔multiply change.
+
+**voro now consumes the whole shared vocabulary** via a new `SdfScene` provider wrapping
+`evalTree`: capsule, torus, cone, ellipsoid, superquadric, both cylinder forms, CSG, transforms and
+grids all reach the cell clipper and mesh optimiser through the `eval(x,y,z)` + `gradH()` interface
+it already expects, with voro owning no geometry code (ctest `test_sdf_scene`).
+
+> **TRAP — a host function in a device lambda can corrupt a kernel silently.** `SdfGrid::fromSpacing`
+> was first a plain static member. Called inside a `KOKKOS_LAMBDA`, nvcc accepted it **without any
+> error or warning** and corrupted the whole kernel: `SdfSpheres`, which that change did not touch,
+> moved by O(1) in the same kernel. Only the bit-capture caught it — the analytic block was clean
+> while two providers sharing one kernel were both wrong, which localised it at once. Annotate every
+> helper a device path might reach.
 
 #### 6.1 Measured leaf properties (rung-2 gate, `ctest geom_properties`)
 
