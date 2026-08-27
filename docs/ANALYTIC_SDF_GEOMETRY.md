@@ -12,10 +12,10 @@
 > §6 Layer 0 is now an executable spec (rungs + gates); an executor needs only this document.
 > **Rungs 0-2 SHIPPED** (core `e5815b7`, `7f21d72`, `7da12f0`): leaves + `PECLET_HD`/`Vec3`, the
 > runtime node layer (transforms, iterative CSG, grid leaf), and the extended vocabulary +
-> gradients; **rungs 3-4 SHIPPED** (dem `638727e`, voro `fc7a6ad`) — dem's and voro's SDF layers
-> now delegate to core, bit-identical on host-openmp and CUDA. Core 92/92, dem 8/8 (both backends)
-> + 24/24 MPI, voro 10/11 (matching its pre-port baseline). **Measured exactness table in §6.1.**
-> Next: rung 5 (scene encoding contract) — the last rung of Layer 0.
+> gradients; rungs 3-4 (dem `638727e`, voro `fc7a6ad`) delegating both consumers to core; the
+> grid-SDF consolidation (§6.0); and **rung 5** (core `789d2ea`) — the scene encoding contract.
+> **LAYER 0 IS COMPLETE.** Core 93/93, dem 8/8 both backends + 24/24 MPI, voro 12/12.
+> Next: **Layer 1** (dem consumes it — shape tables, exact gradients, analytic walls).
 >
 > `file:line` references are snapshots of the audit — **re-grep before acting**.
 
@@ -372,9 +372,25 @@ delegate to the `double` leaf instantiations (no behaviour change to host consum
   > leaves from already-loaded members with no long contraction chain, unlike dem's per-call
   > descriptor marshalling into a trilinear sum. The trap is specific to constructing a
   > multi-field descriptor inside a hot kernel, not to delegation as such.
-- **Rung 5 — scene encoding contract.** Document the flat node/instance array encoding (the
-  Python-facing composition format) + host `SceneBuilder`; core ctest round-trips build → evaluate.
-  Per-code bindings that *accept* the encoding are Layers 1–2.
+- **Rung 5 — scene encoding contract. ✅ DONE** (core `789d2ea`).
+  Documented the flat node/instance array encoding (the Python-facing composition format) + host
+  `SceneBuilder`; core ctest round-trips build → evaluate. Per-code bindings that *accept* the
+  encoding remain Layers 1–2.
+  *Outcome:* `Instance` and `SceneView` land as decision 4 specified — `SceneView` is **raw
+  pointers**, so it is POD, captures into a Kokkos lambda, and works host or device from
+  `View::data()`. `evalCandidates` makes contract 9 real (union over a caller-supplied list, so AABB
+  binning plugs in later with no API change). The flat encoding has compile-time strides — 3 ints +
+  16 reals per node, 2 ints + 17 reals per instance — so a nanobind layer is numpy-in, POD-out with
+  no per-field code. Gate: 20 000 probes × 3 instances round-tripped with **zero** bit mismatches,
+  plus transform/union/candidate-list/velocity semantics and four malformed-scene rejections.
+
+  > **Host vs device is not bit-exact for long expressions — and that is fine.** A `SceneView` built
+  > from `View::data()` matches the host builder exactly on host-openmp (same compiler) but differs
+  > on CUDA at up to **4 ULP** (6.9e-16 relative) over a depth-3 CSG scene, with **zero sign
+  > disagreements**. That is nvcc contracting multiply-adds differently, not a defect. Note the
+  > distinction from the rungs 0-4 gates: those compared *before vs after on the same backend*,
+  > which must be exact; a host-vs-device comparison must be judged on sign agreement and a ULP
+  > tolerance instead.
 
 > **Migration discipline** (the suite's faithful-port rule): rungs 3–4 are relocations with bit-exact
 > gates. Any numerics improvement (exact normals in contacts, unified hollow cylinder) lands *after*,
