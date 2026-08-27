@@ -12,9 +12,10 @@
 > §6 Layer 0 is now an executable spec (rungs + gates); an executor needs only this document.
 > **Rungs 0-2 SHIPPED** (core `e5815b7`, `7f21d72`, `7da12f0`): leaves + `PECLET_HD`/`Vec3`, the
 > runtime node layer (transforms, iterative CSG, grid leaf), and the extended vocabulary +
-> gradients; **rung 3 SHIPPED** (dem `638727e`) — dem's SDF layer now delegates to core,
-> bit-identical on host-openmp and CUDA. Core 92/92, dem 8/8 (both backends) + 24/24 MPI.
-> **Measured exactness table in §6.1.** Next: rung 4 (voro port).
+> gradients; **rungs 3-4 SHIPPED** (dem `638727e`, voro `fc7a6ad`) — dem's and voro's SDF layers
+> now delegate to core, bit-identical on host-openmp and CUDA. Core 92/92, dem 8/8 (both backends)
+> + 24/24 MPI, voro 10/11 (matching its pre-port baseline). **Measured exactness table in §6.1.**
+> Next: rung 5 (scene encoding contract) — the last rung of Layer 0.
 >
 > `file:line` references are snapshots of the audit — **re-grep before acting**.
 
@@ -355,9 +356,26 @@ delegate to the `double` leaf instantiations (no behaviour change to host consum
   > in-function setup shifting **nvcc's FMA contraction** in the trilinear chain. Fix: `ShapeDesc`
   > and `WallSdf` now *carry* a `GridDesc<float>`, filled once at setup. Build descriptors at
   > setup, never per call, in any hot kernel this layer touches.
-- **Rung 4 — voro port (relocation only).** voro's leaf structs delegate to core's (`SdfHollowCylinder`
-  → `HollowCylinderShell`, preserving its max-form numerics). Gate: voro ctests incl. the Voro++
-  comparison oracle; clang-format clean.
+- **Rung 4 — voro port (relocation only). ✅ DONE** (voro `fc7a6ad`).
+  voro's leaf structs delegate to core's (`SdfHollowCylinder` → `HollowCylinderShell`, preserving its
+  max-form numerics). Gate: voro ctests; clang-format clean.
+  *Outcome:* byte-identical on host-openmp AND CUDA **first attempt** (84 000-word capture covering
+  the three analytic providers over all three cylinder axes, the shared central-difference gradient,
+  plus `SdfSpheres`/`SdfGrid` to prove the un-ported providers were untouched). voro ctests 10/11,
+  exactly the pre-port baseline — the single failure (`test_voro_python`) is **pre-existing and
+  unrelated**: the repair-stats dict gained `extra`/`surgical`/`verify_passes` and the test's strict
+  set-equality was never updated. clang-format 18.1.8: 22 violations before, 22 after — zero
+  introduced (all pre-existing unicode-in-comment lines).
+  **`SdfGrid` deliberately NOT ported** — it is a different function from core's `sampleGrid`: it
+  stores *spacing* and divides where `sampleGrid` stores the inverse and multiplies
+  (`a/s ≠ a·(1/s)`), and it clamps flat off-grid where `sampleGrid` applies a signed residual.
+  Unifying needs a third `GridExtension` policy (`kClamp`) plus a divide-form option — a deliberate
+  numerics change, not a relocation. `SdfSpheres` is a composite, not a leaf.
+
+  > **Note on the rung-3 FMA trap:** it did *not* recur here. voro's providers build tiny value-type
+  > leaves from already-loaded members with no long contraction chain, unlike dem's per-call
+  > descriptor marshalling into a trilinear sum. The trap is specific to constructing a
+  > multi-field descriptor inside a hot kernel, not to delegation as such.
 - **Rung 5 — scene encoding contract.** Document the flat node/instance array encoding (the
   Python-facing composition format) + host `SceneBuilder`; core ctest round-trips build → evaluate.
   Per-code bindings that *accept* the encoding are Layers 1–2.
