@@ -59,7 +59,7 @@ The design contract lives in `docs/`:
 | `flow/` | **Kokkos** + C++20 + nanobind (`flow`) | Incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). | **Yes — read it** |
 | `pnm/` | **Kokkos** + C++20 + nanobind (`peclet.pnm`) | Pore-network extraction from SDF geometry: pore detection, marker-controlled watershed segmentation, throat topology (`SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu`, fused `extract_pore_network`). **Distributed MPI extraction** on the core ORB (`extract_pore_network_mpi`, gated `PECLET_PNM_MPI`) — bit-exact to single-rank, `tests/kokkos_mpi` ctests np=1,2,4 host+CUDA. Split out of `flow` (2026-07) with its git history. | Yes (brief) |
 | `dem/` | **Kokkos + ArborX** + C++20 + nanobind (`dem`) | Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). README still calls it `peclet-dem`. | No |
-| `voro/` | **Kokkos** + C++17/20 (+ core MPI, nanobind; Voro++/Boost for the CPU oracle) | Dynamic 3D Voronoi tessellation of moving particles; periodic & Lees–Edwards boxes, incremental cell repair, Euler/NS/multiphase dynamics. Ported to Kokkos (CUDA/HIP/OpenMP) + core MPI; legacy half-edge engine kept as CPU oracle. | No |
+| `voro/` | **Kokkos** + C++17/20 (+ core MPI, nanobind; Voro++ fetched as a benchmark reference) | Dynamic 3D Voronoi tessellation of moving particles; periodic & Lees–Edwards boxes, incremental cell repair, Euler/NS/multiphase dynamics. Kokkos (CUDA/HIP/OpenMP) + core MPI; the legacy half-edge CPU oracle has been **retired**. | No |
 
 Common threads worth knowing when moving between them: SDFs (signed distance fields) are the shared geometry representation across `flow` and `dem`; VTI/VTP files (ParaView/Ovito) are the shared I/O format; periodic boundary conditions appear everywhere; and the GPU codes (`flow`, `dem`, `core`'s device halo) are now **Kokkos**-based — the backend (CUDA/HIP/OpenMP) and arch are chosen by the `extern/install/<backend>` prefix the build is pointed at, not hard-coded in the sources (`tools/bootstrap_deps.sh` + `CMakePresets.json`).
 
@@ -114,19 +114,27 @@ The many root-level `verify_*.py` / `test_*.py` / `plan_*.md` / `build_log*.txt`
 
 ### voro
 ```bash
-cd voro
-# CPU-oracle + tests build (header-only; FetchContent pulls Voro++ automatically):
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-ctest --test-dir build -R "test_static_voronoi|test_voro_comparison" --output-on-failure
-# Kokkos device path (CUDA/HIP/OpenMP) + nanobind Python module (vorflow_device), opt-in:
+cd voro && source ../.venv/bin/activate
+# The tests live in tests/kokkos and are registered ONLY by the Kokkos build — a plain
+# `cmake -B build` configures zero tests ("No tests were found!!!"), which is not a failure signal.
 cmake -B build_dev -DPECLET_VORO_KOKKOS=ON -DPECLET_VORO_BUILD_PYTHON=ON \
   -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"   # add -DPECLET_VORO_MPI=ON for the distributed path
-clang-format --dry-run --Werror include/*.hpp include/voro/**/*.hpp tests/*.cpp   # Google style, enforced
+cmake --build build_dev --parallel        # -> build_dev/peclet/voro/_voro.*.so (import peclet.voro)
+OMP_PROC_BIND=false ctest --test-dir build_dev --output-on-failure    # 11 tests
+CLANG_FORMAT_BIN=clang-format-18 bash tools/clang_format_check.sh     # what CI runs (see below)
 ```
-The legacy header-only `voronoi.hpp` survives only as the CPU oracle. The production device tessellator
-stores each Voronoi cell as a compact **dual-triangle ConvexCell** (a vertex is a triple of plane indices)
-plus a `facetGeometry` CSR — not the old half-edge mesh (see README).
+`tools/clang_format_check.sh` is the canonical format command — it walks `include/` and `tests/`
+itself, so don't hand-roll globs (the older `include/voro/**` path has not existed since the
+`vorflow` → `voro` rename). Google style, but **informational, not enforced**: the CI job is named
+"clang-format (informational)" and the tree currently carries ~570 pre-existing violations
+(`repair.hpp`, `sdf.hpp`, `tessellator.hpp` + test files), mostly unicode-in-comment lines. Keep
+*new* code clean; a repo-wide reformat is a separate deliberate change.
+The legacy half-edge `voronoi.hpp` CPU oracle is **gone** — retired in voro `0d4f3b8`
+("retire the legacy half-edge engine + rewrite the docs (device-only)"); `include/` now holds only
+`peclet/voro/`. Voro++ survives solely as a FetchContent throughput reference for `bench_convexcell`.
+The production device tessellator stores each Voronoi cell as a compact **dual-triangle ConvexCell**
+(a vertex is a triple of plane indices) plus a `facetGeometry` CSR — not the old half-edge mesh
+(see README).
 
 ### One venv for the whole suite
 
