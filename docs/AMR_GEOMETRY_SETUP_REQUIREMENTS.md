@@ -23,14 +23,16 @@ Phase breakdown (`PECLET_CORE_PROFILE_SETUP=1`, permanent env-gated profiler in 
 | `buildGhostOverlaySampled` (mixed-level overlay) | 12.1 | 10% | SDF at virtual uniform positions |
 | C/F overlays + device assembly + uploads + MG | ~2.8 | 2% | — |
 
-The cost model closes exactly:
+The cost model closes exactly, and a sphere-doubling experiment CONFIRMS it directly
+(duplicating the sphere list keeps the geometry identical but doubles per-eval cost:
+M=180 → 127.1 µs/leaf, M=360 → 246.5 µs/leaf; three M=180 repeats within 0.2%):
 
 - **101 SDF evaluations per leaf** (measured by a counting callback, depth-6 graded bed);
-- ≈1.1 µs per evaluation for the 180-sphere brute-force union (one sqrt + three `nearbyint`
-  per sphere per query);
-- 101 × 1.1 ≈ 111 µs/leaf of pure SDF + ~15 µs/leaf of builder logic ≈ the measured 127.
+- **1.18 µs per evaluation** for the 180-sphere brute-force union (from the doubling slope:
+  119.4 µs/leaf per 180 spheres ÷ 101 evals; one sqrt + three `nearbyint` per sphere per query);
+- SDF share at M=180: 119.4 of 127.1 µs/leaf = **94%**; builder logic is only ~8 µs/leaf.
 
-So: **~85–90% of AMR setup is SDF evaluation cost**, split multiplicatively into (a) evals/leaf
+So: **~94% of AMR setup is SDF evaluation cost**, split multiplicatively into (a) evals/leaf
 (101 — with cross-phase redundancy), (b) cost/eval (brute force over all primitives), and
 (c) serialism (one core, host). The scene layer owns (b) and the batched/device form of (c);
 the AMR builders own (a) and the loop structure of (c).
