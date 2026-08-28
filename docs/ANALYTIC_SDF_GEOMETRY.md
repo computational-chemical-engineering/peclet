@@ -16,7 +16,11 @@
 > grid-SDF consolidation (§6.0); and **rung 5** (core `789d2ea`) — the scene encoding contract.
 > **LAYER 0 IS COMPLETE.** Core 93/93, dem 8/8 both backends + 24/24 MPI, voro 12/12.
 > **LAYER 1 COMPLETE** (dem `e90a5d1`, `9b1de61`, `eb8de1c`, `608916b`, `7edb05d`; core `a78d0f0`).
-> Next: **Layer 2** (flow consumes it — device scene, in-solver exact crossings and apertures).
+> **LAYER 2-FOR-CORE SHIPPED** (2026-08-29): batched scene evaluation + geometry-driven candidate
+> grids + the sphere-union fast paths, retiring the AMR `set_solid_spheres` stopgap — RCP-bed
+> `AmrFlow::setSolid` 127 → ~13 µs/leaf serial, host ≡ device **bitwise** (fma-canonical). See
+> docs/AMR_GEOMETRY_SETUP_REQUIREMENTS.md §5 for the handoff record. flow's Layer-2 remainder
+> (MPI demo, AUTO-scheme guard, Saye apertures) still open.
 >
 > `file:line` references are snapshots of the audit — **re-grep before acting**.
 
@@ -526,6 +530,43 @@ arrays from Python:
   belongs — the general replacement for `exact_apertures_spheres.py`;
 - the per-cell candidate binning of contract 9 (band-splat over instance AABBs);
 - a `set_solid` overload taking a device View, so geometry never round-trips through the host.
+
+#### 6.2 Layer 2-for-core: accelerated queries (shipped 2026-08-29)
+
+Driven by the AMR consumer's measured requirements (docs/AMR_GEOMETRY_SETUP_REQUIREMENTS.md; 94%
+of `AmrFlow::setSolid` was brute-force SDF evaluation). New in `geom/`:
+
+- **`scene_query.hpp`** — `PeriodicBox`/`minImage` (min-image periodicity), `SphereUnionView` with
+  an equal-radius one-sqrt path, `CandidateGridView` + `buildSphereCandidateGrid` (uniform-lattice
+  bins, geometry-driven splat, exact U-bound pruning: keep i iff `lower_i(B) ≤ min_j upper_j(B)` —
+  the list is a superset of the argmin set for every point of the bin, so min over it IS the brute
+  min, bitwise), and `SphereBedQuery`, the callable that slots into `AmrFlow::setSolid`'s
+  templated parameter. Empty-bin / out-of-coverage queries fall back to the full scan: exact.
+- **`device_scene.hpp`** — `DeviceScene<Real>`, the OWNING device scene (the type flow/dem/voro
+  are meant to retrofit onto instead of hand-rolled decode+upload), plus the batched drivers
+  `evalSphereUnionPoints` / `evalScenePoints` (device Views in/out) and `*Host` forms.
+
+Prunability for general scenes: bound-based pruning needs `eval ≥ dist-to-bounding-ball`, which
+exact-distance leaves satisfy and CSG preserves (union: all children; intersection/difference:
+the LEFT child's ball and certificate suffice, since `max(a,·) ≥ a`). Under-estimating leaves
+(ellipsoid, superquadric, `HollowCylinderShell`) and grid leaves are never pruned — they ride an
+always-list.
+
+> **TRAP, now a PRESCRIPTION — fma-canonicalise any expression that must be bitwise host ≡
+> device.** nvcc FMA-contracts `x*x + y*y + z*z` (22 001/200 000 CUDA probes off by 1 ulp at the
+> sqrt magnitude); no portable flag disables it per-expression. Writing the chain as explicit
+> `fma(z,z,fma(y,y,x*x))` (and `fma(-nearbyint(d/L), L, d)` for min-image) is correctly rounded
+> by IEEE on every backend and cannot be re-contracted: after the change, 0/200 000. This
+> upgrades the rung-3/rung-5 observations (contraction shifts results; judge host-vs-device by
+> sign+ULP) into the constructive rule: where bitwise parity is REQUIRED, make fma explicit and
+> gate it (`geom_batch_device`). Cost on hosts built without `-mfma`: `std::fma` is a libm call
+> (~+15% here) — a build-flag fix, not a design cost.
+
+> **TRAP — speedup estimates don't multiply.** The requirements modeled candidates ~30× ×
+> equal-R ~3×. Measured: ~30-40× total. Equal-R's 3× assumed the sqrt dominates a 180-long loop;
+> once candidate lists are 3.75 long, the min-image divides dominate and the equal-R path saves
+> only the 2.75 extra sqrts. Multiplicative factor estimates are only valid against the SAME
+> baseline denominator.
 
 ### Layer 3 — moving geometry
 

@@ -104,3 +104,57 @@ more in the far field.
 
 The AMR-side items marked independent do not touch `geom/` and cannot collide with the SDF
 agent; everything that touches evaluation waits for their API.
+
+
+---
+
+## 5. DELIVERED (2026-08-29, SDF agent) — handoff record, API frozen
+
+Everything in §3 items 1-2 and 4-6 is implemented in `core/include/peclet/core/geom/`
+(`scene_query.hpp`, `device_scene.hpp`, shims in `common/portable.hpp`); the stopgap
+`Flow.set_solid_spheres` is retired — same Python signature, now backed by
+`geom::SphereBedQuery`, which also slots directly into `AmrFlow::setSolid`'s templated `SdfFn`
+(and inlines there; no `std::function` anywhere).
+
+**Measured, single-threaded, RTX 5080 host, `amr_bed_graded.py` meshes:**
+
+| depth | leaves | set_solid BEFORE | AFTER | end-to-end |
+|---|---:|---:|---:|---:|
+| 6 | 262k | 33.3 s (127.1 µs/leaf) | 3.3 s (12.5 µs/leaf) | 10.2× |
+| 7 | 1.79M | ~227 s (127 µs/leaf) | 23.5 s (13.1 µs/leaf) | 9.7× |
+| 8 | 7.01M | ~13 min | 95.6 s (13.6 µs/leaf) | ~8× |
+
+Eval-cost reduction (the scene layer's share of the product): 1.18 µs/eval → ~0.03-0.05 µs/eval
+≈ **~30-40×**, from candidate lists of mean length **3.75** (vs 180) on the RCP bed. The modeled
+"equal-R ~3×" does NOT stack on top of short lists: that estimate assumed the sqrt dominates a
+180-long loop, but at 3.75 candidates the min-image divides dominate and equal-R saves only the
+2.75 extra sqrts. The residual ~8 µs/leaf is builder logic — the AMR-side rows of §4's table
+(sample redundancy, parallel loops), which is where "seconds, not minutes" now lives:
+8 µs/leaf ÷ 16 threads × 7M ≈ 4 s once the collect-points → batch-evaluate → build-rows
+restructure lands.
+
+**Classification parity:** depth-6 fluid mask **bit-identical** to the retired stopgap
+(0 diffs / 262 130); fluid counts identical at depth 7/8. Gate `geom_scene_query` (host ctest):
+candidate-grid path vs brute force **bitwise** over 182k probes incl. surface-hugging ±h/2-scale
+points, superset audit, per-bin shuffle invariance, out-of-coverage fallback.
+
+**One deviation from §3.4, deliberate and measured.** The canonical per-sphere expression is
+FMA-canonical (`d = fma(-nearbyint(d/L), L, d)`; `d2 = fma(z,z,fma(y,y,x*x))`), NOT the stopgap's
+two-rounding form. Reason: §3.5 requires host ≡ device **bit-identical**, and nvcc FMA-contracts
+the plain `x*x + y*y + z*z` chain — measured 22 001/200 000 CUDA probes off by 1 ulp at the sqrt
+magnitude; after canonicalisation **0/200 000** (ctest `geom_batch_device`, OpenMP + CUDA).
+Explicit `fma` is correctly rounded by IEEE everywhere and cannot be re-contracted. The
+difference vs the legacy expression is bounded (measured worst **1.32 ulp** at sqrt magnitude,
+zero sign flips beyond the knife edge over 160k probes) and produced **zero** classification
+changes on the acceptance meshes. Sign-flip exposure: a probe must land within ~2 ulp
+(~1e-17) of a surface; at 7×10⁸ evals per depth-8 build the collision probability is ~1e-4.
+
+**Two notes for the AMR side:**
+- ~15% of the serial win is left on the table because `std::fma` compiles to a libm call in the
+  module build (no `-mfma`); depth-6 measured 10.8 → 12.5 µs/leaf plain→fma. Adding `-mfma` (or
+  `-march=native`) to the python module's host flags recovers it — build config is yours.
+- Candidate lists are keyed by a **uniform auxiliary lattice**, queried per POINT in O(1) — not
+  per octree leaf — so probes at any level/h hit the right list with no `leavesInBox` and no
+  per-level machinery. The batched API (`evalSphereUnionPoints` / `evalScenePoints`, device View
+  in → distances out; `*Host` forms for the oracle) takes arbitrary point arrays per §3.1/§3.3.
+  Restructure the builders against these; `leavesInBox` remains unneeded by the scene layer.
