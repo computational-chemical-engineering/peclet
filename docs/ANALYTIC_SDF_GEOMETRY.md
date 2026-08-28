@@ -15,7 +15,8 @@
 > gradients; rungs 3-4 (dem `638727e`, voro `fc7a6ad`) delegating both consumers to core; the
 > grid-SDF consolidation (§6.0); and **rung 5** (core `789d2ea`) — the scene encoding contract.
 > **LAYER 0 IS COMPLETE.** Core 93/93, dem 8/8 both backends + 24/24 MPI, voro 12/12.
-> Next: **Layer 1** (dem consumes it — shape tables, exact gradients, analytic walls).
+> **LAYER 1 COMPLETE** (dem `e90a5d1`, `9b1de61`, `eb8de1c`, `608916b`, `7edb05d`; core `a78d0f0`).
+> Next: **Layer 2** (flow consumes it — device scene, in-solver exact crossings and apertures).
 >
 > `file:line` references are snapshots of the audit — **re-grep before acting**.
 
@@ -429,6 +430,23 @@ it already expects, with voro owning no geometry code (ctest `test_sdf_scene`).
 > while two providers sharing one kernel were both wrong, which localised it at once. Annotate every
 > helper a device path might reach.
 
+#### 6.0b MEASUREMENT RULE — pin the thread count when comparing dem numerically
+
+**dem's `step()` is nondeterministic under multithreaded OpenMP.** Three runs of the *same binary*
+give three different 120-step trajectories: contact slots are claimed with `atomic_fetch_add`, so
+the buffer order varies with thread scheduling, and the position solve iterates that buffer in slot
+order. At `OMP_NUM_THREADS=1` it is deterministic.
+
+Consequence for every before/after comparison in this plan: **run dem single-threaded, or you are
+measuring scheduling noise.** A multithreaded run of the Layer-1 shape-registry comparison reported
+a confident "regression" (positions diverging 2.8e-2) that did not exist — the same comparison at
+one thread was bit-identical at 1, 5 and 120 steps. The tell was the signature: positions differed
+while velocities and inertia were identical, the static geometry probe agreed to 9 significant
+figures, and contact *counts* matched exactly.
+
+This is pre-existing behaviour, not something Layer 0/1 introduced. It also means multithreaded dem
+runs are not reproducible run-to-run, which is worth knowing before trusting a benchmark delta.
+
 #### 6.1 Measured leaf properties (rung-2 gate, `ctest geom_properties`)
 
 Re-run the gate to regenerate; these are measurements, not targets.
@@ -456,18 +474,41 @@ Three facts Layer 2 must build on:
    sphere-tracing is not guaranteed. Prefer `Sphere` under a conformal transform whenever the body
    is genuinely a sphere — that path is exact.
 
-### Layer 1 — `dem` consumes it
+### Layer 1 — `dem` consumes it ✅ COMPLETE
 
-- Fill the shape table; expose `add_shape` / `set_shape_ids` → mixtures of **shapes**, not just sizes
-  (keep the existing Python `shape_type` integer values 0–3 stable at the binding).
-- Switch analytic normals to exact gradients: 7 evaluations → 1 per probe (**measured change**, after
-  Layer 0 rung 3's bit-exact relocation).
-- A general point-shell generator driven by the SDF itself (so a new primitive needs no bespoke
-  generator).
-- An **analytic wall** variant: a stirrer becomes a scene instance (CSG expression + rigid-body
-  velocity) rather than a voxel grid — removes the per-rank replicated `wallGrid` and its
-  resolution-bound accuracy.
-- Fix the `globalScale` omission in the `generateSdfKokkos` splat.
+All five items shipped. Existing single-shape behaviour is bit-identical except where a numerics
+change was the deliberate point (exact gradients).
+
+- ✅ **Shape table + `add_shape` / `add_sdf_shape` / `set_shape_ids` / `num_shapes`** (dem
+  `9b1de61`). Shape state moved to a host registry; `uploadShapes()` rebuilds the device Views and
+  assigns each shape its `shellOffset` and grid offset. Broad-phase band and contact-buffer sizing
+  now take the **max** over shapes. `initialize_shape` keeps its "shape 0 becomes this" reset.
+- ✅ **Exact analytic contact normals** (dem `eb8de1c`) — the measured change. Accuracy: FD's fixed
+  `eps = 1e-4` is a *real length in canonical space*, so its normal degraded as the shape shrank
+  toward it (0.8° error at r = 3e-4); the exact gradient is flat across four decades, and
+  `| |∇f|−1 |` drops 1.5e-3 → 1.2e-7. Speed: the gradient kernel alone is **11×**, the **narrow
+  phase 26%** (matched work, identical 8096 contacts). End-to-end is *not* cleanly measurable —
+  changing normals diverges the trajectory, so the builds solve different configurations with
+  different contact counts and adaptive solver stopping; a naive end-to-end run reported the new
+  code 17% "slower" while comparing 7043 contacts against 7245.
+- ✅ **General SDF-driven surface-point generator** (core `a78d0f0`) + dem auto-shell (`608916b`).
+  A grid-SDF particle registered with an **empty** shell now generates one from its own zero level
+  set, so an SDF alone defines a colliding body. Deliberately lattice-and-project, not ray casting
+  from a centre — a torus and most CSG results are not star-shaped.
+- ✅ **Analytic walls** (dem `7edb05d`). `WallSdf` gains `{nodes, nodeCount, shapeRoot, sign}` and
+  `add_analytic_wall` consumes rung 5's **flat node encoding** directly, so the whole vocabulary
+  plus CSG reaches a dem wall with no new binding machinery.
+- ✅ **`globalScale` in the `generateSdfKokkos` splat** (dem `e90a5d1`). The export described
+  different geometry than the simulation whenever `global_scale != 1` (5.1 voxels of radius error at
+  `gs = 2`); `gs = 1` is bit-identical, which is why it hid.
+
+> **TRAPS for analytic walls.** (1) *Sign*: a wall reads positive in the void, core's leaves are
+> negative-inside-solid. A stirrer wants `invert=False`; a container wants a **solid** body inverted
+> (a solid cylinder for a drum), so everything beyond the barrel reads as wall. Inverting a thin
+> **tube** is wrong — its bore is already void. (2) *Position*: an analytic wall is placed by its
+> node **transform**; unlike `add_sdf_wall` there is no grid origin doing it implicitly, so an
+> identity transform sits at the domain corner. This failure looks exactly like a sign error, and it
+> is what actually caused the grain escapes seen while developing the feature.
 
 ### Layer 2 — `flow` consumes it
 
