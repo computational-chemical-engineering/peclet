@@ -16,6 +16,10 @@
 > grid-SDF consolidation (§6.0); and **rung 5** (core `789d2ea`) — the scene encoding contract.
 > **LAYER 0 IS COMPLETE.** Core 93/93, dem 8/8 both backends + 24/24 MPI, voro 12/12.
 > **LAYER 1 COMPLETE** (dem `e90a5d1`, `9b1de61`, `eb8de1c`, `608916b`, `7edb05d`; core `a78d0f0`).
+> **LAYER 2 (flow) largely SHIPPED** (flow `553524b`, `0706196`): device scene via core
+> SceneQueryDevice, native periodicity, in-solver exact crossings (staggered AND collocated
+> placement); still open: MPI np2 demo, AUTO-guard relaxation, Saye/quadrature apertures.
+> **LAYERS 3-4 SPECIFIED** below at executable rung detail — run them on Opus.
 > **LAYER 2-FOR-CORE SHIPPED** (2026-08-29): batched scene evaluation + geometry-driven candidate
 > grids + the sphere-union fast paths, retiring the AMR `set_solid_spheres` stopgap — RCP-bed
 > `AmrFlow::setSolid` 127 → ~13 µs/leaf serial, host ≡ device **bitwise** (fma-canonical). See
@@ -568,35 +572,75 @@ always-list.
 > only the 2.75 extra sqrts. Multiplicative factor estimates are only valid against the SAME
 > baseline denominator.
 
-### Layer 3 — moving geometry
+### Layer 3 — moving geometry (SPEC, resolved 2026-08-29 — execute on Opus)
 
-Two pieces, one small and one large:
+Measured inputs (flow `0706196`): a full geometry rebuild at 128³ host-4T is **339 ms** — **~65%
+momentum/IBM stencils, ~35% pressure/MG** (from the FULL vs MOMENTUM-ONLY split), and scene
+sampling is *noise* (array vs candidate-accelerated scene identical). So: per-step full rebuild is
+the v1 moving-geometry cost model; **incremental rebuild is deferred by design** (it must attack
+both sides and is not an overnight item — inputs recorded, decision Frank's).
 
-- **Kinematic BC (small).** Replace the scalar `u_bc_val` with a per-cut-face wall velocity evaluated
-  from the instance velocity record (contract 7), and connect the `w_bc` weights the ghost projection
-  already computes. Add the wall-flux source `∮ u_w·n dA` to the cut-cell divergence constraint.
-- **Incremental rebuild (large).** `setSolid` needs a path that touches only cells whose openness
-  actually changed and re-derives the MG hierarchy incrementally. Without it, a stirrer costs a full
-  hierarchy build every step. **Measure the actual per-step rebuild cost before committing to a
-  design** — this is the biggest single engineering item in the note and deserves a prototype first.
+Everything below is **opt-in**: with no moving instance (all `linVel`/`angVel` zero) every path
+must stay **bit-identical** (fingerprint gate before each commit).
 
-### Layer 4 — resolved CFD-DEM
+- **L3-R1 — cut ownership.** Add `SceneQueryView::owner(p) -> int` in core (argmin instance:
+  candidate-list argmin in sphere mode, instance loop in general mode; ties break to the lowest
+  index, deterministically). flow builds a per-cut-cell `cutOwner_` int field at `set_solid_from_scene`
+  when the scene is installed. *Gate:* on the 4-sphere bed every cut cell's owner equals the
+  brute-force nearest sphere.
+- **L3-R2 — kinematic wall velocity in the momentum operator (staggered first).**
+  `ibmModifyStencil` already accumulates `Nbc * u_bc * vnb` with a scalar `u_bc = 0`; give it an
+  optional per-cut-cell View `uBc_[c]` (empty View ⇒ old scalar path, bit-identical). Fill from the
+  scene: wall point `w = p − sdf(p)·n̂(p)` (n̂ central-diff from the sampled `sdf_`; O(h) placement
+  is the v1 fidelity — per-direction crossing-point placement via `tEx` is a later refinement),
+  `uBc = instanceVelocity(inst[owner], w) · ê_c`. **Collocated ghost-projection `w_bc` hookup is
+  DEFERRED** — staggered first; touching the ghost overlay is attractor-campaign territory.
+- **L3-R3 — wall flux in the divergence constraint.** A rigid body moving through a cut cell
+  injects `∮ u_w·n dA ≠ 0` per cell (zero only integrally over the whole body). Per cell the wall
+  area VECTOR is exact from the aperture identity (divergence theorem on the cell):
+  `A_wall = −h²·(oE−oW, oN−oS, oT−oB)` in open-area terms; RHS of the cut-cell projection gains
+  `u_w(centroid)·A_wall`. Only when a moving instance exists.
+- **L3-R2/R3 GATES (run together — R3 is what makes R2 converge):**
+  (a) OFF ⇒ fingerprint bit-identical. (b) **Galilean**: steady periodic Stokes bed with mean flow
+  U past static spheres vs the co-moving frame (spheres translating at −U, fluid at rest at
+  infinity): assert `u_moving + U == u_static` to solver tolerance; run WITHOUT R3 first to show
+  the failure it fixes, then with. (c) **Rotlet**: single rotating sphere in Stokes; exterior
+  `u = ω×r·(R/|r|)³`; measure L2 error convergence order across N=32/64/128 (periodic-image
+  corrections pollute absolutes; the ORDER is the claim, ≥1 required, ~2 expected away from cuts).
+- **L3-R4 — the moving-step driver.** `set_instance_motion(instance, translation, quat, linVel,
+  angVel)` + a `rebuild_geometry()` that re-samples + rebuilds (warm-started pressure already
+  exists). Measure and RECORD ms/step vs a static step at 64³/128³. No incremental rebuild.
 
-Once 0–3 exist this is mostly composition:
+### Layer 4 — resolved CFD-DEM (SPEC, resolved 2026-08-29 — execute on Opus)
 
-- the dem particle scene **is** the flow geometry scene — dem adapts its SoA into a `SceneView`
-  (decision 4) and hands it to flow zero-copy on the same device; no rasterization step;
-- particle rigid-body velocities feed the Layer-3 wall BC through the instance velocity record;
-- the fluid returns hydrodynamic force and torque by integrating stress over each object's cut faces —
-  a new kernel, but a local one;
-- `generateSdfKokkos` demotes to a fallback / visualisation path rather than the bridge.
+Python-composed like `peclet.coupling` (no C++ link between dem and flow — the suite's
+architecture): a `ResolvedCfdDem` driver in `coupling/python`.
 
-**MPI is the real constraint here.** `flow`'s block decomposition and `dem`'s particle ORB are
-independent, so a particle straddling a fluid block boundary must be visible to **every rank owning a
-cut cell it touches** — a *geometry halo* distinct from both the grid halo and the particle halo.
-With decision 4 this reduces to shipping **instance records** (transform + shapeId + velocity; the
-shape tables are already replicated) to ranks whose block overlaps the instance AABB — a
-`gatherGhosts`-style predicate over small PODs, naturally a `core` facility (see open decision 3).
+- **L4-R1 — dem→scene bridge.** Per coupling step: pull dem state (positions/quats/scales +
+  velocities/angVels via the existing host getters; float→double at the boundary — "zero-copy" is
+  NOT literal across the float/double divide and per-step instance-array rebuild is trivial),
+  build the flat instance encoding (spheres first: one kSphere node, N instances), call
+  `flow.set_scene(..., periodic=)` + `set_solid_from_scene` + the L3 motion fill.
+- **L4-R2 — hydrodynamic force/torque.** Device kernel over cut cells:
+  `dF = (−p·I + μ(∇u+∇uᵀ))·A_wall` with `A_wall` from the aperture identity (L3-R3) and `∇u`
+  central-differenced at the cell; `F[owner] += dF`, `τ[owner] += (x_c − c_owner)×dF` via atomics
+  (tolerance-, not bit-reproducible — document, like coupling's deposits). *Gate:* **Zick–Homsy**:
+  the integrated drag on the fixed periodic array must reproduce the same k the velocity-based
+  `validate_zick_homsy_sdflow.py` measures (self-consistency at N=64, convergence toward Z&H at
+  N=128; cut-cell force integration is O(h)-noisy — report measured, don't promise <1%).
+- **L4-R3 — motion loop.** Weak explicit coupling: flow force → `dem.set_external_forces` → dem
+  substeps → new state → rebuild + flow step. *Gate:* settling sphere at low Re vs the terminal
+  velocity PREDICTED FROM THE MEASURED drag coefficient of the same box (self-consistent — avoids
+  literature wall-correction fits): `U_t = F_g / (6πμR·k_measured)`.
+- **L4-R4 — MPI.** Instances REPLICATED (allgather dem state at coupling cadence): correct, simple,
+  and exactly how the AMR bed treats its spheres; the gatherGhosts-style geometry halo is the
+  documented optimization for large N. *Gate:* np1 vs np2 resolved fixed-bed fields agree to
+  tolerance (atomics ⇒ not bitwise).
+
+**AMR preparation (standing constraint):** all of L3/L4's geometry machinery (owner attribution,
+instance velocity, batched eval, apertures) lands in **core geom** with flow as a consumer, so the
+AMR solver picks it up through the same `SceneQueryView` once its own campaign resumes. No AMR
+builder is touched by any of this.
 
 ### Orthogonal (does not block the above)
 
