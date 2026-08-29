@@ -37,6 +37,39 @@ So: **~94% of AMR setup is SDF evaluation cost**, split multiplicatively into (a
 (c) serialism (one core, host). The scene layer owns (b) and the batched/device form of (c);
 the AMR builders own (a) and the loop structure of (c).
 
+### 1a. Where it stands after the scene layer + the builder parallelization (2026-08-29)
+
+Both halves have now landed. The scene layer took (b) from 1.18 µs/eval to ~0.03–0.05 and the
+whole of `setSolid` from 127 → **13.1 → 10.5 µs/leaf** (the second step is rung 0's `-mfma` on
+the amr_bindings host flags). `core/docs/amr_setup_parallel_plan.md` then took (c): the five
+serial host builders run over the Kokkos host execution space
+(`common/host_parallel.hpp::hostParFor` / `hostParScan`), leaving the numerics bit-identical.
+
+Same bed, same machine (RTX 5080 host, depth-7 graded, 1.79M leaves), µs/leaf:
+
+| phase | 1 thread | 8 threads | 16 threads | rung |
+|---|---:|---:|---:|---|
+| `mom_.build` (cut-cell momentum stencils) | 2.6 | 0.4 | 0.2 | 3 |
+| `presMG_.build` (openness MG hierarchy) | 2.4 | 0.3 | 0.2 | 2 |
+| cf overlays (4 C/F builders) | 2.3 | 0.5 | 0.3 | 1 |
+| `buildOpenness` (level-aware canonical rule) | 1.7 | 0.2 | 0.1 | 2 |
+| `buildGhostOverlaySampled` (mixed-level overlay) | 1.3 | 0.3 | 0.2 | 4 |
+| `velocity MG build` (still serial) | 0.3 | 0.3 | 0.3 | — |
+| `findPocketCells` (still serial — host BFS) | 0.2 | 0.2 | 0.2 | — |
+| device assembly + uploads | 0.1 | 0.1 | 0.1 | — |
+| **total** | **10.9** | **2.4** | **1.7** | |
+
+Depth scaling of the total (same build): depth 6 — 10.0 / 2.5 / 2.0; depth 7 — 10.9 / 2.3 / 1.7;
+depth 8 (7.01M leaves) — 2.4 at 8 threads (**16.9 s**, from 95.6 s serial) and 1.8 at 16.
+
+Two caveats that matter for planning:
+- **Multi-rank setup is unchanged.** `AmrCutCell::build` runs serial whenever a distributed seam
+  resolver is installed, because `LeafHalo::resolveGlobal` mutates the halo's miss map — see
+  finding F1 in `core/docs/amr_setup_parallel_plan.md`.
+- **The remaining serial phases are now the largest single items** (velocity MG build 0.3,
+  `findPocketCells` 0.2), i.e. the next lever is no longer loop parallelism either — it is
+  device-resident assembly (`core/docs/amr_device_assembly_plan.md`).
+
 ## 2. The inversion (user brainstorm, endorsed): geometry drives, not cells
 
 Cell-driven queries make every cell pay a full acceleration-structure traversal — including the
