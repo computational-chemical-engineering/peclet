@@ -33,18 +33,18 @@
 > then 1.51** once measured against a trustworthy reference. A full per-step geometry rebuild costs
 > **9.3 ms at 64³ / 37.0 ms at 128³ on an RTX 5080 — 1.5-1.6× a static step**, which is far cheaper
 > than the 339 ms host datum that motivated deferring incremental rebuild.
-> **LAYER 4 (resolved CFD-DEM): rungs 1-4 executed.** The dem→scene
-> bridge, the cut-cell traction integral and the weak-coupling motion loop are in (`ResolvedCfdDem`
-> in `coupling/python`, `hydro_force_torque` in flow); the loop RUNS and converges to a slip
-> plateau. **One defect explains every miss**: the reconstructed traction under-reads. Attribution
-> and symmetry are exact to 1e-15 and `A_wall` is right to 1-2%, but the force magnitude is
-> **29% low and resolution-independent** (0.715 at N=64, 0.709 at N=128), which then shows up as a
-> 3% frame error on a moving wall and as a settling slip 13% high with total momentum leaking at
-> 0.58 F_g per unit time. Cause localised to the prescribed central-difference velocity gradient;
-> the two principled fixes are in **§7 OPEN FOR REVIEW 1** (route (b), taking the force from the
-> discrete reaction, closes all three at once). A separate, genuine bug — masked solid cells read as
-> fluid samples, which flipped the sign of the moving-wall force — was found by the gate and fixed;
-> §7 item 2.
+> **LAYER 4 (resolved CFD-DEM) COMPLETE 2026-08-30 — the coupling force is the DISCRETE REACTION
+> (route (b), flow `fc54f4a`, coupling `c69b5d9`).** `hydro_force_torque_reaction` sums, per owner
+> region, the momentum the fluid actually lost — R_i = ρ/dt(u−uⁿ) − f_c − Σ_fluid-nbrs μ(u*_nb −
+> u*_i), no pressure field read (it telescopes inside owner regions to the control-volume budget).
+> Gated as the review demanded: the identity ΣF = f·N_fluid holds to **−8.8e-15** at steadiness
+> (the approach is the genuine unsteady term: −3.1e-03 / −1.0e-05 / −1.2e-10 / −8.8e-15 at
+> 200/400/800/1600 steps), frame invariance **0.999999993** (traction: 1.030), MPI per-instance
+> forces cross-np to 4.1e-15, and the settling gate now **PASSES at 0.9988** (was 1.13) with the
+> momentum leak gone (44× smaller residual, of setup origin). The reconstructed traction
+> (`hydro_force_torque`) remains as the DIAGNOSTIC that keeps its own 29% resolution-independent
+> under-read visible — localised to the central-difference gradient (§7 item 1 has the full
+> history, including the masked-solid-cell sign bug the frame-invariance check caught, §7 item 2).
 >
 > `file:line` references are snapshots of the audit — **re-grep before acting**.
 
@@ -854,6 +854,12 @@ missing `_coupling` extension (which only the UNRESOLVED driver uses).
   and the momentum leak shifts the operating point as the run proceeds. Route 1(b) in §7 — take the
   force from the discrete reaction — makes action-reaction exact and closes all three symptoms at
   once (the 29% static deficit, the 3% frame error, this leak).
+
+  **RESOLVED with route (b)** (coupling `c69b5d9`): with the reaction force feeding dem, the same
+  gate gives **slip ratio 0.9988** — inside the 5% claim — and the momentum drift falls 44×, the
+  remainder being the setup's own analytic-vs-discrete V_fluid mismatch plus rebuild blips, not
+  the force method. Calibration and settling now use one force definition, so the self-consistency
+  the spec intended actually holds.
 
   *Two API traps found here.* `dem.step()` with no argument advances **nothing** (`dt=0` is a
   dynamics-free relaxation step), so a driver calling it runs happily with a frozen particle; and
