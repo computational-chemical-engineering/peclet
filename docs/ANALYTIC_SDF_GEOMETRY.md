@@ -7,7 +7,7 @@
 > GPU, and under MPI. Companion to [ARCHITECTURE](ARCHITECTURE.md), [CONVENTIONS](CONVENTIONS.md),
 > [INTERFACES](INTERFACES.md), [MULTIPHYSICS_PLAN](MULTIPHYSICS_PLAN.md).
 >
-> **Design decisions 1 and 4 RESOLVED 2026-08-26** (§7): two-layer dispatch (compile-time leaves +
+> **Design decisions 1 and 4 RESOLVED 2026-08-26** (§8): two-layer dispatch (compile-time leaves +
 > runtime node/scene), and core-defined types with per-code ownership via a non-owning `SceneView`.
 > §6 Layer 0 is now an executable spec (rungs + gates); an executor needs only this document.
 > **Rungs 0-2 SHIPPED** (core `e5815b7`, `7f21d72`, `7da12f0`): leaves + `PECLET_HD`/`Vec3`, the
@@ -541,7 +541,7 @@ change was the deliberate point (exact gradients).
 ### Layer 2 — `flow` consumes it
 
 Where the CFD accuracy motivation lands. Give `flow` a device-resident **scene** (a `SceneView` it
-owns, rank-replicated — see decision 4, §7) and derive geometry *in-solver* instead of importing
+owns, rank-replicated — see decision 4, §8) and derive geometry *in-solver* instead of importing
 arrays from Python:
 
 - exact wall crossings and exact apertures computed on device from the analytic scene — which by
