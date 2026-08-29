@@ -46,7 +46,14 @@ CUDA_COMPILER="${CUDA_COMPILER:-/usr/local/cuda/bin/nvcc}"
 case "$BACKEND" in
   nvidia-cuda)
     kokkos_args=(
-      -DKokkos_ENABLE_CUDA=ON -DKokkos_ENABLE_SERIAL=ON
+      # OpenMP HOST backend alongside CUDA (2026-08-30, core/docs/amr_setup_parallel_plan.md
+      # D1'): DefaultHostExecutionSpace becomes OpenMP so host-side Kokkos parallel_for/scan
+      # (the AMR setup builders) actually run parallel. Verified before enabling: NO existing
+      # code in core/flow/dem names a host execution space explicitly, so behaviour of
+      # already-written kernels is unchanged (unspecified-space dispatch stays on CUDA).
+      # Thread-count guidance: OMP_NUM_THREADS bounded + OMP_PROC_BIND=false (see suite
+      # CLAUDE.md) — an unbounded pool on a 48-core host is a measured hour-long trap.
+      -DKokkos_ENABLE_CUDA=ON -DKokkos_ENABLE_SERIAL=ON -DKokkos_ENABLE_OPENMP=ON
       # --expt-relaxed-constexpr on the Kokkos interface: device code may call constexpr host
       # functions (std::array::operator[] etc.). REQUIRED by core's AMR device assembly (the
       # morton encode/decode on device); without it nvcc only WARNS (#20013/#20015) and the

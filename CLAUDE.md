@@ -169,6 +169,16 @@ location that the wheel install maps into place.
 
 ## Conventions across the suite
 
+- **The `nvidia-cuda` prefix carries an OpenMP HOST backend since 2026-08-30**
+  (`OPENMP;SERIAL;CUDA`; `core/docs/amr_setup_parallel_plan.md` D1′): host-side Kokkos
+  `parallel_for`/`parallel_scan` (the AMR setup builders) run multithreaded. Consequences:
+  **bound the pool** — `OMP_NUM_THREADS=8 OMP_PROC_BIND=false` for test batteries (an unbounded
+  pool on a 48-core host is a measured hour-long trap), and thread-count-pinned probes (e.g.
+  `.sdf-campaign-probes/flow_probe.py` at 4 threads) must keep their pinned counts. Binaries
+  built before the switch statically link the old Kokkos and are unaffected until rebuilt —
+  but do NOT compose old- and new-prefix modules in one Python process (e.g. `coupling`
+  importing flow + dem) until both are rebuilt against the same prefix.
+
 - **Kokkos C++ projects** (`flow`, `dem`) put device kernels in header-only `.hpp` (compiled as C++; the Kokkos launch compiler routes them through `nvcc`/`hipcc` — never `.cu`) and expose the simulation as an importable Python module via a nanobind binding TU (built with scikit-build-core, on core's zero-copy View↔ndarray bridge); drive simulations from Python, not C++ mains.
 - **Header-only C++ projects** (`morton`, `voro`, `core`) put the real logic in templates under `include/`; there is no library to link.
 - Build artifacts (`build/`, `build_*/`, `.venv/`, `*.so`, `__pycache__/`) and large output assets (`*.vti`, `*.vtp`, `*.png`) are committed/present in several projects — don't treat their existence as something you created, and prefer the project's own out-of-source `build/` directory.
