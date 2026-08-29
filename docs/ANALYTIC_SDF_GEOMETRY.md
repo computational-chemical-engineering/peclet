@@ -672,9 +672,20 @@ The pipeline the campaign was building toward, closing three gaps at once (core 
 - **dem `SHAPE_SCENE`** — a particle whose collision field IS a composed analytic tree
   (`Simulation.add_scene_shape`), the particle sibling of the Layer-1 analytic walls: same flat
   encoding, same pooled device node table (`P_.shapeNodes`, absolute indices), evaluated by
-  `evalTree` in canonical body space; gradients by central difference (the runtime tree has no
-  closed-form gradient yet — recorded). The shell still comes from a bake (the point-shell model
+  `evalTree` in canonical body space. The shell still comes from a bake (the point-shell model
   needs probes; probe spacing, not the field, bounds contact resolution).
+- **`evalTreeGrad`** (core, same-day follow-up) — the runtime tree's **analytic gradient**, one
+  traversal carrying (value, gradient): leaves use their closed-form `.grad()`, transforms cost
+  one quaternion rotation each (the conformal scale cancels in the chain rule), and CSG selects
+  the ACTIVE branch's gradient by the same comparison the value makes. Gate `geom_tree_grad`:
+  value bitwise `evalTree`'s (0/50000), chain rule exact to 0.0 under rotated+scaled transforms,
+  O(h²) against FD on smooth regions — and **at a drilled-box rim the analytic normal is the flat
+  face's exact +z at every distance while the central difference smears 39° once the ridge enters
+  its stencil**. Also 3.2× faster than the eval+FD it replaces (184 vs 592 ns/probe). Consumers:
+  dem `SHAPE_SCENE` contact normals AND analytic-wall normals (the deliberate numerics change,
+  mirroring Layer 1's exact particle normals; grid shapes/walls keep FD), and Python
+  `eval_root_grad`. voro's provider contract (`eval + gradH`, FD by design) is the recorded
+  non-consumer — switching it is a provider-contract change for that campaign to take.
 - **`peclet.dem.scene_particle.build`** — the one-call pipeline: author tree → measure → reframe
   to principal → bake shell → `register(sim)`; the same reframed tree feeds flow analytically.
 
