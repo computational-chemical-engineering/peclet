@@ -20,7 +20,10 @@
 > SceneQueryDevice, native periodicity, in-solver exact crossings (staggered AND collocated
 > placement). **MPI scene demo DONE 2026-08-30** (gated at np = 1, 2, 4: k identical, per-rank cut
 > ownership exactly the single-rank field restricted to the block — see Layer 4 rung 4, which the
-> same gate closes). Still open: AUTO-guard relaxation, Saye/quadrature apertures.
+> same gate closes). **Quadrature apertures DONE 2026-08-30** in core `geom/quadrature.hpp` (§6.4):
+> face apertures to 4e-12 mean against the closed form, against 4e-02 for the sampled-SDF linear
+> estimator, explicitly NON-CERTIFIED. Still open: the AUTO-guard relaxation, and wiring the
+> quadrature apertures into flow's openness.
 > **LAYER 3 (moving geometry) COMPLETE 2026-08-30** — cut ownership, kinematic wall velocity in the
 > momentum operator, the wall's own volume flux in the projection, and the moving-step driver
 > (core `318d651`, `81a3f7c`; flow `1b00405`, `7f87b21`). Opt-in throughout: the fingerprint
@@ -551,6 +554,53 @@ arrays from Python:
   belongs — the general replacement for `exact_apertures_spheres.py`;
 - the per-cell candidate binning of contract 9 (band-splat over instance AABBs);
 - a `set_solid` overload taking a device View, so geometry never round-trips through the host.
+
+#### 6.4 Implicit-quadrature apertures (core `geom/quadrature.hpp`, shipped 2026-08-30)
+
+The general replacement for `flow/scripts/exact_apertures_spheres.py`: given any device-callable
+field (a `SceneQueryView`, a leaf, a lambda), the fluid fraction of an axis-aligned face
+(`faceAperture`) or box (`cellVolumeFraction`). Saye's dimension reduction at its simplest useful
+level — pick a height direction, integrate the transverse directions with Gauss–Legendre, and take
+the 1-D measure along each height line by bracketed bisection (exact to rounding). It lives in
+**core geom** so AMR gets it for free through the same `SceneQueryView`.
+
+**The one non-obvious thing, and it is worth 8 orders of magnitude.** `L(t)`, the positive length
+as a function of the transverse coordinate, has a **kink wherever the interface crosses an EDGE of
+the face**. Integrating straight through those pins the error near 1e-3 *at every resolution* —
+because an aperture is a **fraction**, so a fixed kink in a fixed normalized integrand costs a fixed
+amount and refining the grid does not help at all. Locating those crossings on the two edge
+functions (two bracketed bisections each) and running the Gauss rule piecewise removes the
+obstruction entirely.
+
+*Gate (`ctest geom_quadrature`), sphere R=0.3, against the closed-form disk-rectangle overlap:*
+
+| N | cut faces | quadrature (split) | **unsplit** | sampled-SDF linear |
+|---|---:|---:|---:|---:|
+| 16 | 276 | **3.93e-12** | 8.55e-04 | 3.78e-02 |
+| 32 | 1172 | **4.10e-12** | 9.89e-04 | 5.19e-02 |
+| 64 | 4612 | **3.89e-12** | 5.40e-04 | 4.67e-02 |
+
+Mean absolute error over the cut faces. The split buys 2e+07 to 1e+08; the unsplit column is the
+evidence for the paragraph above — it barely moves across a 4× refinement.
+
+*Convergence is in the NODE COUNT, not in h* (N=32, all cut x-faces): order 2 → 3.21e-06,
+3 → 1.60e-08, 4 → 2.10e-10, 5 → 4.10e-12, 8 → 1.21e-14. Geometric, as a Gauss rule on a smooth
+integrand should be once the kinks are removed.
+
+*Volume fractions are weaker*: 7.50e-07 relative on a sphere at 24³, because the outer rule there is
+two-dimensional and its kinks are **curves**, not points, so the same subdivision does not apply.
+More nodes is the lever.
+
+> **NOT CERTIFIED — and the failure modes are structural, not rounding.** Unlike the candidate-grid
+> pruning of §6.2, this carries no exactness guarantee. (1) A feature thinner than the initial
+> bracketing stride is invisible. (2) Where the interface is not a graph over the height direction
+> the premise fails outright. (3) The height direction is chosen once per face from the gradient at
+> its centre, so a face whose interface turns across it loses accuracy. The gate therefore also
+> measures a **torus**, where a line through the hole crosses four times: results stay in [0,1] (0
+> of 288 cut faces out of range) and the volume lands within 8.6e-06 relative — bounded and
+> consistent, with **no order claimed**. Consumers must keep the sub-resolution aperture floor the
+> cut-cell pressure operator needs (α ~ 1e-12 rows destroy its conditioning — measured) and must not
+> build a conservation argument on these numbers.
 
 #### 6.2 Layer 2-for-core: accelerated queries (shipped 2026-08-29)
 
