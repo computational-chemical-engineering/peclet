@@ -19,12 +19,27 @@
 > **LAYER 2 (flow) largely SHIPPED** (flow `553524b`, `0706196`): device scene via core
 > SceneQueryDevice, native periodicity, in-solver exact crossings (staggered AND collocated
 > placement); still open: MPI np2 demo, AUTO-guard relaxation, Saye/quadrature apertures.
-> **LAYERS 3-4 SPECIFIED** below at executable rung detail — run them on Opus.
-> **LAYER 2-FOR-CORE SHIPPED** (2026-08-29): batched scene evaluation + geometry-driven candidate
-> grids + the sphere-union fast paths, retiring the AMR `set_solid_spheres` stopgap — RCP-bed
-> `AmrFlow::setSolid` 127 → ~13 µs/leaf serial, host ≡ device **bitwise** (fma-canonical). See
-> docs/AMR_GEOMETRY_SETUP_REQUIREMENTS.md §5 for the handoff record. flow's Layer-2 remainder
-> (MPI demo, AUTO-scheme guard, Saye apertures) still open.
+> **LAYER 3 (moving geometry) COMPLETE 2026-08-30** — cut ownership, kinematic wall velocity in the
+> momentum operator, the wall's own volume flux in the projection, and the moving-step driver
+> (core `318d651`, `81a3f7c`; flow `1b00405`, `7f87b21`). Opt-in throughout: the fingerprint
+> `u_sum 6.74193610583927948e+05` is bit-identical with no moving instance. **Galilean gate passes**
+> — `u_B + V == u_A` to 2.3e-05 (N=32, 260 steps), 2.6e-06 (800 steps), 6.3e-06 (N=64 CUDA), while
+> the same runs with the wall-flux term off sit at 2.2e+00 and do not converge. **Rotlet order 1.97
+> then 1.51** once measured against a trustworthy reference. A full per-step geometry rebuild costs
+> **9.3 ms at 64³ / 37.0 ms at 128³ on an RTX 5080 — 1.5-1.6× a static step**, which is far cheaper
+> than the 339 ms host datum that motivated deferring incremental rebuild.
+> **LAYER 4 (resolved CFD-DEM): rungs 1-3 executed, rung 4 (MPI) not started.** The dem→scene
+> bridge, the cut-cell traction integral and the weak-coupling motion loop are in (`ResolvedCfdDem`
+> in `coupling/python`, `hydro_force_torque` in flow); the loop RUNS and converges to a slip
+> plateau. **One defect explains every miss**: the reconstructed traction under-reads. Attribution
+> and symmetry are exact to 1e-15 and `A_wall` is right to 1-2%, but the force magnitude is
+> **29% low and resolution-independent** (0.715 at N=64, 0.709 at N=128), which then shows up as a
+> 3% frame error on a moving wall and as a settling slip 13% high with total momentum leaking at
+> 0.58 F_g per unit time. Cause localised to the prescribed central-difference velocity gradient;
+> the two principled fixes are in **§7 OPEN FOR REVIEW 1** (route (b), taking the force from the
+> discrete reaction, closes all three at once). A separate, genuine bug — masked solid cells read as
+> fluid samples, which flipped the sign of the moving-wall force — was found by the gate and fixed;
+> §7 item 2.
 >
 > `file:line` references are snapshots of the audit — **re-grep before acting**.
 
@@ -572,75 +587,226 @@ always-list.
 > only the 2.75 extra sqrts. Multiplicative factor estimates are only valid against the SAME
 > baseline denominator.
 
-### Layer 3 — moving geometry (SPEC, resolved 2026-08-29 — execute on Opus)
+### Layer 3 — moving geometry ✅ COMPLETE (rungs 1-4 shipped 2026-08-30)
 
-Measured inputs (flow `0706196`): a full geometry rebuild at 128³ host-4T is **339 ms** — **~65%
-momentum/IBM stencils, ~35% pressure/MG** (from the FULL vs MOMENTUM-ONLY split), and scene
-sampling is *noise* (array vs candidate-accelerated scene identical). So: per-step full rebuild is
-the v1 moving-geometry cost model; **incremental rebuild is deferred by design** (it must attack
-both sides and is not an overnight item — inputs recorded, decision Frank's).
+Shipped: core `318d651` (cut ownership), `81a3f7c` (rigid-body motion + wall point); flow
+`1b00405` (per-cell owner), `7f87b21` (rungs 2-4). Everything is **opt-in**: with no moving
+instance the fingerprint is bit-identical, gated before each commit.
 
-Everything below is **opt-in**: with no moving instance (all `linVel`/`angVel` zero) every path
-must stay **bit-identical** (fingerprint gate before each commit).
+Measured inputs that shaped it (flow `0706196`): a full geometry rebuild at 128³ host-4T is
+**339 ms** — ~65% momentum/IBM stencils, ~35% pressure/MG, scene sampling in the noise. That
+motivated deferring incremental rebuild. **The GPU measurement changes the picture** (rung 4
+below): a full rebuild is 37 ms at 128³ on an RTX 5080, i.e. **1.5× a static step**, so per-step
+full rebuild is affordable and incremental rebuild is not urgent. Decision still Frank's.
 
-- **L3-R1 — cut ownership.** Add `SceneQueryView::owner(p) -> int` in core (argmin instance:
-  candidate-list argmin in sphere mode, instance loop in general mode; ties break to the lowest
-  index, deterministically). flow builds a per-cut-cell `cutOwner_` int field at `set_solid_from_scene`
-  when the scene is installed. *Gate:* on the 4-sphere bed every cut cell's owner equals the
-  brute-force nearest sphere.
-- **L3-R2 — kinematic wall velocity in the momentum operator (staggered first).**
-  `ibmModifyStencil` already accumulates `Nbc * u_bc * vnb` with a scalar `u_bc = 0`; give it an
-  optional per-cut-cell View `uBc_[c]` (empty View ⇒ old scalar path, bit-identical). Fill from the
-  scene: wall point `w = p − sdf(p)·n̂(p)` (n̂ central-diff from the sampled `sdf_`; O(h) placement
-  is the v1 fidelity — per-direction crossing-point placement via `tEx` is a later refinement),
-  `uBc = instanceVelocity(inst[owner], w) · ê_c`. **Collocated ghost-projection `w_bc` hookup is
-  DEFERRED** — staggered first; touching the ghost overlay is attractor-campaign territory.
-- **L3-R3 — wall flux in the divergence constraint.** A rigid body moving through a cut cell
-  injects `∮ u_w·n dA ≠ 0` per cell (zero only integrally over the whole body). Per cell the wall
-  area VECTOR is exact from the aperture identity (divergence theorem on the cell):
-  `A_wall = −h²·(oE−oW, oN−oS, oT−oB)` in open-area terms; RHS of the cut-cell projection gains
-  `u_w(centroid)·A_wall`. Only when a moving instance exists.
-- **L3-R2/R3 GATES (run together — R3 is what makes R2 converge):**
-  (a) OFF ⇒ fingerprint bit-identical. (b) **Galilean**: steady periodic Stokes bed with mean flow
-  U past static spheres vs the co-moving frame (spheres translating at −U, fluid at rest at
-  infinity): assert `u_moving + U == u_static` to solver tolerance; run WITHOUT R3 first to show
-  the failure it fixes, then with. (c) **Rotlet**: single rotating sphere in Stokes; exterior
-  `u = ω×r·(R/|r|)³`; measure L2 error convergence order across N=32/64/128 (periodic-image
-  corrections pollute absolutes; the ORDER is the claim, ≥1 required, ~2 expected away from cuts).
-- **L3-R4 — the moving-step driver.** `set_instance_motion(instance, translation, quat, linVel,
-  angVel)` + a `rebuild_geometry()` that re-samples + rebuilds (warm-started pressure already
-  exists). Measure and RECORD ms/step vs a static step at 64³/128³. No incremental rebuild.
+- **L3-R1 — cut ownership ✅.** `SceneQueryView::evalOwner(p, own)` / `owner(p)` in core: one
+  traversal returns bitwise `eval`'s value plus the argmin instance. Ties break to the **lowest
+  index by the comparison itself**, not by scan order — necessary because a point can be answered
+  through a candidate list, the always-list ∪ candidate list, or the full-scan fallback, which
+  visit indices in different orders. flow fills a per-inner-cell `cutOwner_` inside
+  `set_solid_from_scene`, free because it rides the sample it already takes.
+  *Gates:* ctest `geom_owner` — RCP-180 60k probes, poly-120 40k, the flow 4-sphere bed 40k, all
+  0 mismatches against an independent brute-force argmin; 30k probes invariant under per-bin
+  candidate reordering; exact ties (coincident spheres, exact mid-plane) resolve to the lowest
+  index; owner **host ≡ device** 0/50000 on OpenMP *and* CUDA (`geom_batch_device`). flow-side:
+  0/1560 cut cells and 0/32768 cells disagree with a numpy argmin, with 2948 exactly-tied lattice
+  cells present so the tie rule is exercised, not assumed away.
 
-### Layer 4 — resolved CFD-DEM (SPEC, resolved 2026-08-29 — execute on Opus)
+- **L3-R2 — kinematic wall velocity in the momentum operator ✅** (staggered only).
+  `ibmModifyStencil`'s scalar `u_bc` became an optional per-cell View; an empty View keeps the
+  scalar path with the same three roundings in the same order. Filled from the scene at each
+  component's **own** staggered point: `n̂` from a central difference of the sampled `sdf_`,
+  `w = p − sdf(p)·n̂` via core's `geom::wallPoint`, `uBc = instanceVelocity(owner(p), w)·ê_c`.
+  The owner is queried **at p**, not read from the cell-centred `cutOwner_`: at a contact between
+  two bodies the staggered point and the cell centre can belong to different ones.
+  Collocated ghost-projection `w_bc` remains **DEFERRED**; ghost-projection / porous /
+  variable-density are refused loudly rather than silently mis-walled.
+
+- **L3-R3 — wall flux in the divergence constraint ✅.** `A_wall = −(oE−oW, oN−oS, oT−oB)` in
+  h=1 units (divergence theorem on the cell's fluid region; the open-face terms telescope), folded
+  into `div_` before the negation and into `max_open_divergence` so the diagnostic still measures
+  the residual of the constraint actually solved.
+
+- **L3-R2/R3 GATE — Galilean invariance. PASSES, and rung 3 is load-bearing by 10⁵.**
+  Stokes bed with body force, solved in the lab frame and in a frame boosted by `V = 0.7` (every
+  sphere given `linVel = −V`, geometry identical); claim `u_B + V == u_A` in every fluid unknown.
+
+  | run | rung 3 ON | rung 3 OFF |
+  |---|---|---|
+  | N=32 host-OpenMP, 260 steps | **2.313e-05** | 2.224e+00 |
+  | N=32 host-OpenMP, 800 steps | **2.591e-06** | 2.224e+00 |
+  | N=64 CUDA, 400 steps | **6.321e-06** | 5.582e-01 |
+
+  (max |u_B + V − u_A| / max|u_A| over all fluid unknowns; the cut band and the deep field give the
+  same order, which is itself evidence the residual is not a wall-treatment error.) Tripling the
+  solver work shrinks the ON error 8.9× and leaves the OFF error where it was — so the ON residual
+  is **convergence level**, and the OFF error is a real, non-vanishing wrong answer. Wall-flux
+  imbalance (Σ u_w·A_wall, the singular problem's compatibility datum) measured 1.6e-13 at N=32 and
+  8.9e-16 at N=64: exactly zero for translation, as the telescoping predicts.
+
+- **L3-R2/R3 second gate — rotlet. PASSES at order ~2 once the reference is trustworthy.**
+  A single sphere spinning in Stokes flow; error in a shell 1.15–2 R from the surface against
+  `u = (R/|r|)³ ω×r` summed over a 9³ image block. **The reference, not the solver, decides
+  whether this is measurable**, and that took a dedicated experiment to establish:
+
+  At **R/L = 0.10** the near-shell error stalls — 2.481e-02, 1.476e-02, 1.355e-02 at N=48/96/144 —
+  and turning on exact scene crossings gives 1.656e-02, 1.259e-02, 1.255e-02. *Two different
+  discretisations descending to the same ~1.25e-02 floor* is the signature of a wrong reference,
+  not a wrong solver: the naive real-space image sum of a 1/r² field is conditionally convergent.
+
+  **The decisive experiment** (`ROTLET_MODE=refprobe`): hold R fixed at 7.2 **cells** — so the
+  discretisation error cannot move at all — and change only the box. Halving R/L dropped the
+  near-shell error 1.736e-02 → 7.457e-03, a factor 2.3. Solving `d + x = 1.736e-2`,
+  `d + x/8 = 7.46e-3` (the image term scales as (r/L)³) gives image ≈ 1.13e-02 and discretisation
+  ≈ 6.2e-03: at R/L = 0.10 the error is **~65% reference**.
+
+  Re-run in the regime where discretisation dominates (R/L = 0.05):
+
+  | N | R (cells) | near-shell L2 rel err | far shell (2–3.5 R) |
+  |---|---|---|---|
+  | 96 | 4.8 | 1.660e-02 | 1.925e-02 |
+  | 144 | 7.2 | 7.457e-03 | 1.415e-02 |
+  | 192 | 9.6 | 4.823e-03 | 1.185e-02 |
+
+  **Near-shell order 1.97 then 1.51** — the "~2 expected" the spec asked for, comfortably past the
+  ≥1 requirement. The far shell still reads 0.76/0.61 because that is where the residual image
+  correction lives, which is the same effect, now isolated rather than confounding. Exact scene
+  crossings improve the coarsest grid by 33%, which is the Layer-2 machinery doing what it is for.
+
+- **L3-R4 — the moving-step driver ✅.** `set_instance_transform(i, translation, quat)` +
+  `rebuild_geometry()`; `set_instance_motion(i, lin_vel, ang_vel, center=None)`. The rebuild
+  re-derives SDF, overlay, apertures and pressure operator, and **saves and restores u and P**
+  around it — `set_solid` zeroes `u/phi/P` by design, which would reset the flow every step.
+  Crossings are re-derived *before* the solid so a moving step costs one rebuild, not two.
+  *Gate — it marches:* N=48, 40 rebuilds — the sphere moved 1.60 cells against 1.60 expected, the
+  near-wake fluid was dragged along at +1.95e-02 for a wall speed of +0.08, max|div| stayed at
+  6.9e-08 over the whole march, and the field accumulated across all 40 rebuilds instead of
+  resetting.
+  *Cost (CUDA, RTX 5080, measured):*
+
+  | N | static | moving, no rebuild | moving + rebuild | rebuild alone |
+  |---|---|---|---|---|
+  | 64 | 13.9 ms | 12.8 ms | 22.1 ms | **9.3 ms (1.6× a static step)** |
+  | 128 | 74.2 ms | 73.0 ms | 110.0 ms | **37.0 ms (1.5× a static step)** |
+
+  Rungs 2-3 cost **nothing** at run time. A full per-step rebuild is ~0.5× a step on GPU.
+
+#### 6.3 TRAPS from the Layer-3 execution (all cost real time; all are gate-side, not solver-side)
+
+> **A benchmark whose baseline solves nothing.** The first rung-4 cost run had **no body force**,
+> so the static case had `u ≡ 0` forever and its pressure PCG converged on a zero right-hand side.
+> It reported the moving path at 2.8× a static step; with a body force the same comparison is
+> 0.9×. Any A/B of solver cost must check that the A side is doing work.
+
+> **`set_pressure_multigrid(True, levels=1)` costs 920 ms/step at N=64 on CUDA** against 19.5 ms
+> at depth 4 — the "coarse" solve is left on the full grid. `verify_periodic_spheres_sdflow.py`
+> uses `levels=1` deliberately (it is pure RB-GS, keeping the operator) and that is fine on CPU;
+> on GPU it silently turns a 20-second study into a 20-minute one.
+
+> **Compare staggered fields at staggered points.** Two separate gates were wrong the same way.
+> (1) A fluid mask taken at CELL CENTRES reported a Galilean error of exactly `V / max|u_A|`,
+> because a cell whose centre is fluid can have its u-point inside the solid, where both runs store
+> a masked 0. (2) The rotlet compared `get_u/get_v/get_w` — which are MAC FACE values at
+> (i−½,j,k), (i,j−½,k), (i,j,k−½) — against the analytic field at cell centres, an O(h) offset that
+> caps the measured order at 1 no matter how good the scheme is (it reported 0.93 and looked like a
+> real first-order result).
+
+> **The flow fingerprint is OpenMP thread-count sensitive** in `p_sum` and `u_l2` (not in `u_sum`
+> or `u_absmax`): at 4 threads all four golden digits reproduce, at 8 threads the last digits of
+> those two move. Pre-existing host-reduction behaviour. Run `flow_probe.py` at **4 threads**, or
+> compare only `u_sum` / `u_absmax`.
+
+> **`rebuild_geometry` must preserve the flow.** `set_solid` is a setup entry point and zeroes
+> `C[c].u`, `phi_` and `P_`. A moving-geometry driver that calls it per step without saving and
+> restoring them silently resets the solution every step and still "runs".
+
+
+### Layer 4 — resolved CFD-DEM (rungs 1-2 shipped, rung 3 measured, rung 4 open)
 
 Python-composed like `peclet.coupling` (no C++ link between dem and flow — the suite's
-architecture): a `ResolvedCfdDem` driver in `coupling/python`.
+architecture): `ResolvedCfdDem` in `coupling/python/peclet_coupling/resolved.py`. It is pure
+Python and needs no compiled kernels of its own, so `peclet_coupling/__init__.py` now tolerates a
+missing `_coupling` extension (which only the UNRESOLVED driver uses).
 
-- **L4-R1 — dem→scene bridge.** Per coupling step: pull dem state (positions/quats/scales +
-  velocities/angVels via the existing host getters; float→double at the boundary — "zero-copy" is
-  NOT literal across the float/double divide and per-step instance-array rebuild is trivial),
-  build the flat instance encoding (spheres first: one kSphere node, N instances), call
-  `flow.set_scene(..., periodic=)` + `set_solid_from_scene` + the L3 motion fill.
-- **L4-R2 — hydrodynamic force/torque.** Device kernel over cut cells:
-  `dF = (−p·I + μ(∇u+∇uᵀ))·A_wall` with `A_wall` from the aperture identity (L3-R3) and `∇u`
-  central-differenced at the cell; `F[owner] += dF`, `τ[owner] += (x_c − c_owner)×dF` via atomics
-  (tolerance-, not bit-reproducible — document, like coupling's deposits). *Gate:* **Zick–Homsy**:
-  the integrated drag on the fixed periodic array must reproduce the same k the velocity-based
-  `validate_zick_homsy_sdflow.py` measures (self-consistency at N=64, convergence toward Z&H at
-  N=128; cut-cell force integration is O(h)-noisy — report measured, don't promise <1%).
-- **L4-R3 — motion loop.** Weak explicit coupling: flow force → `dem.set_external_forces` → dem
-  substeps → new state → rebuild + flow step. *Gate:* settling sphere at low Re vs the terminal
-  velocity PREDICTED FROM THE MEASURED drag coefficient of the same box (self-consistent — avoids
-  literature wall-correction fits): `U_t = F_g / (6πμR·k_measured)`.
-- **L4-R4 — MPI.** Instances REPLICATED (allgather dem state at coupling cadence): correct, simple,
-  and exactly how the AMR bed treats its spheres; the gatherGhosts-style geometry halo is the
-  documented optimization for large N. *Gate:* np1 vs np2 resolved fixed-bed fields agree to
-  tolerance (atomics ⇒ not bitwise).
+- **L4-R1 — dem→scene bridge ✅.** Per coupling step: pull dem positions / quaternions /
+  velocities / angular velocities, build the flat instance encoding (one `kSphere` node, N
+  instances), push transforms + rung-2 motion, `rebuild_geometry()`. float32→float64 at the
+  boundary — "zero-copy" is not literal across that divide and does not need to be: the instance
+  array is a few hundred bytes per grain against a rebuild measured in tens of ms.
 
-**AMR preparation (standing constraint):** all of L3/L4's geometry machinery (owner attribution,
-instance velocity, batched eval, apertures) lands in **core geom** with flow as a consumer, so the
-AMR solver picks it up through the same `SceneQueryView` once its own campaign resumes. No AMR
-builder is touched by any of this.
+- **L4-R2 — hydrodynamic force/torque ✅ (shipped), with a MEASURED and LOCALISED bias.**
+  Device kernel over the cells the wall passes through: `dF_body = −(σ · A_wall)` with
+  `σ = −p I + μ(∇u + ∇uᵀ)`, `A_wall` from the aperture identity, posted to `cutOwner_`'s instance
+  by atomics (tolerance-, not bit-reproducible — documented, like the coupling deposits), torque
+  about the instance centre with a min-imaged lever arm. Returns force, torque, **and the pressure
+  and viscous parts separately**, because they fail differently.
+
+  *Gate — the momentum balance, which the solved field must already satisfy.* For a body-force
+  driven periodic bed at steady state, `Σ F_hydro = f · V_fluid` exactly, with no empirical input.
+  Measured (4-sphere bed, porosity 0.902, Stokes):
+
+  | N | Σ F_hydro / f·V_fluid | pressure part | viscous part |
+  |---|---|---|---|
+  | 64 | **0.715** | +87.8 | +81.3 |
+  | 128 | **0.709** | +668.8 | +672.8 |
+
+  Everything structural is exact: transverse leakage 5.5e-16 / 2.1e-13 relative (symmetry), and the
+  per-sphere spread over four identical spheres is 1.9e-15 / 1.0e-15 — so **owner attribution
+  splits the surface perfectly**. What is wrong is the magnitude, by **29%, and it does not
+  converge** (order −0.03): a modelling error, not a discretisation one.
+
+  *Localised, in two steps.* (1) A new `wall_area_probe()` sums `Σ x_c · A_wall,x` per axis, which
+  by the divergence theorem on the solid must equal `−V_solid`; measured **1.0222 at N=64 and
+  1.0114 at N=128**, converging. The geometry is right to 1-2%. (2) The pressure/viscous split
+  says the pressure part is roughly right while the viscous part is about half of what a 1/3–2/3
+  Stokes split would need. The cause is the prescribed **central difference**: it spans 2h while
+  the wall sits a fraction of a cell away, so it under-reads the wall shear by a factor that does
+  not shrink with h.
+
+  *The obvious repair was tried and is worse.* Differencing one-sidedly to the wall over the
+  crossing distance θ gave the drag **17× too large**: cut cells with θ→0 make 1/θ unbounded. That
+  is exactly why the momentum operator uses a Robust-Scaled reconstruction instead of a raw
+  one-sided difference. The experiment was removed rather than left behind a flag whose "on" state
+  is 17× wrong. See OPEN FOR REVIEW 1 for the two principled routes.
+
+- **L4-R3 — motion loop. RUNS AND CONVERGES; the gate misses by 13%, and the miss is the SAME
+  traction bias, now visible as a momentum leak.** Weak explicit coupling: flow force →
+  `dem.set_external_forces` → dem sub-steps → new state → rebuild + flow step.
+
+  *Gate:* a settling sphere against the terminal velocity predicted from the drag coefficient
+  **measured in the same box**, so every periodicity/blockage correction cancels and no literature
+  wall-correction fit is involved. (a) Sphere held fixed, body force f drives the fluid:
+  `λ := F_drag / (6πμR⟨u⟩)` = **1.0111**. (b) Same sphere freed with body force `F_g` and a
+  compensating fluid body force `−F_g/V_fluid` (without which the whole periodic system accelerates
+  forever and there is no terminal velocity to find); prediction `|⟨u⟩ − U_p| = F_g/(6πμRλ)`.
+
+  Measured (N=40, ρ_p/ρ_f = 5, 600 coupling steps): the slip rises 1.93e-02 → 2.26e-02 and
+  plateaus, against a prediction of 2.00e-02 — **ratio 1.13**, versus the 5% the gate asks for.
+
+  *Why, established rather than guessed.* Total x-momentum must be constant (the external forces
+  sum to zero by construction) and instead grows linearly, `p_tot 8.8e-03 → 1.28e+03` over 600
+  steps ≈ **0.58 F_g per unit time**. That is an action-reaction gap, and it is quantitatively the
+  one rung 2 already measured: the fluid feels the TRUE reaction through the no-slip wall while the
+  grain is handed the reconstructed traction, which under-reads by ~0.68-0.71. Working the arithmetic
+  the other way, `F_reported = −F_g` at the particle's steady state ⇒ `F_true ≈ −1.46 F_g` ⇒ a net
+  system injection of ≈ 0.46 F_g per unit time, against 0.58 measured. Same effect, same size.
+
+  *This also corrects the spec's own reasoning.* The gate was designed as self-consistent so the R2
+  bias would cancel between calibration and prediction. It does not fully cancel: calibration holds
+  the sphere STATIC (no frame error) while settling moves it (a further 3% frame error, measured),
+  and the momentum leak shifts the operating point as the run proceeds. Route 1(b) in §7 — take the
+  force from the discrete reaction — makes action-reaction exact and closes all three symptoms at
+  once (the 29% static deficit, the 3% frame error, this leak).
+
+  *Two API traps found here.* `dem.step()` with no argument advances **nothing** (`dt=0` is a
+  dynamics-free relaxation step), so a driver calling it runs happily with a frozen particle; and
+  dem assigns unit mass regardless of size, which makes the weak explicit exchange violently
+  unstable (the run reached 1e16 in 60 steps) until a physical mass is set via `set_inv_mass`.
+
+- **L4-R4 — MPI (replicated instances).** Not started. The force kernel already carries its
+  `MPI_Allreduce` (instances are replicated, each rank integrates the wall cells in its own block,
+  the body's total is the rank sum), and `wallFluxImbalance` / `wallAreaProbe` reduce likewise, so
+  the remaining work is the np1-vs-np2 gate and the driver's allgather of dem state.
 
 ### Orthogonal (does not block the above)
 
@@ -649,7 +815,63 @@ Shape-aware **unresolved** closures: sphericity / equivalent diameter / orientat
 
 ---
 
-## 7. Decisions
+## 7. OPEN FOR REVIEW (raised during the Layer 3-4 execution, 2026-08-30)
+
+Questions the specs did not resolve and that materially affect numerics or API. The conservative
+option was taken in each case and is stated; none of them is settled.
+
+1. **The cut-cell traction needs a wall-aware reconstruction, and it must come from the IBM
+   machinery, not a patch.** The spec prescribes `∇u` central-differenced at the cell. Measured
+   consequence: the integrated drag is **29% low and does not converge** (0.715 at N=64, 0.709 at
+   N=128), with `A_wall` itself verified right to 1-2% and the deficit sitting in the viscous part.
+   The one-sided repair over the crossing distance θ was tried and gave **17× too much** drag,
+   because cut cells with θ→0 make 1/θ unbounded — which is exactly why the momentum operator uses
+   a Robust-Scaled reconstruction. Two principled routes, neither improvised tonight:
+   *(a)* reuse the overlay's own `K/M/X/Nbc/D_rescale` coefficients, which already encode the
+   robust near-wall reconstruction, to form the wall traction; *(b)* skip the reconstruction
+   entirely and take the force from the **discrete reaction** the operator applies — sum the IBM
+   inhomogeneous/diagonal terms per cut cell and attribute by owner. Route (b) is consistent with
+   the solve *by construction* (`Σ F = f·V_fluid` exactly, not approximately) and is what several
+   IBM codes do; it is the recommended one. *Conservative choice taken:* keep the spec's central
+   difference, ship the pressure/viscous split and `wall_area_probe()` so the bias is visible, and
+   document it.
+
+2. **A masked solid cell is not a fluid sample — fixed, but the same class of bug may sit
+   elsewhere.** The force integral read the masked 0 in solid cells as a physical velocity. Static
+   geometry hides it (0 *is* the wall velocity); moving geometry does not, and the Galilean pair
+   measured the integrated force at **+7.08e+01 in the lab frame and −1.71e+02 boosted** — wrong
+   sign, ratio −2.42 — while the velocity field itself was frame-invariant to 7e-7. Substituting
+   the wall velocity fixes it and is bit-identical when nothing moves. **Worth auditing every other
+   consumer that differences the velocity field across a wall** (the advection stencils, the
+   collocated face-averaging, any post-processing) for the same assumption.
+
+3. **Centre of rotation when an encoded instance leaves `center` at the origin.** flow uses the
+   instance's own translation in that case, and the encoded `center` when it is nonzero. That makes
+   `add_instance(sphere, translation=c, ang_vel=w)` do the obvious thing, but it is a heuristic: a
+   body genuinely meant to spin about the world origin cannot say so by leaving `center` at zero.
+   The alternative is to require `center` explicitly and ignore the translation.
+
+4. **Fresh cells.** A cell uncovered by a body's motion inherits the zero the solid held there, not
+   an extrapolated fluid value. Conservative (bounded, and the momentum solve relaxes it within a
+   step at small per-step motion) but not obviously right at larger CFL. Alternatives: seed with
+   the local wall velocity of the body that uncovered it (cheap — `uwCell_` is already there), or
+   extrapolate from the fluid side.
+
+5. **dem has no external-torque API.** `set_external_forces` exists; there is no
+   `set_external_torques`. So `ResolvedCfdDem` computes the hydrodynamic torque, reports it, and
+   **cannot apply it** — a freely rotating resolved grain is not yet possible. The dem-side
+   addition is small but is dem-solver territory.
+
+6. **Rung 3's scope.** Moving geometry currently refuses the ghost-projection, porous and
+   variable-density paths outright. That is right for v1 (the wall-flux identity assumes the plain
+   cut-cell continuity, and the collocated overlay's `w_bc` slot is attractor-campaign territory),
+   but the porous case in particular will want it eventually.
+
+7. **The periodic-Stokes reference.** The rotlet order claim is only decidable where the naive
+   image sum is a good reference — measured as R/L ≲ 0.05. A Hasimoto/Ewald periodic rotlet would
+   make the gate valid at any R/L and is the right thing if this becomes a standing regression.
+
+## 8. Decisions
 
 ### Resolved (2026-08-26)
 
