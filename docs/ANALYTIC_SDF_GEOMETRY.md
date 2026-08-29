@@ -33,6 +33,13 @@
 > then 1.51** once measured against a trustworthy reference. A full per-step geometry rebuild costs
 > **9.3 ms at 64³ / 37.0 ms at 128³ on an RTX 5080 — 1.5-1.6× a static step**, which is far cheaper
 > than the 339 ms host datum that motivated deferring incremental rebuild.
+> **BODY-PROPERTY TOOLING + PYTHON AUTHORING + COMPOSED PARTICLES shipped 2026-08-30** (§6.5;
+> core `d4d3a60`, dem `fd371e1`): `geom::bodyProperties` (mass/COM/full tensor/principal moments +
+> QUATERNION by implicit quadrature — no bound-leaf bias, 1.7e-05 where the voxel builder is
+> +3.5e-02), `SceneBuilder::addReframed` (exact principal-frame re-expression, one composed
+> transform), the `peclet.core.geom` Python module (authoring + encode + bake + body_properties),
+> dem `SHAPE_SCENE` (a particle whose collision field IS a composed analytic tree; gated
+> tree-vs-fine-grid on OpenMP and CUDA), and `peclet.dem.scene_particle` gluing it into one call.
 > **LAYER 4 (resolved CFD-DEM) COMPLETE 2026-08-30 — the coupling force is the DISCRETE REACTION
 > (route (b), flow `fc54f4a`, coupling `c69b5d9`).** `hydro_force_torque_reaction` sums, per owner
 > region, the momentum the fluid actually lost — R_i = ρ/dt(u−uⁿ) − f_c − Σ_fluid-nbrs μ(u*_nb −
@@ -639,6 +646,51 @@ always-list.
 > only the 2.75 extra sqrts. Multiplicative factor estimates are only valid against the SAME
 > baseline denominator.
 
+#### 6.5 Body-property tooling + Python authoring + composed particles (shipped 2026-08-30)
+
+The pipeline the campaign was building toward, closing three gaps at once (core `d4d3a60`, dem):
+
+- **`geom/body_properties.hpp`** — mass, COM, full inertia tensor, and the principal decomposition
+  as three moments **plus a quaternion**, by composite implicit quadrature. Only signs and
+  bracketed roots are consumed, so bound-only fields (ellipsoid, superquadric, CSG — the
+  non-certified leaves) carry **zero systematic bias**: measured 1.7e-05 on the ellipsoid where
+  the voxel integrator (`peclet.dem.particle_builder`) is +3.5e-02. Grade ~O(n⁻²) (transverse-rule
+  kink *curves*, the `cellVolumeFraction` obstruction, honestly stated in the header): sphere
+  inertia 1.7e-04 / 2.5e-05 / 4.0e-06 at n = 8/16/32; a rotated+offset box recovers its COM to
+  2.4e-05 and its unique principal axis to 0.0042°. Gate: ctest `geom_body`.
+- **`SceneBuilder::addReframed` + `composeTransform`** — deep-copy a subtree and pre-compose a
+  transform on the copied root: `eval_new(p) = eval_old(toLocal(W, p))`, exactly. With the inverse
+  principal transform this puts a shape's canonical frame ONTO its principal frame in one node, no
+  resampling — **the resolution of the "reference frame ≠ principal frame" question**: supported
+  at preprocessing by construction, so dem's diagonal-inertia contract is met without carrying a
+  runtime reference quaternion. Round-trip gated (com 9.0e-06, frame deviation 0°).
+- **`peclet.core.geom`** (new Python module, host-only) — `SceneBuilder` with string-kind leaves,
+  CSG, quaternion transforms, instancing; `encode()` emitting exactly the flat arrays
+  `flow.set_scene` / `dem.add_analytic_wall` / `dem.add_scene_shape` consume; `eval`/`eval_root`
+  batch evaluation; `bake` (x-fastest float32 lattice, dem's grid layout); `body_properties`;
+  `principal_frame` (measure + reframe in one call). Ends the hand-assembled node-array era.
+- **dem `SHAPE_SCENE`** — a particle whose collision field IS a composed analytic tree
+  (`Simulation.add_scene_shape`), the particle sibling of the Layer-1 analytic walls: same flat
+  encoding, same pooled device node table (`P_.shapeNodes`, absolute indices), evaluated by
+  `evalTree` in canonical body space; gradients by central difference (the runtime tree has no
+  closed-form gradient yet — recorded). The shell still comes from a bake (the point-shell model
+  needs probes; probe spacing, not the field, bounds contact resolution).
+- **`peclet.dem.scene_particle.build`** — the one-call pipeline: author tree → measure → reframe
+  to principal → bake shell → `register(sim)`; the same reframed tree feeds flow analytically.
+
+*Gate (`scene_particle_gate.py`, OMP_NUM_THREADS=1):* an asymmetric dumbbell (real COM shift
+−0.152, recentred to 1e-06 by `principal_frame`) run as a tree particle vs the SAME shape baked to
+a 96³ grid particle: relaxed-contact separation errs 4.9e-03 for BOTH (the shared shell
+decimation — they agree with *each other* to 1e-05), and 400 colliding steps track to 0.0126
+against the grid's own 0.019 resolution. dem 8/8 kernel + 24/24 MPI stay green (the new kind is a
+new branch; existing shapes untouched). A pipeline smoke (box ∪ angled capsule) shows composed
+grains exchanging contact TORQUE — dem's internal rotational contact dynamics work for trees; only
+the EXTERNAL torque API (§7 item 5) remains missing.
+
+> **TRAP (bit dem again): `set_positions` resets every particle to shape 0.** A probe that
+> re-positions after `set_shape_ids` silently relaxes placeholder spheres — the static-contact
+> gate measured exactly nothing until the ids were re-applied after positioning.
+
 ### Layer 3 — moving geometry ✅ COMPLETE (rungs 1-4 shipped 2026-08-30)
 
 Shipped: core `318d651` (cut ownership), `81a3f7c` (rigid-body motion + wall point); flow
@@ -947,7 +999,9 @@ option was taken in each case and is stated; none of them is settled.
    consumer that differences the velocity field across a wall** (the advection stencils, the
    collocated face-averaging, any post-processing) for the same assumption.
 
-3. **Centre of rotation when an encoded instance leaves `center` at the origin.** flow uses the
+3. **Centre of rotation when an encoded instance leaves `center` at the origin.** *(Partly
+   softened 2026-08-30: with `principal_frame` re-expressing shapes COM-at-origin, the
+   translation-as-centre heuristic is exact for any shape that went through the pipeline.)* flow uses the
    instance's own translation in that case, and the encoded `center` when it is nonzero. That makes
    `add_instance(sphere, translation=c, ang_vel=w)` do the obvious thing, but it is a heuristic: a
    body genuinely meant to spin about the world origin cannot say so by leaving `center` at zero.
@@ -959,7 +1013,9 @@ option was taken in each case and is stated; none of them is settled.
    the local wall velocity of the body that uncovered it (cheap — `uwCell_` is already there), or
    extrapolate from the fluid side.
 
-5. **dem has no external-torque API.** `set_external_forces` exists; there is no
+5. **dem has no external-torque API.** *(Sharpened 2026-08-30: the pipeline smoke shows dem's
+   INTERNAL contact torques work for composed shapes — grains spin up in collisions — so this is
+   purely the missing `set_external_torques` entry point plus the coupling hand-off.)* `set_external_forces` exists; there is no
    `set_external_torques`. So `ResolvedCfdDem` computes the hydrodynamic torque, reports it, and
    **cannot apply it** — a freely rotating resolved grain is not yet possible. The dem-side
    addition is small but is dem-solver territory.
