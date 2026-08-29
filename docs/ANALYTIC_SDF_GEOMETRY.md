@@ -18,7 +18,9 @@
 > **LAYER 1 COMPLETE** (dem `e90a5d1`, `9b1de61`, `eb8de1c`, `608916b`, `7edb05d`; core `a78d0f0`).
 > **LAYER 2 (flow) largely SHIPPED** (flow `553524b`, `0706196`): device scene via core
 > SceneQueryDevice, native periodicity, in-solver exact crossings (staggered AND collocated
-> placement); still open: MPI np2 demo, AUTO-guard relaxation, Saye/quadrature apertures.
+> placement). **MPI scene demo DONE 2026-08-30** (gated at np = 1, 2, 4: k identical, per-rank cut
+> ownership exactly the single-rank field restricted to the block — see Layer 4 rung 4, which the
+> same gate closes). Still open: AUTO-guard relaxation, Saye/quadrature apertures.
 > **LAYER 3 (moving geometry) COMPLETE 2026-08-30** — cut ownership, kinematic wall velocity in the
 > momentum operator, the wall's own volume flux in the projection, and the moving-step driver
 > (core `318d651`, `81a3f7c`; flow `1b00405`, `7f87b21`). Opt-in throughout: the fingerprint
@@ -28,7 +30,7 @@
 > then 1.51** once measured against a trustworthy reference. A full per-step geometry rebuild costs
 > **9.3 ms at 64³ / 37.0 ms at 128³ on an RTX 5080 — 1.5-1.6× a static step**, which is far cheaper
 > than the 339 ms host datum that motivated deferring incremental rebuild.
-> **LAYER 4 (resolved CFD-DEM): rungs 1-3 executed, rung 4 (MPI) not started.** The dem→scene
+> **LAYER 4 (resolved CFD-DEM): rungs 1-4 executed.** The dem→scene
 > bridge, the cut-cell traction integral and the weak-coupling motion loop are in (`ResolvedCfdDem`
 > in `coupling/python`, `hydro_force_torque` in flow); the loop RUNS and converges to a slip
 > plateau. **One defect explains every miss**: the reconstructed traction under-reads. Attribution
@@ -803,10 +805,28 @@ missing `_coupling` extension (which only the UNRESOLVED driver uses).
   dem assigns unit mass regardless of size, which makes the weak explicit exchange violently
   unstable (the run reached 1e16 in 60 steps) until a physical mass is set via `set_inv_mass`.
 
-- **L4-R4 — MPI (replicated instances).** Not started. The force kernel already carries its
-  `MPI_Allreduce` (instances are replicated, each rank integrates the wall cells in its own block,
-  the body's total is the rank sum), and `wallFluxImbalance` / `wallAreaProbe` reduce likewise, so
-  the remaining work is the np1-vs-np2 gate and the driver's allgather of dem state.
+- **L4-R4 — MPI (replicated instances) ✅, and with it the Layer-2 MPI scene demo.** Instances are
+  replicated, so each rank derives its own block's geometry from the same scene with **zero new
+  communication** — that, not any new exchange, is what lifts the single-rank restriction the
+  Python override path carried. Each rank integrates the wall cells inside its own block and the
+  body's total is the rank sum (`MPI_Allreduce` in `hydroForceTorque`; `wallFluxImbalance` and
+  `wallAreaProbe` reduce likewise).
+
+  *Gate* (`mpi_scene_gate.py`, 4-sphere bed, N=32, np = 1, 2, 4):
+
+  | claim | np=2 vs np=1 | np=4 vs np=1 |
+  |---|---|---|
+  | permeability `k = μ⟨u⟩/f` | 0.000e+00 | 1.727e-16 |
+  | per-instance hydrodynamic force | 3.798e-07 | 3.798e-07 |
+  | per-rank cut-owner vs the single-rank global field | **0 mismatches** | **0 mismatches** |
+
+  The owner check is the sharp one: every rank's ownership field equals the single-rank global
+  field restricted to its block, exactly, because every rank evaluates the same replicated scene at
+  global coordinates. The force agrees to 4e-07 rather than bitwise, which is the documented
+  consequence of atomics over an unordered traversal — not a distribution artefact.
+
+  Still open on the driver side: `ResolvedCfdDem` does not yet allgather dem state, so the resolved
+  MOVING case is single-rank; the fixed-bed case above is fully distributed.
 
 ### Orthogonal (does not block the above)
 
