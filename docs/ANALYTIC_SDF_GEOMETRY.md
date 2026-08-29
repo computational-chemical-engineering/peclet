@@ -836,6 +836,35 @@ full rebuild is affordable and incremental rebuild is not urgent. Decision still
 > restoring them silently resets the solution every step and still "runs".
 
 
+- **L3-R5 — rigid PLACEMENT of an analytic dem wall ✅ (`set_wall_transform`, dem, 2026-08-30).**
+  `set_wall_velocity` gives a static wall a rigid-body surface-velocity field, which is the whole
+  story for a body of revolution (a drum barrel looks the same at every angle) and no story at all
+  for a stirrer blade, whose geometry has to sweep. `set_wall_transform(wall_index, translation,
+  quat)` composes the world placement onto the wall tree's **AUTHORED** root transform (kept at
+  `add_analytic_wall` time) via `SceneBuilder::composeTransform`, and re-uploads the KB-sized
+  `wallNodes` View — that upload is the whole cost. Composing onto the authored transform, not
+  onto the previous frame's result, is what makes calls absolute rather than compounding. The
+  caller drives `set_wall_transform` and `set_wall_velocity` together each step; neither is
+  inferred from the other. A companion `wall_sdf_at(wall_index, points)` returns exactly what the
+  narrow phase reads, so a placement can be checked (and a stirrer drawn) without a contact.
+
+  *Gates* (`wall_transform_gate.py`, OMP_NUM_THREADS=1):
+
+  | claim | measured |
+  |---|---|
+  | placed (q,t) vs the SAME tree AUTHORED at (q,t), 4000 probes | **bitwise identical** (max diff 0) |
+  | 100 identical calls; then return to identity | **bitwise stable / bitwise home** |
+  | the placement is not a no-op | max\|placed − home\| = 3.13 |
+  | self-axis rotation of a barrel (analytically the identity) | max\|ΔSDF\| **2.4e-06** = the float32 re-rounding floor |
+  | drum bed, 600 settle + 400 driven steps, bulk centre of mass | **6.1e-05 grain radii** |
+  | per-grain spread, static vs rotated geometry | 1.0e-02 grain radii, **bounded by** the rotated-vs-rotated control at 1.1e-01 |
+
+  The bitwise claim is real, not a tautology: it holds because `composeTransform(W, identity)`
+  reduces to `W` exactly (`mulQuat` with the identity quaternion and `rotate()` of the zero vector
+  are exact in floating point). The last row is the honest reading of a *chaotic* control: two runs
+  that BOTH rotate the geometry differ by more than static-vs-rotated does, so the per-grain spread
+  is float32 rounding amplified by the cascade, not an effect of moving the wall.
+
 ### Layer 4 — resolved CFD-DEM (rungs 1-2 shipped, rung 3 measured, rung 4 open)
 
 Python-composed like `peclet.coupling` (no C++ link between dem and flow — the suite's
@@ -998,8 +1027,15 @@ option was taken in each case and is stated; none of them is settled.
    inconsistency stays visible; the momentum-balance gate is **repurposed** as the
    implementation-completeness check (round-off or a term is missing) rather than an accuracy
    gate; and local surface distributions still need the traction route — that part remains open.
-   v1 scope: staggered, no advection / porous / variable properties / domain BCs (refused loudly —
-   each puts momentum terms in the step the budget does not yet carry).
+
+   **v2 (2026-08-30): EXPLICIT ADVECTION is now carried.** The high-order advection adds exactly
+   one more RHS term to the same composed step, `A_i = rho*(FOU_i − HO_i)` as `buildRhs`
+   assembled it, so the budget subtracts `A_i` beside `f_c`. It is **stashed**, not recomputed:
+   recomputing would read the projected `u^{n+1}` while the RHS used the Picard iterate `u^k`, and
+   the two differ by the projection — a silent O(1) attribution error. The IMPLICIT upwind path
+   folds advection into the MATRIX instead, so the reaction is no longer of this form and stays
+   refused, along with porous / variable properties / domain BCs / ghost projection / drag /
+   fluid-only star modes. See §7 item 8 for what the extension exposed.
 
 2. **A masked solid cell is not a fluid sample — fixed, but the same class of bug may sit
    elsewhere.** The force integral read the masked 0 in solid cells as a physical velocity. Static
@@ -1024,17 +1060,72 @@ option was taken in each case and is stated; none of them is settled.
    the local wall velocity of the body that uncovered it (cheap — `uwCell_` is already there), or
    extrapolate from the fluid side.
 
-5. **dem has no external-torque API.** *(Sharpened 2026-08-30: the pipeline smoke shows dem's
-   INTERNAL contact torques work for composed shapes — grains spin up in collisions — so this is
-   purely the missing `set_external_torques` entry point plus the coupling hand-off.)* `set_external_forces` exists; there is no
-   `set_external_torques`. So `ResolvedCfdDem` computes the hydrodynamic torque, reports it, and
-   **cannot apply it** — a freely rotating resolved grain is not yet possible. The dem-side
-   addition is small but is dem-solver territory.
+5. **dem has no external-torque API — RESOLVED 2026-08-30: `set_external_torques` shipped.**
+   The entry point takes a **WORLD-frame** (N,3) torque — that is what every torque source
+   produces — and rotates it into the body frame inside the predictor, where the gyroscopic term
+   already lives, so the angular update is Euler's equation entire:
+   `dw_body = invI (tau_body − w × I w) dt`. Island sleeping is disabled while a torque is set,
+   exactly as it is for external forces. `clear_external_torques()` releases both.
+
+   *Gates* (`torque_gate.py`, OMP_NUM_THREADS=1, one free body, no gravity, no contacts, three
+   DISTINCT principal moments I = (0.40, 0.65, 0.90) so no symmetry can hide a frame error):
+
+   | claim | measured |
+   |---|---|
+   | A. constant torque about each principal axis vs the closed form `w = tau t / I` | rel err **1.8e-05 / 2.6e-05 / 3.4e-05** at 4000 steps |
+   | A. that residual is float32 accumulation, not truncation | grows with step count at fixed T: 1.3e-05 (1k) → 1.8e-05 (4k) → 5.4e-05 (16k) |
+   | B. torque about a NON-principal axis vs `scipy solve_ivp` (DOP853, rtol 1e-12) on the same system | **4.9e-04** relative at dt=1e-3, order **1.00 / 0.99 / 0.94** (semi-implicit Euler) |
+   | B. past the truncation/round-off crossover the ladder inverts | 2.7e-04 (dt=2e-4) → 7.3e-04 (dt=5e-5) — reported, not hidden |
+   | C. `L_world(t) − L_world(0) = tau t` | 3.0e-04 … 9.3e-04 relative |
+
+   Gate A is exact by construction (with `w` along a principal axis the gyroscopic term is
+   identically zero, so the discrete update *is* the closed form), which is why the only thing left
+   in it is dem's float32 state — the trap the plan flagged, measured rather than assumed.
+   `ResolvedCfdDem` can now hand the reaction torque over; wiring that is example-side work.
+
+   The kernel-level ctest `integration` now runs with a NONZERO external force **and** torque, so
+   both coupling buffers are covered by host-vs-device parity rather than only by the probe.
 
 6. **Rung 3's scope.** Moving geometry currently refuses the ghost-projection, porous and
    variable-density paths outright. That is right for v1 (the wall-flux identity assumes the plain
    cut-cell continuity, and the collocated overlay's `w_bc` slot is attractor-campaign territory),
    but the porous case in particular will want it eventually.
+
+8. **The advection operator is not discretely conservative at a cut wall (new, 2026-08-30).**
+   Extending the reaction budget to explicit advection (§7 item 1, v2) made a property of the FLOW
+   SOLVER visible that the Stokes gate could not see. The full discrete identity over the fluid
+   momentum cells is
+
+       sum_bodies F_c  =  f_c*N_c + sum_i fb_i + sum_i A_i  −  sum_i (rho/dt)(u_i − u^n_i)
+
+   — the viscous fluxes and grad(pi) telescope to zero over the whole fluid region, the last two
+   terms vanish at steady state with advection off, and the Stokes form `sum F = f*N` drops them.
+   With advection on, `sum_i A_i` is **not zero**: the flux form telescopes over the interior and
+   leaves the advective momentum flux through the fluid region's boundary, which at a cut wall is
+   reconstructed from stencils that read the masked (wall-velocity) value one or two cells inside
+   the solid. In the continuum that flux is exactly zero at an impermeable wall; discretely it is
+   an O(h)-class wall term.
+
+   *Measured* (4-sphere bed, porosity 0.902, Re_d ≈ 23, `force_gate.py FORCE_ADVECT=1`, with the
+   new `reaction_budget_terms()` decomposition):
+
+   | N | `sum A / (f*N_fluid)` | unsteady term | identity residual with A carried |
+   |---|---|---|---|
+   | 32 | **−0.965%** | +7.1e-07 | **−6.8e-15** |
+   | 48 | **−0.369%** | +7.8e-07 | **−3.7e-15** |
+
+   So the budget itself closes to round-off — it is complete — while the naive `sum F = f*N` form
+   misses by exactly `sum A`, which converges away (ratio 2.6 for a 1.5× refinement, ≈ O(h^2.4)).
+
+   *Conservative option taken:* report `sum_i A_i` through `reaction_budget_terms()` and state the
+   identity in its full form, rather than either (a) silently absorbing it, which would turn a
+   solver property into an invisible force bias, or (b) "fixing" the advection stencil at cut cells,
+   which is a change to the momentum operator and to every validated result that rests on it.
+   **Action-reaction is unaffected**: the force handed to a body is still exactly the momentum the
+   fluid lost through its own wall. What `sum A` says is that the advection scheme itself leaks a
+   converging amount of momentum at cut walls — worth knowing before anyone reads a resolved
+   CFD-DEM momentum budget at Re where it matters, and the natural place for a conservative
+   cut-cell advection scheme if it ever does.
 
 7. **The periodic-Stokes reference.** The rotlet order claim is only decidable where the naive
    image sum is a good reference — measured as R/L ≲ 0.05. A Hasimoto/Ewald periodic rotlet would
