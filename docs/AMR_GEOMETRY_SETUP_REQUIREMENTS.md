@@ -158,3 +158,89 @@ changes on the acceptance meshes. Sign-flip exposure: a probe must land within ~
   per-level machinery. The batched API (`evalSphereUnionPoints` / `evalScenePoints`, device View
   in → distances out; `*Host` forms for the oracle) takes arbitrary point arrays per §3.1/§3.3.
   Restructure the builders against these; `leavesInBox` remains unneeded by the scene layer.
+
+## 6. SDF CAMPAIGN COMPLETE (2026-08-30) — briefing for the resuming AMR agent
+
+The pause condition is met: the analytic-SDF campaign (suite/docs/ANALYTIC_SDF_GEOMETRY.md) has
+shipped Layers 0–4 plus the tooling layer. **Your territory was never touched**: nothing under
+`core/include/peclet/core/amr/` or `core/python/amr_bindings.cpp` was edited by the SDF side
+beyond the §5 integration you already accepted. Everything below reaches you through the same
+`SceneQueryView` / `geom::` headers you already consume — adopt at your own pace, per capability.
+
+### 6.1 What §5 already gave you, unchanged and still frozen
+
+`SphereBedQuery` in `AmrFlow::setSolid` (127 → ~13 µs/leaf), the batched drivers
+(`evalSphereUnionPoints` / `evalScenePoints`), candidate grids keyed by a uniform auxiliary
+lattice (per-POINT O(1), level-agnostic), min-image periodicity, and the fma-canonical
+host ≡ device bit-parity. The two §5 notes still stand: the residual ~8 µs/leaf is YOUR builder
+logic (the collect-points → batch-evaluate → build-rows restructure remains the known AMR-side
+job), and `-mfma` on the python module's host flags recovers ~15% (`std::fma` is a libm call
+without it).
+
+### 6.2 New capabilities since the pause (all in core `geom/`, all gated, none AMR-touching)
+
+- **Cut ownership — `SceneQueryView::evalOwner(p, own)` / `owner(p)`** (`scene_query.hpp`). One
+  traversal returns bitwise `eval`'s value PLUS the argmin instance; ties break to the LOWEST
+  index by the comparison itself, so candidate-list, always-list and fallback paths agree, and
+  owner and classification can never disagree. Host ≡ device 0/50000 on OpenMP and CUDA. This is
+  what per-leaf force attribution and moving-wall velocities read.
+- **Moving geometry primitives** (`scene_query.hpp`): `InstanceMotionView` + `instanceVelocity`
+  (the lever arm is MIN-IMAGED — a body can own a wall point across a periodic seam, and for
+  rotation the raw arm is wrong by O(L·|ω|), silently), `wallPoint(p, sdf, grad)`,
+  `motionIsStatic`. flow's Layer 3 is the reference consumption pattern: wall velocity into the
+  momentum operator's inhomogeneous term, and the wall's own volume flux into continuity via the
+  aperture identity `A_wall = −(oE−oW, oN−oS, oT−oB)` — with a GALILEAN gate (boosted frame vs
+  lab frame) as the validation instrument. The wall-flux term is load-bearing by 10⁵ there.
+- **Analytic tree gradients — `evalTreeGrad`** (`scene.hpp`). Value bitwise `evalTree`'s
+  (0/50000); chain rule costs one rotation per node; CSG selects the ACTIVE branch's gradient, so
+  at a CSG ridge you get one face's EXACT normal where a central difference smears 39°. Also
+  3.2× faster than eval+FD. If any AMR path central-differences the scene (normals for
+  `wallPoint`, ghost closures on analytic geometry), switch to this.
+- **Implicit-quadrature apertures — `quadrature.hpp`**: `faceAperture` (mean 4e-12 vs the
+  closed-form sphere overlap, vs 4e-2 for the linear estimator — the lever is splitting the outer
+  Gauss rule at face-exit kinks) and `cellVolumeFraction` (~1e-6; its kinks are curves, weaker by
+  construction). **NOT certified** — structural failure modes documented in the header. If your
+  cut-cell openness adopts them for analytic geometry: keep the sub-resolution aperture floor
+  (α ~ 1e-12 rows destroy pressure-operator conditioning — measured), and treat them as
+  estimators, never as a conservation basis. flow has NOT yet wired them into its openness; you
+  may be the first adopter.
+- **Body properties — `body_properties.hpp`**: mass, COM, full inertia tensor, principal moments
+  + QUATERNION by implicit quadrature. Sign-exact bracketing ⇒ zero bias on bound-only leaves
+  (1.7e-05 where the voxel integrator is +3.5e-02). `SceneBuilder::addReframed` re-expresses any
+  tree in its principal frame exactly (one composed transform, no resampling).
+- **Python authoring — `peclet.core.geom`** (host-only module, `core/python/geom_bindings.cpp`,
+  build dir `core/python/build_geom`): `SceneBuilder` (string-kind leaves, CSG, quaternion
+  transforms, instancing), `encode()` → the flat arrays every consumer takes, `bake`,
+  `eval_root_grad`, `body_properties`, `principal_frame`. No more hand-assembled node arrays.
+- **dem consumes composed trees as particles** (`SHAPE_SCENE`) and flow's resolved coupling force
+  is the **discrete reaction** (route b, exactly conservative, gated to −8.8e-15) — relevant to
+  you as the *pattern* for any future AMR resolved coupling: take the force from the operator's
+  own budget, keep reconstructed tractions as diagnostics only.
+
+### 6.3 Contracts and traps you must not re-learn (each cost real time; details in the SDF note)
+
+1. **Bitwise host ≡ device requires explicit `fma`** — do not "simplify" `sphereDist2` / `minImage`
+   (nvcc re-contracts anything else), and do not turn the min-image divide into a multiply. A
+   spacing-0.3 fixture HIDES a divide↔multiply change; pick fixture values deliberately.
+2. **Candidate lists need TOTAL coverage**; empty-bin / out-of-coverage queries MUST fall back to
+   the full scan — that fallback IS the exactness contract. Never prune non-certified instances
+   (ellipsoid, superquadric, shell, grid): they ride the always-list.
+3. **Knife-edge exposure** of the fma-canonical expressions: sign flips only within ~2 ulp of a
+   surface; ~1e-4 collision probability per depth-8 build. Known, bounded, accepted.
+4. Speedup factors don't multiply across changed baselines — re-measure each rung against the
+   CURRENT denominator (§5's equal-R lesson).
+5. Regression net: core `build_komp3` (OpenMP) / `build_kcuda2` (CUDA), 148 ctests green; the geom
+   gates are `geom_scene_query`, `geom_batch_device` (bit-parity), `geom_owner`, `geom_quadrature`,
+   `geom_body`, `geom_tree_grad`. Dev probes in `suite/.sdf-campaign-probes/` (untracked; README
+   inside) — `time_setsolid.py` is your acceptance driver, `mask6_before.npy` your parity
+   reference.
+
+### 6.4 Where your campaign stands (your own records, for convenience)
+
+Your last commit is core `dfcca8d` — the Phase-3 Snellius H100 headline (graded RCP bed within
+1.79% at 1.62× fewer cells). Your campaign state lives in your memory
+(`amr-mixed-level-cut-band-plan`) and `core/docs/amr_mixed_level_cut_band_plan.md`; the known
+next AMR-side items from §5 remain the builder restructure onto the batched API and `-mfma`.
+Read the SDF note's §7 OPEN FOR REVIEW before building on any of the new capabilities — items
+there (quadrature non-certification, the Ewald reference, fresh-cell policy) may interact with
+your plans.
