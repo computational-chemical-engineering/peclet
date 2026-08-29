@@ -240,7 +240,7 @@ Each layer is independently useful and independently shippable.
 ### Layer 0 — one device-callable SDF library in `core` (SPEC — decisions resolved, ready to execute)
 
 The keystone; everything else is a consumer. The architecture is **two layers over one set of
-formulas** (resolved decision 1, §7):
+formulas** (resolved decision 1, §8):
 
 ```
   compile-time LEAVES            runtime NODES / SCENE
