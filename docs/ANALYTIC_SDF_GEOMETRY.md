@@ -786,7 +786,10 @@ missing `_coupling` extension (which only the UNRESOLVED driver uses).
   boundary — "zero-copy" is not literal across that divide and does not need to be: the instance
   array is a few hundred bytes per grain against a rebuild measured in tens of ms.
 
-- **L4-R2 — hydrodynamic force/torque ✅ (shipped), with a MEASURED and LOCALISED bias.**
+- **L4-R2 — hydrodynamic force/torque ✅ COMPLETE: the coupling force is the DISCRETE REACTION
+  (`hydro_force_torque_reaction`, route (b) — §7 item 1 has the derivation and the round-off
+  gate); the reconstructed traction below is kept as the diagnostic that keeps its own bias
+  visible.**
   Device kernel over the cells the wall passes through: `dF_body = −(σ · A_wall)` with
   `σ = −p I + μ(∇u + ∇uᵀ)`, `A_wall` from the aperture identity, posted to `cutOwner_`'s instance
   by atomics (tolerance-, not bit-reproducible — documented, like the coupling deposits), torque
@@ -819,7 +822,9 @@ missing `_coupling` extension (which only the UNRESOLVED driver uses).
   crossing distance θ gave the drag **17× too large**: cut cells with θ→0 make 1/θ unbounded. That
   is exactly why the momentum operator uses a Robust-Scaled reconstruction instead of a raw
   one-sided difference. The experiment was removed rather than left behind a flag whose "on" state
-  is 17× wrong. See OPEN FOR REVIEW 1 for the two principled routes.
+  is 17× wrong. **Route (b) — the discrete reaction — is now implemented and is the coupling
+  force**; §7 item 1 records the derivation, the telescoping-pressure trick, and the gate that
+  holds to −8.8e-15.
 
 - **L4-R3 — motion loop. RUNS AND CONVERGES; the gate misses by 13%, and the miss is the SAME
   traction bias, now visible as a momentum leak.** Weak explicit coupling: flow force →
@@ -890,21 +895,42 @@ Shape-aware **unresolved** closures: sphericity / equivalent diameter / orientat
 Questions the specs did not resolve and that materially affect numerics or API. The conservative
 option was taken in each case and is stated; none of them is settled.
 
-1. **The cut-cell traction needs a wall-aware reconstruction, and it must come from the IBM
-   machinery, not a patch.** The spec prescribes `∇u` central-differenced at the cell. Measured
-   consequence: the integrated drag is **29% low and does not converge** (0.715 at N=64, 0.709 at
-   N=128), with `A_wall` itself verified right to 1-2% and the deficit sitting in the viscous part.
-   The one-sided repair over the crossing distance θ was tried and gave **17× too much** drag,
-   because cut cells with θ→0 make 1/θ unbounded — which is exactly why the momentum operator uses
-   a Robust-Scaled reconstruction. Two principled routes, neither improvised tonight:
-   *(a)* reuse the overlay's own `K/M/X/Nbc/D_rescale` coefficients, which already encode the
-   robust near-wall reconstruction, to form the wall traction; *(b)* skip the reconstruction
-   entirely and take the force from the **discrete reaction** the operator applies — sum the IBM
-   inhomogeneous/diagonal terms per cut cell and attribute by owner. Route (b) is consistent with
-   the solve *by construction* (`Σ F = f·V_fluid` exactly, not approximately) and is what several
-   IBM codes do; it is the recommended one. *Conservative choice taken:* keep the spec's central
-   difference, ship the pressure/viscous split and `wall_area_probe()` so the bias is visible, and
-   document it.
+1. **The cut-cell traction needs a wall-aware reconstruction — RESOLVED 2026-08-30: route (b)
+   implemented and gated to round-off.** The history: the spec's central-difference traction was
+   measured **29% low and resolution-independent** (0.715 at N=64, 0.709 at N=128), with `A_wall`
+   verified right to 1-2% and the deficit in the viscous part — an inconsistent estimator, since
+   the near-wall gradient's relative error is O(1) in units of h ((1+θ)/2 per axis against the
+   masked value at the wrong distance) on exactly the support of the integral. The one-sided 1/θ
+   repair was tried and gave **17× too much** (θ→0 unbounded).
+
+   **The fix — `hydro_force_torque_reaction()`** — takes the force from the discrete reaction:
+   per fluid momentum cell, `R_i = ρ/dt(u−uⁿ) − f_c − Σ_fluid-nbrs μ(u*_nb − u*_i)` with u* the
+   stashed last momentum-solve iterate, summed per owner region with sign flipped. The pressure is
+   deliberately NOT subtracted: per cell R contains −∇π, which **telescopes inside each owner
+   region** to exactly the control-volume boundary flux plus the wall pressure force — pressure
+   counted once, in the right place, without reading a pressure field. The budget's only
+   approximation is the momentum solver's residual; everything else is identity.
+
+   *Gated as the review demanded — the balance must hold to ROUND-OFF, not percent* (single
+   sphere, N=32, body-force driven, ratio ΣF/(f·N_fluid) − 1):
+
+   | steps | 200 | 400 | 800 | 1600 |
+   |---|---|---|---|---|
+   | ratio − 1 | −3.1e-03 | −1.0e-05 | −1.2e-10 | **−8.8e-15** |
+
+   The early-step residuals are the genuine unsteady term (the flow still accelerating — correct
+   physics, included in the budget), decaying with the approach to steady state; the floor is
+   machine precision. Sweep count does not move it (100 vs 1200 sweeps identical at fixed steps),
+   confirming no term is missing. The traction integral gives 0.665 on the same run.
+
+   *What this repairs vs hides, per the review:* the reaction is the coupling force — exactly
+   conservative and inheriting the flow solution's validated 2nd-order accuracy; the traction
+   integral is **kept as a diagnostic** (`hydro_force_torque`, docstring demoted) so its O(1)
+   inconsistency stays visible; the momentum-balance gate is **repurposed** as the
+   implementation-completeness check (round-off or a term is missing) rather than an accuracy
+   gate; and local surface distributions still need the traction route — that part remains open.
+   v1 scope: staggered, no advection / porous / variable properties / domain BCs (refused loudly —
+   each puts momentum terms in the step the budget does not yet carry).
 
 2. **A masked solid cell is not a fluid sample — fixed, but the same class of bug may sit
    elsewhere.** The force integral read the masked 0 in solid cells as a physical velocity. Static
