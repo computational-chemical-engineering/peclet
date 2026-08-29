@@ -1127,6 +1127,33 @@ option was taken in each case and is stated; none of them is settled.
    CFD-DEM momentum budget at Re where it matters, and the natural place for a conservative
    cut-cell advection scheme if it ever does.
 
+9. **The reaction TORQUE is not the reaction force (new, 2026-08-30).** With dem's
+   `set_external_torques` in place (item 5), `ResolvedCfdDem` can hand the per-instance reaction
+   torque over — and doing so by default was wrong. The force is exact because the per-cell
+   `−grad(pi)` **telescopes** over an owner region to the region-boundary flux plus the wall
+   pressure force. That argument does not survive taking the first moment: `Σ r × grad(pi)` over
+   the region does not telescope the same way, so the reported torque has no equivalent derivation
+   behind it.
+
+   *Measured.* On a body-force-driven translating sphere (N=48, 600 steps), where the true
+   hydrodynamic torque is exactly zero by symmetry:
+
+   | quantity | reaction | traction (diagnostic) |
+   |---|---|---|
+   | \|T\| / (\|F\|·R) | **3.2e-07** | 5.0e-14 |
+
+   Three orders apart. The reaction torque is small, but it is at *its own* round-off floor rather
+   than at the field's, and it has never been checked against a case where the torque is genuinely
+   nonzero. Applying it also exposes a second trap: **dem's default inverse inertia is unrelated to
+   the grain's size**, so a torque handed to a grain whose inertia was never set spins it up at an
+   arbitrary rate — with `apply_torque=True` and no `set_inv_inertia`, the settling gate diverges
+   to \|U_slip\| = 5.9e+09 in 600 steps.
+
+   *Conservative option taken:* `apply_torque=False` by default (coupling `3b24934`), the torque
+   still computed and reported through `torques()`, and both facts written into the class
+   docstring. The validating experiment is the **Jeffery orbit** of an ellipsoid in shear, whose
+   period `T = (2π/γ̇)(r + 1/r)` is exact — that is the gate that would let this be turned on.
+
 7. **The periodic-Stokes reference.** The rotlet order claim is only decidable where the naive
    image sum is a good reference — measured as R/L ≲ 0.05. A Hasimoto/Ewald periodic rotlet would
    make the gate valid at any R/L and is the right thing if this becomes a standing regression.
