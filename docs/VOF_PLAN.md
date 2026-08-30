@@ -290,10 +290,30 @@ load at extreme scale.
   iteration, i.e. exactly the all-reduce-free pressure driver the comm-scaling campaign
   wants (`core/docs/comm_avoiding_pressure_driver.md`). The ladder, cheap → deep, each
   rung gated on measurement (first-principles directive):
-  - **S0 — measure before investing**: a-priori battery with *static manufactured* ρ
-    fields (sphere / film / meniscus-shaped jumps inside the ring + packing cut-cell
-    geometries; ratio sweep 10²–10⁴): Chebyshev its, PCG stall reproduction, per-level
-    residual decomposition. Needs NO VoF — can run today.
+  - ~~**S0 — measure before investing**~~ — **DONE 2026-08-30 (WO-B)**, and it **refutes the
+    diagnosis this ladder was built on**. `flow/tests/study/vardensity_solver_probe.py`, 406
+    configurations × 20 steps, CUDA + host; full numbers in `flow/doc/vof_workorders.md`
+    (WO-B findings) and the superseding note in `flow/doc/variable_density_projection.md` §2.
+    (a) `set_pressure_pcg(True, …)` **ignores its flag** — it never clears `useChebyshev_` — so
+    §2's "PCG" control, and every later varRho PCG measurement, actually ran Chebyshev.
+    (b) With PCG really selected the stall reproduces (2000/2000 its on the literal §2 column),
+    but it is **not a ρ effect**: the identical stall occurs at **constant density** on any 3-D
+    wall-bounded (domain-BC) grid — 200/200 with max|div(open·u)| ≈ 1.2e-05 once the third axis
+    reaches 8 cells, Chebyshev 13–14 on the same operator — and does **not** occur on a periodic
+    + IBM problem at any ratio (periodic cylinder, real PCG: 7–10 its at ratio 1 … 10⁴). Present
+    in the 2026-07-06 release build; invisible so far only because every shipped domain-BC
+    verification is quasi-2D (nz = 4).
+    (c) Chebyshev is **flat in the ratio** on every well-resolved geometry (11–18 its, 1.00–1.09×
+    from ρ≡1 to 10⁴; smooth vs sharp is not a significant axis, and the *smooth* edge is the
+    marginally worse one). The only hard geometry is the real `packing_ring.vti` bed — but there
+    **MG-PCG needs 16 its at ratio 10⁴ where Chebyshev needs 155**, so that is a Chebyshev
+    spectrum-bound weakness, not a coefficient-coarsening problem.
+    **Consequence for the rungs below: S3/S4 are NOT indicated by any measurement** and should
+    stay parked; the actionable items are the two escalations (the `set_pressure_pcg` no-op and
+    the domain-BC PCG stall — each needs its own WO), then S1 (FCG), which is exactly the remedy
+    for the non-SPD-preconditioner failure that was measured, gated on this battery. S2 is worth
+    **3×** on the varRho pressure stage for as long as Chebyshev is the default: the per-step
+    bound re-estimation is 30 extra V-cycles, measured at 21.2 ms of a 31.6 ms projection (67 %).
   - **S1 — flexible CG (FCG/IPCG)**: Polak–Ribière β tolerates a nonsymmetric/variable
     preconditioner; a ~one-vector change to the existing driver. If FCG with the current
     V-cycle beats Chebyshev, the "stall" is closed at trivial cost.
