@@ -151,10 +151,29 @@ Design rules:
 Every rung gates on: single-phase `sdflow_regression.py` **bit-exact (+0.00%, identical
 iteration counts)**; MPI np 1/2/4 bit-exact vs single-rank; device≡host-oracle agreement.
 
-**V0 — PLIC toolbox (no NS).** SZ inversion + MYC + clipping, host oracle + device.
-Gates: linear interfaces reproduced exactly (Pilliod–Puckett criterion); forward/inverse
-round-trip to machine eps; sphere-init volume error 2nd order; unit ctest
-`flow/tests/kokkos/test_vof_plic.cpp`.
+**V0 — PLIC toolbox (no NS). ✅ DONE 2026-08-30** (flow `c1fcf8f`, umbrella `79a13c1`;
+`src/vof/plic.hpp` + `tests/kokkos/test_vof_plic.cpp`, 20/20 ctests on host-openmp AND
+CUDA). Measured: forward vs an independent inclusion-exclusion oracle 1.2e-15; **10⁵-sample
+round-trip 6.7e-15**; `faceFluxVolume(f=1)` bitwise equal to `plicVolume`; MYC on exact
+planes max 1.02° / mean 0.10° (Youngs 3.67° / 1.21°); sphere reconstruction order **1.98**.
+Two findings, both in `flow/doc/vof_workorders.md`:
+- **A boundary defect in Lehmann & Gekle's published Listing 1, found and fixed.** Their
+  hoisted case-(5) guard `min(n1+n2,n3) <= d <= n3` fires at the single point `d == n3`
+  when `n3 < n1+n2`, where case (3) is correct — `plicVolume(⅓,⅓,⅓, ⅓)` returned 0 instead
+  of ⅙. Caught by the hand-computed tetrahedron, *not* by the randomized battery (the
+  defect has measure zero). Keep the hand-computed cases in every future port.
+- **MYC normal-*angle* error does not converge (order 0.83); reconstruction error does
+  (1.98).** Mechanism isolated: MYC is not exact on planes (fails Pilliod–Puckett) and
+  ~28% of mixed cells take the Youngs fallback, whose normal error is flat. This
+  reproduces Aulisa et al.'s own published behaviour (their reconstruction order degrades
+  2.22→1.37 likewise), so the shipped gate is the reconstruction slope with the normal
+  angle recorded as a tripwire. **This is a first-principles confirmation of §0's verdict
+  against candidate A** (∇C-based geometry): a normal estimator of this class cannot carry
+  curvature, which is exactly why V3 takes curvature from height functions (column sums of
+  C, independent of the MYC normal) rather than from ∇C. Consequence to carry: if 2nd-order
+  *normals* are ever needed, the routes are ELVIRA/LVIRA on a 5³ stencil (3³ is provably
+  insufficient in 3D — Boniou 2022) or plicRDF iterative refinement at V5 — never a tune
+  of MYC.
 
 **V1 — WY advection on prescribed velocity fields.** Own g=3 halo, sweep parity, worklist.
 Gates: translation/rotation shape errors vs published (Zalesak disk, 3D LeVeque deformation
