@@ -1322,6 +1322,21 @@ option was taken in each case and is stated; none of them is settled.
    be ~31% off. Gallery page: `examples/rotating-sphere-torque`, which carries the exact gate and
    both ladders.
 
+10. **Per-body attribution carried the owner-boundary pressure flux — RESOLVED 2026-08-31 (flow
+   `1d95260`, v4).** The spec's own words flagged it ("per-body attribution is the control-volume
+   one over the owner partition; the region-boundary fluxes … cancel exactly in the total") without
+   quantifying the per-body error. The gallery's ten-Cate work did: a sphere translating through a
+   closed analytic tank — the first ASYMMETRIC multi-instance case — had **half its drag booked to
+   the tank** (λ = 0.62 against a physical floor of 1.36, with the identical single-instance
+   periodic control healthy at 1.42), and the Jeffery dry run's spheroid-between-plates torque was
+   mis-attributed enough for a **−44% orbit period**. The fix removes, for every fluid-fluid
+   staggered face whose two momentum points have different owners, the shared cell's π from both
+   sides' telescoped sums — pairwise, so the total identity is untouched; wall faces are skipped
+   (their remainder IS the wall pressure force); single-instance runs are bit-identical. Bonus:
+   the 4-sphere gate's per-sphere spread was the boundary flux all along, and drops
+   **4.87e-03 → 5.72e-09**. Tank drag after: λ = 1.89 decaying on the impulsive-start history
+   toward the physical range.
+
 7. **The periodic-Stokes reference.** The rotlet order claim is only decidable where the naive
    image sum is a good reference — measured as R/L ≲ 0.05. A Hasimoto/Ewald periodic rotlet would
    make the gate valid at any R/L and is the right thing if this becomes a standing regression.
