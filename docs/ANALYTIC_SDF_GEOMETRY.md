@@ -1229,8 +1229,71 @@ option was taken in each case and is stated; none of them is settled.
 
    *Conservative option taken:* `apply_torque=False` by default (coupling `3b24934`), the torque
    still computed and reported through `torques()`, and both facts written into the class
-   docstring. The validating experiment is the **Jeffery orbit** of an ellipsoid in shear, whose
-   period `T = (2π/γ̇)(r + 1/r)` is exact — that is the gate that would let this be turned on.
+   docstring.
+
+   **MEASURED 2026-08-31 — it is not merely unvalidated, it is WRONG by 31%.** The clean test is a
+   sphere spinning in quiescent Stokes flow: the torque is `8πμa³Ω` exactly, and a sphere is
+   invariant under rotation about its own axis, so the geometry never moves and none of the
+   moving-boundary machinery is in play.
+
+   | N | R/h | c | reaction torque | traction torque | net force |
+   |---|---|---|---|---|---|
+   | 64 | 9.6 | 1.41e-02 | **−30.54%** | −4.22% | 1.1e-13 |
+   | 96 | 9.6 | 4.19e-03 | **−31.57%** | — | 2.9e-13 |
+   | 128 | 9.6 | 1.77e-03 | **−31.24%** | — | 4.0e-14 |
+   | 96 | 14.4 | 1.41e-02 | **−31.04%** | +32.01% | 4.6e-13 |
+   | 128 | 19.2 | 1.41e-02 | **−31.00%** | −36.92% | 1.0e-13 |
+
+   The reaction torque is flat over a factor of 8 in box volume, 3.4 in solid fraction and 2 in
+   R/h, and unchanged at 2000 steps versus 600 — a **structural** deficit, not a discretisation or
+   convergence one, and not the periodic array (which must vanish as c → 0). The traction torque is
+   worse: not biased but *erratic*, spanning −37% to +32%. The net force on the same runs is at
+   1e-13, i.e. the run that gets the torque wrong gets the force exactly right.
+
+   *THE CAUSE, and it is exact.* The viscous operator here is the Laplacian `∇·(μ∇u)`, not the full
+   stress divergence `∇·[μ(∇u + ∇uᵀ)]`. For constant μ and a solenoidal field the two agree in the
+   INTERIOR, since `∇·(∇uᵀ) = ∇(∇·u) = 0` — but not as a BOUNDARY TRACTION, and the reaction
+   budget's wall term is exactly a boundary traction. For the isolated Stokes rotlet
+   `u = (A×r)/r³`, on `|x| = a` with `n = x/a`,
+
+       (∇u)·n  = −2(A×x)/a⁴          (∇uᵀ)·n = −(A×x)/a⁴
+
+   so the transposed part is exactly HALF the plain gradient **pointwise on the surface** — one
+   third of the sum before any integration. With `∮ x×(A×x) dS = (8π/3)a⁴A` and uniform pressure,
+   the full traction gives `−8πμa³Ω` and the Laplacian-only traction gives exactly `−(16/3)πμa³Ω`,
+   two thirds. Predicted deficit **−33.33%**, measured **−31.0%**, the gap being discretisation
+   (and it deepens toward the prediction as the box grows: −30.54 → −31.58 → −31.82% at
+   c = 1.41e-02 → 1.77e-03).
+
+   *Why it hid.* The transposed term integrates to **zero in the net FORCE** (Gauss + continuity)
+   but does not cancel under the `r×` weighting of the torque. A solver validated on drag alone
+   never sees it — which is the argument for making the rotating sphere a standing gate.
+
+   *Not novel.* Maitri et al., *Comput. Fluids* **175** (2018) 111–128, doi
+   10.1016/j.compfluid.2018.08.018 — same group — ran exactly this a-priori test on the earlier
+   Deen et al. (2012) IBM, which omits the same term, and measured **34.34 / 33.04 / 33.24 /
+   33.32%** at a/h = 5/10/20/40: the same resolution-independent plateau, with the stated cause
+   "the ignored transposed terms contribute 1/3 of the total analytical torque value".
+
+   *A repair that failed, and why.* Reading `R_i = −∇π_i + F_wall,i`, one might add
+   `Σ r × ∇π` back with the momentum operator's own staggered pressure gradient. Tried: it moves
+   the error from −31% to **−84%**. The pressure moment is not the missing piece, because the
+   missing piece is in the viscous term. Reverted rather than left behind a flag.
+
+   *A SECOND, independent defect on the traction route.* On the same steady field the traction
+   torque does not converge at all — it walks linearly with step count, −26% → +83% over 4000
+   steps, crossing the exact answer on the way. Cause: the cut-cell pressure operator decouples
+   solid-centred cells, nothing pins their value, the incremental scheme keeps accumulating into
+   them, and the surface integral samples them. Measured split, on a velocity field steady to four
+   digits from step 200: `std(P)` over FLUID cells is constant at 7.3e-07, over SOLID cells it
+   grows linearly 2.5e-04 → 1.6e-03, and the traction torque tracks the solid. Every drag result is
+   unaffected — this only surfaces where the physical pressure is uniform and has nothing to mask
+   it.
+
+   *Consequence.* A freely rotating resolved grain is not supported. The Jeffery orbit (E8 of the
+   gallery's SDF-showcase plan) is **blocked**, not merely unbuilt — attempting it would silently
+   be ~31% off. Gallery page: `examples/rotating-sphere-torque`, which carries the exact gate and
+   both ladders.
 
 7. **The periodic-Stokes reference.** The rotlet order claim is only decidable where the naive
    image sum is a good reference — measured as R/L ≲ 0.05. A Hasimoto/Ewald periodic rotlet would
