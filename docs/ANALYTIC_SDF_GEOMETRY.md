@@ -836,6 +836,37 @@ full rebuild is affordable and incremental rebuild is not urgent. Decision still
 > restoring them silently resets the solution every step and still "runs".
 
 
+- **L3-R6 — `refresh_wall_velocity()`: a moving BC without a geometry rebuild ✅ (flow `23a8c82`,
+  2026-08-30).** The linearised moving-boundary problems change an instance's VELOCITY every step
+  while the geometry never moves — an oscillating body at vanishing amplitude, a shear cell driven
+  by counter-moving plates. `set_instance_motion` does not reach the fields those need: `uBc_` (the
+  momentum operator's no-slip datum) and `uwCell_` (the cut-cell projection's wall flux) are built
+  inside `set_solid_from_scene`, so such a driver had to call `rebuild_geometry()` every step and
+  pay a full geometry re-derivation to update a boundary condition. `refreshWallVelocity()` runs
+  `buildWallVelocity()` + `rebuildStencils()` and nothing else, and **refuses** when
+  `sceneDirty_` — it does not re-sample the SDF, the apertures, the ownership field or the pressure
+  operator, so on a body that had actually moved it would silently continue on stale geometry.
+
+  *Gates* (`refresh_wall_gate.py`, N=48, 60 steps of a cos-driven wall velocity):
+
+  | claim | measured |
+  |---|---|
+  | u, v, w, P vs `rebuild_geometry()` | **bitwise identical**, max\|diff\| 0.000e+00 (all four) |
+  | reaction force vs `rebuild_geometry()` | 3.7e-15 relative — the documented atomics floor |
+  | the call itself, CUDA at N=48 | 4.0 ms → **1.4 ms**, 2.8× cheaper |
+  | the driver's per-step total | 16.5 → 13.9 ms, **1.19×** (a bare step is 12.4 ms) |
+
+  Both cost numbers are quoted: the refresh still rebuilds the momentum stencils, which are the bulk
+  of a geometry rebuild, so the 2.8× on the call alone would overstate what a caller saves.
+
+  *A latent bug it surfaced, live on the `rebuild_geometry` path too.* `buildWallVelocity` returned
+  early when `hasMotion_` went false, leaving previously-built `uBc_`/`uwCell_` **stranded** — and
+  `wallVelView()` keys off the field's extent, not `hasMotion_`, so a body whose velocity the caller
+  set back to zero kept its old wall velocity folded into the momentum operator indefinitely. The
+  fields are now zeroed instead of stranded; allocation state is unchanged, so a run that never
+  moves stays bit-identical. Gated: a body stopped and refreshed is bitwise identical to one that
+  never moved, while the same run *without* the refresh differs by 1.9e-02 in u and 5.2e-02 in P.
+
 - **L3-R5 — rigid PLACEMENT of an analytic dem wall ✅ (`set_wall_transform`, dem, 2026-08-30).**
   `set_wall_velocity` gives a static wall a rigid-body surface-velocity field, which is the whole
   story for a body of revolution (a drum barrel looks the same at every angle) and no story at all
