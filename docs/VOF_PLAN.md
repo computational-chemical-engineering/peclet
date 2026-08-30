@@ -175,10 +175,28 @@ Two findings, both in `flow/doc/vof_workorders.md`:
   insufficient in 3D — Boniou 2022) or plicRDF iterative refinement at V5 — never a tune
   of MYC.
 
-**V1 — WY advection on prescribed velocity fields.** Own g=3 halo, sweep parity, worklist.
-Gates: translation/rotation shape errors vs published (Zalesak disk, 3D LeVeque deformation
-field with reversal); volume conserved to ~1e-15 per step; CFL<0.5 asserted; np 1/2/4
-bit-exact. Wisp census recorded (clipping OFF at this rung — conservation must be exact).
+**V1 — WY advection on prescribed velocity fields. ✅ DONE 2026-08-30** (flow `0440c08`;
+`src/vof/advect_wy.hpp` + `tests/kokkos/test_vof_advect.cpp` + `tests/kokkos_mpi/
+test_vof_advect_mpi.cpp`, ctests green on host-openmp AND CUDA, np 1/2/4 **bitwise**).
+Own g=3 halo, 6-permutation sweep cycling, `parallel_scan` worklist (bitwise neutral,
+0/54 872). Measured: planar slab under uniform flow transported **exactly** (Linf and drift
+0.0 over 1024 steps); sphere-translation L1 order **2.23**; Zalesak L1/V **2.81e-2** at 100²
+(published spread on the identical metric: THINC-scaling 1.55e-2 … THINC/QQ 3.22e-2);
+LeVeque T=3 reversal L1(vol) 7.75e-3 / 2.68e-3 / **5.98e-4** at 32/64/128³, order 1.53 then
+**2.16** — the published PLIC behaviour; volume drift ≤ 5.7e-14 against a measured discrete
+face divergence ≤ 1.2e-15. Clipping OFF; wisp census recorded. Three things to carry
+(details in `flow/doc/vof_workorders.md`):
+- **The trap is now a number, not folklore**: `debugRecomputeDilation` ships default-off and
+  gate G measures it — frozen flag **2.3e-15** vs recomputed per sweep **1.5e-2**.
+- **§6's "hard CFL < 0.5" is the *2D* bound.** Weymouth's own thesis (Appendix A, eq. A.33 —
+  the JCP paper's proof, and the primary source used, since the paper is paywalled) gives
+  `|u|Δt/h < 1/(2(N−1))`, i.e. **1/4 in 3D**. Shipped at 0.5 per the WO, settable per
+  instance, and conservation is provably *independent* of boundedness. A measured sweep to
+  CFL 0.48 on LeVeque never left `0 ≤ C ≤ 1`, so the bound is sufficient, not tight.
+- **The velocity must be discretely, not analytically, solenoidal.** The dilation term adds
+  `H(C−½)·div·Δt/h` to *every* cell including interior full ones, so pointwise sampling pins
+  the conservation floor at O(h²). Test fields are sampled as the discrete curl of an edge
+  vector potential. For V2 the relevant number is the projection's own divergence residual.
 
 **V2 — Two-phase NS, no surface tension (staggered).** C → closures → varRho projection;
 **momentum-consistent transport** (half-shifted fractions). Gates: two-layer hydrostatic
