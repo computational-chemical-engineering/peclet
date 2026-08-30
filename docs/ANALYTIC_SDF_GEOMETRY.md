@@ -1205,7 +1205,34 @@ option was taken in each case and is stated; none of them is settled.
    CFD-DEM momentum budget at Re where it matters, and the natural place for a conservative
    cut-cell advection scheme if it ever does.
 
-9. **The reaction TORQUE is not the reaction force (new, 2026-08-30).** With dem's
+9. **The reaction TORQUE is not the reaction force — RESOLVED 2026-08-31 (flow `16e91ec`): the
+   transposed-stress wall term, added in closed form.** The chain that closed it, kept because each
+   link is load-bearing: (a) the rotating sphere measured a **structural −31%** (table below), flat
+   under every refinement; (b) the cause is exact — the budget measures the Laplacian-form wall
+   flux, the physical traction adds `μ(∇u)ᵀ·n`, and for a rigid no-slip wall moving with angular
+   velocity Ω that missing traction is **`μ(n×Ω)` pointwise** (tangential derivatives of u on the
+   surface equal the rigid-body field's `[Ω×]`; continuity kills the normal piece; verified against
+   the analytic rotlet to 3e-11). Its FORCE integral is zero over a closed surface — why the
+   exactly-gated force identity never saw it — and its TORQUE integral is exactly ONE THIRD of the
+   Stokes torque (predicted −33.3% vs the −31% measured; Maitri et al., Comput. Fluids 175 (2018)
+   111–128, same 33–34% plateau on an IBM omitting the same term); (c) the fix integrates
+   `μ r×(n dA×Ω)` over cut cells with the EXACT aperture wall-area vectors — no interior
+   reconstruction, no near-wall gradient, zero when nothing rotates, force untouched.
+
+   *Gated* (`rotation_gate.py`, the new standing probe): static spin vs `8πμa³Ω` went from the
+   structural −31% to **+3.47 / +2.42 / +2.19%** (N=64/96/128 at R/h=9.6) and **+2.89 / +2.61%**
+   (R/h=14.4/19.2) — CONVERGING on both ladders, tracking the aperture first-moment
+   discretisation, net force at 1e-13 throughout. Dynamically, `ResolvedCfdDem` with
+   `apply_torque=True` decays a freely spinning sphere (physical inertia) at **1.0389×** the same
+   box's calibrated rotational drag (coupling `a6f8b02`). `apply_torque` stays off by default only
+   for the dem default-inertia trap. **E8 (Jeffery orbit) is UNBLOCKED.**
+
+   Still open from this item: the TRACTION torque's linear drift (decoupled solid-centred pressure
+   cells accumulate under the incremental scheme and the surface integral samples them) — the
+   diagnostic route only; pinning those gauge cells to zero is the known fix, deferred because the
+   pressure driver is under concurrent VoF work.
+
+   *(the original measurement, kept as the record)* With dem's
    `set_external_torques` in place (item 5), `ResolvedCfdDem` can hand the per-instance reaction
    torque over — and doing so by default was wrong. The force is exact because the per-cell
    `−grad(pi)` **telescopes** over an owner region to the region-boundary flux plus the wall
