@@ -314,9 +314,32 @@ load at extreme scale.
     for the non-SPD-preconditioner failure that was measured, gated on this battery. S2 is worth
     **3×** on the varRho pressure stage for as long as Chebyshev is the default: the per-step
     bound re-estimation is 30 extra V-cycles, measured at 21.2 ms of a 31.6 ms projection (67 %).
-  - **S1 — flexible CG (FCG/IPCG)**: Polak–Ribière β tolerates a nonsymmetric/variable
-    preconditioner; a ~one-vector change to the existing driver. If FCG with the current
-    V-cycle beats Chebyshev, the "stall" is closed at trivial cost.
+  - ~~**S1 — flexible CG (FCG/IPCG)**~~ — **DONE 2026-08-30 (WO-C)**, and it **settles the
+    diagnosis**. `set_pressure_fcg` / `CutcellMG::solveFCG` (Polak–Ribière β, +1 vector,
+    +1 dot/iteration, 2 % projection-time overhead, default off, single-phase regression
+    +0.00 %). Full numbers: `flow/doc/vof_workorders.md`, WO-C findings; reproduce with
+    `vardensity_solver_probe.py --drivers pcg,fcg`.
+    (a) **The V-cycle preconditioner is NOT symmetric w.r.t. the fine operator, and the
+    asymmetry comes from the domain BCs at the FIRST coarse level.** FCG converges on **93
+    of the 130** battery configurations where MG-PCG fails, with **0** regressions — e.g.
+    constant-density lid box 32³, PCG 200/200 (div/u 1e-5) vs FCG 20 (div/u 8e-14). The
+    contamination term FCG removes, `pr = |rᵀz_k|/|rᵀz_{k+1}|` (exactly 0 for a symmetric
+    preconditioner, printed under `PECLET_FLOW_MG_DEBUG=2`), measures **0.062 median**
+    periodic + IBM against **0.43–0.48** wall-bounded on the SAME geometry, and it is
+    already full-size at `levels=2` (`levels=1` solves in 1 iteration). ⇒ WO-H should
+    target `applyBoundaryOpenness`'s per-level re-imposition and the non-periodic
+    prolongation ghosts as an adjoint pair.
+    (b) Where PCG is healthy the two βs coincide algebraically and the drivers agree
+    exactly: periodic cylinder 7/7, 3-ring bed 10/10, `packing_ring` 64³ 14/14; at ratio
+    10⁴ FCG 16 vs Chebyshev 155. **FCG is a strictly-safer drop-in for MG-PCG on the
+    production pore-scale path.**
+    (c) **Two residual modes FCG does NOT cover**, both new and both for WO-H: the
+    gravity-driven hydrostatic column with a *global* stratification (`hydro` × slab/tilt,
+    all 36 configurations — the residual *freezes* at `r/r0 = 6.98` with `pr` locked at
+    0.500, a stationary iteration, while Chebyshev returns the machine-exact rest state),
+    and a small coefficient ρ₀/ρ_f adjacent to a *prescribed-velocity* face (ratio ≥ 10²;
+    all-wall configurations are healthy at every ratio). **Chebyshev stays the varRho
+    default** — it is the only driver healthy on all four regimes — so S2 keeps its 3×.
   - **S2 — bound amortization for moving interfaces**: at capillary-limited dt the
     interface crosses a cell over many steps → coefficients drift slowly; freeze Chebyshev
     bounds for N steps (safety-inflated, residual-guarded re-estimate on violation) +
