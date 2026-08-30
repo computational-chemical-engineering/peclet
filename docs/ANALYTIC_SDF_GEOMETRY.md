@@ -1085,11 +1085,58 @@ option was taken in each case and is stated; none of them is settled.
    body genuinely meant to spin about the world origin cannot say so by leaving `center` at zero.
    The alternative is to require `center` explicitly and ignore the translation.
 
-4. **Fresh cells.** A cell uncovered by a body's motion inherits the zero the solid held there, not
-   an extrapolated fluid value. Conservative (bounded, and the momentum solve relaxes it within a
-   step at small per-step motion) but not obviously right at larger CFL. Alternatives: seed with
-   the local wall velocity of the body that uncovered it (cheap — `uwCell_` is already there), or
-   extrapolate from the fluid side.
+4. **Fresh cells — RESOLVED 2026-08-31: seeded with the local wall velocity, and it is now the
+   DEFAULT** (flow `1a01769`). The concern below was right and understated: inheriting the solid's
+   value is not merely "not obviously right at larger CFL", it costs a **resolution-independent
+   drag bias** on any moving body.
+
+   The remedy is the one this item proposed. `seedFreshCells()` sets a just-uncovered staggered
+   point to `uBc_` — the owning instance's rigid-body velocity at the nearest wall point, already
+   computed for the no-slip datum. Bounded (no extrapolation), no new field, and exactly the old
+   behaviour when nothing moves, so a static run stays bit-identical.
+
+   *Measured* on a sphere that physically translates through the grid, oscillating at δ/R = 1,
+   where the LINEARISED run (boundary condition oscillating, geometry static) is an exact internal
+   reference — itself validated to 0.23% against Stokes (1851) in the gallery's
+   `oscillating-sphere` page:
+
+   | | drag bias vs the linearised answer | RMS(F_2δ)/\|F₁\| | 5-harmonic residual p2p |
+   |---|---|---|---|
+   | static reference (the floor) | — | 6.98e-04 | 2.29e-03 |
+   | moving, seeding OFF | **+2.6 … +2.9%** | 2.1e-02 … 6.5e-02 | 3.5e-02 … 2.3e-01 |
+   | moving, seeding ON | −0.04 … +0.38% | 8.2e-04 … 1.6e-03 | 3.1e-03 … 1.0e-02 |
+
+   The bias without seeding is **+2.91 / +2.61 / +2.71% at R/h = 6.4 / 9.6 / 12.8** — flat under a
+   factor-two refinement, the same signature the traction integral's 29% carries. Refinement was
+   never going to fix it. The spurious oscillation falls 20–50×, and at R/h = 12.8 reaches
+   8.2e-04 against the non-moving floor of 6.98e-04, i.e. within 17% of a body that is not moving.
+   `RMS(F_2δ)` is the second-difference measure of Seo & Mittal (JCP 230, 2011, Eq. 12), the one
+   the moving-boundary IBM literature uses; the 5-harmonic residual is kept alongside because the
+   2δ operator has its own (ωΔt)² rolloff, so the two legitimately disagree on the temporal
+   exponent.
+
+   *The decisive diagnostic.* Without seeding the oscillation gets **worse** as Δt is refined
+   (2.80e-02 → 4.13e-02 over 100 → 400 steps/cycle) — the literature's signature that the source is
+   spatial, not temporal. With seeding it converges (3.07e-03 → 6.26e-04), so the mechanism is gone
+   rather than masked.
+
+   *Why the default flipped.* In the resolved CFD-DEM loop the settling gate's total-momentum leak
+   falls **1.07e-02 → 1.13e-04** of F_g per unit time (95×) and the slip drift over the last 30
+   steps 1.89e-03 → 4.48e-04. The slip ratio moves 0.9989 → 1.0076, both far inside the gate's 5%
+   claim; that it moved at all is expected, since the calibration holds the sphere static while the
+   settling run moves it, so the old agreement was partly a cancellation of two errors.
+   `set_fresh_cell_seed(False)` restores the previous behaviour. Gate:
+   `.sdf-campaign-probes/fresh_cell_gate.py`.
+
+   *What it does NOT address.* The second mechanism the literature names — the abrupt change of the
+   cut-cell stencil as the interface crosses a face — is untouched. That fresh-cell seeding alone
+   recovers the non-moving floor says that term was subdominant here, which matches what the
+   sharp-interface papers report, but it is a measurement on one geometry, not a proof.
+
+   *Beyond Stokes.* With advection on, the peak drag on the same oscillating sphere converges onto
+   Blackburn's spectral table (Phys. Fluids 14, 2002, Table II; A/D = 1, Re = 20, Ĉ_d = 4.29) as the
+   Stokes layer is resolved: **+10.27% → +2.10% → −0.42%** at δ/h = 4.05 / 5.06 / 6.32, with the box
+   independent to 0.1% between L/D = 7.5 and 10.
 
 5. **dem has no external-torque API — RESOLVED 2026-08-30: `set_external_torques` shipped.**
    The entry point takes a **WORLD-frame** (N,3) torque — that is what every torque source
