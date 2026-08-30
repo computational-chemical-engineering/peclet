@@ -222,12 +222,51 @@ load at extreme scale.
 
 ## 5. Parallel workstreams (not on the ladder's critical path)
 
-- **Pressure solver under sharp ρ jumps.** PCG stalls on ρ-scaled coefficients
-  (`flow/doc/variable_density_projection.md` §2); Chebyshev converges (~20–32 its at 10³)
-  and is the shipped default — V2 proceeds on it. The symmetric-CutcellMG-transfer follow-up
-  (`MULTIPHYSICS_PLAN.md:495`) becomes *the* perf lever once the interface moves every step
-  (coefficient rebuild + Chebyshev bound re-estimation per step). Own the risk: if per-step
-  Chebyshev degrades on real pore geometries, this workstream promotes to critical path.
+- **Pressure solver under sharp ρ jumps — the S-ladder** (elevated 2026-08-30; user's main
+  concern). Diagnosis (`flow/doc/variable_density_projection.md` §2): the V-cycle
+  preconditioner's transfer pair is not symmetric w.r.t. the coefficient-weighted inner
+  product once level fields are ρ-scaled → CG's orthogonality collapses and it stalls;
+  Chebyshev needs only real spectrum bounds and is immune (≤32 its at ratio 10³). Two
+  reframes before any deep work: (a) the fine-level face mean is *already right* — the
+  arithmetic-ρ face mean equals the harmonic mean of the coefficient β=1/ρ, which is the
+  homogenization-correct series choice AND the hydrostatic-exactness requirement; the
+  flagged degradation lives in the *coarse hierarchy* (arithmetic sub-face averaging +
+  rediscretization is fine for openness, unproven for 10³ coefficient jumps); (b)
+  **Chebyshev is not a stopgap** — it is the only driver with zero global reductions per
+  iteration, i.e. exactly the all-reduce-free pressure driver the comm-scaling campaign
+  wants (`core/docs/comm_avoiding_pressure_driver.md`). The ladder, cheap → deep, each
+  rung gated on measurement (first-principles directive):
+  - **S0 — measure before investing**: a-priori battery with *static manufactured* ρ
+    fields (sphere / film / meniscus-shaped jumps inside the ring + packing cut-cell
+    geometries; ratio sweep 10²–10⁴): Chebyshev its, PCG stall reproduction, per-level
+    residual decomposition. Needs NO VoF — can run today.
+  - **S1 — flexible CG (FCG/IPCG)**: Polak–Ribière β tolerates a nonsymmetric/variable
+    preconditioner; a ~one-vector change to the existing driver. If FCG with the current
+    V-cycle beats Chebyshev, the "stall" is closed at trivial cost.
+  - **S2 — bound amortization for moving interfaces**: at capillary-limited dt the
+    interface crosses a cell over many steps → coefficients drift slowly; freeze Chebyshev
+    bounds for N steps (safety-inflated, residual-guarded re-estimate on violation) +
+    φ warm start. Turns the per-step re-estimation cost into noise.
+  - **S3 — coefficient-aware coarsening, structure-preserving**: keep the 7-band
+    rediscretized hierarchy but coarsen coefficients as a resistor network (parallel:
+    sub-face conductances add — the current `coarsenOpenAvg` is already correct here;
+    series: add the two half-cell resistances through the coarse cell along the normal —
+    the missing "half-harmonic" step, cf. Alcouffe et al. 1981). Cheap, no stencil growth.
+  - **S4 — symmetric transfers / Galerkin (RAP) or operator-dependent (BoxMG/Dendy 1982)
+    transfers**: the provably-SPD fix that makes MG-PCG legal for arbitrary positive
+    coefficients (`MULTIPHYSICS_PLAN.md:495`). Real work (RAP grows 7-band → 27-point on
+    cut cells); only climb to it if S0–S3 measurements say Chebyshev/FCG iteration counts
+    actually hurt on pore geometries.
+  - **Rejected as primary**: Dodd–Ferrante constant-coefficient splitting — its splitting
+    error scales with the pressure jump σκ, which is the *dominant* field in
+    capillary-controlled pore flow, and it forfeits the exact-adjoint hydrostatic/
+    balanced-force structure the whole Part-I acid-test chain is built on. Legitimate as a
+    bubbly-channel fast mode at most (it is what TBFsolver uses).
+- **MPI + CUDA validation of the varRho/varMu paths** — the multiphysics phases were
+  validated on host-openmp only (`variable_density_projection.md` §4: "MPI/CUDA validation
+  deferred"). This IS on V2's critical path: promote to a pre-V0 hardening rung (**V-1**)
+  — varRho hydrostatic + RT on CUDA, np 1/2/4 bit-exact ctests for varRho/varMu/scalar
+  paths, Chebyshev-bounds behavior under np>1.
 - **`bcCorrectOutflow` lacks the 1/ρ_f factor** (known gap, variable_density doc §4) —
   needed before any two-phase outflow case.
 - **Ghost-projection / porous-ε paths throw under varRho** (`flow_ibm.hpp:3486,:3516`).
