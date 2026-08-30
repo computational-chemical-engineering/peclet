@@ -469,10 +469,34 @@ Rationale: every rung past V1 couples to `Solver<Grid>` internals (projection, c
 cut-cell overlay, ghost machinery); a repo boundary would force premature API design and
 split the bit-exact regression gates from the code they gate. The suite precedent is to
 split when a component acquires its own users/package (the `pnm` split), which git makes
-cheap *later* with history preserved. Named extraction trigger: if/when `core/amr` (V10)
-or another method code wants the PLIC toolbox, the *kernels* (`vof/plic.hpp`,
-`vof/curvature.hpp`) move into `core/` as `peclet::core::vof` — a header promotion, not a
-new repository. Part III's block container stays in flow regardless.
+cheap *later* with history preserved.
+
+**Three-layer structure w.r.t. the AMR future** (clarified 2026-08-30 — AMR VoF is wanted,
+not hypothetical, so the promotion is *scheduled*, not conditional):
+- **L1 — container-free math kernels**: SZ forward/inverse, MYC/Youngs normals on a
+  supplied 3³ array, slab clipping, HF column arithmetic on supplied column sums,
+  paraboloid LSq fit on supplied points, wetting ghost-fill math. Written from day one as
+  pure `KOKKOS_INLINE_FUNCTION`s of scalars/small local arrays — **no grid views, no
+  indexing, no halo types in their signatures** (WO-D already mandates this). One copy,
+  shared by all three containers (structured field, AMR leaves, bubble blocks).
+  **Scheduled promotion: at the V4 freeze** (kernels are frozen math once their gates
+  pass) the L1 headers move to `core/` as `peclet::core::vof`, before V10 starts.
+- **L2 — stencil gathering**: "give me the 3³ of C / the 7-column / the 5³" —
+  container-specific by nature. Trivial on the structured grid; on the octree it is the
+  virtual-cell machinery (rescaled extraction from a coarser neighbor's PLIC plane, valid
+  under 2:1 balance — the Basilisk pattern) and is the *bulk of the genuine V10 work*,
+  together with per-substep flux averaging, PLIC-subdivision prolongation, and solenoidal
+  face refinement.
+- **L3 — drivers**: sweep loops, halo choreography, adapt hooks — per container, exactly
+  as the suite already duplicates NS orchestration between `flow`'s structured solver and
+  `core`'s `AmrFlow` (with kernel *bodies* shared, the MORTON_HD consolidation pattern).
+
+So AMR does not "split the implementation" beyond the split the suite already has for the
+flow solver itself; VoF adds shared L1 + thin per-container L2/L3. Note the AMR path's
+other prerequisite: `AmrFlow` is collocated, so AMR VoF inherits the V8 collocated
+variable-density/balanced-force work in addition to V10's machinery; the interface-band-
+at-finest-level contract coincides with the existing cut-band-at-finest contract.
+Part III's block container stays in flow regardless.
 
 **Ownership model** (the AMR-campaign pattern: Opus executes rungs specified as
 work orders with deterministic gates; Fable does design-heavy derivation and writes the
