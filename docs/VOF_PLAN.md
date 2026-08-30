@@ -462,6 +462,59 @@ Note for §0: this also retroactively strengthens the "transport/geometry as sea
 the block container is the third consumer of the same kernel toolbox (global field, AMR,
 blocks).
 
+## 11. Execution: repo location, ownership, Opus-readiness
+
+**Repo decision (2026-08-30): no new submodule — VoF lives in `flow` (`flow/src/vof/`).**
+Rationale: every rung past V1 couples to `Solver<Grid>` internals (projection, closures,
+cut-cell overlay, ghost machinery); a repo boundary would force premature API design and
+split the bit-exact regression gates from the code they gate. The suite precedent is to
+split when a component acquires its own users/package (the `pnm` split), which git makes
+cheap *later* with history preserved. Named extraction trigger: if/when `core/amr` (V10)
+or another method code wants the PLIC toolbox, the *kernels* (`vof/plic.hpp`,
+`vof/curvature.hpp`) move into `core/` as `peclet::core::vof` — a header promotion, not a
+new repository. Part III's block container stays in flow regardless.
+
+**Ownership model** (the AMR-campaign pattern: Opus executes rungs specified as
+work orders with deterministic gates; Fable does design-heavy derivation and writes the
+work orders). Detailed phase-0 work orders: `flow/doc/vof_workorders.md`.
+
+| rung | owner | notes |
+|---|---|---|
+| V-1 MPI/CUDA hardening | **Opus** | WO-A written — pattern-copy MPI ctests, bitwise gates |
+| S0 solver battery | **Opus** | WO-B written — measurement only |
+| S1 flexible CG | **Opus** | WO-C written — one-formula change, inert-by-default gate |
+| S2 bound amortization | **Opus** | spec after S0 numbers |
+| S3 series-harmonic coarsening | Fable spec → Opus | touches CutcellMG internals |
+| S4 Galerkin/BoxMG transfers | **Fable** | only if S0–S3 say so |
+| V0 PLIC toolbox | **Opus** | WO-D written — self-checking gates (round-trip 1e-13) |
+| V1 WY advection | **Opus** | WO-E written — traps pre-loaded, conservation gate |
+| V2a closures/projection wiring | **Opus** | hydrostatic acid test is the loud gate |
+| V2b momentum-consistent transport | **Fable** design → Opus | half-shifted fractions; the subtle rung |
+| V3 HF cascade | **Opus** (detailed WO to come) | Popinet 2009 is a precise spec |
+| V3 PV paraboloid fallback | Fable spec → Opus | LSq fit + weighting choices |
+| V4 balanced CSF + capillary dt | **Opus** | one-rule force placement; machine-zero droplet gate |
+| V5 SDF wetting | **Fable** (+ Opus harness) | research-grade; reference impl has known fixmes |
+| V6 dynamic θ / hysteresis | Fable design → Opus | model implementation after the derivation |
+| V7 pore-scale campaign | **Opus** runs, Fable/user interpret | scripts + sweeps |
+| V8 collocated | **Fable** | attractor-campaign territory |
+| V9 scale-out | mixed | probes Opus; lever selection Fable |
+| V10 AMR | **Fable** | separate campaign |
+| P0–P2 phase-change basics | **Opus** after Part-II kernel specs | Stefan/sucking are deterministic gates |
+| P3+ | Fable design → Opus | extrapolation quality is the crux |
+| W0 block container | Fable exchange design → Opus arena | core-NBX gather/scatter is the design part |
+| W1–W3 bubbly rungs | mostly **Opus** | channel_18 cross-code gate |
+| W4–W5 coalescence models / dem bridge | **Fable** | modeling decisions |
+
+Net: **roughly two-thirds of the rung-work is Opus-executable** once specified at WO
+grain, because the plan's gate style (bitwise, analytic, loud acid tests) makes
+correctness machine-checkable — an Opus agent cannot silently pass a wrong PLIC inverse
+through a 10⁵-sample 1e-13 round-trip gate. The reserved third is derivation (wetting,
+momentum consistency, MG transfers) and campaign interpretation.
+
+**Start order**: WO-A ∥ WO-D (independent), then WO-B → WO-C, then WO-E (needs WO-D).
+Escalation rule in every WO: a twice-failed gate stops the run and is written into the
+findings log — numerics are never tweaked to make a gate pass.
+
 ## Key references
 
 Weymouth & Yue JCP 2010 · Scardovelli & Zaleski JCP 2000 · Lehmann & Gekle Computation 2022 ·
