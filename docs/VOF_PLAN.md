@@ -329,8 +329,15 @@ load at extreme scale.
 
 ## 6. Traps (from the literature, pre-loaded)
 
-- WY boundedness is a **hard CFL < 0.5**, and the dilation coefficient is frozen *once per
-  step* across all three sweeps — recompute it per sweep and exact conservation silently dies.
+- WY boundedness is a **hard CFL cap of 1/(2(N−1)) — 1/2 in 2D but 1/4 in 3D** (Weymouth
+  thesis eq. A.33; MEASURED 2026-08-30, and this plan's own §2 quoted the 2D value). The
+  shipped default is the proven 3D bound, inclusive. The dilation coefficient is frozen
+  *once per step* across all three sweeps — recompute it per sweep and exact conservation
+  silently dies (measured: drift 2.3e-15 → 1.5e-2, a factor 6e12).
+- **A global CFL max over-throttles**: on Zalesak the domain-corner faces run at 0.314
+  while the interface never exceeds 0.157. Weymouth's bound is per-flux, so **V2's dt
+  limiter must take its CFL over interface-adjacent cells**, not the whole domain, or
+  quiescent far-field corners will shrink the step for nothing.
 - **Wisp clipping (ε=1e-8) erodes exact conservation** unless clipped volume is
   redistributed; with surface tension clipping is unavoidable (Arrufat). Ship clipping with
   redistribution, and keep the V1 conservation gate running with clipping on.
