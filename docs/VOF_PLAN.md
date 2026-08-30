@@ -316,11 +316,18 @@ load at extreme scale.
     capillary-controlled pore flow, and it forfeits the exact-adjoint hydrostatic/
     balanced-force structure the whole Part-I acid-test chain is built on. Legitimate as a
     bubbly-channel fast mode at most (it is what TBFsolver uses).
-- **MPI + CUDA validation of the varRho/varMu paths** — the multiphysics phases were
-  validated on host-openmp only (`variable_density_projection.md` §4: "MPI/CUDA validation
-  deferred"). This IS on V2's critical path: promote to a pre-V0 hardening rung (**V-1**)
-  — varRho hydrostatic + RT on CUDA, np 1/2/4 bit-exact ctests for varRho/varMu/scalar
-  paths, Chebyshev-bounds behavior under np>1.
+- ~~**MPI + CUDA validation of the varRho/varMu paths**~~ — **DONE 2026-08-30 (rung V-1 /
+  WO-A)**: `tests/kokkos_mpi/test_{vardensity,varmu}_mpi.cpp`, np 1/2/4 on host-openmp AND
+  nvidia-cuda (np=1 bitwise, np>1 at the MPI reduction-order floor, ≤3e-19…6e-17 on u);
+  hydrostatic max|u| 2.75e-17 at ratio 1000 on CUDA; RT reproduces the host record
+  digit-for-digit; single-phase regression +0.00%. **The Chebyshev bounds path IS
+  decomposition-independent** — on a non-degenerate solve the V-cycle count is identical at
+  np=1/2/4 (and across thread counts). Two OPEN gaps escalated out of it, both in the
+  DOMAIN-BC machinery rather than the variable-property path — per-face domain BCs have no
+  rank-ownership test, and `fillPropGhosts`/`fillPorousEpsGhosts` skip their domain-face
+  override under MPI. **Both must be fixed before any wall-bounded two-phase MPI case**
+  (V2+ with walls, and the boiling/porous work of Part II). See
+  `flow/doc/variable_density_projection.md` §3.1/§4 and the WO-A findings log.
 - **`bcCorrectOutflow` lacks the 1/ρ_f factor** (known gap, variable_density doc §4) —
   needed before any two-phase outflow case.
 - **Ghost-projection / porous-ε paths throw under varRho** (`flow_ibm.hpp:3486,:3516`).
