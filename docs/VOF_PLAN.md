@@ -198,11 +198,28 @@ sweep. Lesson to design against: **corner films decide imbibition fidelity** —
 micromodel benchmark defeated nearly every 2019-era code on strong imbibition. Cross-checks
 against `pnm` invasion metrics where applicable.
 
-**V8 — Collocated.** Requires: collocated varRho projection (currently throws), Rhie–Chow-
-consistent face CSF force (harder balance — the collocated-attractor lesson), Favre face
+**V8 — Collocated.** The collocated path is the **ABC approximate projection**
+(wall-aware center-to-face interpolation → exact face projection `divergOpen(uf)=0` →
+separate cell correction), NOT Rhie–Chow momentum interpolation — corrected 2026-08-30.
+Consequences: (a) the *transport* half is already right — the ABC face field is exactly
+divergence-free, which is precisely what WY's conservation proof needs (and
+`advanceScalars` already consumes `uf_`); (b) the balanced-force recipe has a direct
+published precedent in this exact framework: **Basilisk is a collocated ABC-style code**
+(cell-centered u, auxiliary face field, approximate projection) and achieves machine-zero
+spurious currents by applying σκ∂C at faces with the same discrete gradient as ∂φ before
+the face projection — so V8's force placement follows the V4 rule on the face path, plus
+the *consistent cell-side counterpart* through the same averaging operator as
+`projectCorrectCenter`. Requires: collocated varRho projection (currently throws — 1/ρ_f
+in the face correction and its cell-averaged adjoint), face CSF as above, Favre face
 states for momentum consistency (AMR-Wind pattern; their non-Favre variants blew up).
-Gate: same V2/V4 battery; staggered stays the reference. Sequenced after V7 deliberately —
-porous-media results don't wait on it.
+Specific ABC risk to gate: the approximate projection leaves a filtered remnant of any
+face/cell inconsistency in the *cell* velocities — a stiff localized σκδ_Γ force is
+exactly the kind of input that could re-excite the invisible-subspace/attractor family
+the collocated campaign just tamed (`flow/doc/collocated_invisible_subspace.md`); the
+hydrostatic and static-droplet acid tests on the collocated path are the canaries, run
+with the wall-blend settings from that campaign. Gate: same V2/V4 battery; staggered
+stays the reference. Sequenced after V7 deliberately — porous-media results don't wait
+on it (but V8 is the gateway to AMR two-phase, §11).
 
 **V9 — Performance & scale.** Interface-weighted ORB rebalancing (the weighted
 `BlockDecomposer` is the published remedy for VoF's O(N^{2/3}) imbalance); PARIS
