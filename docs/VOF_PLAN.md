@@ -228,6 +228,43 @@ WO-J entry, three of them corrections to gates as written:
   the floor is `max|div(open·u)|` (1e-12…1e-11 here), not the advection.
 - **a mixed-cell-only CFL band is empty on a grid-aligned sharp interface**; the band predicate is
   a colour *difference*. Measured over-throttle avoided: **22×**.
+
+**V2b — momentum-consistent transport. ✅ DONE 2026-08-31** (flow `7d1a1f0`;
+`src/vof/momentum_advect.hpp` + `plicBoxVolume` + `enable_vof_momentum`/`buildRhsVarMom`;
+`tests/kokkos/test_vof_momentum.cpp`, `tests/kokkos_mpi/test_vof_momentum_mpi.cpp`,
+`tests/study/vof_momentum_consistency.py`; green host-openmp AND CUDA, MPI np 1/2/4 on both,
+single-phase regression +0.00 %). `ρ^c u_c` is advected on the half-shifted MAC control volumes by
+the SAME PLIC planes, the same sweep order and one frozen dilation state as that step's colour
+advection — the momentum sweeps are INTERLEAVED with the colour sweeps, because the planes are
+overwritten every sweep. **The decisive gate is bitwise**: an arbitrary sharp C carried by a uniform
+velocity comes out exactly uniform at ratios 1e1…1e4 on a slab, a tilted plane and a sphere, on one
+rank and at np 1/2/4, with no tolerance. Five findings in the WO-K entry:
+- **the uniform-velocity gate does NOT discriminate against the V2a baseline on this solver.**
+  flow's momentum advection is in ADVECTIVE (non-conservative) form and the discrete advection of a
+  constant by a divergence-free field is exactly zero, so a uniform velocity is a fixed point of the
+  inconsistent scheme too. The `O(Δρ)` failure the test targets belongs to codes that advect ρu
+  conservatively with a non-VoF mass flux. The gate is still the sharpest instrument in the rung —
+  it caught three separate defects at 1.5e+06, 1.2e-13 and 2.2e-10 — but the CONTRAST has to come
+  from a case where momentum actually transports.
+- **the geometric flux must be clamped into Weymouth's own admissible interval on the shifted
+  volume's colour.** It is bounded by what the CURRENT cell planes see in the donor, not by the
+  ADVECTED `C^c`; the O(a²) gap drives ρ^c to −255 at ratio 1e4 (ablation: divergence at step 2).
+- **the dilation COEFFICIENT ρ̂·u must be frozen across the three sweeps**, exactly as WY freeze
+  H(C^n−½): per-step momentum drift **1.4e-7 → 2.2e-13**. General rule to carry — *every coefficient
+  multiplying the divergence in a WY sweep must be a constant of the step.*
+- **a MUSCL slope in the momentum flux is a density-ratio amplifier** on a control volume a sweep
+  empties (gain Δρ·F/ρ^c); donor-cell upwind is the default (2.2e-10 → 6.7e-16 at ratio 1e4).
+- **algebraic exactness is not enough for a 1e-15 gate** — two floating-point conditioning defects
+  each degraded it *linearly in the ratio*, i.e. each mimicked the defect the rung removes. Storing
+  ρ^c u loses the cancellation on a volume a sweep fills and the next empties; the shipped form
+  evolves `u_new = u_old + dev/ρ_new`, in which every term is a velocity DIFFERENCE.
+- **ESCALATED**: the coupled-loop residual is floored at 1.2e-7 by the solver's FLOAT
+  momentum-operator storage (`Solver::FV`), not by VoF — a `-DPECLET_FLOW_MREAL_DOUBLE` A/B puts the
+  same measurement at 1.2e-15, flat across four decades. V2b is honestly rated to ratio ~1e3 on the
+  shipped build. Same float storage the S-rung has independently root-caused on the pressure
+  operator; the fix belongs there.
+- the Arrufat raindrop gate **cannot be run before V4** (it is held together by surface tension);
+  the substitute is a viscous Stokes drop at the same ratio and 15 cells/diameter.
 V2a is explicitly **valid only at modest density ratios for cases with motion** (no momentum
 consistency), staggered only, and refuses an immersed solid.
 
