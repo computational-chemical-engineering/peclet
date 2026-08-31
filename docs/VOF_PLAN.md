@@ -348,6 +348,29 @@ an explicit parameter; hysteresis (advancing/receding θ) per Huang 2026.
 Gates: capillary rise vs the Gründing 2020 benchmark (rise dynamics + corrected stationary
 height, slip-length sensitivity reproduced); spreading drop vs Cox–Voinov.
 
+**⚠ V4's measurements change V7's premises — read before scoping the pore-scale campaign.**
+1. **The Ca ≲ 1e-7 spurious-current budget is NOT reachable, and the reason is structural.**
+   With an *exact* κ the balanced force gives spurious Ca = **1.9e-18** (max|u| 1.93e-17) —
+   the force itself is exact. With the *computed* κ, Ca = 2.5e-4 / 5.9e-5 / 2.6e-5 / 1.4e-5
+   at D/Δ = 8/16/24/32 (order 2.10). Since Ca ≈ δκ·h, the budget is a **curvature**
+   requirement, and V3 measured curvature error to stop converging with advection-realistic
+   fractions. So the 1e-7 figure quoted from the literature in §2 is a target for the
+   *estimator*, not something the force discretisation can deliver — plan capillary-dominated
+   cases around the achievable Ca at the resolution you can afford, or improve κ (V5's RDF,
+   or ELVIRA/LVIRA on 5³), not the force.
+2. **The capillary time step binds everywhere at pore scale, and worsens under refinement.**
+   Measured over 18 combinations (50/200 µm pores × 16/32/64 cells/diameter × Ca 1e-6…1e-2):
+   it binds **18 of 18**, by factors 6 to 5.9e4, and increasingly so as `dt_σ ~ h^{3/2}`
+   against `dt_CFL ~ h`. **Cost: 3.8e6–3.0e7 steps per pore volume at Ca ~ 1e-6.** That is the
+   dominant feasibility constraint on V7 and it is arithmetic, not tuning. Consequences to
+   decide before committing to the campaign: pick the largest Ca that still answers the
+   physics question; budget wall-clock from a measured ms/step; and note this **reopens the
+   implicit-surface-tension question** the plan parked on Popinet (2018)'s advice — his "not
+   yet worth the complexity" was written for cases where the capillary limit is not 4 orders
+   inside the advective one. Hysing confirms the crossover is real and not universal: case 1
+   is capillary-bound 204/204 steps, case 2 (ratio 1000, σ 12.5× smaller) is CFL-bound
+   108/113.
+
 **V7 — Pore-scale campaign.** Pore doublet drainage/imbibition; imbibition in an SDF sphere
 packing (the existing packed-bed scenes); a Zhao-2019-style micromodel with wettability
 sweep. Lesson to design against: **corner films decide imbibition fidelity** — the
