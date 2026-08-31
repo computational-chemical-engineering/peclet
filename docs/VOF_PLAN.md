@@ -379,6 +379,26 @@ load at extreme scale.
     sub-face conductances add — the current `coarsenOpenAvg` is already correct here;
     series: add the two half-cell resistances through the coarse cell along the normal —
     the missing "half-harmonic" step, cf. Alcouffe et al. 1981). Cheap, no stencil growth.
+    **⚠ PREREQUISITE, added 2026-08-31 — rule out an fp32 floor FIRST.** The MG operator
+    storage is **single precision** (`mac_cutcell_mg.hpp:51`, `using MReal = float`,
+    "Operator stored single-precision + double iterate, exactly as CUDA"), and `:1411`
+    already documents a float-induced failure in this same hierarchy: float storage
+    "breaks that identity at ~5e-8 relative … measured as the inner CG flooring at ~1e-5
+    and burning its full iteration cap every call", cured there by a targeted
+    **double-precision resum**, not by an fp64 hierarchy. The collocated-paper campaign
+    independently measured a high-contrast stall flooring at |r|∞ ≈ 3e-8 — right at that
+    number — with `pr` starting at 1e-15 and growing only as the residual falls to ~1e-6,
+    which is the signature of a fixed-*absolute* perturbation becoming relatively
+    dominant, **not** of an indefinite preconditioner (a negative eigenvalue is present
+    from iteration 1). WO-H's negative pivot was found in the *assembled* preconditioner
+    and so is independent of residual level: **the dense-LDLᵀ negative-pivot probe
+    discriminates the two mechanisms directly** and runs in seconds at 48³ on the
+    collocated campaign's reproducer (fully periodic, no domain BCs, no VoF, no varRho,
+    analytic SDF bed, contrast tunable by `PECLET_FLOW_APERTURE_ORDER=1|2`). A
+    coefficient-coarsening fix that ignores a precision floor is a wasted campaign — so
+    S3 starts with that probe, on that reproducer, not with `coarsenOpenAvg`. Note also
+    that `buildOpenness` feeds both the geometric openness and the coefficient path, in
+    this code and in theirs: any change there has two consumers.
   - **S4 — symmetric transfers / Galerkin (RAP) or operator-dependent (BoxMG/Dendy 1982)
     transfers**: the provably-SPD fix that makes MG-PCG legal for arbitrary positive
     coefficients (`MULTIPHYSICS_PLAN.md:495`). Real work (RAP grows 7-band → 27-point on
