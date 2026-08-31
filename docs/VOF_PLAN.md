@@ -272,10 +272,37 @@ consistency), staggered only, and refuses an immersed solid.
 uniform-velocity consistency test exact at 1e-15 across ratios 10…10⁴; falling raindrop at
 ratio ~800 stable and accurate at ~15 cells/diameter (Arrufat criterion); the V2a battery re-run.
 
-**V3 — Curvature.** HF cascade + PV 5³ fit; κ as a registered field.
-Gates: Han-style static convergence (exact fractions → 2nd order; sphere sweep incl.
-D/Δ < 5 where the fallback must engage, no NaN/zero-κ cells); curvature of a translating
-droplet (transport-noise floor visible, documented).
+**V3 — Curvature. ✅ DONE 2026-08-31** (`src/vof/curvature.hpp` — container-free, the V4
+promotion target — + `src/vof/curvature_field.hpp` + `compute_vof_curvature()` registering
+`"kappa"`/`"kappa_branch"`; `tests/kokkos/test_vof_curvature.cpp` and
+`tests/kokkos_mpi/test_vof_curvature_mpi.cpp`, green on host-openmp AND CUDA, MPI np 1/2/4
+**bitwise** on both, single-phase regression +0.00 %). The Popinet cascade as specified: HF on
+7-cell column sums over a 3×3 patch → the same in the other two directions → the **PV**
+PLIC-volumetric paraboloid fit (Jibben 2019 / Han, Evrard & Desjardins IJMF 2024) on a 5³
+Wendland-weighted stencil. κ = 2H in 1/h, positive for a liquid blob; plane, cylinder and sphere
+all gated so the mean-curvature factor is measured. **No new halo** — the whole cascade reaches
+exactly ±3, which is what the colour field's g = 3 already gives, and it contains no reduction at
+all, hence the bitwise MPI. Measured: exact-fraction sphere 16³→32³→64³ **order 2.26 (L1) / 1.86
+(max)**; the PV branch alone 1.96–1.99; plane 1.5e-14. Findings in
+`flow/doc/vof_workorders_v34.md` (WO-O):
+- **the fallback rate is ~19 % at D/Δ = 48, not Han's 2-D 0.9 %, and that is geometry.** In 3D the
+  corner column of a 3×3 patch must span √2·s where the preferred-direction slope reaches √2 on the
+  octant diagonal — 2.5 cells, exactly a 7-column's capacity — so the failing fraction is
+  *resolution-independent*. Han et al. use NH = 11 in 3D for this reason; NH = 11 needs g = 5. **The
+  one place a wider halo would buy something**, and it is not needed: PV serves those cells at
+  order ~2.
+- **the advection-realistic plateau sets in between CΔ ≈ 0.16 and 0.08** (max error 1.60e-1 →
+  1.53e-1, order 0.07, while the exact-fraction control on the same geometry keeps converging at
+  2.16). Consequence for V4: at pore-scale resolutions the curvature error is set by the transport,
+  so the spurious-current budget is spent on the balanced-force identity, not on a fancier κ.
+- **tier 2b (the mixed height-position fit) ships OFF, measured.** It takes over the 19.5–59.6 % of
+  cells tier 1 cannot serve and destroys the max-error convergence (order 0.00 vs 1.86) for every
+  Wendland width from 1.5 to 6.0 cells, because its data set is the columns that CLOSED — a
+  slope-selected, asymmetric subset whose lever-arm bias is scale invariant. PV is immune because a
+  PLIC polygon exists at every slope. Caught by the WO's own "report max and L1 separately" gate.
+- **a sign error in Han et al.'s published eq. (14f)**, found and corrected (the `∫y'²dA` edge
+  factor); the second such defect this campaign has found in a published listing, both caught by a
+  hand-computable case that the randomized batteries miss.
 
 **V4 — Balanced-force CSF + capillary time step.** Face `σκ∂C` with the projection's own
 gradient; Brackbill/Denner capillary Δt exposed and folded into the step limiter.
