@@ -443,8 +443,52 @@ load at extreme scale.
     sub-face conductances add — the current `coarsenOpenAvg` is already correct here;
     series: add the two half-cell resistances through the coarse cell along the normal —
     the missing "half-harmonic" step, cf. Alcouffe et al. 1981). Cheap, no stencil growth.
-    **⚠⚠ SUPERSEDED 2026-08-31 (later the same day): the mechanism is PRECISION, confirmed
-    by direct A/B, and S3's evidence is now contaminated.** The collocated-paper campaign
+    **✅ RESOLVED 2026-08-31 by WO-M: S3 STANDS — there are TWO mechanisms, not one.** The
+    dense-preconditioner probe was rebuilt as a committed instrument
+    (`flow/tests/study/mg_precond/`) and run on default vs `-DPECLET_FLOW_MREAL_DOUBLE`
+    builds with nothing else different: **the negative pivot survives in double, unchanged
+    to 3–4 significant figures at every contrast** (first real negative eigenvalue of
+    `sym(M)` at ratio ~1e3 wall-bounded, ~1e4 periodic, in *both* precisions; at 16³/4
+    levels the periodic 1e3 case grows to two negatives, so the defect deepens with depth).
+    So WO-H's coefficient-coarsening evidence was **not** contaminated by float storage, and
+    the "strike S3" prediction below was **wrong**. Two method corrections that strengthen
+    WO-H: `sym(M)` is singular by construction, so its "1 negative pivot (−1.1e-12) at ratio
+    1e2" was sign noise (it flips between builds), and the unpivoted LDL breaks down near
+    the transition — **the mean-free restricted spectrum is the reliable read-out**.
+    The float `A·1 ≠ 0` defect is separately real and contrast-amplified as claimed (up to
+    4.6e-2 relative to the small couplings at ratio 1e6, vs 5e-11 in double) — but it does
+    **not** move `M`'s spectrum. **Two loci, two mechanisms, two signatures**: the float
+    floor is resolution- and depth-independent (a fine-level storage defect); S3's
+    indefiniteness deepens with depth (a coarsening defect).
+
+    **Resolution-aware tolerance — adopt this in every gate.** WO-M measured
+    **κ(A) ≈ 0.18·N²·contrast** (×4 wall-bounded), exactly linear in contrast and quadratic
+    in N. At ratio 1000 on 256³ that is κ ≈ 1.2e7, so the fp64 attainable limit is ~1e-9
+    before the O(1)–O(10) constant: **a fixed rtol of 1e-8 is already within a small factor
+    of the arithmetic limit there, and unreachable at 512³ or ratio 1e4.** Use
+    `rtol = max(1e-8, C·eps·0.18·N²·Δρ/ρ)` — the analogue of the collocated campaign's
+    `PRTOL = 2e-7`. Gates must not demand what the arithmetic cannot deliver.
+
+    **Precision policy (WO-M, stated as a rule rather than a patch)**: *a quantity an
+    algorithm requires to satisfy an exact discrete identity must be stored in the precision
+    in which that identity is asserted; a quantity carrying only an approximation may stay
+    float.* Here the identity-bearing quantity is the operator **diagonal** in both
+    operators; the six face couplings are the approximation. Tested directly by the
+    `PECLET_FLOW_MG_DIAGRESUM=1` ablation (bit-for-bit double-diagonal arithmetic), judged
+    against a **matched full-double control**: it recovers full-double behaviour at every
+    grid from 48³ to 160³. **Recommendation: ship the double-diagonal in both operators**
+    (+17 B/cell against a measured +120 B/cell and +12 % time for full fp64) as a follow-on
+    work order — it is view-type surgery through smoother/residual/matvec/CA-ring/AMG, not a
+    line edit. **Do not make fp64 the default**: it buys nothing on Z&H drag, permeability or
+    the regression suite. Keep `-DPECLET_FLOW_MREAL_DOUBLE` documented as the validated
+    escape hatch for high-contrast beds.
+
+    **Next unexamined locus**: the *geometry* is still float (`IbmOverlay` K/M/X/Nbc,
+    `D_rescale`, `mac_ibm.hpp`'s θ sampling) and `MReal` does not reach it — the leading
+    suspect for a residual floor that persists in a full-double build.
+
+    **Earlier note, now corrected — "the mechanism is PRECISION and S3's evidence is
+    contaminated" (this prediction did not survive measurement).** The collocated-paper campaign
     made `MReal` compile-switchable (`-DPECLET_FLOW_MREAL_DOUBLE`, smoothers/matvec
     templated on the coefficient view type, default float untouched) and ran the same
     192³ high-contrast bed both ways: **float** — PCG reaches 8e-7 then *rebounds* to
