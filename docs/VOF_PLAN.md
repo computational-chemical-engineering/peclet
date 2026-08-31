@@ -379,7 +379,34 @@ load at extreme scale.
     sub-face conductances add — the current `coarsenOpenAvg` is already correct here;
     series: add the two half-cell resistances through the coarse cell along the normal —
     the missing "half-harmonic" step, cf. Alcouffe et al. 1981). Cheap, no stencil growth.
-    **⚠ PREREQUISITE, added 2026-08-31 — rule out an fp32 floor FIRST.** The MG operator
+    **⚠⚠ SUPERSEDED 2026-08-31 (later the same day): the mechanism is PRECISION, confirmed
+    by direct A/B, and S3's evidence is now contaminated.** The collocated-paper campaign
+    made `MReal` compile-switchable (`-DPECLET_FLOW_MREAL_DOUBLE`, smoothers/matvec
+    templated on the coefficient view type, default float untouched) and ran the same
+    192³ high-contrast bed both ways: **float** — PCG reaches 8e-7 then *rebounds* to
+    3.8e-5 and burns its 300 cap, FCG floors at 2e-6, Chebyshev cap-burns; **double** —
+    clean monotone convergence to rtol 1e-8 in ~86 iterations/step, no floor, no rebound.
+    Same geometry, same hierarchy, same drivers; only the operator storage changed.
+    Mechanism: float rounding breaks `A·1 = 0` per row at eps_f32, and under ~3 decades of
+    contrast the defect on rows mixing large and tiny couplings is ~1e-4 *relative to the
+    tiny coupling*, shifting the near-null vector off the constant that mean-removal
+    deflates — i.e. the `:1411` agglomerated-bottom failure generalised to **every level**.
+    **Consequence for S3: WO-H's negative LDLᵀ pivot was measured on a V-cycle assembled
+    from this same float-backed hierarchy, so a float-perturbed near-singular operator is a
+    sufficient explanation and we have no result separating the two.** Rerun the WO-H dense
+    probe on a `-DPECLET_FLOW_MREAL_DOUBLE` build *before* investing in coefficient
+    coarsening: pivot disappears in double ⇒ S3 loses its evidence and the real work item is
+    **precision policy**; pivot survives ⇒ S3 stands and there are two independent
+    mechanisms. Best-targeted candidate fix (theirs, and better than resistor-network
+    coarsening): a **double-diagonal** variant — keep the six face coefficients in float,
+    store and resum the diagonal in double so `A·1 = 0` holds exactly, +4 B/cell against
+    +28 B for a full fp64 hierarchy. Data: `flow/doc/data/collocated_campaign/`. Build note:
+    CUDA 12.x nvcc ICEs on the pre-fix code; their templating cures it, or use CUDA 13.
+    **This plausibly reaches VoF directly** — two-phase at ratio 1000 puts ~3 decades of
+    contrast into the pressure operator by a different route (a smooth density jump, no cut
+    cells), so V2b's ratio sweep doubles as an independent reproducer.
+
+    **Earlier note, now subsumed — rule out an fp32 floor FIRST.** The MG operator
     storage is **single precision** (`mac_cutcell_mg.hpp:51`, `using MReal = float`,
     "Operator stored single-precision + double iterate, exactly as CUDA"), and `:1411`
     already documents a float-induced failure in this same hierarchy: float storage
