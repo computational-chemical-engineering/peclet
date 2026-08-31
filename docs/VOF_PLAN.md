@@ -483,9 +483,23 @@ load at extreme scale.
     the regression suite. Keep `-DPECLET_FLOW_MREAL_DOUBLE` documented as the validated
     escape hatch for high-contrast beds.
 
-    **Next unexamined locus**: the *geometry* is still float (`IbmOverlay` K/M/X/Nbc,
-    `D_rescale`, `mac_ibm.hpp`'s θ sampling) and `MReal` does not reach it — the leading
-    suspect for a residual floor that persists in a full-double build.
+    **Next unexamined locus, correctly scoped (2026-08-31):** the cut-cell IBM geometry is
+    still float — `IbmOverlayT` carries `View<float*>` for `D_rescale`, `K_val`, `M_val`,
+    `X_val`, `Nbc_val`, `R_val` (`cut_cell_ibm.hpp:74`) — and `MReal` does not reach it. But
+    this is **velocity-side only**: the *pressure* operator's geometry is the openness, and
+    `CCField = View<double*>` (`mac_cutcell.hpp:22`), so float geometry **cannot** set a
+    pressure-solve floor. It is a momentum-side accuracy audit item, not a candidate
+    explanation for a pressure residual floor. (I first proposed it as the latter; the
+    collocated campaign corrected it and the types confirm them.)
+
+    **And that floor now has a closed explanation, with no locus left to chase.** The
+    collocated campaign checked WO-M's κ formula against their own data: `eps_f64·κ` at
+    contrast 1e3 gives ~1.5e-9 at 192³ (below their rtol 1e-8, which is why their local
+    float/double A/B converged cleanly) and ~4e-8 at 384³ — *exactly* their measured
+    full-double floor, and why the same build cap-burned there. One formula, both
+    observations, no free parameters beyond an O(1) constant; it further predicts ~2.4e-8 at
+    768³, giving their `PRTOL = 2e-7` about 8× margin by derivation rather than by taste.
+    Their floor is **attainable accuracy**, full stop.
 
     **Earlier note, now corrected — "the mechanism is PRECISION and S3's evidence is
     contaminated" (this prediction did not survive measurement).** The collocated-paper campaign
