@@ -1205,6 +1205,30 @@ option was taken in each case and is stated; none of them is settled.
    CFD-DEM momentum budget at Re where it matters, and the natural place for a conservative
    cut-cell advection scheme if it ever does.
 
+   *Addendum (2026-08-31, ten Cate benchmark — the leak is NOT small for a moving body).* The
+   `peclet-examples` page `ten-cate-sphere` (sphere settling in the closed 100×160 mm tank,
+   Re 1.5–31.9, fully coupled) turned this from a percent-class curiosity into the solver's
+   sharpest open defect. Measured, all at d/h = 8 unless noted, every probe in the page's repo:
+
+   - **Newton audit, moving sphere towed at the E4 speed (Re 32):** F_sphere + F_tank = **+0.32 W**
+     (W = the buoyant weight the drag must balance) — versus −0.001 W with advection off at Re 1.5.
+     The static-bed table above measured −0.4…−1%; the moving cut wall leaks two orders more.
+   - **Confined finite-Re drag is creeping-valued:** the E1 (Re 1.5) settling plateau converges,
+     resolution-flat (d/h = 8, 12, 16), onto u/u∞ ≈ 0.78 — the *Stokes* confined value
+     (effective K ≈ 1.67) — where the experiment reads 0.947 (K ≈ 1.38): the inertial screening
+     of the wall correction never develops. Independent of dt (×½), sweeps (×3.3), and SOU→Koren.
+   - **Coupled high-Re trajectories are unphysical:** E3/E4 accelerate past u∞ (peaks 2.2 / 1.9 u∞),
+     impossible under any drag law.
+   - **Controls that pass:** the identical setup without the tank (large periodic box,
+     back-pressure-compensated) settles at 1.03 of the screened expectation; towed-vs-free-fall
+     internal consistency in the tank agrees to 2%; Galileo similarity to 1%.
+
+   The "conservative option" above (report, don't fix) was the right call for the static-bed
+   percent class; the moving-body numbers now motivate the momentum-operator work it deferred:
+   an advective cut-wall flux consistent with the wall velocity (the moving-geometry analogue of
+   the rung-3 wall-flux identity), plus its reaction-budget term. Until then, resolved coupled
+   motion is quantitatively trustworthy only in the creeping regime.
+
 9. **The reaction TORQUE is not the reaction force — RESOLVED 2026-08-31 (flow `16e91ec`): the
    transposed-stress wall term, added in closed form.** The chain that closed it, kept because each
    link is load-bearing: (a) the rotating sphere measured a **structural −31%** (table below), flat
