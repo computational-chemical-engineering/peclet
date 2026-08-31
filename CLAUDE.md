@@ -106,7 +106,7 @@ PYTHONPATH=$PWD/build python scripts/verify_segmentation.py ../flow/data/packing
 ```bash
 cd dem && source ../.venv/bin/activate        # the suite venv already has nanobind + numpy
 cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"
-cmake --build build -j$(nproc)                  # -> build/dem.cpython-*.so  (-DDEM_MPI=ON for the MPI step)
+cmake --build build -j$(nproc)                  # -> build/dem.cpython-*.so  (-DPECLET_DEM_MPI=ON for the MPI step)
 export PYTHONPATH=$PYTHONPATH:$(pwd)/build
 python verify_packing_spheres.py                # verify_*.py are the test/demo entry points
 ```
@@ -162,8 +162,8 @@ everything after `activate` runs against system Python and a `pip install` targe
 interpreter. If the suite directory ever moves, delete `.venv` and recreate it.
 
 **Local dev imports** come from the build tree, not an install: `PYTHONPATH=<build-dir>`. The
-`coupling` module additionally needs its two pure-Python files staged beside the extension
-(`cp coupling/python/peclet_coupling/{__init__,driver}.py <build>/peclet/coupling/`), because the
+`coupling` module additionally needs its three pure-Python files staged beside the extension
+(`cp coupling/python/peclet_coupling/{__init__,driver,resolved}.py <build>/peclet/coupling/`), because the
 importable package is `peclet.coupling` — the `python/peclet_coupling/` directory is only the source
 location that the wheel install maps into place.
 
