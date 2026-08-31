@@ -1229,6 +1229,46 @@ option was taken in each case and is stated; none of them is settled.
    the rung-3 wall-flux identity), plus its reaction-budget term. Until then, resolved coupled
    motion is quantitatively trustworthy only in the creeping regime.
 
+   *Second addendum (2026-08-31, rung A0 EXECUTED — flow `fb1a1a7`, `469ab7f`; full gate battery
+   in `flow/doc/advective_cutwall_flux_plan.md`).* The wall velocity is now fed into the momentum
+   advection's inputs: `buildAdvInputs` fills scratch copies of `C[c].u` whose solid-masked rows
+   carry `uBc_` (the rigid-body wall velocity the rung-2 machinery already evaluates), and the
+   three explicit RHS builders, both implicit-FOU stencil builders and the velocity-MG restriction
+   all read them. `maskVelocity`'s global convention is untouched, the fill is gated on
+   `hasMotion_` (static scenes byte-identical: 60/60 MPI ctests, regression +0.00 % throughout),
+   and `PECLET_FLOW_ADV_WALLVEL=0` is the ablation. **The hypothesis was half right, and the half
+   that failed is the more interesting one:**
+
+   | probe | before | after | target |
+   |---|---|---|---|
+   | Newton audit, towed E4, `sum F/W` | +0.3217 | **−0.0329** | \|<0.02\| |
+   | Tow drag E4, `F/W` at 0.955 u* | 1.5421 | **1.0866** | ~1.0 |
+   | Blackburn peak `Cd`, δ/h = 4.05 | +10.16 / +10.27 % | **−0.76 / −0.66 %** | 0 |
+   | Blackburn peak `Cd`, A/D = 0.5 | +6.71 % | **−0.54 %** | 0 |
+   | ten Cate E1 peaks, d/h = 8/12/16 | 0.781 / 0.777 / 0.749 | 0.803 / 0.797 / 0.766 | 0.947 |
+   | ten Cate E3 / E4 peaks (× u_inf) | 2.16 / 1.87 | 2.03 / 1.77 | < 1 |
+   | unconfined periodic control | 1.0322 | 1.0843 | ≈1.03 |
+
+   So `sum A` at a MOVING wall was real and is now closed — the towed-E4 residual is below that
+   probe's own advection-OFF floor of −0.0695 — and the 10 % excess this defect was putting on
+   finite-Re moving-body drag against a spectral reference is gone. But the ten Cate benchmark
+   does **not** recover: E1 is still resolution-flat at the creeping value and E3/E4 still exceed
+   u_inf. **The confined finite-Re failure is therefore NOT the advective cut-wall flux**, and
+   §7 item 8's diagnosis of it (the 2026-08-31 first addendum, and the `peclet-examples` ISSUES
+   entry) is superseded on that point. Three concrete threads replace it: the towed and
+   free-falling sphere now DISAGREE at E4 (drag 1.087 W at 0.955 u* against a fall peaking at
+   1.77 u_inf, where at E1 they agreed to 2 %); the unconfined periodic control shifted 5 %, so
+   the extension velocity has a bulk effect away from any confining wall; and the Blackburn ladder
+   is now flat at −0.7…−2.2 % where it used to converge, i.e. a small resolution-INDEPENDENT
+   deficit replaced a large resolution-dependent excess. **Rung A1 (aperture-weighted cut-face
+   fluxes, D2) is NOT indicated by any of this** — nothing in the remaining symptoms implicates D2.
+
+   *Also found en route, unrelated:* `.sdf-campaign-probes/force_gate.py FORCE_ADVECT=1` returns
+   NaN at every N (`CutcellMG::solvePCG: preconditioner produced non-finite z`), which is why the
+   static-bed `sum A` table above could not be re-measured. Pre-existing — the pre-A0 module
+   reproduces it exactly — so it wants bisecting against the 2026-08-31 WO-M/WO-O/WO-P landings.
+   `FORCE_ADVECT=0` passes at 2.2e-15 / 3.3e-15.
+
 9. **The reaction TORQUE is not the reaction force — RESOLVED 2026-08-31 (flow `16e91ec`): the
    transposed-stress wall term, added in closed form.** The chain that closed it, kept because each
    link is load-bearing: (a) the rotating sphere measured a **structural −31%** (table below), flat
