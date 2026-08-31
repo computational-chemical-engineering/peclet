@@ -304,12 +304,37 @@ all, hence the bitwise MPI. Measured: exact-fraction sphere 16³→32³→64³ *
   factor); the second such defect this campaign has found in a published listing, both caught by a
   hand-computable case that the randomized batteries miss.
 
-**V4 — Balanced-force CSF + capillary time step.** Face `σκ∂C` with the projection's own
-gradient; Brackbill/Denner capillary Δt exposed and folded into the step limiter.
-Gates: **stationary droplet spurious currents at machine zero** (the direct analogue of the
-hydrostatic acid test — fails loudly on any force/coefficient face inconsistency);
-capillary wave vs Prosperetti; oscillating droplet vs Lamb; Hysing rising-bubble benchmark
-(both cases) vs reference; spurious Ca ≲ 1e-7 on a resolved static droplet.
+**V4 — Balanced-force CSF + capillary time step. ✅ DONE 2026-08-31** (flow `cd507ba` /
+`f2fea3f`; `src/vof/surface_tension.hpp` + `Solver::addCsfRhs`, ctest `vof_surface_tension`,
+`vof_surface_tension_mpi_np{1,2,4}`, `tests/study/vof_surface_tension.py`; WO-P in
+`flow/doc/vof_workorders_v34.md`). The face force is `σ·κ_f·(C(i) − C(i−s_c))/h` with the
+**projection's own difference operator** — deliberately NOT through the per-cell force field,
+whose face rule is an arithmetic interpolation (right for `ρg`, wrong for `σκ∇C`); the
+interpolated variant ships as the ablation `set_csf_mode(1)`.
+- **The stationary-droplet gate is at machine zero**: max|u| **3.6e-17 / 1.9e-17 / 2.4e-17** at
+  16³/32³/48³ and **9.4e-17 … 4.3e-18** over μ = 1e-3…1. The ablation reads **5.8e-2 (Ca 5.8e-3),
+  3.0e+15×** — the literature's "naive CSF ~1e-2" as a switch. Young–Laplace exact to 2.2e-16 and
+  `P = σκC + const` to 2.6e-15 field-wide.
+- **Ca ≲ 1e-7 is NOT reached with a computed curvature and cannot be**: measured **2.5e-4 / 5.9e-5 /
+  2.6e-5 / 1.4e-5** at D/Δ = 8/16/24/32, order 2.1. `Ca ≈ δκ·h`, so the budget is a *curvature*
+  requirement, and V3 measured curvature error to stop converging with advection-realistic
+  fractions. The force discretization is exact; the estimator is the ceiling.
+- **Hysing both cases within 3 %** (case 1 +3.3 % / −0.02 %, case 2 +2.9 % / −2.6 %), and
+  **momentum consistency is worth 14 % of that at ratio 10** — the discriminating case V2b never
+  had. Capillary wave vs the dispersion relation −2.1…−3.7 %; Lamb mode-2 **−6.3…−7.0 %**, an
+  open measured deviation with amplitude, dt, initialisation, confinement and resolution all
+  ruled out by ablation.
+- **The capillary Δt binds everywhere at pore scale** — 18 of 18 sweep combinations, by factors 6
+  to 5.9e4, and *more* under refinement (`dt_σ ~ h^{3/2}` vs `dt_CFL ~ h`). Cost: 1e6–1e7 steps
+  per pore volume at Ca ~ 1e-6. That is the number implicit surface tension would have to beat.
+- **The rung found a V3 defect**: WY round-off colour residue makes ~5300 extra cells "interfacial"
+  at 64³, for which the cascade returns |κ| up to **2.9e+11**; under a force that destroys the run.
+  Fixed by `VofCurvature::interfaceEps` (default 0 = V3 unchanged; `set_surface_tension` sets 1e-8).
+  This is §6's "clipping is unavoidable once surface tension is on", in its cheapest form.
+- **And it corrected the V2b falling-drop gate**: a periodic zero-mean body force conserves
+  *momentum*, not volume flux, so the lab-frame drop velocity is a near-cancellation; the relative
+  velocity reaches 0.79/0.83/0.87 of Hadamard–Rybczynski at D/h = 10/15/20 and is insensitive to
+  the momentum-sweep count, refuting V2b's suspected mechanism.
 
 **V5 — Static contact angle on SDF solids.** Band RDF; ghost-fraction fill with
 `n_wall = ∇sdf` + θ rotation; cut-cell-conserving fluxes (C never leaks into solid).
