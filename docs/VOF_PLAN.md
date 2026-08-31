@@ -198,12 +198,42 @@ face divergence ≤ 1.2e-15. Clipping OFF; wisp census recorded. Three things to
   the conservation floor at O(h²). Test fields are sampled as the discrete curl of an edge
   vector potential. For V2 the relevant number is the projection's own divergence residual.
 
-**V2 — Two-phase NS, no surface tension (staggered).** C → closures → varRho projection;
-**momentum-consistent transport** (half-shifted fractions). Gates: two-layer hydrostatic
-acid test machine-exact at ratio 1000 (the varRho acid-test pattern); sharp-interface
-Rayleigh–Taylor growth rate vs linear theory (extend `rayleigh_taylor.py`); falling raindrop
-at ratio ~800 stable and accurate at ~15 cells/diameter (Arrufat criterion); harmonic ρ_f
-face-mean option added to `buildRhoCoeff` (the flagged >10²–10³ coarsening trap).
+**V2 — Two-phase NS, no surface tension (staggered).** Split into **V2a** (wiring, WO-J) and
+**V2b** (momentum-consistent transport, WO-K) — `flow/doc/vof_workorders_v2.md`.
+
+**V2a — C → closures → varRho projection. ✅ DONE 2026-08-31** (flow `45c3bd5`;
+`src/vof/colour_field.hpp` + the VoF section of `flow_ibm.hpp` + harmonic-ρ_f siblings in
+`mac_pressure.hpp` + `interfaceLocalCfl` in `advect_wy.hpp`; `tests/kokkos/test_vof_twophase.cpp`
+and `tests/kokkos_mpi/test_vof_twophase_mpi.cpp`, 23/23 ctests on host-openmp AND CUDA, MPI
+np 1/2/4 on both, single-phase regression +0.00 % with identical iteration counts). `"C"` is an
+ordinary G=2 registered field (so ρ(C)/μ(C) are the existing `LinearMix` closures verbatim) and
+the g=3 working block with its own `GridHaloTopology` belongs to the advector — flow's `G = 2`
+untouched. Measured: hydrostatic ∂P/∂z = −ρ_f·g to **1.1e-15** through the C chain at ratio 1000,
+and with the interface frozen the steady max|u| is **bitwise equal** to the hand-set-ρ reference
+(`2.1760599219479075e-17`); colour volume drift a bounded **5.6e-13** over 1000 coupled steps;
+C ≡ const bitwise inert and bitwise equal to the hand-set uniform-ρ varRho path; sharp-interface
+Rayleigh–Taylor ×13.5 at **0.77×**√(Agk) against the diffuse record's ×13.0 at 0.75×; harmonic ρ_f
+shipped default OFF and measured (it breaks hydrostatic balance to 0.34 relative — arithmetic ρ_f
+is the harmonic mean of the mobility 1/ρ and the consistency requirement). Four findings in the
+WO-J entry, three of them corrections to gates as written:
+- **the two codes index a staggered face differently by one cell** (flow: low face; `WyAdvector`:
+  high face). Omitting the shift is invisible in a uniform flow, in each axis' own divergence, and
+  in `max|div(open·u)|` — and cost **35 % of the colour volume** over 1000 steps, because the
+  advector sums the three axes AT ONE CELL. The shipped gate drives the solver and a standalone
+  advector with the same physical LeVeque field.
+- **the acid test's velocity half cannot be at machine zero with a FREE interface**: the colour
+  field is an extra degree of freedom with loop gain g·Δρ·dt/ρ_g (= 100 at ratio 1000, g = 0.1,
+  dt = 1), measured to scale with exactly that gain. Frozen-interface bitwise is the sharp gate.
+- **the conservation gate is a gate on the pressure solver** — WO-E finding 2 said so in advance;
+  the floor is `max|div(open·u)|` (1e-12…1e-11 here), not the advection.
+- **a mixed-cell-only CFL band is empty on a grid-aligned sharp interface**; the band predicate is
+  a colour *difference*. Measured over-throttle avoided: **22×**.
+V2a is explicitly **valid only at modest density ratios for cases with motion** (no momentum
+consistency), staggered only, and refuses an immersed solid.
+
+**V2b — momentum-consistent transport** (half-shifted fractions, WO-K). Gates: the
+uniform-velocity consistency test exact at 1e-15 across ratios 10…10⁴; falling raindrop at
+ratio ~800 stable and accurate at ~15 cells/diameter (Arrufat criterion); the V2a battery re-run.
 
 **V3 — Curvature.** HF cascade + PV 5³ fit; κ as a registered field.
 Gates: Han-style static convergence (exact fractions → 2nd order; sphere sweep incl.
