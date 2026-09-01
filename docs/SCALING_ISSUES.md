@@ -120,6 +120,35 @@ out or errored during this campaign, so the np=768 and np=1536 partitions could 
 before submitting. Given that issue 3 makes the partition the dominant performance variable, this
 tool should be fast enough to sweep the whole ladder in one call.
 
+## Issues 2 and 3 compound — and that is the most important thing here
+
+They are not independent, and the packed-bed ladder shows it. With the fp64 build (issue 2's fix)
+the dense bed converges cleanly at 24…384 ranks — 52 → 82 iterations, `max|div|` ~1e-13, and
+strong-scaling efficiency 100 → 69 %. At **1536 ranks it partially caps again even in fp64**:
+the repeat hits the 200 cap outright and the first run averaged 122 with per-step counts swinging
+63 → 133 → 67, and the step time *regresses* to 16.9 s against 6.19 s at 384 ranks — peclet goes
+from 3.9× faster than FoxBerry to slower than it. Meanwhile np=384 reproduces to 5 % across two
+runs (6.19 / 6.52 s, 81.7 iterations both times), so this is the rank count and not the draw.
+
+The mechanism ties the two together: **issue 3 starves the hierarchy, which weakens the
+preconditioner, which pushes a high-contrast problem back over issue 2's convergence threshold.**
+The depth cap therefore does not merely cost iterations at a fixed rate — on a hard problem it can
+cost convergence outright, and the cliff arrives suddenly. Two consequences:
+
+- The packed ladder is only reportable to 384 ranks. That point is the *measured* strong-scaling
+  limit of the IBM path on this problem, and it is a much lower ceiling than the single-phase
+  case's.
+- **Fixing issue 3 is worth more than its 33 % suggests.** On the single-phase case coarse-level
+  redistribution buys efficiency; on the packed case it plausibly buys the ability to run at all
+  above ~400 ranks. That argues for doing it before, or together with, generalising the
+  double-diagonal — and for testing the fix on a dense bed, not on a clean single-phase problem
+  where the hierarchy is not starved.
+
+A cheap check that would sharpen this before any code is written: rerun the np=1536 packed rung with
+`PRESSURE=cheby`. Chebyshev is the driver that survives high contrast in float (measured: 252
+iterations where PCG capped), so if it also converges on the starved hierarchy, the cliff is the
+preconditioner's indefiniteness rather than the depth per se.
+
 ---
 
 ## Environment traps (not peclet defects) — recorded in [SNELLIUS.md](SNELLIUS.md)
