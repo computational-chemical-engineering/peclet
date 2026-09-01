@@ -681,6 +681,299 @@ with the gate on.
    regression. The all-fluid porous drag balance is unaffected (`rs ≡ 1`); it is the cut-cell drag that
    moves, and it moves in a *double* build too — this is a numerics fix, not a precision one.
 
+
+### P1 — `CutcellMG` exact level-0 matvec — **gate-passed, NOT default-flipped 2026-09-01/02**, flow `e9da3e5`
+
+`PECLET_FLOW_EXACT_RESIDUAL=1`, default OFF, byte-identical off. `applyCutcellOpExact` /
+`applyCutcellOpExactBox` (`mac_pressure.hpp`) apply `y_i = Σ_f t_f (x_i − x_nbr)`,
+`t_f = open_f·gf`, read from the resident double `Level::ox/oy/oz` — the same arrays
+`buildCutcellOp` assembles the float bands from, so **0 B/cell** (GPU memory identical to the
+byte, measured). `matvecOverlap` branches on the gate in both the distributed-overlap and the
+single-rank branch; `setOpenness` retains `gfx_/gfy_/gfz_` (all three call sites pass 1.0 today,
+stored anyway). Nothing inside `vcycle` changed.
+
+**Status: the gate stays OFF and the default is NOT flipped.** Gates 1, 2, 3 and 5 passed and the
+discriminating experiment (gate 3) passed decisively, but **gate 4 (MPI) is only partially run and
+gate 6 is partial** — see below. The plan's "then flip the default ON in a separate commit with
+the regression re-baseline" step is **not done** and must not be done until gate 4 closes.
+
+**Gate 1 — `A·1 = 0` bitwise.** New block in `tests/kokkos/test_cutcell.cpp`, on the two
+regression beds (`random_spheres` centres lifted from the seed-12345 generator; `hollow_rings`
+is deterministic), N = 32 and 64:
+
+| bed | N | `max\|A_exact·1\|` | `max\|A_bands·1\|` | rel. to `max AC` | cut / solid cells |
+|---|---|---|---|---|---|
+| random_spheres | 32 | **0.000e+00** | 2.980e-07 | 4.97e-08 | 4192 / 5083 |
+| random_spheres | 64 | **0.000e+00** | 2.980e-07 | 4.97e-08 | 15990 / 45822 |
+| hollow_rings | 32 | **0.000e+00** | 2.980e-07 | 4.97e-08 | 3197 / 2330 |
+| hollow_rings | 64 | **0.000e+00** | 2.980e-07 | 4.97e-08 | 12283 / 23004 |
+
+Bitwise zero, as predicted, and the band figure is the expected ~1e-7·`max AC`. Solid cells: 0
+in both forms, checked explicitly. Bands vs exact on a random field agree to 2.3e-8…2.5e-8
+relative — it is the same operator, not a null-space trick.
+
+**Gate 2 — gate off byte-identical.** Regression suite **+0.00 % on every metric**, identical
+`p_iter_tot`, iterations/step, step count and divergence on all 13 grid points of
+`zh_sphere` / `random_spheres` / `hollow_rings`. 26/26 `tests/kokkos` ctests pass on nvidia-cuda.
+
+**Gate 3 — the ladder** (RCP bed, PCG rtol 1e-8 cap 300, one RTX 5080):
+
+| Ng | float bands | **EXACT_RESIDUAL** | DIAGRESUM (double build) | full MREAL_DOUBLE |
+|---|---|---|---|---|
+| 48 | 24 its, div 4.51e-06 | **14, div 9.51e-12** | 14, div 6.19e-10 | 14, div 9.51e-12 |
+| 64 | 33 its, div 6.48e-07 | **14, div 9.53e-12** | 14, div 1.24e-09 | 14, div 9.53e-12 |
+| 96 | **300 — CAPPED, INVALID**, div 4.36e-06 | **28, div 3.17e-11** | 28, div 2.04e-09 | 28, div 3.17e-11 |
+
+The prediction was that the exact column reproduces the double column (14/14/28) with the
+hierarchy still float. It does, **to every printed digit on iterations and on divergence**, and
+the float column reproduces WO-M's 24/33/capped and 4.5e-6/6.5e-7/4.4e-6 exactly, so the
+instrument is validated against its own prior record.
+
+**One result stronger than the plan predicted: exact beats the double-diagonal by ~2 orders on
+divergence** (9.51e-12 vs 6.19e-10 at Ng=48; 3.17e-11 vs 2.04e-09 at Ng=96) while matching it on
+iterations. Mechanism: `DIAGRESUM` converges to the *float-face* operator (it rounds the faces and
+resums the diagonal), the exact form converges to the true one. This is the bitwise-vs-`eps_f64`
+distinction of §0 showing up in a physical output rather than only in an identity — the first
+direct measurement that defect correction dominates its own fallback on something the solver ships.
+
+**Attained residual (the gate-3 trap: is this a shared floor?).** No. From
+`PECLET_FLOW_MG_DEBUG=2` through `mg_trace_parse.py`:
+
+- float: floor 1.115e-08 at it 14 → **final 8.657e-04, rebound ×7.76e+04**; Ng=96 floor 2.429e-08
+  at it 25 → final 3.816e-03, **rebound ×1.57e+05**. The plateau-then-rebound eps_f32 signature.
+- exact: **rebound ×1 on every solve**, monotone, stopping at 13–28 its (finals 2.4e-09…9.8e-09),
+  far under the 300 cap, having crossed rtol. No plateau.
+
+Three independent reasons this is not the collocated cold-start pore-pocket floor returning a
+false GO: (i) the four columns do **not** agree — float is 24/33/CAPPED against 14/14/28, so the
+signal is float-vs-rest, not agreement; (ii) the attained residual sits at rtol with rebound ×1,
+which is what the trap asks to be shown; (iii) EXACT and DIAGRESUM agree on iterations yet
+separate **65×** on divergence while EXACT reproduces full double exactly — a shared floor cannot
+produce a 65× separation between two columns while one of them matches a third to every digit.
+
+**Warm leg** (gate 3, second trap — attribute a cap to precision only if the warm leg caps).
+`case_contrast` already marches 4 steps and its per-solve counts run *against* a cold-start
+reading: at Ng=96 float is `[45, 300, 300, 300]` — the **cold** solve converges in 45 its and the
+**warm** ones cap — while exact is `[21, 25, 27, 28]`, stable across the march. Ng=48 is the same
+shape (float `[13, 23, 24, 24]`, exact `[13, 13, 14, 14]`). So the float failure *appears as the
+state warms*, the opposite of a cold-start artifact, and the exact column is the march-stable one.
+The dedicated long-march leg (16 steps, cold vs warm reported separately) was written
+(`warm_ladder.py`) but **not run — the session's batteries were interrupted**. It is not needed to
+read the result above, because the 4-step data already contains a cold/warm split and it points
+the same way; run it if a stronger statement is ever wanted.
+
+**Gate 4 — MPI.** **PARTIAL — not a pass, not a failure.** The gate-off battery (`tests/kokkos_mpi`, 60 ctests on
+nvidia-cuda, np 1/2/4) reached **47/60 with zero failures** and was interrupted at test 48
+(`vof_twophase_mpi_np4`); the gate-**on** leg was not started. `mpirun` env forwarding was verified
+first (`PECLET_FLOW_EXACT_RESIDUAL=1 mpirun -np 1 env` shows the variable), so the gate-on leg will
+be meaningful when it runs. **Gate 4 is therefore still open and P1 must not be default-flipped
+until it closes.** What can be said structurally: with the gate off the change is a branch not
+taken, and the 47 green legs are consistent with the byte-identity gate 2 measured directly; with
+the gate on the box form reads `x` and the openness and writes `y` with no aliasing and no
+same-colour dependence, which is the same argument that makes `applyCutcellOpBox` bit-identical to
+the blocking form — but that is an argument, not a measurement, and it is the measurement gate 4
+asks for.
+
+**Gate 5 — perf. This contradicts the plan's prediction and is written up as a handoff below.**
+At matched iteration counts (`case_cost`, rtol 1e-6 so neither caps, 3 warm-up + 10 timed steps,
+three interleaved off/on repeats):
+
+| Ng | ms/step gate off | ms/step gate on | Δ | GPU MiB off / on |
+|---|---|---|---|---|
+| 64 | 31.50 | 31.57 | **+0.2 %** | 732 / 732 |
+| 96 | 84.90 | 85.23 | **+0.4 %** | 1270 / 1270 |
+| 128 | 171.67 | 171.83 | **+0.1 %** | 2532 / 2532 |
+
+Memory identical to the byte — the 0 B/cell claim is confirmed directly. But per *matvec*
+(isolated micro-benchmark, 20 warm-up + 200 timed applies on a sphere-packing openness):
+
+| N | bands | exact | ρ_x = c_exact/c_band |
+|---|---|---|---|
+| 64 | 0.0123 ms | 0.0144 ms | **1.17** |
+| 96 | 0.0328 ms | 0.0430 ms | **1.31** |
+| 128 | 0.0932 ms | 0.0993 ms | **1.07** |
+
+The plan predicted **≤ 0** ("24 B/cell read instead of 28"). Measured **+7 % to +31 %** on the
+kernel. The byte count is right and the inference from it is wrong: the band form is 7 perfectly
+coalesced loads all at index `i`; the flux form is 6 loads at `i` **and** `i±sx/sy/sz`, touching
+more distinct cache lines than the unique-byte accounting suggests, plus 6 subtractions of extra
+arithmetic against 7 FMAs. At step level it disappears into +0.1…+0.4 % because the matvec is one
+kernel per PCG iteration against a whole V-cycle — and where it matters the change is a large
+*win*: Ng=96 goes 0.40 → 0.10 s/step because 28 valid iterations replace 300 burnt ones.
+
+**This number resolves M2's `Depends on P1` without a handoff.** Fable's decision rule: `ρ_x ≤ 1.5`
+⇒ the Richardson-vs-BiCGStab choice is decided by outer-iteration counts alone. Measured
+`ρ_x = 1.07…1.31`, so the **`ρ_x ≤ 1.5` branch holds** and the `ρ_x > 2` handoff branch does not
+fire. M2 proceeds on iteration counts.
+
+**Gate 6 — contrast / varRho.** **PARTIAL.** `vardensity_projection` (the varRho hydrostatic acid test + uniform-rho reduction)
+passes inside the 26/26 `tests/kokkos` run with the gate off. The V2a `∂P/∂z` at ratio 1000 and the
+`precision_ab --cases hydro` ratio ladder with the gate **on** were not run (interrupted). Note the
+ρ-folded path is structurally the one most likely to be fine: `buildRhoCoeff` hands the full
+coefficient `c_f = open_f·rho0/rho_f` to `setOpenness` *as* the openness, so `Level::ox/oy/oz`
+already holds exactly what `buildCutcellOp` consumed, and the exact apply reads the same array
+(verified: the only writers of `lv.ox/oy/oz` are the allocation, the `setOpenness` deep-copy,
+`fillOpenness` and `applyBoundaryOpenness` — nothing mutates them during a solve).
+
+**Two corrections to the plan's premises, both verified against source.**
+
+1. **`matvecOverlap` is not "the single choke point for all three drivers"**
+   (`VOF_NEXT_SESSION.md` Item 1, correction 1). `solveBiCGStab` has its own inline matvec
+   (`mac_cutcell_mg.hpp:995` and `:1003`) because the gp overlay needs a g=2 staging block; it
+   does not route through `matvecOverlap`. P1 as specified therefore covers `solvePCG` and the
+   flexible PCG only. Those two `applyCutcellOp` sites are left untouched here and belong with
+   **P2**, which owns the gp overlay that is the reason BiCGStab has a separate matvec at all.
+2. **This plan's own §5 double-control build recipe was wrong and failed silently — fixed in
+   this commit.** `cmake -DPECLET_FLOW_MREAL_DOUBLE=ON` sets an `UNINITIALIZED` cache variable
+   that nothing reads and builds **float**; the symbol appears nowhere in flow's `CMakeLists.txt`,
+   `CMakePresets.json` or `cmake/`, because it is a *compile define*, not a CMake option. The
+   first "double" ladder column here came back byte-identical to the float one because of it —
+   a null result that reads like a finding. The working form is
+   `-DCMAKE_CXX_FLAGS=-DPECLET_FLOW_MREAL_DOUBLE` (`flow/doc/vof_workorders_v34.md:256` has it
+   right, and is how WO-M actually built its control). Corrected at §5 below. **Attribution: the
+   bad recipe was only ever in this file (§5:707)** — `suite/CLAUDE.md` never mentioned
+   `MREAL_DOUBLE` at all and `flow/CLAUDE.md` mentions it only in prose, so there is nothing to
+   fix in either.
+
+### A0 — core AMR audit — **DONE 2026-09-01/02, COMPLIANT, no code change**
+
+Source audit only (`core` at the umbrella pointer, 2026-09-01); nothing built or run, because
+nothing needed changing. Four questions, four answers.
+
+1. **Is `applyFv` flux form?** **Yes, and already bitwise.** `applyFv` (`fv_op.hpp:114`) delegates
+   per row to `fvApplyRow` (`face_csr.hpp:120-126`):
+   ```cpp
+   const double ui = u(i); double acc = 0.0;
+   for (Index k = op.start(i); k < op.start(i + 1); ++k)
+     acc += op.coef(k) * (u(op.nbr(k)) - ui);
+   return op.c0 * ui + op.cD * (op.invVol(i) * (acc - op.bcDiag(i) * ui));
+   ```
+   That is `Σ_f w_f (u_j − u_i)` exactly as §0 requires — the diagonal is never formed, so it
+   cannot disagree with the faces. On the periodic/pure-Neumann path (`bcDiag = 0`, `c0 = 0`,
+   `cD = 1`) a constant vector gives every difference identically 0 ⇒ `acc = 0` ⇒ `L·1 = 0`
+   **bitwise**, with no storage change and nothing to fix. Where `bcDiag ≠ 0` the operator is
+   non-singular and `L·1 = −invVol·bcDiag ≠ 0` is correct, so the identity holds exactly where it
+   is supposed to. `faceW / bcDiag / invVol` are `View<double>` throughout.
+2. **Does the default pressure driver use the exact operator?** Yes. `presPCG_ = true`
+   (`flow.hpp:2042`) and the PCG matvec is `applyFv` (`pcg.hpp:219`) — the exact double operator,
+   with the MG as preconditioner. **This path is defect correction by construction.**
+3. **Does the `setPressurePCG(false)` plain-MG path recompute the fine residual exactly?** Yes —
+   `residualFv` (same `fvApplyRow`) at `multigrid.hpp:196` and `:234`, and
+   `distributed_flow_mg.hpp:158`. So that path is defect correction by construction too. (Context
+   worth carrying: `flow.hpp:1255-1270` records that the un-deflated V-cycle *stalls* at
+   `|mean|·√V_fluid` because the aperture RHS is incompatible by a fluid-mean component — the PCG's
+   per-iteration fluid-range projection is what makes it valid. That is a compatibility/deflation
+   issue, not a precision one, and this campaign does not touch it.)
+4. **Is `DistributedPoissonMG::vcycle` production or test-only?** **Test-only — and the name in §1
+   does not exist.** `distributed_poisson.hpp` declares `DistributedPoisson` and
+   `DistributedMultigrid` (`:142`), the latter a *host* `std::vector<double>` implementation whose
+   `vcycle` is reached only from `tests/test_amr_distributed_mg_mpi.cpp` (plus a reference mention
+   in `distributed_view.hpp:34`). The **production** distributed pressure MG is a different class,
+   `DistributedFlowMultigrid<3, Bits> presMGD_` (`flow.hpp:2126`, `distributed_flow_mg.hpp`), and
+   it is used as the *preconditioner* inside `pcg_.solve` (`flow.hpp:1330`). Compliant either way.
+
+**Verdict: core AMR pressure needs no P1-equivalent change.** §1's "compliant — written
+double-first" is confirmed, and stronger than it claimed: the operator is not merely double, it is
+already in the flux form that makes the identity bitwise. A0's gates (AMR ctests, `amr-testing`
+recipes) were not run because no code changed. **§1 correction:** the row should read
+`DistributedMultigrid` (test-only) and name `DistributedFlowMultigrid` as the production
+distributed path.
+
+### X — audits, record only — **DONE 2026-09-01/02, all three compliant**
+
+Source audit only; nothing built or run.
+
+**voro mesh-optimizer CG — compliant.** The Gauss-Newton Hessian is assembled host-side as
+`std::vector<double> Hval, Hdiag` (`mesh_optimizer.hpp:359-360`), the CG matvec is the double CSR
+`s += Hval[k]·v[Hcol[k]]` (`:379`), and the CG driver is a plain double CG on that exact operator
+(`:441-460`). `GraphAMG` is reached only through `precond` (`amg.apply(r, z)`, `:420`, alongside
+the Jacobi and coloured-GS alternatives) — **preconditioner only**, never the matvec, exactly as
+§1 recorded. The SDF wall term is double as well: `wallG` is `DV = View<double*>` (`:711`) and the
+wall-facet Jacobian `J_wallᵀ` (`:187-191`) is accumulated from the published double facet areas.
+Note the matvec is in *stored* form (it sums all CSR entries including the diagonal) rather than
+flux form — correct here, because this operator carries **no exact discrete identity**: it is the
+Hessian of a volume energy, not a singular Laplacian with a constant null space, so §0's flux-form
+corollary does not apply. The precision rule is satisfied end to end.
+
+**pnm — out of scope, confirmed.** `extract_network_flow` (`pore_extraction.hpp:860-905`) has no
+linear solve; it forms fluxes from a given velocity field, all double.
+
+**`flow/src/mac_mg.hpp` (FlowReference const-coeff periodic MG) — compliant on precision, with one
+honest caveat §1 did not state.** `SField = Kokkos::View<double*>` (`mac_stencils.hpp:21`), and the
+operator is matrix-free — there are no stored coefficients at all, so there is no float storage to
+correct and it is defect correction by construction. **But its apply is written in stored-diagonal
+form, not flux form**: `r(i) = f(i) − (6.0·phi(i) − s)/h2` (`mac_mg.hpp:141`), with
+`s = Σ_6 phi(nbr)`. For a constant field `6.0·φ − Σφ` is **not** bitwise zero — the running sum
+`((((φ+φ)+φ)+φ)+φ)+φ` rounds at the 3φ and 5φ partials — so `A·1 = 0` holds here only to
+`eps_f64`, not bitwise. That is six orders below the eps_f32 defect this campaign exists to remove
+and it is a *reference* path, not production, so **no change is proposed**; recording it because
+§1's "compliant" row could otherwise be read as "bitwise", which P1 has now made a meaningful
+distinction. Making it bitwise is a one-line rewrite to
+`((phi(i)−phi(i+sx)) + (phi(i)−phi(i−sx)) + …)/h2` if anyone ever wants it.
+
+### Handoff → Fable: P1's matvec is 7–31 % *slower* per kernel, not ≤ 0 — does P3 survive its own perf gate?
+
+**Trigger 3** (a measurement contradicts a prediction in this plan). P1 itself passes every gate;
+this is about what P1's perf number does to **P3**, which is gated on it.
+
+**What was measured.** nvidia-cuda, one RTX 5080, `OMP_NUM_THREADS=8 OMP_PROC_BIND=false`,
+worktree `flow-dc` at `e9da3e5` (= flow main `72278d2` + P1 only).
+
+*Isolated matvec* — 20 warm-up + 200 timed applies on a jittered 8-sphere packing openness,
+`applyCutcellOp` (float bands) vs `applyCutcellOpExact`, same field, same block:
+
+| N | bands | exact | `ρ_x = c_exact / c_band` |
+|---|---|---|---|
+| 64 | 0.0123 ms | 0.0144 ms | **1.17** |
+| 96 | 0.0328 ms | 0.0430 ms | **1.31** |
+| 128 | 0.0932 ms | 0.0993 ms | **1.07** |
+
+*Step level* — `precision_ab.py --cases cost`, rtol 1e-6 so neither variant caps, 3 warm-up + 10
+timed steps, three interleaved off/on repeats: **+0.2 % / +0.4 % / +0.1 %** at Ng = 64 / 96 / 128,
+GPU memory identical to the byte (732 / 1270 / 2532 MiB both ways — the 0 B/cell claim confirmed
+directly).
+
+**What was predicted.** P1 gate 5: "Expected ≤ 0 (24 B/cell read instead of 28)."
+
+**Believed mechanism.** The byte count is right; the inference from it is not. `applyCutcellOp`
+issues **7 perfectly coalesced loads, all at index `i`** — seven streams, each one aligned access
+per thread. `applyCutcellOpExact` issues **6 loads at `i` and `i±sx / i±sy / i±sz`**: the `±sy`
+and `±sz` offsets land on different cache lines from the thread's own `i`, so the kernel touches
+more distinct lines than the 24-vs-28 B unique-byte accounting predicts, and adds 6 subtractions
+against 7 FMAs. On a kernel that was already line-limited rather than unique-byte-limited, fewer
+bytes does not mean fewer transactions.
+
+**What this does NOT threaten.** P1 on its own terms. +0.1…+0.4 % of a step is a pass, and where
+the change is load-bearing it is a large win, not a cost: Ng=96 goes **0.40 → 0.10 s/step**
+because 28 valid iterations replace 300 burnt ones. The matvec is one kernel per PCG iteration
+against an entire V-cycle, which is why a +31 % kernel is +0.4 % of a step.
+
+**What it does threaten: P3.** P3's stated condition is "only worth doing if P1's perf gate showed
+the matvec is bandwidth-bound and the smoother dominates the V-cycle on level 0". The first half
+is now measured false in the direction P3 needs. P3 would move this access-pattern penalty **into
+the smoother**, which runs (pre + post) several times per V-cycle and once per level-0 visit,
+rather than once per PCG iteration — so a per-sweep `ρ` of the same order would be multiplied by
+the sweep count instead of divided by the V-cycle cost.
+
+**Why it is not simply a no.** The smoother case is *not* the matvec case, and my number does not
+settle it: P3 does not trade 7 bands for 3 openness arrays, it **drops the 7 bands entirely**
+(−28 B/cell of allocation, a real memory win the matvec change does not have) and forms
+`ac = Σ t_f` on the fly, which also yields the exact double diagonal for free. So the access mix
+differs and the sign is genuinely open.
+
+**Decision needed.** One of:
+1. **Measure then decide** (my recommendation, and cheap): a `cutcellSmoothColorExact` micro-
+   benchmark gated on **ms per V-cycle**, not ms per matvec — the peer session's point, and the
+   right unit — plus the −28 B/cell against the measured per-sweep penalty. If the V-cycle gets
+   slower, stop and record it; P3 was always marked optional and perf-gated.
+2. **Drop P3 now** on the strength of `ρ_x > 1` and bank the campaign's remaining rungs.
+3. Something the above misses about why the smoother would behave differently.
+
+**Already resolved, for the record: this number does *not* block M2.** M2's `Depends on P1` rule
+is `ρ_x ≤ 1.5` ⇒ decide Richardson-vs-BiCGStab on outer-iteration counts alone; `ρ_x > 2` ⇒
+handoff. Measured `ρ_x = 1.07…1.31`, so the `≤ 1.5` branch holds and M2 proceeds without a ruling.
+Writing the decision rule into the design did exactly what §3 intended it to.
+
 ## 5. Working practices (inherited; not optional)
 
 - Isolated `git worktree` per session carrying only your own diff; three live sessions share
@@ -704,6 +997,14 @@ with the gate on.
 - Never tune a gate to pass. If a gate measures the wrong quantity, say so and fix the gate — five
   did last campaign and each time saying so improved the plan.
 - Build recipes: `suite/CLAUDE.md` per project (`flow`: `cmake -S . -B build
-  -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"`; add `-DPECLET_FLOW_MREAL_DOUBLE=ON`
-  for the double control; MPI ctests: `tests/kokkos_mpi` with `-DPECLET_FLOW_MPI=ON`; the
-  `host-openmp` prefix for the host gate).
+  -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"`; MPI ctests: `tests/kokkos_mpi` with
+  `-DPECLET_FLOW_MPI=ON`; the `host-openmp` prefix for the host gate).
+- **The double control is a COMPILE DEFINE, not a CMake option** (corrected 2026-09-01 by P1,
+  which lost a ladder column to it). Use
+  `cmake -S . -B build_double -DCMAKE_PREFIX_PATH=… -DCMAKE_CXX_FLAGS=-DPECLET_FLOW_MREAL_DOUBLE`.
+  This bullet previously said `-DPECLET_FLOW_MREAL_DOUBLE=ON`, which **silently builds float**:
+  the symbol appears nowhere in flow's `CMakeLists.txt`, `CMakePresets.json` or `cmake/`, so a
+  `-D…=ON` on the cmake line only creates an uninitialized cache entry that nothing reads. The
+  failure is silent and looks like a *result* — P1's first "double" column came back byte-identical
+  to its float column. Verify a double build before trusting it (`grep CMAKE_CXX_FLAGS
+  build_double/CMakeCache.txt`, or check that the RCP ladder at Ng=96 does not cap).
