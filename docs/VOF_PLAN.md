@@ -516,6 +516,11 @@ load at extreme scale.
     of the arithmetic limit there, and unreachable at 512³ or ratio 1e4.** Use
     `rtol = max(1e-8, C·eps·0.18·N²·Δρ/ρ)` — the analogue of the collocated campaign's
     `PRTOL = 2e-7`. Gates must not demand what the arithmetic cannot deliver.
+    **Caveat (2026-09-01): this rule inherits the κ law's validity boundary — measured
+    192³–384³, and a 768³ probe came in three orders WORSE than it predicts (see below). So
+    the rule is a floor on what to demand, not a guarantee of what is achievable: above ~384³
+    verify the attainable residual empirically before trusting it, and never treat a
+    prediction from it as a reason to dismiss a measured floor.**
 
     **Precision policy (WO-M, stated as a rule rather than a patch)**: *a quantity an
     algorithm requires to satisfy an exact discrete identity must be stored in the precision
@@ -545,9 +550,19 @@ load at extreme scale.
     contrast 1e3 gives ~1.5e-9 at 192³ (below their rtol 1e-8, which is why their local
     float/double A/B converged cleanly) and ~4e-8 at 384³ — *exactly* their measured
     full-double floor, and why the same build cap-burned there. One formula, both
-    observations, no free parameters beyond an O(1) constant; it further predicts ~2.4e-8 at
-    768³, giving their `PRTOL = 2e-7` about 8× margin by derivation rather than by taste.
-    Their floor is **attainable accuracy**, full stop.
+    observations, no free parameters beyond an O(1) constant.
+
+    **⚠ VALIDITY BOUNDARY (2026-09-01): the closure holds 192³→384³ and BREAKS BY 768³.**
+    Their 768³ probe measured r/r₀ ≈ **3e-4** — three orders above the eps·κ prediction of
+    1.6e-7, and 7500× the 384³ floor for a factor 2 in N. So the extrapolation to 768³ and the
+    "8× margin by derivation" are withdrawn, and their three R=48 rung values are **invalid**
+    (floor-limited rather than converged — which is why they agreed to nine digits across cap
+    settings). Cause under investigation: their R=48 runs were their only **2-node** runs, so
+    two probes are separating problem size from rank/node count (768³ at np4 single-node
+    against a 384³ np4 control). If the 384³ np4 control reproduces the np1 floor and 768³ np4
+    comes back clean, it is an **inter-node communication defect in the pressure path**; if
+    768³ np4 still floors at 3e-4, the κ law's N² needs a **superlinear correction**.
+    **Use the closure only as "validated 192³–384³; breaks by 768³, under investigation".**
 
     **Earlier note, now corrected — "the mechanism is PRECISION and S3's evidence is
     contaminated" (this prediction did not survive measurement).** The collocated-paper campaign

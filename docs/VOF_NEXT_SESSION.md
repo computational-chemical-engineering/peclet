@@ -185,6 +185,17 @@ that `buildOpenness` feeds both the geometric openness and the coefficient path.
 - **Gates must not demand what the arithmetic cannot deliver**: use
   `rtol = max(1e-8, C·eps·0.18·N²·Δρ/ρ)`. At ratio 1000 on 256³, κ ≈ 1.2e7 and a fixed 1e-8 is
   already near the limit; at 512³ or ratio 1e4 it is unreachable.
+  **But treat this as a lower bound on what to demand, not a prediction of what is
+  achievable.** The κ law behind it is validated only **192³–384³**: the collocated campaign's
+  768³ probe floored at 3e-4, *three orders worse* than the law predicts, invalidating three of
+  their rung values (they had agreed to nine digits across cap settings — floor-limited, not
+  converged). Cause under investigation: those were their only 2-node runs, so it is either an
+  inter-node comm defect in the pressure path or a superlinear correction to the N² scaling.
+  **Above ~384³, measure the attainable residual; never use a prediction from this law to
+  dismiss a measured floor.**
+- **If anything ever runs multi-rank on a `MREAL_DOUBLE` build, run the `kokkos_mpi` battery
+  first.** The collocated campaign's double build never exercised it — its np4 path is
+  vindicated only indirectly (one rung matching the float np4 result digit-for-digit).
 - **Five gates in this campaign turned out to measure the wrong quantity** (V0's MYC-normal
   order, WO-C's premise, WO-K's uniform-velocity discrimination, WO-J's acid-test velocity half,
   WO-P's falling drop). Every time, an agent isolating the mechanism and saying so improved the
