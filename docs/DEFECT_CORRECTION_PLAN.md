@@ -974,6 +974,100 @@ is `ρ_x ≤ 1.5` ⇒ decide Richardson-vs-BiCGStab on outer-iteration counts al
 handoff. Measured `ρ_x = 1.07…1.31`, so the `≤ 1.5` branch holds and M2 proceeds without a ruling.
 Writing the decision rule into the design did exactly what §3 intended it to.
 
+
+### Handoff → Fable: P2 and A1 are the SAME change, in a shared `core` header — and widening the storage as scoped would buy nothing
+
+**Triggers 4** (a design fork with more than one defensible option and no measurement that decides
+it) **and 2** (the change alters a *double-build* result). Found by source inspection while
+starting P2; nothing was built or changed. **No P2/A1 code was written — the rung is stopped here.**
+
+**What §1 says.** The two gp overlays are "computed in double (`gpFillRow`, sdf `S` double), stored
+float", and the fix is `rescale, wm_n1, wm_n2 → double` — a switch-the-matvec change, P2 in flow
+and A1 in core, listed as independent rungs in different repos.
+
+**What the source says.** The matrix weights are **computed in float, not merely stored in float**,
+and the computation is one shared template that all three overlays call.
+
+`peclet::core::scheme::gpFillRow` (`core/include/peclet/core/scheme/ghost_closure.hpp:169-232`):
+```cpp
+struct GpFace { int8_t state; float th, wbc, w1, w2, D; };              // :104-107
+PECLET_CORE_GP_HD void gpOrderWeights(int8_t st, float th, int order,
+                                      float& wbc, float& w1, float& w2, float& D);  // :84-85
+  float wbcM[6], w1M[6], w2M[6];                                        // :197
+  float Dm; gpOrderWeights(f.state, f.th, matrixOrder, wbcM[k], w1M[k], w2M[k], Dm);  // :206-207
+  if (Dm < rho) rho = Dm;                                               // :208
+  ov.rescale(slot)      = rho;                                          // :215
+  ov.wm_n1(slot*6 + k)  = w1M[k];                                       // :228
+```
+So `th` is float, `gpOrderWeights` takes and returns floats, the matrix weights live in float
+locals, and the row rescale `rho` is the min of float `Dm`s. Only the *upstream geometry sampling*
+is double. **Widening `View<float*> wm_n1/wm_n2` to `View<double*>`, exactly as P2 and A1 specify,
+would store an already-float-rounded value in a double and change nothing.** The scoped change does
+not achieve its stated goal.
+
+**Consequences that make this a fork rather than a bigger edit.**
+
+1. **P2 and A1 become one change, in `core`, not two changes in two repos.** `ghost_closure.hpp`
+   has three consumers: `flow/src/ghost_projection.hpp` (P2), `core/.../amr/ghost_projection.hpp`
+   and `core/.../amr/ghost_projection_sampled.hpp` (A1). Fixing the shared closure fixes all three
+   at once; fixing them separately is not possible without duplicating the closure.
+2. **It alters double-build results — trigger 2.** `th`/`w1M`/`Dm` are hard-typed `float`, *not*
+   `MReal`, so a `-DCMAKE_CXX_FLAGS=-DPECLET_FLOW_MREAL_DOUBLE` build carries the same float
+   closure. Widening therefore moves the answers of the double build too. That is the campaign's
+   *intent* here (the current weights are float-rounded approximations of the exact closure), but
+   it means **the gate cannot be byte-identity-on-a-double-build**, and the gp ctests need a
+   deliberate re-baseline rather than an unchanged-to-tolerance check. P2's stated gates
+   ("gate-off byte-identical; the gp order-2 Z&H tests unchanged to tolerance") are written for the
+   storage-only change and do not fit this one.
+3. **`rescale` does not need widening at all — settled from source, this is the Fable question P2
+   reserved.** `ov.rescale` is read in exactly two places: `gpApplyDelta`
+   (`flow/src/ghost_projection.hpp:268`, `y(r) = rho*(y(r) + delta)`) and `gpDivergDelta` (`:322`,
+   `d(r) = rescale(s)*dd`) — the **same view, same slot, applied multiplicatively to the whole row
+   of A and of b**. So the solved system is `D A x = D b` with one identical stored `D`, whose fixed
+   point is that of `A x = b` for any `D ≠ 0` regardless of its precision. Widening `rescale`
+   changes rounding and cannot change the answer. **Drop it from P2 and A1.** (`rho` is
+   `min(1, min_f D_f) > 0`, and rows with no coupling are zeroed explicitly via `coupled`, so the
+   `D ≠ 0` proviso holds.)
+4. **`wm_n1/wm_n2` already annihilate constants bitwise.** `gpApplyDelta:263-266` applies
+   `sgn*w1*(X(a,mn-1) − X(a,mn))` — difference form already, so `A·1 = 0` for the overlay part
+   holds whatever the weights' precision. What float costs here is therefore *not* the identity but
+   the operator itself: the Krylov method converges to a float-rounded gp operator. P1 measured
+   exactly what that costs on the pressure side — DIAGRESUM matched double on iterations yet sat
+   ~65× worse on `max|div(open·u)|`, because it converged to the float-face operator. That is the
+   real argument for doing this, and it is a *different* argument from the one §1 gives.
+
+**The fork — three defensible options, no measurement between them.**
+
+- **(a) Widen the shared closure.** `GpFace::th/wbc/w1/w2/D`, `gpOrderWeights`' signature and
+  `w1M/w2M/wbcM/Dm` → `double` in `ghost_closure.hpp`. One edit, fixes all three overlays. Cost:
+  a `core` header change with a blast radius across flow gp + AMR gp + AMR gp-sampled, and a
+  re-baseline of every gp ctest in both repos including the double builds.
+- **(b) A gated double overload.** Keep `gpOrderWeights` float, add a `double` twin used only when
+  the exact-residual gate is on. Keeps gate-off byte-identical *by construction in both builds* and
+  makes the re-baseline opt-in, at the cost of two copies of a closure that must not drift — the
+  exact hazard §5 warns about.
+- **(c) Template the closure on its real type** (`template <class R> gpOrderWeights(…)`), overlays
+  instantiate at `float` today and `double` under the gate. No duplication, but it touches every
+  call site's deduction and the `PECLET_CORE_GP_HD` device path.
+
+**My recommendation: (c), falling back to (a).** (c) has (b)'s gate-off safety without duplicating
+the closure, and the campaign has already shown that a single exact operator beats a
+carefully-maintained approximate twin. But this is a `core`-wide typing decision affecting a second
+repo and two other rungs' scope, so it is yours, not mine.
+
+**Decision needed.** Which of (a)/(b)/(c); whether P2 and A1 merge into one core-first rung with
+flow and AMR as consumers; and what replaces P2's byte-identity gate given (2) — presumably
+"gate-off byte-identical in *both* builds, gate-on re-baselined with the gp order-2 Z&H order and
+the mode-9 throat-safety preserved".
+
+**What is NOT blocked by this** and is still open [Opus] work: P1's gate 4 (MPI, 47/60 green and
+interrupted) and gate 6; and P2's **star-overlay half**, which is independent of all of the above —
+`StarOverlay::a` (`star_elimination.hpp:37`) is a genuine float *store* of a value built from the
+double openness (`:75-80`), so widening it does what §1 says it does. One further note for whoever
+takes it: `starApplyDelta` (`:115-133`) computes `phibar = Σa·x / Σa` and adds `a_k(x_k − phibar)`,
+which is **not** bitwise-annihilating for a constant even in double; the algebraically identical
+`(a_k/D)·Σ_j a_j (x_k − x_j)` is, and is the P1 trick applied to the star row.
+
 ## 5. Working practices (inherited; not optional)
 
 - Isolated `git worktree` per session carrying only your own diff; three live sessions share
