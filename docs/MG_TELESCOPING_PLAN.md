@@ -12,6 +12,11 @@ on a dense bed, costs convergence outright.
 > missed that a *far* cheaper first rung falls straight out of machinery that already exists. The
 > staging in §6 now leads with that rung.)
 
+> **Status 2026-09-02 — IMPLEMENTED (rung 2 directly), tested, measuring on Snellius.**
+> `core a156528` (`BlockDecomposer::agglomerated`), `flow db7b1ba` (`CutcellMG` telescoping,
+> `set_pressure_telescope`, `predict_hierarchy`, `check_decomposition.py --predict`,
+> `tests/kokkos_mpi/test_telescope_mpi`). Off by default; byte-identical with it off. See §9.
+
 **Conclusion up front.** Do geometric telescoping on the ORB tree: when in-place coarsening is
 blocked, merge sibling ORB blocks onto half (or a quarter, or an eighth) as many ranks, move the
 level's data with one gather per group, and carry on halving. This is PETSc `PCTELESCOPE`'s
@@ -345,3 +350,54 @@ The honest caveat: P0 may show that a share of the single-phase gap is the ancho
 than the depth. That would not invalidate this plan — telescoping is still what makes the bottom
 small enough for any bottom solver to be cheap — but it would change which fix is urgent, and it is
 much better to learn that from two reruns than from a week of implementation.
+
+## 9. What was built (2026-09-02)
+
+Rung 2 was implemented directly — the user asked for the ORB-tree telescoping in the code — and
+rung 1 was not built separately, since a merge to depth 0 is the same code path.
+
+**core** — `BlockDecomposer::agglomerated(depth, &groupOf, &rootOf)` truncates the bisection tree;
+every kept node's box is reconstructed by a downward walk from `(0, globalSize)`; dropped nodes
+become leaves so `coarsened()`/`refined()`/`ownerOf` work on the result unchanged. `treeDepth()`.
+Unit test: for every depth, exact tiling + `ownerOf` agreement, exact-union group map with
+contiguous members and lowest-member root, identity at full depth, one block at depth 0; plus the
+multigrid scenario (8 blocks of 12³ halve to 3³ and stick; `agglomerated(0).coarsened()` reaches 3³).
+
+**flow** — `CutcellMG::Level` gains its own `MPI_Comm`; a `Telescope` record on level L holds the
+group communicator, the roots' sub-communicator, the merged-block geometry and stage buffers at
+resolution L. The V-cycle gathers `lv.res` at L's own resolution onto the group root, the root
+restricts / recurses / prolongs into the stage, and the correction is scattered and *added*.
+`setOpenness` gathers the openness once per telescope point. Every per-level collective
+(`removeMean`, `dot`, `maxabs`, the bottom's `gatherv`) takes the level's communicator. A rank
+idling below a telescope point ends its level list there and takes the gather/skip/scatter branch.
+`restrictAvg`, `prolongAdd`, `coarsenOpenAvg`, the smoother and `GridHalo` are untouched.
+
+**Trigger.** Telescope when a still-coarsenable axis has an odd block, *or* when the smallest block
+extent is below `PECLET_FLOW_TELESCOPE_MIN_EXTENT` (default 4). Merge the fewest tree levels at
+which every coarsenable axis is even and the merged blocks are ≥ 2× the min extent — so they
+survive the halving that follows (keyed on the candidate's own extent, the ladder oscillated
+6³ → 3³ at every level).
+
+**Prediction (P1).** `CutcellMG::predict()` / `flow.predict_hierarchy()` /
+`check_decomposition.py --predict` — a pure function, no `mpirun`, any rank count. 384³:
+
+| ranks | in place | telescoped |
+|---|---|---|
+| 24 | 7 levels, coarsest 6×12×6 on 24 ranks | 8 levels, 3³ on 1 rank (24 → 1) |
+| 384 | 6 levels, coarsest 24×12×24 on 384 | 8 levels, 3³ on 1 (384 → 8 → 1) |
+| 1536 | **5 levels, coarsest 24×48×24 on 1536** | **8 levels, 3³ on 1 (1536 → 64 → 1)** |
+
+**Gates (`test_telescope_mpi`, np=1/2/4).** A forced telescope on a grid that also coarsens in
+place matches the control to 1e-14. On a starved partition (a plain ORB on 24³, since the solver's
+own factory nests at these rank counts) the in-place hierarchy stops at 6×3×3 / 6×6×3 while the
+telescoped one reaches the single-rank 3³ with the single-rank iteration count, and its solution
+matches the single-rank reference to 2.5e-14 — *better* than the untelescoped 1.3e-10, because it
+reproduces the single-rank hierarchy exactly. `cutcellmg_mpi` and `sdflow_mpi` np=1/2/4 unchanged
+with it off. End to end through the Python driver at np=4 (IbmSolver, wall-confined bed, FoxBerry
+inlet/outlet): packed 20.0 → 16.8 iterations, single-phase 12.2 → 10.5, `<u>` and `max|div|`
+identical to seven digits.
+
+**P0 results.** Single-phase np=384 with the agglomerated bottom forced on the anchored path:
+**24.9 → 10.9 iterations, 2.48 → 1.88 s/step, floor 2.1e-9 → 3.4e-10** — so the anchored-path
+gate (open problem 4) is real money at ≤384 ranks, and its risk did not materialise here. Both
+np=1536 probes hung in the first warmup step (issue 4) and were cancelled after 17 minutes.

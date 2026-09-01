@@ -16,7 +16,7 @@ is reproducible; the remaining defect is narrower.*
 | # | Issue | Severity | Status |
 |---|---|---|---|
 | 1 | Float operator storage caps MG-PCG on dense beds | **High, silently invalid** | Known (WO-M), fix not defaulted |
-| 2 | MG depth capped by the per-rank block | High (scaling shape) | Known, fix specified |
+| 2 | MG depth capped by the per-rank block | High (scaling shape) | **Fixed 2026-09-02** (telescoping, opt-in), measuring at scale |
 | 3 | Solid intersecting an OPEN domain face stalls the solve | Medium, silently wrong (narrow) | Open, new |
 | 4 | Intermittent multi-node hang in warmup | Medium (reliability) | Open, undiagnosed |
 | 5 | Velocity multigrid is single-rank only | Medium (unverified impact) | Known restriction |
@@ -67,9 +67,18 @@ hypre's redundant coarse solve, DUNE's *accumulation*. The endpoint already exis
 thing to measure first: hand the level where geometry stops to the existing `GraphAMG` and let it
 coarsen the rest of the way.
 
-Full treatment, measurements and staged plan: **`DECOMPOSITION_AND_MULTIGRID.md` §2.8 and open
-problem 1**; the design and implementation plan is
-**[`MG_TELESCOPING_PLAN.md`](MG_TELESCOPING_PLAN.md)** (2026-09-01). Note its P0: two single-rung
+**Implemented 2026-09-02** — coarse-level telescoping on the ORB tree (`core a156528`, `flow
+db7b1ba`; `set_pressure_telescope(True)` / `PECLET_FLOW_TELESCOPE=1`, off by default and
+byte-identical off). The predictor shows 384³/1536 going from a 24×48×24 coarsest grid on 1536
+ranks to 3³ on one (5 → 8 levels); the ctest gate shows a starved partition reproducing the
+single-rank hierarchy to 2.5e-14. Full treatment: **`DECOMPOSITION_AND_MULTIGRID.md` §2.8 and
+open problem 1**; design, implementation and status: **[`MG_TELESCOPING_PLAN.md`](MG_TELESCOPING_PLAN.md)**.
+
+**P0 answered (2026-09-02).** The anchored-bottom half is real: single-phase np=384 with the
+agglomerated bottom *forced* on the inlet/outlet path went **24.9 → 10.9 iterations, 2.48 → 1.88
+s/step, with the floor improving 2.1e-9 → 3.4e-10** — the §2.7 degradation did not appear here.
+So open problem 4's gate costs ~24 % at 384 ranks on this case and should be revisited. (Both
+np=1536 probes hung in warmup — issue 4 — and were cancelled.) Note its P0: two single-rung
 reruns should come before any code, because the single-phase case runs an *anchored* operator and so
 takes the **smoothed** bottom on a 48-across coarsest grid (`auto` is gated to the singular path),
 while the packed case takes the redundant gather. Part of this issue's headline may be the bottom
