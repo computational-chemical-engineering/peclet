@@ -115,8 +115,14 @@ srun --mpi=pmix --ntasks=$N --ntasks-per-node=$RPN --cpus-per-task=1 \
   a measured hour-long trap since the CUDA prefix gained an OpenMP host backend (2026-08-30).
 - **genoa node-set variability is real** — the same config measured 3.2 vs 8.0 s/step on different
   node sets. Report best-of or the spread, never a single draw.
-- **Memory**: genoa has 336 GiB/node. An OOM-killed rank leaves the survivors hung in a collective,
-  so drivers print a heartbeat; a run past ~10 min with no heartbeat progress is hung → `scancel`.
+- **Memory: `--exclusive` does NOT give you the node's memory.** SLURM still caps the job at
+  roughly 1792 MiB × ntasks (SURF's per-core default), so a job that holds a whole 336 GiB genoa
+  node with only 24 ranks is limited to ~43 GiB and gets OOM-killed on a large grid — measured
+  2026-09-01, job 26280702, `Detected 2 oom_kill events`. Add **`#SBATCH --mem=0`** (all node
+  memory) to any script whose low-rank rungs under-fill a node; at 192 ranks/node the per-task
+  allowance already sums to the node, which is why only the sparse rungs fail and the fully packed
+  ones pass. An OOM-killed rank also leaves the survivors hung in a collective, so drivers print a
+  heartbeat; a run past ~10 min with no heartbeat progress is hung → `scancel`.
 
 ## Result flow
 
