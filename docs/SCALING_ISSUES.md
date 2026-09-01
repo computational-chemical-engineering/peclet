@@ -9,39 +9,22 @@ detailed write-up rather than repeating it.
 plausible-looking number that is not converged is worse off than one whose job hangs, because only
 the second one knows something went wrong.
 
+*Revised 2026-09-01 after the original issue 1 ("cut-cell IBM + open BCs is a blocker") was found to
+be an artifact of the test bed rather than a property of the solver — see issue 3. FoxBerry's Case 3
+is reproducible; the remaining defect is narrower.*
+
 | # | Issue | Severity | Status |
 |---|---|---|---|
-| 1 | Cut-cell IBM + open domain BCs stalls / diverges | **Blocker, silently wrong** | Open, new |
-| 2 | Float operator storage caps MG-PCG on dense beds | **High, silently invalid** | Known (WO-M), fix not defaulted |
-| 3 | MG depth capped by the per-rank block | High (scaling shape) | Known, fix specified |
+| 1 | Float operator storage caps MG-PCG on dense beds | **High, silently invalid** | Known (WO-M), fix not defaulted |
+| 2 | MG depth capped by the per-rank block | High (scaling shape) | Known, fix specified |
+| 3 | Solid intersecting an OPEN domain face stalls the solve | Medium, silently wrong (narrow) | Open, new |
 | 4 | Intermittent multi-node hang in warmup | Medium (reliability) | Open, undiagnosed |
 | 5 | Velocity multigrid is single-rank only | Medium (unverified impact) | Known restriction |
 | 6 | `check_decomposition.py` unusable above ~100 ranks | Low (tooling) | Open |
 
 ---
 
-## 1. Cut-cell IBM + open domain boundaries — BLOCKER
-
-**A cut-cell bed together with inflow/outflow BCs does not solve.** MG-PCG caps at its iteration
-limit with `max|div|` 2.5e-3 (six orders too large), and at MG depth ≤ 2 it diverges outright to
-NaN / 1e+268. Neither Krylov driver survives and the agglomerated bottom is exonerated.
-
-Each ingredient alone is healthy — same bed periodic: 15 iterations; same bed with six no-slip
-walls: 17; same BCs with no bed: 27 — so it is the *combination*, which **no test anywhere
-covers**: no `tests/kokkos_mpi` test calls `setDomainBc` with `setSolid`, and no
-`verify_*_sdflow.py` domain-BC script carries an immersed solid.
-
-*Why this is first:* it is the configuration a user reaches for to simulate a packed reactor,
-filter, or column — flow through a bed, driven by an inlet. It is exactly FoxBerry's Case 3, and
-it is the reason that case could not be reproduced at all.
-
-Evidence, suspected mechanism (the Dirichlet/outflow half of the open-boundary openness split
-meeting the coarse-level cut-cell rediscretization — the cut-cell sibling of the WO-H
-Neumann-ghost bug), and a bisection plan: **`flow/doc/cutcell_openbc_convergence.md`**. Reproduce
-with `BCMODE=foxberry|walls|periodic` in the benchmark driver. First gate to write: any test that
-combines `setDomainBc` with `setSolid`.
-
-## 2. Float operator storage caps MG-PCG on dense cut-cell beds — HIGH
+## 1. Float operator storage caps MG-PCG on dense cut-cell beds — HIGH
 
 The documented **WO-M** defect, reproduced independently in the field. Float `MReal` breaks the
 singular row-sum identity `A·1 = 0`, the residual floors at 5e-9…6e-8 and rebounds, and any dense
@@ -64,7 +47,7 @@ generalisation — see `flow/doc/vof_workorders_v34.md` (WO-M).
 one-line warning naming `PMAXIT` costs nothing and converts a silent invalid into a visible one);
 and add the rtol=1e-6-vs-1e-8 comparison to the diagnostics, since it identifies this in one shot.
 
-## 3. Multigrid depth capped by the per-rank block — HIGH (scaling shape)
+## 2. Multigrid depth capped by the per-rank block — HIGH (scaling shape)
 
 A level coarsens an axis only if every rank's block origin *and* size are even on it, because
 coarse levels must be the fine decomposition `coarsened()` in place. When no axis qualifies the
@@ -87,6 +70,32 @@ coarsen the rest of the way.
 Full treatment, measurements and staged plan: **`DECOMPOSITION_AND_MULTIGRID.md` §2.8 and open
 problem 1**.
 
+## 3. Solid intersecting an OPEN domain face stalls the pressure solve — MEDIUM
+
+**Corrected from the original write-up, which called this a blocker and was wrong.** It was found
+with a bed whose spheres were *clipped by the inlet and outlet planes* — an artifact of how that bed
+was built, not a property of the configuration. With the spheres whole and clear of the open faces —
+which is what FoxBerry's case actually specifies — the identical configuration converges, and Case 3
+turned out to be reproducible after all.
+
+The real defect is narrower: when solid **cuts** an inflow/outflow face, the cut-cell solve caps and
+its divergence sits orders too high. Measured A/B at 128³, everything identical but the bed:
+
+| bed | pressure iters | capped | final `max｜div｜` |
+|---|---|---|---|
+| whole spheres inside the region | **32.7** | none | 9.6e-05 → **1.95e-06** over 42 steps |
+| spheres clipped by the inlet/outlet | 260.8 | 5 of 6 steps | 4.0e-03 |
+
+Still worth fixing — a partially blocked inlet is a reasonable thing to want — but it is a narrow
+correctness bug rather than something blocking mainstream use. It may even be legitimate to *reject*
+the configuration with a clear error; that should be a decision, not the current silent stall.
+Suspected mechanism, minimal-reproducer plan and the wider gap it sits in (nothing anywhere combines
+`setDomainBc` with `setSolid`): **`flow/doc/cutcell_openbc_convergence.md`**.
+
+*The methodological lesson is the more valuable output here:* an A/B is only as good as its claim
+that A and B differ in one thing. The bed was doing double duty as "the geometry" and as "the thing
+that touches the boundary", and conflating those produced a confident, wrong, top-priority finding.
+
 ## 4. Intermittent hang in the first warmup step at multi-node scale — MEDIUM
 
 Some multi-node runs hang in warmup and never emit another line, at full CPU on every rank (which
@@ -108,7 +117,7 @@ sweep cap and there is no alternative. This campaign did not measure whether tha
 worth checking here specifically: FoxBerry's packed case uses `u = 0.001`, giving `dt = 0.26` and
 therefore **ν·dt/dx² ≈ 3.8e4** — an extremely stiff implicit diffusion for a point smoother, where
 the single-phase case sits at ≈ 38. If the momentum solve is under-converged at the sweep cap, the
-projection is chasing a moving target and some of issue 3's iteration growth may not be the
+projection is chasing a moving target and some of issue 2's iteration growth may not be the
 hierarchy at all. *Cheap check:* sweep `VSWEEPS` at fixed rank count and see whether the pressure
 iteration count moves.
 
@@ -120,9 +129,9 @@ out or errored during this campaign, so the np=768 and np=1536 partitions could 
 before submitting. Given that issue 3 makes the partition the dominant performance variable, this
 tool should be fast enough to sweep the whole ladder in one call.
 
-## Issues 2 and 3 compound — and that is the most important thing here
+## Issues 1 and 2 compound — and that is the most important thing here
 
-They are not independent, and the packed-bed ladder shows it. With the fp64 build (issue 2's fix)
+They are not independent, and the packed-bed ladder shows it. With the fp64 build (issue 1's fix)
 the dense bed converges cleanly at 24…384 ranks — 52 → 82 iterations, `max|div|` ~1e-13, and
 strong-scaling efficiency 100 → 69 %. At **1536 ranks it partially caps again even in fp64**:
 the repeat hits the 200 cap outright and the first run averaged 122 with per-step counts swinging
@@ -130,15 +139,15 @@ the repeat hits the 200 cap outright and the first run averaged 122 with per-ste
 from 3.9× faster than FoxBerry to slower than it. Meanwhile np=384 reproduces to 5 % across two
 runs (6.19 / 6.52 s, 81.7 iterations both times), so this is the rank count and not the draw.
 
-The mechanism ties the two together: **issue 3 starves the hierarchy, which weakens the
-preconditioner, which pushes a high-contrast problem back over issue 2's convergence threshold.**
+The mechanism ties the two together: **issue 2 starves the hierarchy, which weakens the
+preconditioner, which pushes a high-contrast problem back over issue 1's convergence threshold.**
 The depth cap therefore does not merely cost iterations at a fixed rate — on a hard problem it can
 cost convergence outright, and the cliff arrives suddenly. Two consequences:
 
 - The packed ladder is only reportable to 384 ranks. That point is the *measured* strong-scaling
   limit of the IBM path on this problem, and it is a much lower ceiling than the single-phase
   case's.
-- **Fixing issue 3 is worth more than its 33 % suggests.** On the single-phase case coarse-level
+- **Fixing issue 2 is worth more than its 33 % suggests.** On the single-phase case coarse-level
   redistribution buys efficiency; on the packed case it plausibly buys the ability to run at all
   above ~400 ranks. That argues for doing it before, or together with, generalising the
   double-diagonal — and for testing the fix on a dense bed, not on a clean single-phase problem
@@ -167,5 +176,5 @@ Worth stating, because the issues above are not the whole picture: the distribut
 bit-consistent (np=1 and np=4 agree to every digit on the same bed), the decomposition machinery
 delivers imbalance 1.000 at every 384³ rung, per-iteration cost scales *super-linearly* to 1536
 ranks, and peclet is **8.0–9.4× faster than FoxBerry on the single-phase case and 3.9–5.7× on the
-packed bed** across the measured ladder. Issues 2 and 3 are what stand between that and matching
+packed bed** across the measured ladder. Issues 1 and 2 are what stand between that and matching
 FoxBerry's scaling *shape* as well as beating its absolute time.
