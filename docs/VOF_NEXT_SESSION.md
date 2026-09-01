@@ -26,9 +26,50 @@ eq. 14f sign).
 
 ---
 
-## Item 1 — Ship the double-diagonal as an **option** (user decision, 2026-08-31)
+## Item 1 — Precision: evaluate defect correction FIRST, then the double-diagonal
 
-**Decided**: implement it, default OFF, never make fp64 the default.
+**⚠ EVALUATE THIS BEFORE IMPLEMENTING ANYTHING (user proposal, 2026-09-01).** The user
+proposed the scheme WO-M never considered, and it may make the double-diagonal unnecessary:
+
+> 1. Compute `r = b − A_exact·x` with `b`, `A_exact`, `x` all in double — **matrix-free**, as
+>    `r(x)`, which also generalises to a nonlinear residual.
+> 2. Solve the correction approximately in float: `A_float·dx = −(float)r`, then
+>    `x ← x + (double)dx`.
+
+**Why this is stronger than the double-diagonal**: it makes the float operator's errors
+*irrelevant* rather than smaller. Once the residual and matvec use the true operator, the float
+hierarchy is a **pure preconditioner**, and a preconditioner's errors affect only the
+convergence rate, never the fixed point — so `A·1 = 0` breaking inside it stops mattering. The
+double-diagonal instead patches the operator so it can keep serving as both the problem
+definition and the preconditioner; defect correction removes that double duty.
+
+**Why it is cheap here**: `buildCutcellOp(OpV AC, …, CCConst ox, CCConst oy, CCConst oz, …)`
+(`mac_pressure.hpp:24`) assembles the bands from the **openness, which is already double**
+(`CCField = View<double*>`, `mac_cutcell.hpp:22`), and the coefficient is a local function of
+openness and the ρ face mean. So the fine-level matvec can be **matrix-free in double with no
+new storage** — and the fine-level float bands could be *dropped*, saving ~28 B/cell instead of
+adding 17. On a bandwidth-bound kernel that trades flops for traffic in the favourable
+direction. Coarse levels stay float; they only live inside the preconditioner.
+
+**Caveats to check**: the optional star overlay (fluid-only constraint, `star_elimination.hpp`,
+used by the collocated ghost path) applies extra couplings as a separate delta, so a
+matrix-free fine matvec must carry it or be restricted to the standard path. And the
+conditioning ceiling does not move — this removes the *float* floor, not `eps_f64·κ`.
+
+**Why this generalises where storage-widening does not**: with surface tension (V4) and later
+phase change (Part II), the quantity driven to zero is genuinely not a fixed linear system —
+the operator is a linearisation of a residual depending on curvature, colour and interfacial
+mass flux. Defect correction on a matrix-free `r(x)` is the formulation that survives that.
+
+**Honest note on the gap**: WO-M framed the question as *which storage do we widen*, never as
+*should the residual and the preconditioner use different operators*. Given that framing, the
+double-diagonal is the right answer — to the narrower question. Neither campaign raised this
+alternative.
+
+### The double-diagonal (user decision 2026-08-31, still valid as the fallback)
+
+**Decided**: if defect correction does not pan out, implement this, default OFF, never make
+fp64 the default.
 
 **Why it is worth having despite buying little today** (the user asked this directly, and the
 honest answer has two halves):
