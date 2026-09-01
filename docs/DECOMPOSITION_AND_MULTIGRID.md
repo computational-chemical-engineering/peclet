@@ -316,15 +316,21 @@ Roughly in order of expected value.
    - Textbook treatment of processor agglomeration and idle processors on coarse grids:
      Trottenberg, Oosterlee & Schüller, *Multigrid*, ch. 6.
 
-   A pragmatic staging, cheapest first: (a) keep the existing in-place coarsening while it is legal;
-   (b) when it stops, agglomerate by a factor of 2 per axis onto a subset communicator and continue;
-   (c) hand the bottom to the existing exact solve. Item 5 below (a direct bottom solve) and item 6
-   (the redundant gather's cost) become more valuable once this lands, because the bottom then
-   really is tiny. An algebraic alternative — hand the level where geometry stops to `GraphAMG`
-   (item 7) and let *it* coarsen the rest of the way — reuses machinery that already exists and is
-   worth measuring first, since it may capture most of the win for far less work. The user-facing
-   framing to keep in mind: **the number of iterations should be a property of the problem, not of
-   the rank count.**
+   **Designed 2026-09-01 — see [`MG_TELESCOPING_PLAN.md`](MG_TELESCOPING_PLAN.md).** The route is
+   geometric telescoping on the ORB tree: `BlockDecomposer` already stores the bisection tree, every
+   internal node is exactly the union of its subtree's leaf boxes, so *merging sibling blocks is a
+   tree truncation* — nested by construction, no partitioner, no graph. That makes this cheaper here
+   than in MueLu or hypre, which must re-partition an algebraic graph. Three of the four primitives
+   already exist: the tree, `decomp::grid_redistribute.hpp` (bit-exact A→B field movement), and a
+   per-level `GridHaloTopology` already parameterized by `(dec, rank, g, per, comm)`.
+
+   The plan also **retires the "measure the `GraphAMG` handoff first" suggestion that used to sit
+   here**: `GraphAMG`'s agglomerated path gathers the operator to *every* rank and solves it with
+   serial host code, so handing it the stopping level scales the wrong quantity — it would be right
+   only if `GraphAMG` were distributed (item 7), which is a far larger project than the tree walk.
+   Items 5 and 6 become more valuable once telescoping lands, because the bottom then really is tiny.
+   The user-facing framing to keep in mind: **the number of iterations should be a property of the
+   problem, not of the rank count.**
 
 2. **Derive the alignment cap from the requested depth.** It is hard-coded at 16 (five levels) in
    `coarsenAlignment`. It should follow `MGLEVELS` bounded by a load-balance budget, the way

@@ -68,7 +68,12 @@ thing to measure first: hand the level where geometry stops to the existing `Gra
 coarsen the rest of the way.
 
 Full treatment, measurements and staged plan: **`DECOMPOSITION_AND_MULTIGRID.md` §2.8 and open
-problem 1**.
+problem 1**; the design and implementation plan is
+**[`MG_TELESCOPING_PLAN.md`](MG_TELESCOPING_PLAN.md)** (2026-09-01). Note its P0: two single-rung
+reruns should come before any code, because the single-phase case runs an *anchored* operator and so
+takes the **smoothed** bottom on a 48-across coarsest grid (`auto` is gated to the singular path),
+while the packed case takes the redundant gather. Part of this issue's headline may be the bottom
+rather than the depth, and that changes which fix is urgent.
 
 ## 3. Solid intersecting an OPEN domain face stalls the pressure solve — MEDIUM
 
