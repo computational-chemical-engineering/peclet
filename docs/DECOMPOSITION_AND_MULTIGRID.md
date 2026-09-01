@@ -324,6 +324,12 @@ Roughly in order of expected value.
    already exist: the tree, `decomp::grid_redistribute.hpp` (bit-exact A→B field movement), and a
    per-level `GridHaloTopology` already parameterized by `(dec, rank, g, per, comm)`.
 
+   Its first rung is cheap and reuses what exists: at the level where coarsening stops, gather the
+   level *redundantly* to every rank — the pattern the agglomerated bottom already uses for its rhs
+   every V-cycle — and continue with the **single-rank** `CutcellMG` hierarchy from there, which
+   already goes to full depth with every BC path and the exact bottom. Sub-communicator telescoping
+   is the general form for when the gathered level no longer fits one rank.
+
    The plan also **retires the "measure the `GraphAMG` handoff first" suggestion that used to sit
    here**: `GraphAMG`'s agglomerated path gathers the operator to *every* rank and solves it with
    serial host code, so handing it the stopping level scales the wrong quantity — it would be right
