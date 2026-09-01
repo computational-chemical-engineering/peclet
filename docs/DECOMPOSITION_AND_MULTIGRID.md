@@ -41,7 +41,10 @@ An independent ORB per level would not nest, and transfers would read out of bou
 So **the achievable depth is a property of the per-rank block, not the global grid.** Under weak
 scaling the blocks stay roughly constant, so the coarsest *global* grid grows with the rank count no
 matter how many levels are requested. That is a structural limit of a block-local geometric
-hierarchy, and the reason an agglomerated bottom solve exists.
+hierarchy, and the reason an agglomerated bottom solve exists. **It is a limit of this
+implementation, not of multigrid**: letting a coarse level live on its own coarser partition, at
+the price of one redistribution inside the transfer, removes it — see §2.8 for what it currently
+costs and open problem 1 for how the standard libraries do it.
 
 ### 1.3 Two ways to build a partition that survives coarsening
 
@@ -179,12 +182,12 @@ of severity, all in `pcgAmg`/`buildAmg`:
    channel never saw it because there the two projectors coincide. Fixed: per-fluid-component mean
    removal (a union-find over the assembled operator graph labels the components — a coarse level
    can pinch fluid into pockets, each with its own constant).
-2. **Float row-sum defect.** The level coefficients are stored in float (`MReal`), so the assembled
+3. **Float row-sum defect.** The level coefficients are stored in float (`MReal`), so the assembled
    double CSR had fluid row sums of ~5e-8 (relative) instead of 0 — the true near-null vector was
    not the constant the projector (and the AMG's prolongator) assume, flooring the inner CG at
    ~1e-5. Fixed: the singular path resums each fluid diagonal in double from its off-diagonals
    (exactly the operator the discretization means), restoring `A·1 = 0` per row.
-3. **Overtight inner tolerance.** 1e-10 sits at/below the double-precision floor of the projected
+4. **Overtight inner tolerance.** 1e-10 sits at/below the double-precision floor of the projected
    solve for some right-hand sides, costing the full iteration cap for nothing; the outer count is
    unchanged from a far looser bottom (measured: parity even at 1e-5). Now 1e-8, cap 100.
 
@@ -218,6 +221,45 @@ operator — and therefore the bottom AMG — every step; fine for the intended 
 bottoms, but do not pair `auto` with a badly-factored grid (a huge bottom) on those paths.
 `PECLET_FLOW_AGGLOM_EXTENT=1000000` restores the legacy behaviour without a code change.
 
+### 2.8 The depth cap costs real iterations under strong scaling — measured end to end
+
+The FoxBerry-comparison benchmark (`peclet-examples/benchmarks/foxberry-scaling`, 2026-09-01,
+Snellius genoa, 384³ = 56.6M cells, pure MPI, one rank per core) strong-scales the same problem
+from 24 to 1536 ranks. It isolates the cost of §1.2's depth cap cleanly, because the *only* thing
+changing across the ladder is the partition.
+
+| ranks | single-phase s/step | iters | ms/iter | eff. | packed bed (fp64) s/step | iters | eff. |
+|---|---|---|---|---|---|---|---|
+| 24 | 36.53 | 16.6 | 2200.6 | 100% | 67.92 | 52.4 | 100% |
+| 48 | 19.05 | 16.6 | 1147.8 | 96% | 33.82 | 52.2 | 100% |
+| 96 | 8.95 | 16.5 | 543.5 | 102% | 17.74 | 61.6 | 96% |
+| 192 | 5.30 | 22.7 | 233.5 | 86% | 10.25 | 65.5 | 83% |
+| 384 | 2.48 | 24.9 | 99.4 | 92% | 6.19 | 81.7 | 69% |
+| 1536 | 0.852 | 38.7 | 22.0 | 67% | — | — | — |
+
+**The wall-clock efficiency loss is entirely the iteration count.** The decomposition is exact:
+
+```
+speedup = (per-iteration speedup) / (iteration-count growth)
+42.9x   =        100.0x           /         2.33x            (single-phase, 24 -> 1536)
+```
+
+Time *per pressure iteration* improves **100× over a 64× rank increase — 156 % efficiency,
+super-linear**, because the shrinking block fits cache better. Communication is not the problem at
+this scale. What costs the 33 % is that the pressure solve needs 2.33× more iterations at 1536
+ranks than at 24, and that is §1.2's gate and nothing else: the per-rank block at np=1536 is
+24×48×32, which stops coarsening at 3×6×4 (x odd), so the hierarchy is several levels shorter than
+the global grid would allow. The projection's share of the step tracks it exactly, 39 % → 67 %.
+
+The same experiment on **400³** (2⁴·25, a badly factored grid) shows the mechanism amplified:
+iterations climb 96 → 191 between np=48 and np=384 and efficiency falls to 63 %, against 384³'s
+92 % at the same rank count. Two grids differing by 12 % in cell count differ by 7.7× in
+iterations at np=384.
+
+For context on what is being left on the table: a Trilinos/MueLu AMG (FoxBerry's preconditioner)
+strong-scales the same 64M-cell problem essentially at ideal halving across the whole 24 → 1536
+ladder, because MueLu *repartitions its coarse levels onto fewer ranks* rather than stopping.
+
 ## 3. Design rules
 
 1. **Choose grid dimensions for their factors of two.** `2^k · small` in every direction. Never let a
@@ -226,10 +268,10 @@ bottoms, but do not pair `auto` with a badly-factored grid (a huge bottom) on th
    power of two. Think of the domain as a grid of atoms and decompose *that*.
 3. **Multigrid depth is a resolution setting, not a constant.** Across a refinement ladder hold the
    *coarsest grid* fixed, not the level count.
-4. **Prefer coarse-first when the rank count is awkward**, and let the imbalance budget pick the depth.
-5. **When cells/rank cannot be held exactly constant** (3-D power-of-two refinement moves the cell
+5. **Prefer coarse-first when the rank count is awkward**, and let the imbalance budget pick the depth.
+6. **When cells/rank cannot be held exactly constant** (3-D power-of-two refinement moves the cell
    count in 8× steps), compute weak efficiency from **per-GPU throughput**, which corrects for it.
-6. **Watch `last_pressure_iterations()`, not just ms/step.** A clamped iteration count (equal to
+7. **Watch `last_pressure_iterations()`, not just ms/step.** A clamped iteration count (equal to
    `PMAXIT` every step) means the solve never converged and the timing measures the cap, not the work.
 
 ---
@@ -238,14 +280,60 @@ bottoms, but do not pair `auto` with a badly-factored grid (a huge bottom) on th
 
 Roughly in order of expected value.
 
-1. **Derive the alignment cap from the requested depth.** It is hard-coded at 16 (five levels) in
+1. **Redistribute coarse levels onto fewer ranks, instead of stopping the hierarchy.** *The
+   headline item — §2.8 measures it costing 33 % at 1536 ranks, and it is the one open problem here
+   that changes the shape of the scaling curve rather than its offset.*
+
+   §1.2's gate exists only because a coarse level is required to be the fine decomposition
+   `coarsened()` in place, so that restrict/prolong stay purely local. Drop that requirement on the
+   levels where it binds and the constraint disappears: let a coarse level live on its **own,
+   coarser partition**, and pay one redistribution inside the transfer. A block that has reached
+   24×48×32 → 3×6×4 need not stop; the cells can be gathered onto ⅛ as many ranks as 6×12×8 and
+   carry on halving. Repeat, shedding ranks as the grid shrinks, until the coarsest level is on one
+   rank (or a small subset) and is solved directly. Ranks idle at the bottom levels, but those
+   levels are a vanishing share of the work, and the trade — a little idleness and one extra
+   communication per level, for a *constant* iteration count — is exactly the one every scalable
+   multigrid makes.
+
+   **The endpoint of this already exists here**: `set_pressure_bottom("auto")` agglomerates the
+   coarsest level into a global operator and solves it (§2.7). What is missing is the intermediate
+   steps — agglomerating *partway*, onto a subset, and continuing to coarsen geometrically — so
+   today the choice is "stop early, then agglomerate a still-fine grid" rather than "coarsen all
+   the way down, cheaply".
+
+   This is standard practice with standard names, and the design questions are answered in the
+   literature rather than open:
+   - **PETSc `PCTELESCOPE`** redistributes a problem onto a subcommunicator specifically for this
+     use (May, Sanan, Rupp, Knepley & Smith, *Extreme-Scale Multigrid Components within PETSc*,
+     PASC '16). It is the closest match to what is wanted here and is usually composed as
+     `-mg_coarse_pc_type telescope`.
+   - **Trilinos MueLu** does it by default via `RepartitionFactory` + `RebalanceTransferFactory`
+     (Zoltan2), keyed on a minimum-rows-per-rank threshold — this is *why* the MueLu comparison in
+     §2.8 keeps ideal scaling at 401³ where the geometric hierarchy here cannot.
+   - **hypre BoomerAMG** offers a redundant/replicated coarse solve and agglomeration on coarse
+     levels (Baker, Falgout, Kolev & Yang, *Scaling hypre's Multigrid Solvers to 100,000 Cores*).
+   - **DUNE-ISTL AMG** calls it *accumulation*.
+   - Textbook treatment of processor agglomeration and idle processors on coarse grids:
+     Trottenberg, Oosterlee & Schüller, *Multigrid*, ch. 6.
+
+   A pragmatic staging, cheapest first: (a) keep the existing in-place coarsening while it is legal;
+   (b) when it stops, agglomerate by a factor of 2 per axis onto a subset communicator and continue;
+   (c) hand the bottom to the existing exact solve. Item 5 below (a direct bottom solve) and item 6
+   (the redundant gather's cost) become more valuable once this lands, because the bottom then
+   really is tiny. An algebraic alternative — hand the level where geometry stops to `GraphAMG`
+   (item 7) and let *it* coarsen the rest of the way — reuses machinery that already exists and is
+   worth measuring first, since it may capture most of the win for far less work. The user-facing
+   framing to keep in mind: **the number of iterations should be a property of the problem, not of
+   the rank count.**
+
+2. **Derive the alignment cap from the requested depth.** It is hard-coded at 16 (five levels) in
    `coarsenAlignment`. It should follow `MGLEVELS` bounded by a load-balance budget, the way
    coarse-first already does. §2.5 is the regression to protect.
-2. **Graceful degradation instead of skipping the snap.** The aligned ORB abandons alignment entirely
+3. **Graceful degradation instead of skipping the snap.** The aligned ORB abandons alignment entirely
    once a sub-box drops below `2*align` (`initImpl`), which silently costs a level — visible as np=7,
    12, 16, 24 dropping from 6 levels to 5 in §2.3. Snapping to the largest power of two that still
    fits would keep the depth.
-3. **The anchored (outflow) path degrades under the exact bottom** — the gate in §2.7 contains it,
+4. **The anchored (outflow) path degrades under the exact bottom** — the gate in §2.7 contains it,
    understanding it would lift it. Measured: divergence floor 8e-8 → 2e-5 on the inflow/outflow
    channel; inner solve converged, assembled operator consistent with the V-cycle's to 1e-9. The
    float-noise-from-large-near-null-corrections hypothesis is unproven — a clean discriminator
@@ -254,7 +342,7 @@ Roughly in order of expected value.
    (The original problem 3 — the IBM anomaly — is resolved: null-space projection per fluid
    component, float row-sum resummation, inner tolerance 1e-8; `auto` is the default on the
    singular path since 2026-08-13.)
-4. **A direct solve at the bottom.** The agglomerated bottom already converges (AMG-preconditioned CG
+5. **A direct solve at the bottom.** The agglomerated bottom already converges (AMG-preconditioned CG
    to 1e-10), so this buys cost rather than iterations: it replaces ~20 CG iterations of serial host
    code per V-cycle with two triangular solves. For a few-hundred-to-few-thousand-DOF coarse grid a
    DENSE Cholesky is the pragmatic choice — ~100 lines, no new dependency, factor once per operator
@@ -263,34 +351,35 @@ Roughly in order of expected value.
    DOF or factor a regularised operator, then project the mean out (`pcgAmg`'s `meanZero`).
    Beware the porous / variable-ρ paths, which rebuild coefficients every step and so would
    refactorise every step.
-5. **Cost of the redundant gather.** Today every rank receives the whole coarse problem
+6. **Cost of the redundant gather.** Today every rank receives the whole coarse problem
    (`Allgatherv`) and solves it with serial HOST code — a device→host→device round trip inside a GPU
    solve, once per V-cycle. Fine at an 800-cell bottom; measure at 32 GPUs before assuming. If it
    bites: agglomerate onto a subset of ranks, keep the factorisation on device, or agglomerate one
    level earlier (§2.7 shows a shallower hierarchy over an exact bottom is *faster*).
-6. **Agglomeration for the other multigrids.** The block-local hierarchy cannot get coarser than
+7. **Agglomeration for the other multigrids.** The block-local hierarchy cannot get coarser than
    one cell per rank, so under weak scaling the coarsest global grid grows with the rank count. The
    agglomerated `GraphAMG` bottom (`set_pressure_graph_amg`) addresses this algebraically; a geometric
    redistribute-onto-fewer-ranks variant does not exist. This is the main structural lever at scale,
    and the TGV ablation that rejected GraphAMG was run where iterations were already 4 — i.e. where
    there was nothing to fix. Re-test it where the hierarchy is actually starved.
-7. **Padding to friendly sizes with masked cells.** `flow` already carries openness/masking, so
+8. **Padding to friendly sizes with masked cells.** `flow` already carries openness/masking, so
    503 → 512 with 9 solid layers costs 1.8 % more cells and buys 8 levels of coarsening. Probably the
    cheapest large win available, and it needs no new numerics — but it does need the padding to be
    invisible to diagnostics and to the physical box definition.
-8. **Coarse-first vs the weighted ORB.** Weighted decomposition (load balancing, CFD-DEM
+9. **Coarse-first vs the weighted ORB.** Weighted decomposition (load balancing, CFD-DEM
    co-decomposition) and nested coarse levels are currently incompatible beyond `levels=1`: a weighted
    level-0 has no reason to be alignable. Coarse-first offers a way out — weight the *coarse* grid and
    refine upward — which would make dynamic load balancing and multigrid coexist. Not attempted.
-9. **Wall-normal decomposition.** Would lift the ceiling in §2.6. Needs the pressure solve and the
+10. **Wall-normal decomposition.** Would lift the ceiling in §2.6. Needs the pressure solve and the
    velocity BC handling to tolerate an internal boundary in the wall-normal direction.
-10. **Line relaxation for anisotropic levels.** Once only one axis is still coarsening, the coarse
+11. **Line relaxation for anisotropic levels.** Once only one axis is still coarsening, the coarse
    operator is strongly anisotropic and a point Red-Black Gauss-Seidel smoother is a poor smoother for
    it. Line relaxation in the strong direction is the textbook remedy, and would make deep
    semi-coarsened hierarchies actually pay off.
-11. **Odd-grid coarsening.** Allowing `n → (n+1)/2` with matched transfer operators removes the
-   divisibility constraint at the root. Larger change; padding (4) buys most of the benefit first.
-12. **Should coarse-first become the default?** It is opt-in today. It changes the partition for every
+12. **Odd-grid coarsening.** Allowing `n → (n+1)/2` with matched transfer operators removes the
+   divisibility constraint at the root. Larger change; padding (8) buys most of the benefit first, and item 1 removes the
+   pressure to do it at all.
+13. **Should coarse-first become the default?** It is opt-in today. It changes the partition for every
    existing MPI run, so this needs a bit-exactness and performance sweep across the suite first.
 
 ---
