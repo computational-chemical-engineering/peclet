@@ -121,6 +121,10 @@ floats = 28 B), in the favourable direction on a bandwidth-bound kernel.
 levels (inside the preconditioner, stay float), `applyOutflowGhost` and the CA ghost ring (they
 act on the vector, not the operator).
 
+**Promoted to a suite-wide campaign (2026-09-01)**: the plan is `DEFECT_CORRECTION_PLAN.md`
+(rule, per-solver inventory, rungs P1/P2/P3/A0/A1/M1/M2/D1/X, Opus↔Fable handoff protocol) and the
+executing session's prompt is `DEFECT_CORRECTION_PROMPT.md`. This item is now that campaign's P1.
+
 **The discriminating experiment**, when this is implemented behind an env gate: the RCP bed at
 rtol 1e-8, Ng = 48/64/96 — the ladder where float took 24/33/**capped-at-300 (invalid)** against
 14/14/28 in double. Matrix-free level-0 should reproduce the double column while the hierarchy
