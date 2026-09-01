@@ -1,0 +1,142 @@
+# Issues surfaced by the FoxBerry scaling campaign (2026-09-01)
+
+Building `peclet-examples/benchmarks/foxberry-scaling` — a head-to-head reproduction of FoxBerry's
+64M-cell strong-scaling cases on Snellius genoa, 24 → 1536 ranks — turned up six issues worth
+fixing plus two environment traps. This is the prioritized register; each entry points at the
+detailed write-up rather than repeating it.
+
+**Ordering principle:** *silently wrong* beats *visibly broken* beats *slow*. A user who gets a
+plausible-looking number that is not converged is worse off than one whose job hangs, because only
+the second one knows something went wrong.
+
+| # | Issue | Severity | Status |
+|---|---|---|---|
+| 1 | Cut-cell IBM + open domain BCs stalls / diverges | **Blocker, silently wrong** | Open, new |
+| 2 | Float operator storage caps MG-PCG on dense beds | **High, silently invalid** | Known (WO-M), fix not defaulted |
+| 3 | MG depth capped by the per-rank block | High (scaling shape) | Known, fix specified |
+| 4 | Intermittent multi-node hang in warmup | Medium (reliability) | Open, undiagnosed |
+| 5 | Velocity multigrid is single-rank only | Medium (unverified impact) | Known restriction |
+| 6 | `check_decomposition.py` unusable above ~100 ranks | Low (tooling) | Open |
+
+---
+
+## 1. Cut-cell IBM + open domain boundaries — BLOCKER
+
+**A cut-cell bed together with inflow/outflow BCs does not solve.** MG-PCG caps at its iteration
+limit with `max|div|` 2.5e-3 (six orders too large), and at MG depth ≤ 2 it diverges outright to
+NaN / 1e+268. Neither Krylov driver survives and the agglomerated bottom is exonerated.
+
+Each ingredient alone is healthy — same bed periodic: 15 iterations; same bed with six no-slip
+walls: 17; same BCs with no bed: 27 — so it is the *combination*, which **no test anywhere
+covers**: no `tests/kokkos_mpi` test calls `setDomainBc` with `setSolid`, and no
+`verify_*_sdflow.py` domain-BC script carries an immersed solid.
+
+*Why this is first:* it is the configuration a user reaches for to simulate a packed reactor,
+filter, or column — flow through a bed, driven by an inlet. It is exactly FoxBerry's Case 3, and
+it is the reason that case could not be reproduced at all.
+
+Evidence, suspected mechanism (the Dirichlet/outflow half of the open-boundary openness split
+meeting the coarse-level cut-cell rediscretization — the cut-cell sibling of the WO-H
+Neumann-ghost bug), and a bisection plan: **`flow/doc/cutcell_openbc_convergence.md`**. Reproduce
+with `BCMODE=foxberry|walls|periodic` in the benchmark driver. First gate to write: any test that
+combines `setDomainBc` with `setSolid`.
+
+## 2. Float operator storage caps MG-PCG on dense cut-cell beds — HIGH
+
+The documented **WO-M** defect, reproduced independently in the field. Float `MReal` breaks the
+singular row-sum identity `A·1 = 0`, the residual floors at 5e-9…6e-8 and rebounds, and any dense
+bed above ~256³ burns its iteration cap. Measured on a 5000-sphere φ=0.45 bed at 384³: capped at
+300 iterations, where the *same* solve at rtol 1e-6 converges in 36.5 — with `<u>` and `max|div|`
+identical to seven digits. The physical answer arrives in ~36 iterations; the rest is chasing a
+residual below the storage floor.
+
+*Why it ranks here:* the **default build silently produces invalid runs**. Nothing in the output
+says "capped" unless you compare iterations against `PMAXIT` yourself, and the step time then
+reflects `PMAXIT` rather than convergence.
+
+*The framing that should change:* fp64 is **~2× faster in wall clock** on such a bed (71 iterations
+vs a 200 cap) and lands two orders lower in divergence. On dense beds fp64 is the *performance*
+choice, not a +12 % correctness tax. Recommended production fix remains the **double-diagonal**
+(faces float, diagonal resummed in double), already proven at the agglomerated bottom and awaiting
+generalisation — see `flow/doc/vof_workorders_v34.md` (WO-M).
+
+*Actions:* generalise the double-diagonal; failing that, make a capped pressure solve **loud** (a
+one-line warning naming `PMAXIT` costs nothing and converts a silent invalid into a visible one);
+and add the rtol=1e-6-vs-1e-8 comparison to the diagnostics, since it identifies this in one shot.
+
+## 3. Multigrid depth capped by the per-rank block — HIGH (scaling shape)
+
+A level coarsens an axis only if every rank's block origin *and* size are even on it, because
+coarse levels must be the fine decomposition `coarsened()` in place. When no axis qualifies the
+hierarchy stops, so **achievable depth is a property of the per-rank block, not the global grid**.
+
+Measured, 384³, 24 → 1536 ranks: pressure iterations rise 16.6 → 38.7 and strong-scaling efficiency
+falls to 67 %, while time *per iteration* improves 100× over a 64× rank increase — 156 %,
+super-linear. The decomposition is exact: `42.9× speedup = 100.0× per-iteration / 2.33× iteration
+growth`. **The entire loss is algorithmic, not communication.** On the badly factored 400³ the same
+mechanism gives 96 → 191 iterations and 63 % by np=384.
+
+*This is an implementation limit, not a property of multigrid.* The fix is to let a coarse level
+live on its own coarser partition and redistribute inside the transfer — PETSc `PCTELESCOPE`,
+MueLu `RepartitionFactory` (which is why FoxBerry's AMG holds near-ideal halving where flow cannot),
+hypre's redundant coarse solve, DUNE's *accumulation*. The endpoint already exists here as
+`set_pressure_bottom("auto")`; only the intermediate agglomeration steps are missing. Cheapest
+thing to measure first: hand the level where geometry stops to the existing `GraphAMG` and let it
+coarsen the rest of the way.
+
+Full treatment, measurements and staged plan: **`DECOMPOSITION_AND_MULTIGRID.md` §2.8 and open
+problem 1**.
+
+## 4. Intermittent hang in the first warmup step at multi-node scale — MEDIUM
+
+Some multi-node runs hang in warmup and never emit another line, at full CPU on every rank (which
+distinguishes nothing — OpenMPI busy-polls a blocked collective). Single-phase 384³ np=768 hung in
+two independent 4-node allocations; 400³ np=1536 hung on 8 nodes; packed 384³ np=1536 hung once and
+**ran normally on the retry**. That last point is what makes it intermittent rather than a property
+of a rank count, and it cost two rungs of the ladder plus several node-hours.
+
+*Next steps, cheapest first:* a stack dump from one hung rank (`gdb -p` on the compute node) would
+settle it in one shot and is worth more than any black-box bisection. Failing that,
+`PECLET_FLOW_AGGLOM_EXTENT=1000000` removes the agglomerated coarse solve's global `Allgatherv`
+from every V-cycle, separating a coarse-solve collective from a halo one; and the host-staged halo
+path isolates the exchange engine.
+
+## 5. Velocity multigrid is single-rank only — MEDIUM, impact unverified
+
+`IbmSolver` never calls `VelocityMG::initMpi`, so under MPI the momentum solve is RB-GS with a
+sweep cap and there is no alternative. This campaign did not measure whether that bit, but it is
+worth checking here specifically: FoxBerry's packed case uses `u = 0.001`, giving `dt = 0.26` and
+therefore **ν·dt/dx² ≈ 3.8e4** — an extremely stiff implicit diffusion for a point smoother, where
+the single-phase case sits at ≈ 38. If the momentum solve is under-converged at the sweep cap, the
+projection is chasing a moving target and some of issue 3's iteration growth may not be the
+hierarchy at all. *Cheap check:* sweep `VSWEEPS` at fixed rank count and see whether the pressure
+iteration count moves.
+
+## 6. `check_decomposition.py` is unusable above ~100 ranks — LOW (tooling)
+
+The pre-flight tool is a pure function of (ranks, grid, levels) and needs no hardware, which is its
+whole point — but it takes minutes per rank count above ~100 and several combinations simply timed
+out or errored during this campaign, so the np=768 and np=1536 partitions could not be checked
+before submitting. Given that issue 3 makes the partition the dominant performance variable, this
+tool should be fast enough to sweep the whole ladder in one call.
+
+---
+
+## Environment traps (not peclet defects) — recorded in [SNELLIUS.md](SNELLIUS.md)
+
+- **`--exclusive` does not grant the node's memory.** SLURM still caps at ~1792 MiB × ntasks, so a
+  24-rank job on a 336 GiB genoa node gets ~43 GiB and is OOM-killed at 64M cells. Use
+  `#SBATCH --mem=0`. Cost one wasted job before it was understood.
+- **SURF's `sbatch` drops leading `VAR=x sbatch …` env vars**, silently running the default
+  instead. Pass such choices as script arguments or via `--export=ALL,VAR=…`. Cost one wasted
+  job — *after* the trap had already been written down, which is why the benchmark scripts now take
+  the case list as a positional argument rather than relying on discipline.
+
+## What the campaign also confirmed working
+
+Worth stating, because the issues above are not the whole picture: the distributed solve is
+bit-consistent (np=1 and np=4 agree to every digit on the same bed), the decomposition machinery
+delivers imbalance 1.000 at every 384³ rung, per-iteration cost scales *super-linearly* to 1536
+ranks, and peclet is **8.0–9.4× faster than FoxBerry on the single-phase case and 3.9–5.7× on the
+packed bed** across the measured ladder. Issues 2 and 3 are what stand between that and matching
+FoxBerry's scaling *shape* as well as beating its absolute time.

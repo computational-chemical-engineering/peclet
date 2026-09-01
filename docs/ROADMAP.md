@@ -175,6 +175,11 @@ The "remaining work is at-scale tuning" phase now has measured campaigns behind 
       compute-sanitizer: `ensureCapacity` missed `materialId` → silent OOB ghost-slot writes with
       allocator-layout-dependent damage (dem `17288f8`). Voxel-fraction gates remain at both ends
       of the packing→flow pipeline.
+- [x] **FoxBerry head-to-head scaling** (`peclet-examples/benchmarks/foxberry-scaling`, 384³,
+      genoa 24→1536 ranks): peclet 8.0–9.4× faster than FoxBerry single-phase, 3.9–5.7× on the
+      packed bed; near-linear to 384 ranks, 67 % at 1536 with the whole loss algorithmic (time
+      per iteration scales at 156 %). Surfaced six issues, prioritized in
+      [SCALING_ISSUES](SCALING_ISSUES.md) — the top two are correctness, not performance.
 - [ ] **Open**: fat-block ablation rung (512³ cells/GPU, script ready); ghost-projection march
       instability at large elongated rungs + ghost hardening phases B/C
       (`flow/doc/ghost_hardening_plan.md` — active); warmstart divergence on steady marches;
