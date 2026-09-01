@@ -118,13 +118,30 @@ two independent 4-node allocations; 400³ np=1536 hung on 8 nodes; packed 384³ 
 **ran normally on the retry**. That last point is what makes it intermittent rather than a property
 of a rank count, and it cost two rungs of the ladder plus several node-hours.
 
-*Next steps, cheapest first:* a stack dump from one hung rank (`gdb -p` on the compute node) would
-settle it in one shot and is worth more than any black-box bisection. Failing that,
+**Stack dumps taken 2026-09-02** (`srun --jobid --overlap … gdb -p`, two nodes, five ranks each,
+on an 8-node 1536-rank job without telescoping): **every sampled rank on every node is in
+`MPI_Waitall` under `ompi_request_default_wait_all`**, i.e. a point-to-point halo exchange whose
+completions never arrive, in the *first* step. Nobody is in a collective, nobody is elsewhere in
+the solver. Four of four 8-node jobs hung today (float and fp64 builds, telescoping on and off,
+different node sets); two 8-node jobs succeeded the day before. That is transport behaviour at
+≥4 nodes with 192 ranks/node (OpenMPI 5.0.3 + UCX 1.16, `uct_mm` shared-memory progress visible
+on the other threads), not a solver mismatch — a mismatch would put ranks in different places.
+Discriminators submitted: `OMPI_MCA_pml=ob1` (UCX bypassed) and 16 nodes × 96 ranks (same
+rank count, half the ranks per node). Failing that,
 `PECLET_FLOW_AGGLOM_EXTENT=1000000` removes the agglomerated coarse solve's global `Allgatherv`
 from every V-cycle, separating a coarse-solve collective from a halo one; and the host-staged halo
 path isolates the exchange engine.
 
-## 5. Velocity multigrid is single-rank only — MEDIUM, impact unverified
+## 5. Velocity multigrid is single-rank only — now the LARGEST cost on the packed case
+
+**Measured 2026-09-02, packed bed with FoxBerry BCs, 384 ranks, telescoped pressure MG:** momentum
+4.55 s of a 7.28 s step (63 %), projection 2.55 s. Once telescoping flattens the pressure iteration
+count, the RB-GS momentum solve at ν·dt/dx² ≈ 3.8e4 is what the step is made of. And it **hits its
+sweep cap on every step**: 600 sweeps/step = 3 components × the 200-sweep cap, so the 1e-3
+tolerance stop never engages — the momentum solve is under-converged as well as expensive (its
+cost is then a fixed 600 sweeps × cells, which strong-scales perfectly but is where the absolute
+time lives). A distributed velocity multigrid (`VelocityMG::initMpi` is what is missing) would
+attack both at once; it is the next lever on this case now that the pressure side is flat.
 
 `IbmSolver` never calls `VelocityMG::initMpi`, so under MPI the momentum solve is RB-GS with a
 sweep cap and there is no alternative. This campaign did not measure whether that bit, but it is
