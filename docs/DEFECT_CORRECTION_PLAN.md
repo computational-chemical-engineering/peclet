@@ -675,6 +675,11 @@ with the gate on.
    two identity cases → M2 at the production default on the regression suite (+0 % sweeps
    predicted) → `kokkos_mpi` np=1,2,4 → the default-flip commit with `--update`.
 3. After M2 lands: the drag-diagonal rescale commit from M1's ruling (4), with its own re-baseline.
+   **Name `coupling` as an affected consumer in that commit message** (collocated session, 2026-09-01):
+   drag on cut cells is the porous CFD-DEM coupling campaign's bread and butter, so whichever session
+   next touches `peclet-coupling` must re-baseline its drag-balance checks rather than chase a phantom
+   regression. The all-fluid porous drag balance is unaffected (`rs ≡ 1`); it is the cut-cell drag that
+   moves, and it moves in a *double* build too — this is a numerics fix, not a precision one.
 
 ## 5. Working practices (inherited; not optional)
 
