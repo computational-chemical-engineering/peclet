@@ -16,18 +16,31 @@ Read, in this order, before doing anything else:
    `PECLET_FLOW_MG_DIAGRESUM` control, and the harness `flow/tests/study/precision_ab.py`).
 3. `suite/CLAUDE.md`, then `flow/CLAUDE.md` and `core/CLAUDE.md` for build/test recipes.
 
+**The campaign opens with a Fable design session.** Per plan §3 the order is **M1 + M2 design
+(Fable) first**, then P1 → (P2, A0, A1) → M1 → M2 → P3 → D1 → X. If §4 is empty, the correct
+first session is Fable writing both momentum design sections. P1 nevertheless remains the
+implementation go/no-go — the design being on paper first does not lower that bar.
+
 **Which model are you?** Say so in your first line.
 
-- **If you are Opus**: execute the rungs in the order of plan §3, starting from the first rung
-  §4 does not mark done. Do every [Opus] rung yourself. Do not begin M1 or M2 implementation
-  unless §4 already holds a Fable design section for it ending in `**Ready for Opus:**`. When a
+- **If you are Opus**: execute the rungs in the order of plan §3, starting from the first [Opus]
+  rung §4 does not mark done — which is P1 unless §4 says otherwise. Do every [Opus] rung
+  yourself. Do not begin M1 or M2 implementation unless §4 already holds a Fable design section
+  for it ending in `**Ready for Opus:**`; if §4 has no momentum design at all, run P1/P2/A0/A1
+  (none depend on it), leave M1/M2 alone, and say in your closing summary that the momentum
+  design is the queued Fable work. When a
   handoff trigger in §3 fires, stop that rung, append the `### Handoff → Fable:` section to §4
   exactly as §3 specifies (numbers, commands, build flags, np, what was tried, the believed
   mechanism, the decision needed), commit it, and continue with any *other* rung that does not
   depend on the answer. If none remains, end the session with a one-paragraph summary of where
   the plan stands and which decisions are queued for Fable.
-- **If you are Fable**: read §4 for open `### Handoff → Fable:` sections and unwritten design
-  sections (M1, M2, P2-`rescale`, D1). Answer each in place (`**Fable ruling (date):**` or the
+- **If you are Fable**: if §4 holds no momentum design yet, that is your session — write the M1
+  and M2 design sections (plan §2 lists what each must decide), against the §1 inventory rather
+  than against P1 measurements, which do not exist yet. Where a decision genuinely needs a number
+  P1 would produce, do not guess: write `**Depends on P1:** …` and give the *decision rule* so
+  Opus can resolve it from P1's numbers without another handoff. Otherwise, read §4 for open
+  `### Handoff → Fable:` sections and unwritten design sections (P2-`rescale`, D1). Answer each
+  in place (`**Fable ruling (date):**` or the
   design section ending in `**Ready for Opus:**`), from first principles and measurement, not
   literature; if a ruling needs a probe, run it yourself. Commit. Then, if any [Opus] rung is
   unblocked and cheap, you may execute it — but the design work comes first.

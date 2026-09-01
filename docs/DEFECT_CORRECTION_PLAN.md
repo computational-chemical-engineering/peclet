@@ -249,14 +249,34 @@ linear solve, out of scope. `mac_mg.hpp`: already exact matrix-free. One paragra
 
 ## 3. Order, ownership, and the handoff protocol
 
-**Order**: P1 → (P2, A0, A1 in any order) → M1 design (Fable) → M1 → M2 design (Fable) → M2 → P3
-(if perf says so) → D1 (Fable) → X. P1 is the discriminating experiment for the whole campaign;
-if its ladder does **not** reproduce the double column, stop and hand off — the premise is wrong
-somewhere and the rest should not be built on it.
+**Order**: **M1 + M2 design (Fable) FIRST** → P1 → (P2, A0, A1 in any order) → M1 → M2 → P3
+(if perf says so) → D1 (Fable) → X.
+
+The design leads deliberately (user decision, 2026-09-01). Both momentum design sections are
+written up front, in one Fable session, before any Opus implementation starts — so that Opus then
+has a long uninterrupted run (P1 → P2/A0/A1 → M1 → M2) with no mid-campaign wait for a ruling, and
+so that M1's exact-residual design is settled while the inventory that motivated it is fresh. It
+costs nothing to front-load: the design is reading and reasoning, no builds, no GPU time.
+
+**P1 remains the go/no-go for *implementation*.** It is the discriminating experiment for the
+whole campaign: if its ladder does **not** reproduce the double column, stop and hand off — the
+premise is wrong somewhere and nothing further should be built on it, M1/M2 included. Ordering the
+design first does not lower that bar; it only means the design is already on paper when P1
+answers. If P1 fails, the M1/M2 design sections stay in §4 as unexecuted design, and the handoff
+question becomes why the premise failed.
+
+Consequence for Fable's first session: it writes M1 and M2 designs against the *inventory* (§1),
+not against P1's measurements, which do not exist yet. Where a design decision genuinely depends
+on a number P1 would produce, do not guess — state the dependency explicitly in the design section
+(`**Depends on P1:** …`) and give the decision rule rather than the decision, so Opus can resolve
+it from P1's numbers without another handoff.
 
 **Ownership**: Opus executes every rung marked [Opus]; Fable owns the design decisions in M1, M2,
 the `rescale` semantics in P2, and D1. Opus does not start M1/M2 implementation until the Fable
-design section for it exists in §4 of this file.
+design section for it exists in §4 of this file — which, under the order above, it will, since the
+campaign opens with that Fable session. If an Opus session somehow starts first and §4 is empty,
+it may still run P1/P2/A0/A1 (none of them depend on the momentum design) and must leave M1/M2
+alone.
 
 **Handoff triggers (Opus → Fable)** — stop, write the handoff, do not push past it:
 1. A gate fails and two attempts have not isolated the *mechanism* (not "made it pass").
