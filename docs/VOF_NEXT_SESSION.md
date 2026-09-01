@@ -56,6 +56,78 @@ used by the collocated ghost path) applies extra couplings as a separate delta, 
 matrix-free fine matvec must carry it or be restricted to the standard path. And the
 conditioning ceiling does not move — this removes the *float* floor, not `eps_f64·κ`.
 
+### Verdict of the evaluation (2026-09-01, by source inspection — no run yet)
+
+**Go.** Every premise holds, the change is *smaller* than the proposal assumed, and on the one
+identity that matters it is strictly stronger than the double-diagonal. Three corrections to the
+framing above, in descending order of importance.
+
+**1. No outer defect-correction loop is needed — the structure is already there.** `solvePCG`
+(`src/mac_cutcell_mg.hpp:769`) already separates the two roles: a `matvec` lambda and a `precond`
+lambda that runs one symmetric V-cycle. The float hierarchy is *already* only a preconditioner
+everywhere except that the level-0 `matvec` and the initial residual read the float bands. Make
+the level-0 apply exact and the Krylov fixed point becomes `A_exact` by construction; the
+proposal's steps 1 and 2 are then just what PCG already does. The work is one kernel plus a
+switch at `matvecOverlap` (`:1715`), which is the single choke point for all three drivers
+(`solvePCG`, the flexible PCG at `:881`, `solveBiCGStab` at `:988`).
+
+**2. The float bands are the *whole* error — the arithmetic is already double.**
+`applyCutcellOp` (`mac_pressure.hpp:178`) and `residualCutcell` (`:109`) both promote to double
+before accumulating (`(double)AC(i)*x(i) + …`). So nothing is lost in the summation; the entire
+defect is the fp32 *rounding of the stored coefficients*, i.e. precisely the quantity the
+double-diagonal targets. This confirms the diagnosis and means storage is the only lever.
+
+**3. The flux form gives `A·1 = 0` BITWISE — the double-diagonal only gets it to `eps_f64`.**
+Writing the matrix-free apply in difference form,
+`y_i = t_w(x_i − x_{i-1}) + t_e(x_i − x_{i+1}) + …`, annihilates the constant vector *exactly*,
+whatever the precision of `t_f`, because each difference vanishes identically. A stored double
+diagonal satisfies the identity only to double round-off. Defect correction therefore dominates
+its own fallback on the very identity the fallback exists to protect — this is the strongest
+argument for it and it was not in the proposal.
+
+**What the caveats turned out to be:**
+
+- **Star overlay: already resolved, no work.** `starApplyDelta` is applied *after* `matvecOverlap`
+  as a separate additive delta (`:777-781`), and the gp overlay follows the same pattern in
+  BiCGStab. A matrix-free 7-point level-0 apply composes with both unchanged.
+- **Variable density: nothing special.** The caller pre-folds ρ into the coefficient
+  (`buildRhoCoeff`, `mac_pressure.hpp:251` — "the coefficient rides the openness rails") and passes
+  it *as* the openness (`flow_ibm.hpp:4408,4442`). The double array on level 0 is already the full
+  `c_f`, ρ included.
+- **`gf` plumbing: trivial.** All three `setOpenness` call sites pass `idx2=idy2=idz2=1.0`
+  (`flow_ibm.hpp:1659,4408,4442`) — grid units. Store them as members anyway rather than assume it.
+- **The coefficients are already resident and already double.** `Level::ox/oy/oz` are
+  `CCField = View<double*>` (`:276`), ghost-filled and boundary-re-imposed by `setOpenness`
+  (`:693-698`) and retained for the coarsening. The matrix-free apply needs **no new storage**.
+
+**Correction to the cost claim — the −28 B/cell saving is not free.** The proposal assumed the
+level-0 float bands could simply be dropped. They cannot: the V-cycle *smooths on level 0*, and
+`cutcellSmoothColor` divides by `AC(i)` and uses `ac < 1e-30` to detect decoupled solid cells. So
+the honest ledger is:
+
+| variant | Δ bytes/cell | `A·1 = 0` |
+|---|---|---|
+| double-diagonal (fallback) | **+17** | to `eps_f64` |
+| matrix-free level-0 matvec, bands kept for the smoother | **0** | **bitwise** |
+|  + matrix-free level-0 smoother too | **−28** | bitwise |
+
+The middle row is the honest first step: zero new storage, still strictly better than the
+fallback. The bottom row is a *follow-on* — and note it comes with the double diagonal for free,
+since a matrix-free smoother must form the diagonal on the fly as the exact sum of six double face
+terms. Traffic on the matvec itself does drop either way (3 doubles = 24 B read instead of 7
+floats = 28 B), in the favourable direction on a bandwidth-bound kernel.
+
+**Unchanged:** the conditioning ceiling `eps_f64·κ` (as stated), the AMG bottom and all coarse
+levels (inside the preconditioner, stay float), `applyOutflowGhost` and the CA ghost ring (they
+act on the vector, not the operator).
+
+**The discriminating experiment**, when this is implemented behind an env gate: the RCP bed at
+rtol 1e-8, Ng = 48/64/96 — the ladder where float took 24/33/**capped-at-300 (invalid)** against
+14/14/28 in double. Matrix-free level-0 should reproduce the double column while the hierarchy
+stays float. `PECLET_FLOW_MG_DIAGRESUM=1` gives the matched double-diagonal control on the same
+ladder, so the three variants are directly comparable in one battery. Run it in an isolated
+worktree (working practices, below), and not concurrently with other heavy batteries (WO-L race).
+
 **Why this generalises where storage-widening does not**: with surface tension (V4) and later
 phase change (Part II), the quantity driven to zero is genuinely not a fixed linear system —
 the operator is a linearisation of a residual depending on curvature, colour and interfacial
