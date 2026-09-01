@@ -62,14 +62,56 @@ conditioning ceiling does not move — this removes the *float* floor, not `eps_
 identity that matters it is strictly stronger than the double-diagonal. Three corrections to the
 framing above, in descending order of importance.
 
+**RESULT (2026-09-01): P1 PASSED, and it retires the double-diagonal rather than deferring it.**
+Measured on the RCP bed, PCG rtol 1e-8 cap 300, nvidia-cuda (P1 session, plan §4 carries the full
+table and traces):
+
+| Ng | float bands | exact residual | DIAGRESUM | full double |
+|---|---|---|---|---|
+| 48 | 24, div 4.51e-06 | **14, div 9.51e-12** | 14, div 6.19e-10 | 14, div 9.51e-12 |
+| 64 | 33, div 6.48e-07 | **14, div 9.53e-12** | 14, div 1.24e-09 | 14, div 9.53e-12 |
+| 96 | **300 CAPPED (invalid)**, div 4.36e-06 | **28, div 3.17e-11** | 28, div 2.04e-09 | 28, div 3.17e-11 |
+
+Not a shared floor (the trap the collocated finding warned of): the columns do *not* all agree —
+float separates sharply — and the residual traces show float plateauing then rebounding (floor
+1.115e-08 at it 14, final 8.657e-04, **rebound ×7.8e4**; Ng=96 ×1.6e5) while every exact solve is
+monotone, rebound ×1, crossing rtol far under the cap. The warm leg inverts the worry outright:
+Ng=96 float is [45, 300, 300, 300] across a 4-step march — the *cold* solve converges and the
+*warm* ones cap — against exact [21, 25, 27, 28], march-stable.
+
+**The decisive number is the one this evaluation did not predict.** Exact and DIAGRESUM agree on
+iteration counts but separate **65×** on flux divergence (9.51e-12 vs 6.19e-10 at Ng=48; 3.17e-11 vs
+2.04e-09 at Ng=96), while exact matches full double to every printed digit. The double-diagonal
+converges to the *float-face* operator's solution; the exact residual converges to the true one.
+So the bitwise-vs-`eps_f64` distinction argued below is not academic — it shows up in a physical
+output, and the fallback is **measurably worse, not merely unnecessary**. The double-diagonal is
+retired as an option, not held in reserve.
+
+**Correction to point 1 below (found by the P1 session, verified here).** `matvecOverlap` is NOT
+the single choke point for all three drivers: `solveBiCGStab` has its own inline `matvec` lambda
+(`mac_cutcell_mg.hpp:995` distributed-g2 branch, `:1003` single-rank) calling `applyCutcellOp` with
+the float bands directly, because the g=2 gp staging needs it. P1 therefore covers `solvePCG` and
+the flexible PCG only; the two BiCGStab sites belong with **P2**, which owns the gp overlay that is
+the reason BiCGStab has a separate matvec at all.
+
+**Correction to the cost claim (P1 measurement).** Per-matvec the exact form is **slower**, not
+free: +6.5 % (N=128) / +16.8 % (64) / +31.2 % (96). The byte count was right (24 vs 28 B/cell, 0 B
+new storage confirmed) and the *access pattern* was not — the bands are 7 perfectly coalesced loads
+all at index `i`, while the flux form loads at `i` and `i ± sx/sy/sz`, touching more distinct cache
+lines. At step level it is +0.1…+0.4 %, because the matvec is a small part of the step. This is
+P3's go/no-go input, not P1's: P3 moves that penalty into the **smoother**, which runs many times
+per V-cycle instead of once per PCG iteration.
+
 **1. No outer defect-correction loop is needed — the structure is already there.** `solvePCG`
 (`src/mac_cutcell_mg.hpp:769`) already separates the two roles: a `matvec` lambda and a `precond`
 lambda that runs one symmetric V-cycle. The float hierarchy is *already* only a preconditioner
 everywhere except that the level-0 `matvec` and the initial residual read the float bands. Make
 the level-0 apply exact and the Krylov fixed point becomes `A_exact` by construction; the
 proposal's steps 1 and 2 are then just what PCG already does. The work is one kernel plus a
-switch at `matvecOverlap` (`:1715`), which is the single choke point for all three drivers
-(`solvePCG`, the flexible PCG at `:881`, `solveBiCGStab` at `:988`).
+switch at `matvecOverlap` (`:1715`), the choke point for `solvePCG` and the flexible PCG at
+`:881`. **[Corrected 2026-09-01 — `solveBiCGStab` at `:988` does NOT route through it: it has its
+own inline matvec at `:995`/`:1003` for the g=2 gp staging, and belongs to P2. See the correction
+block above.]**
 
 **2. The float bands are the *whole* error — the arithmetic is already double.**
 `applyCutcellOp` (`mac_pressure.hpp:178`) and `residualCutcell` (`:109`) both promote to double
