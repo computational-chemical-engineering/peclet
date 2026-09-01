@@ -1068,6 +1068,64 @@ takes it: `starApplyDelta` (`:115-133`) computes `phibar = Σa·x / Σa` and add
 which is **not** bitwise-annihilating for a constant even in double; the algebraically identical
 `(a_k/D)·Σ_j a_j (x_k − x_j)` is, and is the P1 trick applied to the star row.
 
+
+### P2 (star half) — exact star apertures + flux-form delta — **DONE 2026-09-02**, flow `7fb80e0`
+
+The half of P2 independent of the ghost-closure ruling handed off above. §1 is right about this
+one: `StarOverlay::a` really was a float **store** of a double-built value
+(`star_elimination.hpp:75-87`, `const double op` → `(float)op`), unlike the gp weights.
+
+**Change**, all behind `PECLET_FLOW_EXACT_RESIDUAL`, which moved to `mac_cutcell.hpp` so the
+overlay and `CutcellMG` share **one** definition — the star delta is part of the same level-0
+operator, so "the matvec is exact" has to cover it or the composed operator is still the float one.
+
+- `StarOverlay::a`: `View<float*>` → `View<double*>`; the build keeps the double aperture.
+- `starAval()` reads it back through `(float)` when the gate is OFF, so the default path sees
+  bitwise the value it always saw. (The widening is otherwise unconditional — a runtime gate
+  cannot change a view's type.)
+- `starApplyDelta` gains a **flux form** under the gate:
+  `a_k (x_k − phibar) = (a_k/D)·Σ_j a_j (x_k − x_j)` — algebraically identical, but every term is
+  a coefficient times a *difference*, so a constant `x` is annihilated **bitwise**. The `phibar`
+  form is not: `phibar = Σ(a·x)/Σa` does not return `x` exactly for constant `x` **even in
+  double** (the two sums round independently, then divide). So the star delta was leaking a row
+  contribution into `A·1` that P1's exact 7-point apply could not cancel. **The level-0 operator
+  is the 7-point part PLUS this delta, and `A·1 = 0` needs both halves exact** — this is the
+  composition P1's §2 note ("P1 composes with it unchanged") left open.
+- `starCorrectFaces` reads the aperture at the same precision, so the reconstruction matches the
+  operator actually solved. Its `phibar` *is* the wanted quantity (the eliminated cell's value),
+  not an operator row, so there is no difference form to take there.
+
+**GATE CORRECTION — "gate-off byte-identical" cannot be measured on this path.** Saying so rather
+than tuning it (§5). `starApplyDelta` uses `Kokkos::atomic_add`, so the mode-B path is **not
+bit-reproducible against itself** on CUDA: three runs of one binary give three different states.
+That is pre-existing — the atomics predate this rung — but it makes P2's stated gate unmeasurable
+here. Measured (N=32, 6 steps, mode B via `set_fluid_only_constraint(2)` on a jittered 8-sphere
+packing; max abs over u/v/w/p; scale `max|state| = 2.127e-01`):
+
+| comparison | max abs diff |
+|---|---|
+| REF (pre-change, flow `e9da3e5`) run-to-run spread | 1.110e-16 |
+| NEW gate-off run-to-run spread | 1.110e-16 |
+| **NEW gate-off vs REF** | **8.327e-17 best pairing / 1.110e-16 worst** |
+| NEW gate-ON vs REF | 2.239e-09 (rel 1.1e-08 — the eps_f32 scale) |
+
+So gate-off is **indistinguishable from pre-change within the path's own noise floor (~2 ulp)**,
+which is the strongest statement this path admits, and the gate-on effect sits **7 orders above
+that noise**. Iterations `[13,13,13,13,13,13]`, `max_open_divergence` and `umean` identical to
+every printed digit across all three. **The corrected gate for any future work on this path:**
+*gate-off matches the reference within the path's measured run-to-run spread, and iterations /
+divergence / mean velocity match exactly* — not byte-identity, which is not achievable here.
+
+**Other gates.** Staggered regression **+0.00 %** on all 13 points; collocated gauge-exact
+regression **+0.00 %** on all points; **26/26** `tests/kokkos` ctests. Those also confirm the
+`exactResidual()` move is inert. Note the two regressions do **not** exercise the star path at all
+— mode B is only reachable via `set_fluid_only_constraint(2)` (single-rank periodic collocated,
+`flow_ibm.hpp:1414`), which no baseline sets; that is why the dedicated probe above exists, and it
+is worth knowing that **the shipped regression suite covers none of mode B**.
+
+**Not done:** the gp/BiCGStab half of P2 (handed off above), and P2's wider mode-B batteries
+(`tests/study/collocated_longmarch.py KIND=fluidonly2`) beyond this probe.
+
 ## 5. Working practices (inherited; not optional)
 
 - Isolated `git worktree` per session carrying only your own diff; three live sessions share
