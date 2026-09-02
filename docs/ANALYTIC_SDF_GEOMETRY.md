@@ -1401,6 +1401,38 @@ option was taken in each case and is stated; none of them is settled.
    **4.87e-03 → 5.72e-09**. Tank drag after: λ = 1.89 decaying on the impulsive-start history
    toward the physical range.
 
+11. **Periodic images are a UNION — the oversized-leaf trap (found 2026-09-02, closed the ten
+    Cate case).** The scene query takes the minimum over an instance's 27 neighbour images. That
+    is the right semantics for a body straddling a periodic face, and a silent trap for any leaf
+    WIDER than the box: its images overlap, and a cavity carved from it is refilled wherever a
+    neighbouring image's slab covers it. Measured (`.sdf-campaign-probes/periodic_image_gate.py`):
+    a 0.7 L slab minus a 53-cell cavity gives a **38-cell duct**, independent of the cavity size;
+    a slab of L/2 + wall thickness gives 53. The non-periodic CSG evaluation of the same node is
+    correct — the fault is entirely the image union, i.e. the geometry as specified.
+
+    *Consequence:* the `ten-cate-sphere` tank was built with an `NX*0.7` slab and ran **30 %
+    narrow (d/W = 0.21 instead of 0.15) through two campaigns**. Everything read there as
+    "creeping-valued confined drag at finite Re" was the narrower tank (Faxén K ≈ 1.67 at
+    d/W = 0.21 — exactly the measured effective K). With the slab fixed, the static twin of the
+    experiment (fixed sphere, duct walls translating with the plug, `set_velocity` stream) gives
+    the confinement factor **K(Re = 1.5) = 1.09** against K(creeping) = 1.11 relative to the
+    periodic box, i.e. duct Cd/Abraham 1.30 → 1.08 from creeping to Re 1.5: the solver screens
+    confinement as the physics requires. Sphere-only gates were never affected.
+
+    *Fix taken (flow, `set_solid_from_scene`):* when any instance's bounding sphere spans more
+    than the box on a periodic axis, the primary image alone is sampled too and the cells whose
+    sign the images changed are counted — an exact detector, zero cost in the common case — with
+    a stderr warning and `periodic_image_overlap_cells()` for gates. Not a refusal: a plate
+    deliberately spanning the box (the Jeffery page) is a legitimate union. Rule for container
+    walls: slab half-extent = half the box + wall thickness, never more.
+
+    *Also new:* `set_velocity(c, array)` — an initial-condition hook (uniform stream around a
+    fixed body = the Galilean twin of a towed one), and the **finite-Re Galilean gate**
+    (`galilean_re_gate.py`): towed vs fixed sphere agree to **0.03 %** at Re 1.5 and 2.1 % at
+    Re 30 (d/h = 8), step by step from the same impulsive start. With A0 in place the
+    moving-geometry machinery is Galilean-consistent at finite Re; the 2 % at Re 30 is the SFO
+    residual of the crossing sphere, not a drift.
+
 7. **The periodic-Stokes reference.** The rotlet order claim is only decidable where the naive
    image sum is a good reference — measured as R/L ≲ 0.05. A Hasimoto/Ewald periodic rotlet would
    make the gate valid at any R/L and is the right thing if this becomes a standing regression.
