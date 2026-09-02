@@ -145,11 +145,12 @@ names every pending request then gave the smoking gun on a 1536-rank run: level 
 pending request a RECV whose sender never learned of it.
 
 **Why it is worse than a hang.** When the leaked message is instead matched by a *later* receive
-of the same source pair (the halo exchanges all use tag 0), the run does not hang: it silently
-carries wrong ghost values. Measured: a 768-rank run on the old engine finished with `<u>` =
-1.002349e-03, `max|div|` = 3.40e-06, 40.5 iterations (max 50), where three independent rank counts
-(192 / 384 / 768) on healthy topologies agree to seven digits on 1.002348e-03 / 3.514e-06 / 39.8
-(max 45). That seven-digit agreement is also the evidence that the published rungs are clean.
+of the same source pair (the halo exchanges all use tag 0), the run need not hang: it would carry
+wrong ghost values on one coarse level. *This face was not observed* — an apparent instance at 768
+ranks turned out to be a settings drift (7 multigrid levels and 2 warm-up steps instead of the
+ladder's 8 and 5, reproduced to seven digits by a clean run at 1536 ranks with the same settings).
+The seven-digit agreement of `<u>` / `max|div|` across rank counts is the acceptance test that
+would catch it.
 
 **Fix (core `10294e6`).** `NbxEngine::exchange` sends on `baseTag + round % 64` with the round
 counter held as an MPI attribute of the communicator (lives and dies with it; a handle-keyed map
