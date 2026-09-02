@@ -59,6 +59,17 @@ handoff; their state now:
     `advect_vof(dt)` exists. Recorded as an open measured deviation; the example page states it
     as such (Basilisk's own `oscillation.c` reports a few % at comparable resolution, so it is
     not exotic, but ours does not shrink with resolution and theirs does).
+  - **Transport link CLOSED (same day, with WO-Q's `advect_vof`)**: freezing the projected
+    velocity after one NS step and advecting the exact spheroid kinematically, the WY rate of the
+    P2 moment equals the exact conservative rate `Σ_f u_f C_f Δf` (exact face fractions of the
+    spheroid, `f` quadratic so `Δf` is exact) to **1.0001** at R = 8/12/16. The colour transport
+    is not the mechanism. (A cell-centre-velocity form of the same identity is off by 4 / 2.8 %
+    at R = 8 / 12 — the discrete velocity has cell-scale structure across the interface band,
+    the same signature as the impulse test.) What remains is the response of the discrete
+    momentum/projection to the CSF band on a CURVED interface: resolution-independent in cell
+    units (the band is always 1–2 cells), ~2.5 % (2-D) and ~4 % (3-D) in ω. Next instrument, if
+    pursued: the linearised discrete normal-mode problem (band force + 7-point projection) on a
+    sphere, or a smeared-sheet analysis of the induced interface velocity at O(ξ/R).
 - **Item 3 — V3 curvature issues:** carried into WO-S/WO-U as measurements (branch census on
   every page); no change to the cascade planned before the examples exist.
 - **Item 4 — V5–V7 scope:** V5 is split into V5a (transport in cut cells, WO-Q) and V5b (the
