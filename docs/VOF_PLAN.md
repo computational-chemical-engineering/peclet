@@ -1001,3 +1001,25 @@ pivot at the contact point); domain-face colour is a datum with an algebraic flu
 reconstructed interface; on the collocated grid every interfacial/body force is a **face**
 acceleration and the cell sees the average of the face balance (Basilisk's `centered.h`
 pattern — the ABC counterpart of the V4 rule).
+
+### 12.4 Progress log (2026-09-02)
+
+- **V5a (WO-Q) LANDED** (flow `5b0ecdb`): openness-weighted WY through SDF solids, exact
+  conservation of `Σ eps_eff C` to the projection floor, colour in solid exactly 0, flux clamp on
+  mixed donors (not a C clip), cut-cell Courant `max(|a|, o|a|/max(eps,0.1))`, momentum
+  consistency in cut cells (uniform-velocity identity bitwise), `advect_vof(dt)`.
+- **V5b (WO-S) LANDED** (flow `a89417c`): θ-fill with a volume-matched anchor (the plan's
+  contact-point pivot is NOT idempotent — kept as the ablation `set_contact_angle_pivot(2)`);
+  θ within 1.3° for θ ≤ 90° at D/Δ = 20–24, −3.6° converged residual at 120° (contact radius
+  ≥ 10 cells needed), cap radius on a sphere within 2.1 %. Trap: a flat SDF wall at a
+  HALF-INTEGER coordinate closes the wall cell's tangential faces (`sdf > 0` = fluid) and pins
+  the contact line; Jurin gate inconclusive (scene defects). Domain-BC walls get no θ fill.
+- **Examples E1–E5 PUBLISHED** (`peclet-examples` main): vof-advection-benchmarks,
+  parasitic-currents, capillary-oscillations, rising-bubble, droplet-wetting.
+- **Citation caveat**: the "Huang et al. JCP 2025/2026, arXiv:2603.10045" solid-clipped flux
+  polygon reference in §2/§3 could not be resolved by the E5 session; the verified paper on
+  volume-conserving cut-cell VoF with dynamic contact lines is **Chen, Han, Pan, Fuster &
+  Zaleski, Phys. Fluids 37(2):023392 (2025)**. Treat the Huang entry as unverified until
+  someone locates it.
+- Pending: WO-R (open boundaries; the cut-cell flux path and the boundary datum are not yet
+  composed — needed by E6), WO-T (collocated), E6/E7/E8.
