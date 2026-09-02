@@ -1077,13 +1077,24 @@ option was taken in each case and is stated; none of them is settled.
    consumer that differences the velocity field across a wall** (the advection stencils, the
    collocated face-averaging, any post-processing) for the same assumption.
 
-3. **Centre of rotation when an encoded instance leaves `center` at the origin.** *(Partly
-   softened 2026-08-30: with `principal_frame` re-expressing shapes COM-at-origin, the
-   translation-as-centre heuristic is exact for any shape that went through the pipeline.)* flow uses the
-   instance's own translation in that case, and the encoded `center` when it is nonzero. That makes
-   `add_instance(sphere, translation=c, ang_vel=w)` do the obvious thing, but it is a heuristic: a
-   body genuinely meant to spin about the world origin cannot say so by leaving `center` at zero.
-   The alternative is to require `center` explicitly and ignore the translation.
+3. **Centre of rotation — RESOLVED 2026-09-02 (core + flow): NaN follows the body, any finite point
+   pins, the flag is explicit.** The old rule read an all-zero encoded `center` as "unset" and
+   substituted the translation, so a body meant to spin about the world origin could not say so,
+   and `set_instance_transform` decided whether a centre followed the body by float-comparing it
+   with the translation (a pinned centre became a tracked one whenever the body passed through
+   it). Now: the builder's `add_instance(center=...)` defaults to NaN = follows the body; any
+   finite centre — (0, 0, 0) included — is pinned; the instance record carries an explicit
+   `centerPinned` flag as an 18th real (`kInstanceRealStride = 18`; legacy 17-real records are
+   decoded with the old reading, so every raw array the pages and the coupling build keeps
+   meaning "follows the body" — pin a world-origin centre from a raw array through
+   `set_instance_motion(center=...)`, which pins by flag whatever the value). flow exposes
+   `instance_center(i)` / `instance_center_pinned(i)`. Gate
+   `.sdf-campaign-probes/centre_of_rotation_gate.py`: builder default → tracked; builder
+   `center=(0,0,0)` → pinned at the origin; raw zeros → tracked (legacy); setter pin survives a
+   transform through it; and the physics — a sphere spinning about a pivot a distance R_p from
+   its centre feels the towing drag of its instantaneous translation |ω × R_p| to **0.2 %**
+   (Stokes, same box), while spinning about its own centre gives a net force of 1e-4 μRU —
+   round-off of the discrete reaction, not a drift.
 
 4. **Fresh cells — RESOLVED 2026-08-31: seeded with the local wall velocity, and it is now the
    DEFAULT** (flow `1a01769`). The concern below was right and understated: inheriting the solid's
