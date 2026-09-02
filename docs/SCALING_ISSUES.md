@@ -16,9 +16,9 @@ is reproducible; the remaining defect is narrower.*
 | # | Issue | Severity | Status |
 |---|---|---|---|
 | 1 | Float operator storage caps MG-PCG on dense beds | **High, silently invalid** | Known (WO-M), fix not defaulted |
-| 2 | MG depth capped by the per-rank block | High (scaling shape) | **Fixed 2026-09-02** (telescoping, opt-in), measuring at scale |
+| 2 | MG depth capped by the per-rank block | High (scaling shape) | **Fixed 2026-09-02** (telescoping, opt-in), **measured**: iterations flat 24 → 768 ranks, ≥ 99 % efficiency |
 | 3 | Solid intersecting an OPEN domain face stalls the solve | Medium, silently wrong (narrow) | Open, new |
-| 4 | Intermittent multi-node hang in warmup | Medium (reliability) | Open, undiagnosed |
+| 4 | Intermittent multi-node hang in warmup | **High, silently wrong** (was: Medium) | **Root-caused and fixed 2026-09-02** (core `10294e6`): NBX inter-round tag race |
 | 5 | Velocity multigrid is single-rank only | Medium (unverified impact) | Known restriction |
 | 6 | `check_decomposition.py` unusable above ~100 ranks | Low (tooling) | Open |
 
@@ -74,6 +74,19 @@ ranks to 3³ on one (5 → 8 levels); the ctest gate shows a starved partition r
 single-rank hierarchy to 2.5e-14. Full treatment: **`DECOMPOSITION_AND_MULTIGRID.md` §2.8 and
 open problem 1**; design, implementation and status: **[`MG_TELESCOPING_PLAN.md`](MG_TELESCOPING_PLAN.md)**.
 
+**Measured at scale (2026-09-02, fp64 build, wall-confined bed with FoxBerry's inlet/outlet).**
+Pressure iterations per step, telescoped: **43.1 / 42.9 / 41.7 / 39.8 / 39.8 / 39.8** at 24 / 48
+/ 96 / 192 / 384 / 768 ranks (max 45 everywhere), step time 128.7 / 64.9 / 31.6 / 15.6 / 7.28 /
+3.34 s — efficiency vs 24 ranks 100 / 99 / 102 / 103 / 110 / 121 %. Single-phase (float build):
+14.7 → 14.0 iterations flat, 34.8 → 0.768 s, 142 % at 768. A/B at 384 ranks: packed 49.9
+iterations (max 69) / 10.8 s in place vs 39.8 / 7.28 s telescoped; single 24.9 / 2.48 s vs 14.0 /
+2.01 s. At 24 ranks the two are identical (129.5 vs 128.7 s) — the hierarchy is already full depth
+there. Every ladder bottoms at 3³ on one rank (384 → 8 → 1, 768 → 8 → 1, predicted 1536 → 64 → 1).
+The 1536 rung was blocked by issue 4 until its fix; see the benchmark page for the current state.
+**What remains of this issue is policy, not mechanism**: telescoping is still opt-in
+(`PECLET_FLOW_TELESCOPE=1`), the `MIN_EXTENT` default (4) is untuned, and the gather is
+host-staged (fine on CPU; a device build would want a device-aware path).
+
 **P0 answered (2026-09-02).** The anchored-bottom half is real: single-phase np=384 with the
 agglomerated bottom *forced* on the inlet/outlet path went **24.9 → 10.9 iterations, 2.48 → 1.88
 s/step, with the floor improving 2.1e-9 → 3.4e-10** — the §2.7 degradation did not appear here.
@@ -110,27 +123,50 @@ Suspected mechanism, minimal-reproducer plan and the wider gap it sits in (nothi
 that A and B differ in one thing. The bed was doing double duty as "the geometry" and as "the thing
 that touches the boundary", and conflating those produced a confident, wrong, top-priority finding.
 
-## 4. Intermittent hang in the first warmup step at multi-node scale — MEDIUM
+## 4. Intermittent hang in the first warmup step at multi-node scale — ROOT-CAUSED, FIXED (was MEDIUM; actually HIGH, silently wrong)
 
-Some multi-node runs hang in warmup and never emit another line, at full CPU on every rank (which
-distinguishes nothing — OpenMPI busy-polls a blocked collective). Single-phase 384³ np=768 hung in
-two independent 4-node allocations; 400³ np=1536 hung on 8 nodes; packed 384³ np=1536 hung once and
-**ran normally on the retry**. That last point is what makes it intermittent rather than a property
-of a rank count, and it cost two rungs of the ladder plus several node-hours.
+**What it was.** Not transport. A race between consecutive NBX consensus rounds on one
+communicator in `core`'s `NbxEngine`: rounds shared a tag, and a rank that has already observed
+round *k*'s `Ibarrier` complete posts round *k+1*'s `Issend`s while a neighbour still draining
+round *k* probes `MPI_ANY_SOURCE` on that tag and receives the new message as an old one. Hoefler
+et al.'s NBX paper (§4) says consecutive invocations need distinct tags for exactly this reason.
+`GridHaloTopology::buildTopology` runs one round per multigrid level, back to back, and a level's
+topology is built from both sides asymmetrically: the *recv* side is computed locally from
+`ownerOf`, the *send* side is learned from the round — so a swallowed request leaves a rank that
+never learns it must send. Larger communicators mean larger barrier-completion skew, which is why
+it appeared at ≥ 4 nodes and was intermittent.
 
-**Stack dumps taken 2026-09-02** (`srun --jobid --overlap … gdb -p`, two nodes, five ranks each,
-on an 8-node 1536-rank job without telescoping): **every sampled rank on every node is in
-`MPI_Waitall` under `ompi_request_default_wait_all`**, i.e. a point-to-point halo exchange whose
-completions never arrive, in the *first* step. Nobody is in a collective, nobody is elsewhere in
-the solver. Four of four 8-node jobs hung today (float and fp64 builds, telescoping on and off,
-different node sets); two 8-node jobs succeeded the day before. That is transport behaviour at
-≥4 nodes with 192 ranks/node (OpenMPI 5.0.3 + UCX 1.16, `uct_mm` shared-memory progress visible
-on the other threads), not a solver mismatch — a mismatch would put ranks in different places.
-Discriminators submitted: `OMPI_MCA_pml=ob1` (UCX bypassed) and 16 nodes × 96 ranks (same
-rank count, half the ranks per node). Failing that,
-`PECLET_FLOW_AGGLOM_EXTENT=1000000` removes the agglomerated coarse solve's global `Allgatherv`
-from every V-cycle, separating a coarse-solve collective from a halo one; and the host-staged halo
-path isolates the exchange engine.
+**How it was found.** A stack census (parallel gdb over all 192 ranks of a node, `snellius/
+stack_census.sh`) showed 178 ranks in the telescope `Scatterv` and the 8 group roots in
+`GridHalo::exchangeEnd` — so the hang was in the 64-rank sub-hierarchy, in the *first* exchange on
+a fresh topology. A halo timeout diagnostic (`PECLET_CORE_HALO_TIMEOUT=<s>`, `core daf6881`) that
+names every pending request then gave the smoking gun on a 1536-rank run: level 5 on 64 ranks,
+**26 recv partners on every rank, send partners 26 / 24 / 16 / 12 / 10 / 8 / 6 / 0**, every
+pending request a RECV whose sender never learned of it.
+
+**Why it is worse than a hang.** When the leaked message is instead matched by a *later* receive
+of the same source pair (the halo exchanges all use tag 0), the run does not hang: it silently
+carries wrong ghost values. Measured: a 768-rank run on the old engine finished with `<u>` =
+1.002349e-03, `max|div|` = 3.40e-06, 40.5 iterations (max 50), where three independent rank counts
+(192 / 384 / 768) on healthy topologies agree to seven digits on 1.002348e-03 / 3.514e-06 / 39.8
+(max 45). That seven-digit agreement is also the evidence that the published rungs are clean.
+
+**Fix (core `10294e6`).** `NbxEngine::exchange` sends on `baseTag + round % 64` with the round
+counter held as an MPI attribute of the communicator (lives and dies with it; a handle-keyed map
+would confuse a freed handle with its reuse on another rank). `buildTopology` now cross-checks
+promised against requested cells with one allreduce and **throws** on a mismatch, so this class
+of defect fails at build time with a message instead of hanging. Gate:
+`core/tests/test_nbx_rounds.cpp` — 300 back-to-back rounds plus interleaved world /
+sub-communicator rounds; with the rotation ablated it fails on a laptop (np=8: 62 wrong-round
+messages), with it 0. Every NBX consumer (particle migration, ghost gathers, redistribution, the
+AMR octree exchanges) inherits the fix.
+
+**Follow-ups.** (a) The same *shape* of race exists for any tag-0 point-to-point exchange that
+follows an NBX round on the same communicator; the rotation keeps NBX tags in `[base, base+64)`
+and the halo uses tag 0, so they cannot collide, but a new caller passing a small `baseTag` could.
+(b) The old stack-census guess ("transport behaviour, UCX") was wrong and is retracted; the
+`ob1` and 16×96 discriminators were both consistent with the real cause (the race is
+transport-independent and sensitive to skew, not rank density).
 
 ## 5. Velocity multigrid is single-rank only — now the LARGEST cost on the packed case
 

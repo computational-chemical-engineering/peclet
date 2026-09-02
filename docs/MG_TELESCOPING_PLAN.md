@@ -401,3 +401,42 @@ identical to seven digits.
 **24.9 → 10.9 iterations, 2.48 → 1.88 s/step, floor 2.1e-9 → 3.4e-10** — so the anchored-path
 gate (open problem 4) is real money at ≤384 ranks, and its risk did not materialise here. Both
 np=1536 probes hung in the first warmup step (issue 4) and were cancelled after 17 minutes.
+
+## 10. At scale (2026-09-02, Snellius genoa, 384³, fp64 operator build for the bed)
+
+The FoxBerry ladder with telescoping on, wall-confined 5000-sphere bed with FoxBerry's inlet /
+outlet BCs (`BED=walls`, `BCMODE=foxberry`), 100 steps (20 / 25 / 50 on the one-node rungs):
+
+| ranks | ladder | packed iters (max) | packed s/step | eff. vs 24 | single iters | single s/step | eff. |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 24 | 24 → 1 at 12³ | 43.1 (45) | 128.7 | 100 % | 14.7 | 34.8 | 100 % |
+| 48 | 48 → 1 | 42.9 (45) | 64.9 | 99 % | 14.8 | 18.3 | 95 % |
+| 96 | 96 → 1 | 41.7 (45) | 31.6 | 102 % | 14.4 | 8.56 | 102 % |
+| 192 | 192 → 8 → 1 | 39.8 (45) | 15.6 | 103 % | 14.0 | 4.29 | 101 % |
+| 384 | 384 → 8 → 1 | 39.8 (45) | 7.28 | 110 % | 14.0 | 2.01 | 108 % |
+| 768 | 768 → 8 → 1 | 39.8 (45) | 3.34 | 121 % | 14.0 | 0.768 | 142 % |
+
+Iteration counts are rank-independent, as the design predicted (every ladder bottoms at the
+single-rank 3³). The A/B against the in-place hierarchy: at 384 ranks packed 49.9 (max 69) /
+10.8 s → 39.8 (45) / 7.28 s, single 24.9 / 2.48 s → 14.0 / 2.01 s; at 24 ranks identical
+(129.5 vs 128.7 s), so the trigger correctly stays silent where the hierarchy is already deep.
+Against FoxBerry: 3.0–3.6× on the bed, 9–14× single-phase, the gap *widening* up the ladder
+where before it narrowed.
+
+**The 1536 rung exposed a different bug**, not in the telescoping: the NBX consensus round that
+builds each level's halo topology raced with the next level's round on the same communicator
+(SCALING_ISSUES.md §4, core `10294e6`). The telescoped sub-hierarchy made it *more* likely
+(three back-to-back topology builds on a 64-rank sub-communicator), which is how it was caught;
+the un-telescoped 1536-rank hierarchy hung on the same race. The halo timeout diagnostic that
+named the missing messages (`PECLET_CORE_HALO_TIMEOUT`) and the topology symmetry check that now
+throws at build time are the permanent yield.
+
+**Open (in priority order).** (1) Default the trigger on once a GPU (device-staged gather) run
+and the anchored-path agglomerated bottom (open problem 4 of DECOMPOSITION_AND_MULTIGRID.md — at
+384 ranks single-phase it is worth 14.0 → 10.9 iterations on top of telescoping's 24.9 → 14.0)
+have been measured together. (2) `MIN_EXTENT` = 4 was chosen by the 6³ → 3³ oscillation, not
+tuned; 8 would telescope one level earlier and is worth a sweep at 768 ranks where the per-level
+halo latency dominates. (3) The idle members could take the *next* V-cycle's fine-level work
+(pipelining) — not worth it until the momentum solve (SCALING_ISSUES.md §5) stops dominating
+the step.
+
