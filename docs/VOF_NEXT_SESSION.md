@@ -25,6 +25,40 @@ handoff; their state now:
   dynamic (advected-fraction) curvature, and a resolution ladder at fixed confinement
   (R = 8/12/16). The quasi-2D cylinder mode-2 case gave erratic deficits (−4.7 / −8.9 / −3.9 % at
   R = 8/12/16), which points at the measurement. Findings will be appended here.
+
+  **Addendum (same day, all at ν = 0.0025 unless stated; scratch scripts `lamb_*.py`,
+  `drop_modes.py`, `dispersion.py`, `fit_series.py` in the session scratchpad):**
+  - *Measurement is sound*: a damped-sinusoid fit of the saved P2-moment series returns the
+    zero-crossing frequency to 0.01 %; the polar half-height and the equatorial half-width give
+    −5.7 / −5.0 % against the moment's −5.6 % (48³, R = 8); volume drift 2e-14.
+  - *Exact viscous drop modes computed* (unsteady Stokes, equal ρ and ν, potential + poloidal
+    vortical parts, 4×4 determinant): Δω/ω₀ = −0.885·√(ν/(ω₀R²)) to first order — **−5.0 % at
+    ν = 0.02, −1.8 % at ν = 0.0025** (R = 8). The simulation captures only part of it (its
+    damping is 25–43 % below the exact −Re s) because the interfacial boundary layer
+    √(ν/ω₀) is 0.1–0.45 cells; a resolved-viscous Lamb test needs R ≳ 32.
+  - *Inviscid residual after subtracting the exact viscous shift*: **−3.9 / −3.4 / −3.9 %** at
+    R = 8/12/16 (48³/72³/96³, φ = 1.9 %) — resolution-independent. The quasi-2D cylinder
+    (mode 2, `ω² = 6σ/(2ρR³)`) shows ≈ −2.5 % after the same subtraction.
+  - *Not the estimator*: with the curvature FROZEN to the exact curvature of the moment-fitted
+    spheroid every step (`set_vof_kappa_frozen` + `set_field("kappa")`), the deficit is
+    **larger**, −9.0 % (ν = 0.0025) / −9.5 % (0.02); the cascade's κ carries a +3 % P2
+    over-estimate that partly compensates. Dynamic (advected-fraction) P2 content of the
+    cascade's κ stays within +2…+5 % of the fitted spheroid's over the whole oscillation.
+  - *One-step impulse test* (spheroid at rest, one CSF step, projected velocity along the axis
+    against the exact potential-flow impulse response with `η₂ = εR`, `δκ₂ = 4η₂/R²`):
+    0.94 inside / 0.98 outside, resolution- and κ-source-independent. BUT the planar standing
+    wave gives 0.956 by the same instrument while its *frequency* is exact to 0.03 %, so a
+    weak first impulse does not by itself set the frequency — the instrument is not decisive
+    and the analysis needs the full linearized discrete loop.
+  - **Where it stands**: a ~3.5–4 % inviscid, resolution-independent mode-2 frequency deficit
+    specific to curved interfaces (2-D cylinder ~2.5 %, 3-D sphere ~4 %), not attributable to
+    the reference, viscosity, confinement, amplitude, time step, the measurement or the
+    curvature estimator. The untested link is the **transport**: whether WY advection of a
+    curved interface by the mode's velocity field moves the P2 moment at the exact rate — a
+    kinematic test with the prescribed potential-flow field, runnable once WO-Q's
+    `advect_vof(dt)` exists. Recorded as an open measured deviation; the example page states it
+    as such (Basilisk's own `oscillation.c` reports a few % at comparable resolution, so it is
+    not exotic, but ours does not shrink with resolution and theirs does).
 - **Item 3 — V3 curvature issues:** carried into WO-S/WO-U as measurements (branch census on
   every page); no change to the cascade planned before the examples exist.
 - **Item 4 — V5–V7 scope:** V5 is split into V5a (transport in cut cells, WO-Q) and V5b (the
