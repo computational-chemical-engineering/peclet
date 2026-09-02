@@ -220,7 +220,10 @@ momentum residual it leaves (8e-4) costs the pressure solve 14 → 30 iterations
 `set_velocity_residual_tolerance(0)` restores the update criterion), the constant-coefficient
 domain-BC smoother has its residual (`diffResidual`) so RB-GS covers that path too, and an AUTO
 rule picks the 3-level V-cycle under MPI below `PECLET_FLOW_VMG_AUTO_CELLS` = 65536 cells/rank
-(the measured crossover). **Still open:** (c) a max-residual relative to the row scale pins the
+(the measured crossover). The single-GPU regression suite passes on the default (metrics +0.00 %, pressure iterations/step
+identical; steady-state cases need 5–20 % more steps to meet their convergence check, since the
+over-converged update-criterion solve made the per-step drift smoother). **Still open:** (c) a
+max-residual relative to the row scale pins the
 solution only to ~rtol × 5·10⁴ on this operator (μ/Δx² against ρ/Δt); 1e-5 is what the ladder
 validated (`<u>`/`max|div|` to seven digits, pressure iterations unchanged). (d) A Chebyshev
 *momentum* solver was considered and not built: at 1536 ranks the momentum phase is 0.07–0.15 s of
