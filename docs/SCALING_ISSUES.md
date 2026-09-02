@@ -16,7 +16,7 @@ is reproducible; the remaining defect is narrower.*
 | # | Issue | Severity | Status |
 |---|---|---|---|
 | 1 | Float operator storage caps MG-PCG on dense beds | **High, silently invalid** | Known (WO-M), fix not defaulted |
-| 2 | MG depth capped by the per-rank block | High (scaling shape) | **Fixed 2026-09-02** (telescoping, opt-in), **measured**: iterations flat 24 → 768 ranks, ≥ 99 % efficiency |
+| 2 | MG depth capped by the per-rank block | High (scaling shape) | **Fixed 2026-09-02** (telescoping, opt-in), **measured**: iterations flat 24 → 1536 ranks, ≥ 99 % efficiency on the bed |
 | 3 | Solid intersecting an OPEN domain face stalls the solve | Medium, silently wrong (narrow) | Open, new |
 | 4 | Intermittent multi-node hang in warmup | **High, silently wrong** (was: Medium) | **Root-caused and fixed 2026-09-02** (core `10294e6`): NBX inter-round tag race |
 | 5 | Velocity multigrid is single-rank only | Medium (unverified impact) | Known restriction |
@@ -75,14 +75,14 @@ single-rank hierarchy to 2.5e-14. Full treatment: **`DECOMPOSITION_AND_MULTIGRID
 open problem 1**; design, implementation and status: **[`MG_TELESCOPING_PLAN.md`](MG_TELESCOPING_PLAN.md)**.
 
 **Measured at scale (2026-09-02, fp64 build, wall-confined bed with FoxBerry's inlet/outlet).**
-Pressure iterations per step, telescoped: **43.1 / 42.9 / 41.7 / 39.8 / 39.8 / 39.8** at 24 / 48
-/ 96 / 192 / 384 / 768 ranks (max 45 everywhere), step time 128.7 / 64.9 / 31.6 / 15.6 / 7.28 /
-3.34 s — efficiency vs 24 ranks 100 / 99 / 102 / 103 / 110 / 121 %. Single-phase (float build):
-14.7 → 14.0 iterations flat, 34.8 → 0.768 s, 142 % at 768. A/B at 384 ranks: packed 49.9
+Pressure iterations per step, telescoped: **43.1 / 42.9 / 41.7 / 39.8 / 39.8 / 39.8 / 39.8** at
+24 / 48 / 96 / 192 / 384 / 768 / 1536 ranks (max 45 everywhere), step time 128.7 / 64.9 / 31.6 /
+15.6 / 7.28 / 3.24 / 1.33 s — efficiency vs 24 ranks 100 / 99 / 102 / 103 / 110 / 124 / 151 %.
+Single-phase (float build): 14.7 → 14.0 iterations flat, 34.8 → 0.656 s, 142 % at 768 and 83 % at
+1536 (latency-bound momentum sweeps at 37 k cells/rank — issue 5's territory). A/B at 384 ranks: packed 49.9
 iterations (max 69) / 10.8 s in place vs 39.8 / 7.28 s telescoped; single 24.9 / 2.48 s vs 14.0 /
 2.01 s. At 24 ranks the two are identical (129.5 vs 128.7 s) — the hierarchy is already full depth
 there. Every ladder bottoms at 3³ on one rank (384 → 8 → 1, 768 → 8 → 1, predicted 1536 → 64 → 1).
-The 1536 rung was blocked by issue 4 until its fix; see the benchmark page for the current state.
 **What remains of this issue is policy, not mechanism**: telescoping is still opt-in
 (`PECLET_FLOW_TELESCOPE=1`), the `MIN_EXTENT` default (4) is untuned, and the gather is
 host-staged (fine on CPU; a device build would want a device-aware path).
