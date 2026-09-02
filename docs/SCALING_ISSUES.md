@@ -19,7 +19,7 @@ is reproducible; the remaining defect is narrower.*
 | 2 | MG depth capped by the per-rank block | High (scaling shape) | **Fixed 2026-09-02** (telescoping, opt-in), **measured**: iterations flat 24 → 1536 ranks, ≥ 99 % efficiency on the bed |
 | 3 | Solid intersecting an OPEN domain face stalls the solve | Medium, silently wrong (narrow) | Open, new |
 | 4 | Intermittent multi-node hang in warmup | **High, silently wrong** (was: Medium) | **Root-caused and fixed 2026-09-02** (core `10294e6`): NBX inter-round tag race |
-| 5 | Momentum solve: cap-bound RB-GS (update criterion) | High (63 % of the packed step) | **Fixed 2026-09-02**: residual stop + velocity MG under MPI (mixed operator); measuring at scale |
+| 5 | Momentum solve: cap-bound RB-GS (update criterion) | High (63 % of the packed step) | **Fixed 2026-09-02**: residual stop + velocity MG under MPI (mixed operator); packed step 2.2× faster at 384–1536 ranks |
 | 6 | `check_decomposition.py` unusable above ~100 ranks | Low (tooling) | Open |
 
 ---
@@ -206,9 +206,15 @@ stencil they agree to 2e-11. (ii) Level 0 is the *unfolded* stencil, so its ghos
 
 **Depth does not matter on a pore-confined bed** (2, 3 and 5 levels identical): the coarse grid
 serves only the clean fluid interior and the smoother owns the band, so **the velocity hierarchy
-does not need telescoping** where the pressure one did. Single-rank at 96³ RB-GS with the
-residual stop is the cheaper of the two; whether the V-cycle's fewer halo exchanges win at 1536
-ranks is measured on the ladder (benchmark page).
+does not need telescoping** where the pressure one did.
+
+**At scale (Snellius genoa, 384³, residual stop 1e-5, telescoped pressure MG):** packed bed
+7.28 / 3.24 / 1.33 s/step (capped RB-GS) → **3.32 / 1.48 / 0.834** with the velocity MG and
+2.91 / – / 0.844 with RB-GS + residual stop at 384 / 768 / 1536 ranks (8.3× / 8.1× / 6.5×
+FoxBerry); single-phase 2.01 / 0.768 / 0.656 → **0.930 / 0.430 / 0.391** (22.7× / 24.6× / 13.0×).
+Pressure iterations and `<u>` / `max|div|` unchanged to seven digits. The two momentum solvers tie
+at 384 ranks; the V-cycle's fewer halo exchanges win at 1536. rtol 1e-3 is too loose: the
+momentum residual it leaves (8e-4) costs the pressure solve 14 → 30 iterations single-phase.
 
 **Open.** (a) The const-coefficient domain-BC smoother (all-fluid inlet/outlet, the single-phase
 case) has no residual functor yet and keeps the update criterion (204 sweeps/step there — likely
