@@ -1433,6 +1433,23 @@ option was taken in each case and is stated; none of them is settled.
     moving-geometry machinery is Galilean-consistent at finite Re; the 2 % at Re 30 is the SFO
     residual of the crossing sphere, not a drift.
 
+12. **The lattice-plane trap, root-caused and detected (2026-09-02).** A moving box face sitting
+    exactly on a grid plane made the Jeffery plates inert (max|u| = 0). Mechanism, from the
+    predicates: a staggered point whose sampled sdf is EXACTLY zero is fluid to `ibmSolidMask`
+    (strict `sd < 0`) and not a ghost to its neighbours' folds (`ibmFillEntry`, strict
+    `sdf_n < 0`), so the wall datum has no row to enter — the wall is simply absent from the
+    momentum operator while the mask/pin structure still blocks the flow. `set_solid_from_scene`
+    now counts, per moving instance, the staggered points with sdf exactly zero
+    (`moving_instance_degenerate_points()`, global under MPI) and warns; it also counts the
+    instance's cut rows of the momentum overlay (`moving_instance_cut_cells()`) for the
+    sub-cell-body case. Gate `.sdf-campaign-probes/lattice_plane_gate.py`: 4 096 degenerate
+    points and max|u| = 0 exactly for the on-lattice plate; 0 and max|u| = 0.86 U for the same
+    plate 0.3 cells off the lattice. (A first version of the detector counted face apertures —
+    wrong signal: a plane cutting faces parallel to itself leaves every aperture 0 or 1 and still
+    has cut rows; the gate caught it.) Making sdf = 0 count as solid in BOTH predicates would
+    make such faces work instead of warn; that is a numerics change to the mask convention and is
+    deliberately NOT taken here.
+
 7. **The periodic-Stokes reference.** The rotlet order claim is only decidable where the naive
    image sum is a good reference — measured as R/L ≲ 0.05. A Hasimoto/Ewald periodic rotlet would
    make the gate valid at any R/L and is the right thing if this becomes a standing regression.
