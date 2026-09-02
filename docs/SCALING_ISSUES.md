@@ -229,11 +229,14 @@ validated (`<u>`/`max|div|` to seven digits, pressure iterations unchanged). (d)
 *momentum* solver was considered and not built: at 1536 ranks the momentum phase is 0.07–0.15 s of
 a 0.83 s step; the projection (16 ms per pressure iteration at 37 k cells/rank, latency) is where a
 communication-light driver has leverage. **Measured with the existing Chebyshev pressure driver at
-1536 ranks:** single-phase **0.391 → 0.251 s/step** (14 iterations either way, the PCG's two
-all-reduces per iteration were on the critical path; 20× FoxBerry), packed bed **0.834 → 4.18 s**
-(238 iterations against PCG's 40: the cut-cell operator's spectrum is not the one Chebyshev's
-interval assumes). A per-case choice, not a default; an automatic pick would need a spectrum
-probe.
+1536 ranks, on the SAME node set as a PCG control:** single-phase 0.251 vs 0.256 s/step (14
+iterations either way — no gain: the two all-reduces per PCG iteration are not on the critical
+path), packed bed **4.18 vs 0.79 s** (238 iterations against PCG's 40: the cut-cell operator's
+spectrum is not the one Chebyshev's interval assumes). Not worth switching on this hardware. The
+control mattered: a PCG run on a different node set had measured 0.391 s, so a naive A/B would
+have credited Chebyshev with a 36 % win that was **node placement** — at 1536 ranks the same
+configuration varies by up to 1.5× between allocations, and every top-rung comparison needs a
+same-allocation control.
 
 ## 6. `check_decomposition.py` is unusable above ~100 ranks — LOW (tooling)
 
