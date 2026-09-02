@@ -216,8 +216,11 @@ Pressure iterations and `<u>` / `max|div|` unchanged to seven digits. The two mo
 at 384 ranks; the V-cycle's fewer halo exchanges win at 1536. rtol 1e-3 is too loose: the
 momentum residual it leaves (8e-4) costs the pressure solve 14 → 30 iterations single-phase.
 
-**Closed the same day (flow `c600d79`, user decision):** the residual stop is the DEFAULT (1e-5;
-`set_velocity_residual_tolerance(0)` restores the update criterion), the constant-coefficient
+**Closed the same day (flow `c600d79` and after, user decisions):** the residual stop is the
+DEFAULT, and its tolerance **follows the pressure solver's rtol** (the projection consumes u* and
+resolves the divergence the momentum residual leaves to its own tolerance — the self-consistent
+rule; `set_velocity_residual_tolerance(x)` fixes it, `0` restores the update criterion; a round-off
+floor and a one-sweep minimum guard the exact cases), the constant-coefficient
 domain-BC smoother has its residual (`diffResidual`) so RB-GS covers that path too, and an AUTO
 rule picks the 3-level V-cycle under MPI below `PECLET_FLOW_VMG_AUTO_CELLS` = 65536 cells/rank
 (the measured crossover). At least one sweep / V-cycle always runs: an early return on a converged warm start left u*
