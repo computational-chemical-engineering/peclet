@@ -216,12 +216,17 @@ Pressure iterations and `<u>` / `max|div|` unchanged to seven digits. The two mo
 at 384 ranks; the V-cycle's fewer halo exchanges win at 1536. rtol 1e-3 is too loose: the
 momentum residual it leaves (8e-4) costs the pressure solve 14 → 30 iterations single-phase.
 
-**Open.** (a) The const-coefficient domain-BC smoother (all-fluid inlet/outlet, the single-phase
-case) has no residual functor yet and keeps the update criterion (204 sweeps/step there — likely
-the same waste); the all-fluid velocity MG does take the residual stop. (b) The residual stop is
-opt-in; defaulting it needs the regression suite re-baselined (it records sweep counts).
-(c) A max-residual relative to the row scale pins the solution only to ~rtol × 5·10⁴ on this
-operator (μ/Δx² against ρ/Δt); the errors above are what rtol buys in practice.
+**Closed the same day (flow `c600d79`, user decision):** the residual stop is the DEFAULT (1e-5;
+`set_velocity_residual_tolerance(0)` restores the update criterion), the constant-coefficient
+domain-BC smoother has its residual (`diffResidual`) so RB-GS covers that path too, and an AUTO
+rule picks the 3-level V-cycle under MPI below `PECLET_FLOW_VMG_AUTO_CELLS` = 65536 cells/rank
+(the measured crossover). **Still open:** (c) a max-residual relative to the row scale pins the
+solution only to ~rtol × 5·10⁴ on this operator (μ/Δx² against ρ/Δt); 1e-5 is what the ladder
+validated (`<u>`/`max|div|` to seven digits, pressure iterations unchanged). (d) A Chebyshev
+*momentum* solver was considered and not built: at 1536 ranks the momentum phase is 0.07–0.15 s of
+a 0.83 s step; the projection (16 ms per pressure iteration at 37 k cells/rank, latency) is where a
+communication-light driver has leverage — the existing Chebyshev pressure driver is being measured
+there.
 
 ## 6. `check_decomposition.py` is unusable above ~100 ranks — LOW (tooling)
 
