@@ -1037,3 +1037,77 @@ pattern — the ABC counterpart of the V4 rule).
   Also found: `max_open_divergence()` MUTATES the velocity at an outflow (non-mutating sibling
   `max_open_divergence_projected()`; the default is a user decision).
 - Pending: WO-R2, E6/E7 (need R2), E8 (collocated columns, in progress).
+
+## 13. Revised ladder for the remainder (2026-09-02, evening) — review and execution plan
+
+Review of §§4, 9, 10 against the state after today's landings. Nothing in the method verdict
+(§0), the architecture (§3) or the three-layer/AMR structure (§11) needs changing; what changes
+is *status*, *sequencing* and the grain at which the remaining rungs are specified. Work orders
+for everything below: `flow/doc/vof_workorders_v6.md` (Part I remainder, Part II start, Part III
+start). Ownership stays as §11: Fable writes the derivations into the WO, Opus executes against
+gates, twice-failed gates escalate.
+
+### 13.1 Status of the ladder
+
+| rung | status | note |
+|---|---|---|
+| V0–V4 | done (08-30/31) | numbers stand; wave gate now reports the exact viscous reference |
+| V5a transport in cut cells | **done 09-02** (WO-Q) | flux clamp, `eps_eff`, `advect_vof` |
+| V5b static θ | **done 09-02** (WO-S) | ≤1.3° for θ ≤ 90°, −3.6° at 120°; Jurin inconclusive |
+| V-BC open boundaries | **done 09-02** (WO-R) | varRho outflow operator defect → WO-R2 (running) |
+| V8 collocated (minimal) | **done 09-02** (WO-T) | all-fluid, rated ratio ~100; cut-cell + collocated = later |
+| V6 dynamic θ / hysteresis | **next** (WO-V6) | derivation in the WO |
+| V7 pore-scale campaign | after WO-R2 (WO-V7) | measurement campaign, scripts + one page |
+| V9 performance | after E7 (WO-V9) | profile first on the gallery cases, then the levers |
+| V10 AMR | design only (§13.4) | blocked on varRho-on-AMR and cut-cell + collocated |
+| V11 MTHINC | dropped from the critical path | revisit only if V9 shows morphology-bound load |
+| P0–P3 phase change | **start now** (WO-P01, then WO-P23) | 1-D/planar first; the plan's §9 stands |
+| W0–W2 block VoF | **start now** (WO-W0, then WO-W12) | exchange design in the WO; L1 promotion folded in |
+| W3–W5 | after W2 | unchanged |
+| examples E1–E5, E8 | **published** | E6 (after R2), E7 (running) |
+
+### 13.2 What today changed in the premises
+
+1. **The θ-fill anchor.** §2's "rotate the normal about `n_wall` and fill ghost fractions" is
+   right, but the pivot must be volume-matched to the anchor cell (the contact-point pivot is
+   not idempotent) — recorded in WO-S; V6 builds on the shipped fill and only changes *what θ
+   it imposes*.
+2. **Open boundaries are an operator question before they are a VoF question.** The pressure
+   MG's boundary re-imposition ignores the variable-density coefficient (WO-R). Until WO-R2
+   lands, every two-phase case with an outlet at ratio ≥ 10 is invalid; V7's drainage/
+   imbibition cases and E6 wait on it.
+3. **The Lamb residual (~4 %, inviscid, resolution-independent, worse on the collocated grid)
+   is a property of the band-force → projection response on curved interfaces**, not of the
+   estimator, the transport or the reference. It does not block anything below, but any rung
+   that reports a capillary *frequency* must quote it. A dedicated instrument (linearised
+   discrete normal-mode analysis of the CSF band on a sphere) is the way to close it; it is
+   listed as an optional Fable item, not a rung.
+4. **The collocated path is all-fluid and undamped** (explicit face force outside `A`; ceiling
+   `μ dt/(ρ_min h²)`). AMR VoF inherits that, so V10's design (§13.4) must include the
+   viscous-augmented explicit-force step limit and the cut-cell face acceleration.
+5. **Momentum consistency in cut cells diverges under a nonzero-mean periodic body force**
+   (WO-Q open question). Closed or open columns are fine; a periodic driven bed with a heavy
+   phase is not. V7 uses inflow/outflow or closed columns, never a periodic net force.
+
+### 13.3 Order and parallelism (now)
+
+```
+running   WO-R2 (outflow operator, composition, exact-residual default, wisp guard) → E6 page
+running   E7 (bubble through a packing, show-off)
+now       WO-V6 (dynamic angle + hysteresis)   ∥   WO-W0 (block container, single rank + np>1)   ∥   WO-P01 (P0 fixed-flux + P1 Stefan)
+then      WO-V7 (pore-scale campaign, needs R2)  ∥  WO-P23 (sucking interface, Scriven)  ∥  WO-W12 (many bubbles, NS coupling, channel_18)
+then      WO-V9 (profile + levers; measure on the gallery cases when the GPU is quiet)
+design    V10 AMR sketch (§13.4); the Lamb band-force instrument (optional)
+```
+
+### 13.4 V10 — AMR VoF, the design sketch (unchanged in substance, sharpened by V8)
+
+Interface band pinned to the finest level (the cut band already has the contract);
+`fraction_refine`-style PLIC-subdivision prolongation (never interpolate C); per-substep
+fine→coarse flux averaging (pre-reflux); solenoidal face refinement on adapt; the L1 kernels
+(`plic.hpp`, `curvature.hpp`, `cutcell.hpp`'s rules, `wetting.hpp`'s rotation) shared via
+`peclet::core::vof` (promotion folded into WO-W0); the L2 stencil gathering on the octree is the
+genuine work. Prerequisites now known precisely: (a) varRho on `AmrFlow`; (b) the collocated
+face-acceleration form of the forces (V8) with a viscous-augmented explicit step limit or a
+semi-implicit face force; (c) cut-cell + collocated VoF (the composition V8 left out). Scope it
+when (a) exists.
