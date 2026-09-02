@@ -1021,5 +1021,19 @@ pattern — the ABC counterpart of the V4 rule).
   volume-conserving cut-cell VoF with dynamic contact lines is **Chen, Han, Pan, Fuster &
   Zaleski, Phys. Fluids 37(2):023392 (2025)**. Treat the Huang entry as unverified until
   someone locates it.
-- Pending: WO-R (open boundaries; the cut-cell flux path and the boundary datum are not yet
-  composed — needed by E6), WO-T (collocated), E6/E7/E8.
+- **V8 minimal (WO-T) LANDED** (flow `59ab596`): collocated variable density with forces as face
+  accelerations and the averaged cell counterpart; hydrostatic at ratio 1000 machine-zero on the
+  FACE field (the cell field carries the ABC invisible checkerboard at ~3e-8, six orders below
+  the constant-density collocated path); static droplet exact at ratio 1, rated to ratio ~100
+  (ceiling `μ dt/(ρ_min h²)` — the explicit face force is undamped); Hysing 1 / capillary wave
+  within 1.2 % / 0.7 % of staggered; advection bitwise on the same face field.
+- **V-BC (WO-R) LANDED** (flow `57a1d0f`): inflow colour datum with an algebraic flux, backflow
+  colour, inflow property ghosts, exact colour budget (2.5e-15), MPI bitwise. **But the
+  variable-density OUTFLOW is inconsistent by the density ratio**: `CutcellMG::applyBoundaryOpenness`
+  overwrites the varRho coefficient with 1.0 at outflow faces (the Nusselt film at ratio 100/1000
+  fails on it) → **WO-R2** (in progress) imposes the caller's coefficient, composes the cut-cell
+  flux path with the boundary datum, makes `enable_vof` switch the exact residual on (item 6: 7.5
+  orders of flux divergence on Hysing 2, nothing else moves), and adds the advector wisp guard.
+  Also found: `max_open_divergence()` MUTATES the velocity at an outflow (non-mutating sibling
+  `max_open_divergence_projected()`; the default is a user decision).
+- Pending: WO-R2, E6/E7 (need R2), E8 (collocated columns, in progress).
