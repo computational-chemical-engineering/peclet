@@ -1,0 +1,373 @@
+# Voronoi / convex-cell methods plan — one differentiable cell complex, many methods
+
+Status: **DRAFT for review, 2026-09-02.** Companion to [ARCHITECTURE](ARCHITECTURE.md),
+[MULTIPHYSICS_PLAN](MULTIPHYSICS_PLAN.md), [VOF_PLAN](VOF_PLAN.md),
+[ANALYTIC_SDF_GEOMETRY](ANALYTIC_SDF_GEOMETRY.md) and the voro design notes in
+`voro/docs/` (`free_surface_design.md`, `power_cell_solver_spec.md`,
+`voronoi_gpu_research_program.md`). Written the way the VoF plan was written: an inventory
+first, a verdict on the architecture second, then rungs with a-priori gates an executor can
+run. `file:line` references are snapshots — **re-grep before acting**.
+
+The suite directives that shape every rung here: device-first and MPI-distributable from the
+start (host = oracle only); first principles over literature (derive, then use the literature as
+a cross-check, never port-and-rationalise); measure with a-priori tests; match or exceed the best
+massively-parallel codes in every component including setup; Python bindings everywhere.
+
+---
+
+## 0. The thesis
+
+`voro` today is a **differentiable convex-cell complex**: a power/Voronoi tessellation of moving
+seeds, clipped by SDF solids, whose per-cell volumes, per-facet area vectors and their derivatives
+with respect to the seed positions and power weights are published every step, incrementally on
+the GPU and under MPI. Every application the brainstorm listed — body-conforming grid generation,
+a Navier–Stokes solver on that grid, semi-Lagrangian fluids whose cells travel with particles,
+interfaces and wetting from interfacial energies, deformable droplets and bubbles, contact
+detection for polydisperse spheres, and a particle-centred pore-network CFD-DEM — is **the same
+object with a different functional on top and a different rule for how time enters**:
+
+| application | DOFs | functional / constraint | time |
+|---|---|---|---|
+| grid generation (B) | seeds `x`, optionally weights `w` | volume targets + facet tension + centroidal term + wall fit | static minimisation |
+| NS on the static grid (C) | face fluxes, cell pressures on a **fixed** complex | incompressible NS | Eulerian |
+| moving-cell fluid (D) | `x` (material), `w` (pressure) | kinetic + `Σσ_ij A_ij + Σσ_s A_wall − Σ p_i (V_i − V_i⁰)` | Lagrangian, variational |
+| droplets with a free outer surface (E) | `x`, `w` of the liquid cells only | cap-area energy of the union of balls + volume constraint | Lagrangian |
+| contact detection (F) | `x`, `w = r²` | none — read the facets | per DEM step |
+| cell-network CFD-DEM (G) | pressures on the particle cells | Darcy/Poiseuille network on the facets | quasi-steady per DEM step |
+
+The unifying piece of design work is therefore small and shared: a **cell free energy**
+`F(x, w) = Σ_ij σ_ij A_ij + Σ_i σ_s,i A_wall,i + Σ_i e_i(V_i)` with its exact gradient routed
+through the existing `chainToDofs<Policy>` seam, a **volume constraint solved in weight space**
+(the graph Laplacian `L_ij = A_ij / 2d_ij` that `ot_optimizer.hpp` already assembles is *exactly*
+the pressure Poisson operator of the moving-cell fluid), and one **time-integration layer**. Build
+that once and the six applications are consumers. That is also where peclet's uniqueness lies:
+no other code carries mesh generation, a body-fitted solver, a Lagrangian multiphase solver and a
+DEM coupling on one incremental GPU power diagram with derivatives.
+
+---
+
+## 1. What already exists (re-grep before acting)
+
+### 1.1 Engine (`voro/include/peclet/voro/`)
+
+- **ConvexCell** dual-triangle cells (`convex_cell.hpp`): a vertex is a triple of plane indices,
+  ≈ 3.5 KB per cell; clip closest-first with a security-radius early-out. Per-vertex scatter
+  geometry: volumes, facet area vectors, first moments, `∂V/∂n_k`, `∂A_k/∂n_l`
+  (`geomVolumeAreaGrad`), `sectionPolygon(p0,u)`.
+- **Plane policies** (`plane_policy.hpp`): `Voronoi`, `Power` (`n = αr`, offset
+  `d = ½(|r|² + w_i − w_j)`), `chainToDofs<Policy>` = the normal-to-DOF Jacobians, FD-validated.
+  Power cells are exact in the **small-weight regime** (`d > 0`); a seed-excluding live face
+  (`d < 0`) is unrepresentable in the foot-point form, and the periodic **min-image** power diagram
+  is not an exact partition at large weight spread (`test_power_cells` `oracleFill`, ~1–4 %).
+- **Cold build** (`tessellator.hpp`): Morton counting-sort grid + presorted worklist gather; the
+  publish step fills the read-only `TessellationView` CSR (`tessellation_view.hpp`: volumes,
+  `facetNbr`, `facetArea`, `facetConnect` = `dV/dn`, `cellFacetCount`); wall facets carry the
+  `kBoundaryFacet = −2` sentinel and *do* get area vectors.
+- **Incremental update** (`repair.hpp` `MovingTessellation`, `topology_store.hpp`,
+  `verlet_skin.hpp`, `reeval_tessellation.hpp`): two-pass repair under a Verlet-skin worklist,
+  power-aware, `fellBack = 0`, `step()` reproduces the cold rebuild to 5e-16. **Hard-wired
+  `NoSdf`** at both build sites (`repair.hpp:202`, `:437`).
+- **SDF clipping** (`sdf.hpp`): `SdfSphere/SdfBox/SdfHollowCylinder` (delegating to
+  `peclet::core::geom::prim`), `SdfGrid` (core `sampleGrid`), `SdfSpheres` (periodic union of
+  balls), and since 2026-09-01 **`SdfScene`** wrapping core's `evalTree` — capsule, torus, cone,
+  ellipsoid, superquadric, CSG, per-node transforms, sampled grids — for the clipper and the
+  optimisers. Iterative tangent-plane clip (`maxCuts`), which **recedes** from curved walls (the
+  ~7 % cross-section rim in the packed-bed example). `addSdfWallForce` + `sdfHessian`: the
+  differentiable wall, exact for flat walls, first-order on curved ones (sphere 1e-2 in
+  `test_sdf_policy`).
+- **Optimisers**: `mesh_optimizer.hpp` — `meshVolumeOptimize` (host; relative volume energy,
+  log-barrier, ideal-gas free energy `−V_ref log V`, Gauss–Newton with Jacobi / coloured GS /
+  **GraphAMG** / steepest descent, Armijo), `meshVolumeOptimizeDevice` (device, with the wall
+  term from published wall-facet areas), `interfaceMinimize` (Surface-Evolver-style
+  `Σ_{type_i≠type_j} σ A_ij`, host + device, **reconstructs each cell** because `∂A/∂n` is not
+  published); `ot_optimizer.hpp` — semi-discrete OT volume control on the weights, Newton on the
+  facet Laplacian using core's `MomentumOp`/BiCGStab (plateaus at the periodic ~1 % floor).
+- **Physics** (`physics/`): `ExplicitEuler` velocity-Verlet with EOS pressure (atomic-free
+  gather) and the viscous NS term, full rebuild or repair per step; `interfaceEnergy` is energy
+  only — **no interfacial force on the published path**.
+- **MPI** (`mpi/`): `VoronoiHalo` (core decomposition + NBX ghosts) and
+  `DistributedMovingTessellation` (global Allreduce trip test, re-gather + cold rebuild, else local
+  repair); 1-ring halo closes cells, **2-ring** needed for the dynamics. ctests np = 1, 2, 4.
+- **Python** (`src/voro_bindings.cpp`): `Tessellation` (box, build, step, volumes, neighbour
+  counts), `Simulation` (Euler/NS), `VoronoiHalo`, free functions `optimize_volume_mesh`,
+  `optimize_pore_mesh` (spheres only), `sdf_voronoi_cells`, `sdf_voronoi_section`,
+  `minimize_interface`. **No scene geometry, no weights, no SDF on the two classes.**
+- **Tests**: 12 device ctests (invariants, power cells, SDF policy, SDF scene, mesh optimiser,
+  ConvexCell unit/adjacency/per-vertex, benches) + 2 MPI benches × 3 np; a Python smoke test.
+
+### 1.2 Elsewhere in the suite that this plan leans on
+
+- `core/include/peclet/core/geom/` — the analytic SDF layer (Layers 0–4 complete): primitives,
+  scene tree + `SceneQueryDevice`, `bodyProperties`, quadrature apertures, `peclet.core.geom`
+  Python authoring. Moving geometry (kinematic wall velocity) shipped for `flow`.
+- `core` solvers — `GraphAMG` / `GraphAMGDevice` (mesh-agnostic SA-AMG), `MomentumOp` /
+  `MomentumSolver` (sparse operator + Krylov) — the algebra for every Poisson solve below.
+- `flow` — the validated cut-cell IBM NS + VoF (Laplace, Cox–Voinov, capillary rise, imbibition
+  pages E1–E8): the **reference solutions** for cross-code gates in tracks C and D.
+- `dem` — XPBD + Hertz–Mindlin, ArborX broad-phase, Lubachevsky–Stillinger packings
+  (`dem/pack.py`): the polydisperse packings and the contact oracle for track F, the particle side
+  of track G.
+- `coupling` — `CfdDem` (unresolved point-particle CFD-DEM, Python composition of flow + dem):
+  the host of the deformable droplets in track E and the Eulerian comparison for track G.
+- `pnm` — the Voronoi-PNM lineage (`pore_extraction.hpp:464`: throat flux through Voronoi facets,
+  pore pressure at Voronoi vertices): the throat/pore vocabulary for track G.
+
+### 1.3 The droplet brainstorm — what could be recovered
+
+The session transcript is not retained on this machine; the *outcome* survives in
+`voro/docs/free_surface_design.md` and `power_cell_solver_spec.md`, and in a memory note that
+the power-cell solver physics was deliberately parked until that brainstorm. Reconstructed
+content, treated as the design of record for track E:
+
+1. A droplet (or bubble) is a **cluster of power cells** whose seeds are the liquid "particles";
+   the surrounding gas need **not** be meshed.
+2. Its **outer surface is read off the same power diagram**: the union of balls
+   `B_i = ball(p_i, √w_i)` has boundary equal to the dual of the power diagram restricted to that
+   union (the weighted alpha shape). Arcs live in the radical planes the cell already stores,
+   triple points are the cell's dual vertices, a *buried* cell (`d ≤ 0`, already detected) is an
+   interior particle. So the surface is a **post-geometry consumer**, not a second geometry engine.
+3. The one new primitive is spherical: the Girard cap area `A_i = r_i² Ω_i` and its derivative
+   `∂A_i/∂n_k ∝ arc length`, routed through the unchanged `chainToDofs<Power>`.
+4. Surface tension = `γ ΣA_i`; the volume constraint (Laplace pressure) lives in the weights, as in
+   the moving-cell fluid. An eight-point acceptance scaffold ending in a Gauss–Bonnet identity.
+5. Alternatives for the outer surface (an explicit triangle/spline mesh, or gas cells) were the
+   fallback, not the primary.
+
+Everything else in this document is new.
+
+---
+
+## 2. Verdict on the architecture (the decisions this plan makes)
+
+**V1. One free-energy layer, not per-application forces.** Add `voro/include/peclet/voro/energy/`
+holding the terms `Σσ_ij A_ij`, `Σσ_s A_wall`, `Σ e_i(V_i)` (volume target / log-barrier /
+ideal-gas), the Lloyd/centroidal term, and the cap-area term of track E, each returning energy +
+`∂/∂n_k` per facet, combined by the existing chain. Track B's optimiser, track D's forces and track
+E's surface tension all call it. The existing `interfaceMinimize` and the optimiser wall block
+migrate into it (no numerics change: bit-capture gate, as the SDF relocation did).
+
+**V2. Publish `∂A_k/∂n_l` in the facet CSR.** `interfaceMinimize` reconstructs cells because area
+Jacobians are not published; the interfacial force, the wall energies and the free surface all
+need them every step. The per-vertex scatter family already computes them inside the build/repair
+kernel — publish them (opt-in flag like `withForceGeom`) and delete the reconstruction path.
+
+**V3. Volume constraints are solved in weight space.** Incompressibility, Laplace pressure and
+equal-volume grids all become `L(w) δw = V_target − V(w)` on the facet Laplacian, preconditioned by
+`GraphAMGDevice`. This requires an **exact-partition power diagram** at the weight spreads those
+applications need — so the periodic min-image floor and the `d < 0` limitation stop being "deferred
+notes" and become rung A2, a hard prerequisite for tracks D, E, F, G.
+
+**V4. The static NS solver is a staggered covolume (Perot/Nicolaides) scheme, not Rhie–Chow.**
+A Voronoi facet is perpendicular to its seed connector *by construction*, and a power facet keeps
+that property; the two-point flux `(φ_j − φ_i) A_ij / d_ij` is therefore consistent with no
+non-orthogonal correction, and the pressure Laplacian is the same `L` as V3. Put normal fluxes on
+facets and pressure on seeds (the discrete-exterior-calculus form): exactly divergence-free,
+kinetic-energy conserving in the inviscid limit, and the same operator carries over unchanged to
+the moving mesh of track D. The remaining mesh-quality error is **skewness** (facet centroid off
+the connector), which the centroidal term of V1 minimises — grid generation and solver accuracy
+are the same optimisation problem, which is the argument for building B and C together.
+
+**V5. The moving-cell fluid is derived, not ported.** `power_cell_solver_spec.md` sketches a
+Hamiltonian with a consistent mass matrix and an implicit midpoint rule. Rung D0 derives the
+discrete Lagrangian from the cell free energy + lumped kinetic energy first, checks it against the
+spec's consistent-mass variant and against the literature scheme (de Goes et al. 2015 "Power
+Particles") *as cross-checks*, and picks by a-priori gates (energy drift, volume drift, TGV decay).
+
+**V6. Ordering.** Foundation (A) → grid + static solver (B, C) → moving-cell fluid with interfaces
+(D) → power-cell contacts and the cell-network CFD-DEM (F, G) → free-surface droplets in `CfdDem`
+(E). C validates the geometry with an Eulerian solver whose reference solutions the suite already
+has; D reuses C's operators and V1's energies; F and G are the shortest path to a DEM result and
+only need A2 + the published radii; E has the most new geometry and the most open modelling
+questions, so it goes last but its design doc is already done.
+
+---
+
+## 3. Track A — foundation hardening (prerequisite for everything)
+
+| rung | deliverable | a-priori gate | size |
+|---|---|---|---|
+| **A0 SDF in the dynamic path + Python geometry** | `MovingTessellation` / `DistributedMovingTessellation` take an SDF provider (`SdfScene` included); a `kSkinBoundary` trigger so a seed approaching a wall re-clips; `Tessellation.set_geometry(scene)` / `Simulation.set_geometry(scene)` and `set_weights(w)` in Python via the `peclet.core.geom` scene encoding; MPI replicates the scene | dynamic SDF tessellation == cold SDF rebuild to the repair tolerance over 1000 steps of a packing sliding along a CSG wall; np = 1, 2, 4 owned cells identical to single rank; Python smoke bounds a packing by a torus-minus-box scene | M |
+| **A1 Curved walls to second order** | replace the tangent-plane recession: clip against the exact SDF surface through the cell's wall vertices (foot-point of each vertex, then the plane through those feet, iterated to the SDF zero set) **or** publish the wall facet as a curved patch (area + `∂A/∂n` from the SDF Hessian); wall Jacobian computed *inside* the build kernel; dead-cell rescue for wall-hugging seeds | packed-bed centre-slice coverage 93 % → ≥ 99.5 %; sphere-wall force FD error 1e-2 → ≤ 1e-5; `test_sdf_policy` topology-stable FD on the full scene vocabulary; optimiser no longer stalls on wall-hugging seeds (host stall reproduced, then closed) | M |
+| **A2 Exact power diagram at large weights** | generalised half-space so a live `d < 0` face is representable; multi-image gather (or explicit periodic images in the worklist) so the periodic power diagram is an exact partition; weight-aware Verlet skin | `oracleFill` = box volume to 1e-12 at radius ratio 1…10 (LS polydisperse packings); brute-force radical oracle 1e-15 as today; repair `fellBack = 0` under weight changes each step | L |
+| **A3 Published area Jacobians + energy layer** | V1 + V2: `energy/` terms with `∂/∂n_k`, `∂A_k/∂n_l` in the facet CSR, `interfaceMinimize` and the optimiser wall block re-expressed on it | bit-capture: old vs new `interfaceMinimize` identical; FD on every energy term ≤ 1e-6 (topology-stable); device == host 1e-14 | M |
+| **A4 Update-throughput harness** | the figure of merit from `voronoi_gpu_research_program.md` §1 made a ctest+bench: per-step cost split into needs-reclip test / geometry re-eval / re-clip; MPI weak scaling np ≤ 32 on Snellius (billed — needs a go-ahead) | throughput table in `docs/studies/`; no regression gate wired into CI (host) | S–M |
+
+A0 and A3 are the first two things to do; A1 and A2 can run in parallel with B/C once A3 is in.
+
+---
+
+## 4. Track B — grid generation (static, body-conforming)
+
+Goal: a polyhedral mesh of the fluid region of any SDF scene, wall-fitted, with controllable size
+grading, whose quality is set by minimising one energy.
+
+| rung | deliverable | gate | size |
+|---|---|---|---|
+| **B1 Energy library for grids** | on V1: volume target `Σ(V_i/V_ref,i − 1)²` (existing), facet tension `Σ A_ij` (roundness — existing as the two-type interface term, generalised to all facets), **centroidal / Lloyd** `Σ ∫_{V_i} |y − x_i|² dy` (second moments per cell from the per-vertex scatter — new geometry), wall-fit term; weights `w` as extra DOFs for full volume control | each term FD-exact; on a periodic box the combined energy from a random start reaches the equal-volume BCC/FCC-like state the literature reports for CVT (a-priori: volume variance → 0, skewness → 0) | M |
+| **B2 Global redistribution** | the local-Newton stall (memory: "a local method cannot move seeds between pores") closed by topological moves: split cells with `V > β V_ref`, remove cells with `V < V_ref/β`, re-seed by the graded-shell heuristic (`seed_graded`) inside the loop; graded targets `V_ref = s(φ)³` | packed-bed pore mesh reaches `max |V/V_ref − 1| < 0.1` with zero dead cells, including in throats; example page re-rendered | M |
+| **B3 Polyhedral mesh export** | assemble ordered facet polygons (from dual edges, as `sectionPolygon` does) into an owner/neighbour polyhedral mesh with wall patches; writers: VTU (polyhedra) and OpenFOAM `polyMesh`; quality report (non-orthogonality = 0 by construction, skewness, aspect, volume ratio) | watertightness (Euler characteristic per cell, `ΣA = 0` per cell, facet reciprocity) machine-exact; OpenFOAM `checkMesh` passes on the sphere-pack mesh | M |
+| **B4 Grid quality is solver quality** | a Poisson equation with a manufactured solution on B1 grids of decreasing skewness (two-point flux, V4) | second-order convergence in `h` once skewness < 0.1; error ∝ skewness at fixed `h` — the measurement that fixes the weights in the combined energy | S |
+
+Deliverable: `peclet.voro.generate_mesh(scene, size_fn, energy_weights) → PolyMesh` in Python,
+distributed (the optimiser's Newton system already runs on `GraphAMGDevice`; the tessellation
+runs on `DistributedMovingTessellation`).
+
+---
+
+## 5. Track C — Navier–Stokes on the static polyhedral grid
+
+| rung | deliverable | gate | size |
+|---|---|---|---|
+| **C1 Discrete operators on `TessellationView`** | facet-flux 1-form, divergence (exact), two-point Laplacian `L`, Green–Gauss and least-squares cell gradients, Perot velocity reconstruction; wall (`kBoundaryFacet`) and periodic facets | `div(grad φ)` on a manufactured solution second order; `L` symmetric to 1e-15 and identical to `ot_optimizer`'s Laplacian; adjointness `⟨div u, p⟩ = −⟨u, grad p⟩` machine-exact | M |
+| **C2 Incompressible projection** | staggered covolume scheme (V4): explicit/semi-implicit momentum on the facet normals, projection with `L`, `GraphAMGDevice`-PCG; viscous term via the reconstructed velocity or the covolume Laplacian | Taylor–Green vortex: second-order decay rate; kinetic energy non-increasing inviscid; divergence ≤ 1e-12 per step | L |
+| **C3 Body-fitted boundaries** | no-slip / slip / inflow-outflow on wall patches; pressure-driven periodic forcing as in `flow` | Poiseuille between SDF slabs: exact to round-off for the parabolic profile on a uniform Voronoi grid (the two-point flux is exact for quadratics on orthogonal meshes) | S |
+| **C4 Cross-code gate** | periodic sphere array (Zick–Homsy) and the packed bed: permeability from the Voronoi grid vs `flow`'s cut-cell IBM (`verify_periodic_spheres_sdflow.py`) — the roadmap's "same SDF geometry through CFD + packing + Voronoi" harness | `k` within 1 % of Zick–Homsy and of `flow` at matched cell count; convergence with B2 grading documented | M |
+| **C5 MPI + Python** | 2-ring `VoronoiHalo`, distributed `L` through core's halo; `peclet.voro.FlowSolver(mesh)` | np = 1, 2, 4 bit-exact to single rank (the flow standard); Python drives the whole C4 study | M |
+
+Where it sits versus `flow`: `flow` stays THE Eulerian solver; C is the body-fitted alternative
+for geometries where cut cells pay (thin gaps, very high accuracy near curved walls) and the
+Eulerian half of track D. Reuse core's algebra; do not reuse `flow`'s MAC kernels.
+
+---
+
+## 6. Track D — moving-cell (semi-Lagrangian) fluid with interfacial energies
+
+The cells are the fluid parcels; seeds move with the material velocity, so there is no advective
+flux across a material facet, interfaces stay sharp by construction, and each species' volume is
+the sum of its cells' volumes. Incompressibility is the constraint `V_i = V_i⁰` enforced through
+the weights (V3).
+
+| rung | deliverable | gate | size |
+|---|---|---|---|
+| **D0 Derivation + design doc** | discrete Lagrangian from lumped kinetic energy + the V1 free energy; equations of motion; the weight projection as the Lagrange multiplier; integrator choice (Verlet + projection vs implicit midpoint of the spec); viscous dissipation on the moving mesh (existing `viscous.hpp` re-derived on the covolume form); cross-check against the spec's consistent-mass variant and Power Particles | a written doc `voro/docs/moving_cell_fluid.md` with the a-priori gates below fixed **before** code; user review | S |
+| **D1 Incompressible moving-cell solver** | `MovingCellFluid`: predictor on `x`, `L(w) δw = V⁰ − V` projection with `GraphAMGDevice`, corrector; single species | volume drift ≤ 1e-10 per step; TGV decay rate second order; a lid-driven / Poiseuille steady state matching C3 on the same seeds; energy drift bounded | L |
+| **D2 Interfaces and wetting** | species tags; `σ_ij A_ij` forces from the published `∂A/∂n` (A3); solid–liquid `σ_s A_wall` through the wall chain (A1); Young's angle emerges from `cos θ = (σ_sg − σ_sl)/σ_lg`, nothing imposed | static droplet: Laplace `Δp = 2σ/R` from the cell pressures, spurious velocity ≤ 1e-8 `σ/μ`; droplet on a flat SDF wall: equilibrium angle vs Young within 1°; capillary rise in an SDF tube vs Jurin; Rayleigh oscillation frequency of a droplet | L |
+| **D3 Porous-media two-phase** | imbibition/drainage in a sphere pack (the VoF E7/E8 cases) on the moving cells; topology changes (coalescence = cells of one species become facet-adjacent; breakup = a species cluster disconnects) with an explicit rule for film rupture | breakthrough capillary pressure vs the VoF page and vs the pore-throat estimate; mass of each species conserved to round-off | L |
+| **D4 MPI + Python** | `DistributedMovingTessellation` carries the weights and the species; ownership migration of seeds (core `ParticleMigrator`) | np = 1, 2, 4 identical to the repair tolerance; Python drives D2/D3 | M |
+
+Subtleties to settle in D0 (the "quite some subtleties" of the brief): the seed velocity is
+the *cell* velocity, but with Lagrangian cells the seed drifts from the centroid — a Lloyd term or
+periodic re-centring with a remap; cell-size dispersion over long runs (needs cell split/merge, the
+same machinery as B2); the pressure at an interface facet is discontinuous — which the cell-wise
+pressure carries naturally; wall slip at the contact line comes from the wall energy, not from a
+Navier length; and viscosity at a species facet (harmonic mean of the two cells, as in `flow`).
+
+---
+
+## 7. Track E — droplets and bubbles with a free outer surface (in `CfdDem`)
+
+Recovered design (§1.3), executed in the order `free_surface_design.md` §7 gives:
+
+| rung | deliverable | gate | size |
+|---|---|---|---|
+| **E1 `free_surface.hpp`** | arcs from radical faces, triple points from dual vertices, Girard cap area, gate `h_ij < r_i`; `SurfaceView` SoA | closure, volume, orientation, seam, equal-weights regression, lens closed form (criteria 1–4, 6, 7 of the design doc) | M |
+| **E2 Cap-area gradient** | `∂A_i/∂n_k` (spherical), routed via `chainToDofs<Power>`; wall contact via the wall chain | Gauss–Bonnet identity to round-off; FD `∂A/∂x, ∂A/∂w` ≤ 1e-4 (criterion 8); continuity at arc birth/death (criterion 5) | M |
+| **E3 Deformable droplet** | a `Droplet` = cluster of liquid cells with `γ ΣA_i` + volume constraint in `w`, internal hydrodynamics from D1; the gas is *not* meshed | Laplace pressure, Rayleigh modes, contact angle on a wall (the same gates as D2, now with no gas cells) | L |
+| **E4 In `CfdDem`** | each liquid cell is a point particle to the unresolved fluid (drag, void fraction); the droplet's shape responds through E3 | Taylor small-deformation `D(Ca)` in simple shear (drag-only coupling, deviation documented); bubble terminal velocity vs correlations; droplets through a packed bed | L |
+| **E5 Outer-surface alternatives** | evaluate an explicit triangulated surface against E1–E3 on the same gates; keep whichever wins, record the verdict | decision doc | S |
+
+---
+
+## 8. Track F — power cells as the contact structure of polydisperse spheres
+
+With `w_i = r_i²`, sphere `i` pokes through its own radical plane to neighbour `j` exactly when
+`h_ij < r_i`, i.e. when the two spheres overlap — the same scalar test that gates the free
+surface. So the power neighbour list is a candidate set that is a **structural** property of the
+packing, refreshed incrementally by the repair path, ~15 candidates per particle independent of
+polydispersity — where an AABB broad-phase's candidate count grows with the radius ratio.
+
+| rung | deliverable | gate | size |
+|---|---|---|---|
+| **F0 A-priori proof** | the condition under which every overlapping pair shares a power facet (the overlap lens of `i, j` inside a third ball `k` needs `k` to penetrate both by more than half the overlap — state and prove the bound for a maximum-overlap packing; fall back to the 2-ring for the residual) | written proof + a brute-force counter-example search on LS packings at radius ratio ≤ 10 | S |
+| **F1 Contact detection from the power diagram** | `dem` broad-phase provider on `MovingTessellation` (A2 required); contact list = facets with `h_ij < r_i` (+ 2-ring residual) | contact set **identical** to ArborX + brute force on LS packings, ratio 1…10, 1e5–1e6 particles; per-step cost table vs ArborX on the same GPU for dense-slow and dilute-fast regimes — report honestly which regime wins | M |
+| **F2 Packing structure for free** | per-particle local solid fraction `V_p/V_i`, coordination, the contact network and the "next-neighbour" ring published to Python | matches the pnm/dem post-processing on the same packings | S |
+
+---
+
+## 9. Track G — cell-network CFD-DEM (particle-centred pore network)
+
+Each sphere owns its power cell; the pore volume around particle `i` is `V_i − V_p,i`, the
+facet between `i` and `j` is the throat between their pore volumes (open area
+`A_ij − π ρ_ij²` when they touch), and pressures live on the cells. This is a Lagrangian,
+grid-free CFD-DEM: the void fraction `ε_i = 1 − V_p,i / V_i` is exact, there is no
+scale-separation problem between grid and particle, and the network moves with the particles
+through the incremental repair. First-principles closure first (Poiseuille conductance from the
+throat's hydraulic radius, derived), then calibrated against `flow`'s cut-cell DNS on the same
+packing — the suite can generate its own closure. The literature analogue (DEM-PFV, Chareyre et
+al. 2012, on a regular triangulation) is the cross-check, not the source.
+
+| rung | deliverable | gate | size |
+|---|---|---|---|
+| **G1 Network operator** | conductances `g_ij` on facets, network Laplacian, Dirichlet/periodic pressure drive, `GraphAMGDevice` solve; throat flux and pore pressure fields | on a static packing: Darcy permeability vs `flow` cut-cell IBM and vs Ergun within the closure's stated accuracy; conductance closure derived and its DNS calibration documented | M |
+| **G2 Forces on particles** | `F_i = −V_p,i ∇p_i` (Green–Gauss over the facets) + viscous drag consistent with the network's own Darcy law | force balance on a fixed bed = `ΔP · A` to round-off (the discrete identity); fluidisation onset vs `coupling`'s Eulerian CFD-DEM on the same bed | M |
+| **G3 Moving network** | pressures and conductances updated on the repaired tessellation each DEM step; pore-volume change rate as a source term (the particles' motion pumps the fluid) | sedimentation / fluidised bed vs `coupling` and vs experiments (Dosta-style benchmark pages); mass conservation to round-off | L |
+| **G4 MPI + Python** | `dem.enable_mpi_step` + `DistributedMovingTessellation` share the ORB and the migration | np = 1, 2, 4 forces identical; Python driver `peclet.voro.CellNetworkCfdDem` | M |
+
+---
+
+## 10. Cross-cutting
+
+- **Python object model** (`peclet.voro`): `CellComplex` (build/step/geometry/weights/species/
+  scene), `Energy` terms, `MeshOptimizer`, `PolyMesh`, `FlowSolver` (C), `MovingCellFluid` (D),
+  `Droplet` (E), broad-phase provider (F), `CellNetworkCfdDem` (G). Zero-copy on core's bridge,
+  array shapes per [CONVENTIONS](CONVENTIONS.md) §6.
+- **Docs and gallery**: one Quarto page per gate that produces a figure (the VoF campaign's E-page
+  model); `docs/studies/` entries for the throughput and cross-code tables.
+- **Performance yardsticks** (SOTA directive): Voro++ and the 2026 GPU power-diagram paper for the
+  build; Power Particles for the moving-cell fluid; Yade DEM-PFV for track G; OpenFOAM polyhedral
+  for track C at matched cell count; ArborX for track F. Report per component including setup.
+- **CI**: every rung adds a ctest on host-openmp; CUDA parity in the local batteries
+  (`OMP_NUM_THREADS=8 OMP_PROC_BIND=false`); MPI np = 1, 2, 4 for anything distributed.
+
+---
+
+## 11. Milestone summary and dependency order
+
+| milestone | contents | unlocks |
+|---|---|---|
+| **M0 Foundation** | A0, A3, then A1, A2, A4 | everything |
+| **M1 Body-fitted grids + solver** | B1–B4, C1–C5 | the cross-code harness; publication P2 |
+| **M2 Moving-cell multiphase** | D0–D4 | publication P3 |
+| **M3 Power-cell DEM** | F0–F2, G1–G4 | publication P4 (+ P6 if F1 wins a regime) |
+| **M4 Droplets in CfdDem** | E1–E5 | publication P5 |
+
+Publication units this plan is shaped to produce: **P1** the incremental GPU power diagram with
+derivatives under MPI (the engine, A4's tables); **P2** orthogonal polyhedral meshes from
+energy-minimised power diagrams and a body-fitted NS solver on them; **P3** a Lagrangian
+power-cell multiphase solver with wetting from interfacial energies, validated on pore-scale
+cases against VoF; **P4** a grid-free cell-network CFD-DEM at GPU scale; **P5** deformable
+droplets and bubbles as power-cell clusters inside unresolved CFD-DEM; **P6** power-diagram
+contact detection for polydisperse packings.
+
+Sizes: S = one session, M = a few sessions, L = a campaign (a week or more with gates); M0 ≈ 2–3
+weeks, M1 ≈ 4–6, M2 ≈ 4–6, M3 ≈ 3–5, M4 ≈ 4–6, with M1 and the A1/A2 half of M0 overlapping.
+
+---
+
+## 12. Open questions for the reviewer
+
+1. **Grid export target.** VTU is needed anyway; is OpenFOAM `polyMesh` (B3) worth its rung, or
+   is the internal `PolyMesh` + track C the only consumer?
+2. **Track C scope.** Covolume/staggered (V4) is the recommendation; if a collocated scheme is
+   wanted for compatibility with `flow`'s collocated variant, C2 grows by one rung.
+3. **D0 integrator.** Verlet + weight projection (simplest, matches the existing driver) versus the
+   spec's implicit midpoint with a consistent mass matrix; D0 decides by gate, but a preference now
+   saves a derivation.
+4. **F1 expectations.** The power-diagram broad-phase is expected to win for dense, slowly
+   rearranging, highly polydisperse packings and lose for dilute fast flows; is the dense regime the
+   one that matters, or should F stay at F0 + F2 (structure only)?
+5. **E versus D ordering.** E's design is done and its geometry is self-contained; it could be
+   pulled ahead of D if droplets in `CfdDem` are the more urgent publication.
+6. **Snellius runs** for A4 and the scaling tables are billed and need a go-ahead per campaign.
+
+## 13. Risks
+
+- **A2 is the load-bearing rung**: without an exact-partition power diagram at large weights,
+  D, E, F, G all sit on the ~1 % periodic floor. It is also the one with the most engine surgery
+  (generalised half-space in `ConvexCell`). Do it early, gate it hard.
+- **Curved-wall fidelity (A1)** decides whether B/C meshes are body-*fitted* or body-*approximate*;
+  the packed-bed rim is the measured symptom.
+- **Topology changes in D3** (rupture/coalescence rules) are modelling choices, not numerics; keep
+  them explicit, switchable and gated against VoF.
+- **Track G's closure** is the physics risk; the DNS calibration path inside the suite is the
+  mitigation and, done well, a result in itself.
