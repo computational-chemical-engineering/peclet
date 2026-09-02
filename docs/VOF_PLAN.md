@@ -1056,13 +1056,15 @@ gates, twice-failed gates escalate.
 | V5b static θ | **done 09-02** (WO-S) | ≤1.3° for θ ≤ 90°, −3.6° at 120°; Jurin inconclusive |
 | V-BC open boundaries | **done 09-02** (WO-R) | varRho outflow operator defect → WO-R2 (running) |
 | V8 collocated (minimal) | **done 09-02** (WO-T) | all-fluid, rated ratio ~100; cut-cell + collocated = later |
-| V6 dynamic θ / hysteresis | **next** (WO-V6) | derivation in the WO |
+| V6 dynamic θ / hysteresis | **done 09-02 (angle half)** (WO-V6) | Cox–Voinov + pinning exact at the kernel level, Jurin −1 %; contact-line MOBILITY is 180× too low: the velocity-side Navier slip is missing → **V6b** |
 | V7 pore-scale campaign | after WO-R2 (WO-V7) | measurement campaign, scripts + one page |
 | V9 performance | after E7 (WO-V9) | profile first on the gallery cases, then the levers |
 | V10 AMR | design only (§13.4) | blocked on varRho-on-AMR and cut-cell + collocated |
 | V11 MTHINC | dropped from the critical path | revisit only if V9 shows morphology-bound load |
-| P0–P3 phase change | **start now** (WO-P01, then WO-P23) | 1-D/planar first; the plan's §9 stands |
-| W0–W2 block VoF | **start now** (WO-W0, then WO-W12) | exchange design in the WO; L1 promotion folded in |
+| P0/P1 phase change | **done 09-02** (WO-P01) | Stefan 0.2 % at N=256; ṁ sign, analytic `plicArea`, liquid-aware redistribute corrected |
+| P2/P3 | running (WO-P23) | plane-anchored Dirichlet first |
+| W0 block container | **done 09-02** (WO-W0) | L1 kernels now `peclet::core::vof`; two markers never coalesce; np 1/2/4 bitwise |
+| W1/W2 | running (WO-W12) | weighted masters, block CSF, channel_18 |
 | W3–W5 | after W2 | unchanged |
 | examples E1–E5, E8 | **published** | E6 (after R2), E7 (running) |
 
@@ -1085,7 +1087,16 @@ gates, twice-failed gates escalate.
 4. **The collocated path is all-fluid and undamped** (explicit face force outside `A`; ceiling
    `μ dt/(ρ_min h²)`). AMR VoF inherits that, so V10's design (§13.4) must include the
    viscous-augmented explicit-force step limit and the cut-cell face acceleration.
-5. **Momentum consistency in cut cells diverges under a nonzero-mean periodic body force**
+5. **The dynamic angle needs both halves of Afkhami–Zaleski–Bussmann.** WO-V6 ships the angle
+   half (grid-scale Cox–Voinov with explicit λ, hysteresis with pinning — kernel-exact, Jurin
+   −1 % on the repaired plate scene, MPI bitwise) and measured that the contact-line mobility is
+   set by the wall's NUMERICAL slip (~0.1 Δ): capillary rise 180× slower than Lucas–Washburn, a
+   drop on an incline creeps linearly in Bo with no threshold while its contact cells correctly
+   report "pinned", and sweeping λ by 25× moves the macroscopic Cox–Voinov slope by a quarter of
+   the model's sensitivity. **V6b = a Navier slip length in the cut-cell IBM momentum wall
+   closure** (velocity side; touches `cut_cell_ibm.hpp`, i.e. the velocity-solve session's
+   files — coordinate before starting). Until then dynamic-wetting results are qualitative.
+6. **Momentum consistency in cut cells diverges under a nonzero-mean periodic body force**
    (WO-Q open question). Closed or open columns are fine; a periodic driven bed with a heavy
    phase is not. V7 uses inflow/outflow or closed columns, never a periodic net force.
 
