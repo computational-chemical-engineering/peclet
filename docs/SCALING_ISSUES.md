@@ -228,8 +228,12 @@ solution only to ~rtol × 5·10⁴ on this operator (μ/Δx² against ρ/Δt); 1
 validated (`<u>`/`max|div|` to seven digits, pressure iterations unchanged). (d) A Chebyshev
 *momentum* solver was considered and not built: at 1536 ranks the momentum phase is 0.07–0.15 s of
 a 0.83 s step; the projection (16 ms per pressure iteration at 37 k cells/rank, latency) is where a
-communication-light driver has leverage — the existing Chebyshev pressure driver is being measured
-there.
+communication-light driver has leverage. **Measured with the existing Chebyshev pressure driver at
+1536 ranks:** single-phase **0.391 → 0.251 s/step** (14 iterations either way, the PCG's two
+all-reduces per iteration were on the critical path; 20× FoxBerry), packed bed **0.834 → 4.18 s**
+(238 iterations against PCG's 40: the cut-cell operator's spectrum is not the one Chebyshev's
+interval assumes). A per-case choice, not a default; an automatic pick would need a spectrum
+probe.
 
 ## 6. `check_decomposition.py` is unusable above ~100 ranks — LOW (tooling)
 
