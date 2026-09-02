@@ -83,8 +83,9 @@ Single-phase (float build): 14.7 → 14.0 iterations flat, 34.8 → 0.656 s, 142
 iterations (max 69) / 10.8 s in place vs 39.8 / 7.28 s telescoped; single 24.9 / 2.48 s vs 14.0 /
 2.01 s. At 24 ranks the two are identical (129.5 vs 128.7 s) — the hierarchy is already full depth
 there. Every ladder bottoms at 3³ on one rank (384 → 8 → 1, 768 → 8 → 1, predicted 1536 → 64 → 1).
-**What remains of this issue is policy, not mechanism**: telescoping is still opt-in
-(`PECLET_FLOW_TELESCOPE=1`), the `MIN_EXTENT` default (4) is untuned, and the gather is
+**What remains of this issue**: telescoping is the DEFAULT since 2026-09-02 (the WO-R2
+variable-density outflow coefficient crosses a telescope point since the same evening,
+`test_telescope_varrho_mpi`); the `MIN_EXTENT` default (4) is untuned, and the gather is
 host-staged (fine on CPU; a device build would want a device-aware path).
 
 **P0 answered (2026-09-02).** The anchored-bottom half is real: single-phase np=384 with the

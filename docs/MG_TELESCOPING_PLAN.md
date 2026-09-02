@@ -445,3 +445,12 @@ halo latency dominates. (3) The idle members could take the *next* V-cycle's fin
 (pipelining) — not worth it until the momentum solve (SCALING_ISSUES.md §5) stops dominating
 the step.
 
+**Variable-density outflow across a telescope point (2026-09-02, evening).** The WO-R2 outflow
+*coefficient* path stores each level's high-side outflow coefficient on a ghost plane, which the
+inner-only telescope gather left behind — the other session guarded it with a throw. Now
+`teleGatherPlane` gathers that plane from the members touching the global +face into the merged
+stage, and `applyBoundaryOpennessFrom` coarsens the coarse boundary coefficient from the stage
+exactly as the in-place path does from the finer level. `test_telescope_varrho_mpi` (density
+jump advected through a +z outflow, telescope forced at level 1) reproduces the in-place hierarchy
+to the last digit at np 1/2/4. Telescoping therefore has no remaining exception.
+
