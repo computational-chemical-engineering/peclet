@@ -225,9 +225,9 @@ domain-BC smoother has its residual (`diffResidual`) so RB-GS covers that path t
 rule picks the 3-level V-cycle under MPI below `PECLET_FLOW_VMG_AUTO_CELLS` = 65536 cells/rank
 (the measured crossover). At least one sweep / V-cycle always runs: an early return on a converged warm start left u*
 without the O(rtol) momentum response and the hydrostatic acid test (`vardensity_mpi`) drifted
-by 1e-8 in dP/dz (bisected; flow `327faf3`). The single-GPU regression suite passes on the
-default (metrics +0.00 %, pressure iterations/step identical; steady-state cases need 5–20 % more steps to meet their convergence check, since the
-over-converged update-criterion solve made the per-step drift smoother). **Still open:** (c) a
+by 1e-8 in dP/dz (bisected; flow `327faf3`). The single-GPU regression suite is identical to its baseline on the coupled default (metrics
++0.00 %, pressure iterations and step counts equal); a fixed 1e-5 had cost steady-state cases 5–20 %
+more steps to meet their convergence check. **Still open:** (c) a
 max-residual relative to the row scale pins the
 solution only to ~rtol × 5·10⁴ on this operator (μ/Δx² against ρ/Δt); 1e-5 is what the ladder
 validated (`<u>`/`max|div|` to seven digits, pressure iterations unchanged). (d) A Chebyshev
