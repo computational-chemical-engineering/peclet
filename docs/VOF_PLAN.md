@@ -1036,7 +1036,7 @@ pattern — the ABC counterpart of the V4 rule).
   orders of flux divergence on Hysing 2, nothing else moves), and adds the advector wisp guard.
   Also found: `max_open_divergence()` MUTATES the velocity at an outflow (non-mutating sibling
   `max_open_divergence_projected()`; the default is a user decision).
-- Pending: WO-R2, E6/E7 (need R2), E8 (collocated columns, in progress).
+- Pending (evening): E6/E7 pages, WO-V7, WO-P23, WO-W12 all running; WO-V9 after them.
 
 ## 13. Revised ladder for the remainder (2026-09-02, evening) — review and execution plan
 
@@ -1054,7 +1054,7 @@ gates, twice-failed gates escalate.
 | V0–V4 | done (08-30/31) | numbers stand; wave gate now reports the exact viscous reference |
 | V5a transport in cut cells | **done 09-02** (WO-Q) | flux clamp, `eps_eff`, `advect_vof` |
 | V5b static θ | **done 09-02** (WO-S) | ≤1.3° for θ ≤ 90°, −3.6° at 120°; Jurin inconclusive |
-| V-BC open boundaries | **done 09-02** (WO-R) | varRho outflow operator defect → WO-R2 (running) |
+| V-BC open boundaries | **done 09-02** (WO-R + WO-R2) | outflow operator fixed on BOTH faces (Nusselt film at ratio 100/1000 within 0.2 %); cut-cell × boundary composed; `enable_vof` sets the exact residual and the wisp guard; open: a gas stream over a pool at ratio 1000 still stirs the pool (~3 % of the inlet speed) |
 | V8 collocated (minimal) | **done 09-02** (WO-T) | all-fluid, rated ratio ~100; cut-cell + collocated = later |
 | V6 dynamic θ / hysteresis | **done 09-02 (angle half)** (WO-V6) | Cox–Voinov + pinning exact at the kernel level, Jurin −1 %; contact-line MOBILITY is 180× too low: the velocity-side Navier slip is missing → **V6b** |
 | V7 pore-scale campaign | after WO-R2 (WO-V7) | measurement campaign, scripts + one page |
