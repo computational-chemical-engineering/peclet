@@ -936,3 +936,68 @@ Tanguy et al. JCP 2014 · Aslam JCP 2004 · Bureš & Sato IJHMT 2021 + JFM 2021/
 et al. JFM 2025 (arXiv:2503.12171) · Torres et al. JCP 2024 · Urbano et al. IJHMT 2018 ·
 Kunkelmann & Stephan NHT-A 2009 · Dhruv et al. IJMF 2019 + Flash-X SoftwareX 2022 ·
 Welch & Wilson JCP 2000 · Scriven CES 1959 · Berenson 1961 / Klimenko 1981.
+
+## 12. The finishing campaign (2026-09-02) — review verdict, new rungs, order
+
+Written by Fable at the start of the session that finishes Part I and ships the example gallery.
+Companion work orders: `flow/doc/vof_workorders_v5.md` (WO-Q … WO-U).
+
+### 12.1 What the 2026-09-01 solver work changed under V0–V4 (review verdict)
+
+Checked against the source and the recorded gates; the shipped VoF numbers **stand** with three
+qualifications:
+
+- **P1 (exact double flux-form residual, `PECLET_FLOW_EXACT_RESIDUAL=1`, default OFF).** The one
+  solver change that touches a VoF result: Hysing case 2 (ratio 1000) ran at 116/600 pressure
+  iterations with `max|div| = 1.85e-3`, which WO-P attributed to the float `A·1 ≠ 0` defect that P1
+  removes bitwise. WO-R item 6 re-measures it both ways; if it closes the gap, `enable_vof` should
+  turn the exact residual on for the varRho projection (a VoF default, not a solver default).
+  Every other VoF gate ran at ratio ≤ 100 or on a periodic box where float was already adequate.
+- **WO-H (MG prolongation ghost), WO-I (drag ghosts), WO-M** landed *before* V4's measurements —
+  they are already inside the recorded numbers. **A0** (wall velocity into the momentum advection)
+  affects moving bodies only; VoF refused solids, so nothing recorded moves.
+- **The velocity-solve work now in progress (M1/M2 of the defect-correction campaign)** targets the
+  float momentum-operator storage that floors V2b's coupled-loop residual at 1.2e-7 (the reason the
+  shipped build is rated to ratio ~1e3 with motion). When it lands, re-run
+  `tests/study/vof_momentum_consistency.py` — the ratio-1e4 restriction should lift. Nothing in
+  the VoF code depends on it.
+
+Two items of `VOF_NEXT_SESSION.md` were traced this session (details there): the capillary-wave
+"deviation" is **entirely the inviscid reference** (the measured frequencies agree with the exact
+viscous two-fluid dispersion relation to −0.03 / −0.23 / +0.52 %); the Lamb mode-2 deficit is **not**
+viscous (flat at −6.3 % over a 16× viscosity sweep) and **not** a static curvature bias (the P2
+component of the cascade's κ on the initial spheroid is within +2.6 / +1.0 / +0.55 % at R = 8/12/16)
+— trace continuing.
+
+### 12.2 What the examples need that does not exist
+
+| need | rung | WO |
+|---|---|---|
+| VoF through an SDF solid (packing), exact conservation, no leak | **V5a** (split off V5) | WO-Q |
+| liquid/gas entering and leaving through domain faces; the varRho outflow `1/ρ_f` | **V-BC** (new) | WO-R |
+| contact angle on SDF solids and domain walls | **V5b** | WO-S |
+| the collocated path (hydrostatic, static drop, Hysing, advection) | **V8** (minimal) | WO-T |
+| a kinematic `advect_vof(dt)` entry point for the advection benchmarks | V5a item 7 | WO-Q |
+| the example pages E1–E8 | — | WO-U |
+
+V6 (dynamic angle, hysteresis) and V7 (the pore-scale campaign) stay as planned; the examples
+run static θ. V9/V10 unchanged. Part II/III unchanged.
+
+### 12.3 Order and ownership
+
+```
+now      WO-Q (Opus, worktree flow-woq)  ∥  WO-R (Opus, flow-wor)  ∥  WO-U part 1: E2, E4 (Opus, peclet-examples)
+         Fable: Lamb trace; WO-S derivation (written, in WO-S); WO-T design (written); E3 reference
+then     WO-S (Opus, on Q)  ∥  WO-T (Opus, on R)  ∥  WO-U part 2: E1, E3 (Opus, on Q)
+then     WO-U part 3: E5, E6, E7 (Opus, on S+R)  ∥  E8 collocated column (on T)
+gates    every rung: bit-identity of everything existing, np 1/2/4, both backends, regression +0.00 %
+```
+
+Design rules added for this campaign (in the WO preamble): cut-cell colour is advected in
+fluid-volume units with the flux and the dilation sharing one `o_f a_f` per face (exact
+conservation telescopes against the projection's openness-weighted divergence); solid cells are
+*filled*, never advected, and the fill is what carries the contact angle (`m · n_w = cos θ`,
+pivot at the contact point); domain-face colour is a datum with an algebraic flux, never a
+reconstructed interface; on the collocated grid every interfacial/body force is a **face**
+acceleration and the cell sees the average of the face balance (Basilisk's `centered.h`
+pattern — the ABC counterpart of the V4 rule).

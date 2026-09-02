@@ -1,5 +1,38 @@
 # VoF campaign — handoff for the next session
 
+**Status 2026-09-02 (Fable, finishing campaign started).** Items 1–4 below are the 2026-08-31
+handoff; their state now:
+
+- **Item 1 — precision:** RESOLVED by the defect-correction campaign (P1 passed, double-diagonal
+  retired; `DEFECT_CORRECTION_PLAN.md`). Open for VoF: whether `enable_vof` should switch the
+  exact residual on (WO-R item 6 measures Hysing case 2 both ways).
+- **Item 2 — Lamb mode-2:** TRACED IN PART. (a) *Cheapest hypothesis first, as instructed*: the
+  capillary WAVE deviation is 100 % the inviscid reference. The exact normal-mode relation for an
+  interface between two semi-infinite fluids of equal ρ and ν is
+  `s² + ω₀²(1 − k/√(k² + s/ν)) = 0` (derived from the even-ŵ solution `A e^{−kz} + B e^{−mz}`,
+  `m² = k² + s/ν`, continuity of ŵ, ŵ′, ŵ″ and the normal-stress jump `μ[ŵ‴] = −σk⁴ŵ(0)/s`; first
+  order: `Δω/ω₀ = −γ/ω₀ = −k√(ν/ω₀)/(2√2)`). With the finite-depth `coth(kH)` factor the
+  measured ω agree to **−0.03 %, −0.23 %, +0.52 %** (WO-P's −2.20 / −2.07 / −3.64 % against the
+  inviscid formula), and the measured decay is within 5–24 % of `−Re s` (a two-extremum fit).
+  The reference `2νk²` WO-P used is the *free-surface* rate; the two-fluid rate is the O(√ν)
+  boundary-layer term, 3–4× larger. (b) The DROP is different: a viscosity sweep μ = 0.02 →
+  0.00125 at 32³/R = 8 leaves the frequency deficit flat at **−6.95 → −6.3 %** while the damping
+  scales as √ν as it should, so the deficit is **inviscid**; and a static test of the cascade's κ
+  on the initial prolate spheroid puts the P2 component within **+2.6 / +1.0 / +0.55 %** of the
+  analytic value at R = 8/12/16, so it is **not a static curvature bias** either. Confinement
+  accounts for ~0.6 % (−6.27 % at 32³ → −5.63 % at 48³, same R = 8). Remaining candidates under
+  test: the moment-based frequency measurement (a damped-sinusoid fit on saved series), the
+  dynamic (advected-fraction) curvature, and a resolution ladder at fixed confinement
+  (R = 8/12/16). The quasi-2D cylinder mode-2 case gave erratic deficits (−4.7 / −8.9 / −3.9 % at
+  R = 8/12/16), which points at the measurement. Findings will be appended here.
+- **Item 3 — V3 curvature issues:** carried into WO-S/WO-U as measurements (branch census on
+  every page); no change to the cascade planned before the examples exist.
+- **Item 4 — V5–V7 scope:** V5 is split into V5a (transport in cut cells, WO-Q) and V5b (the
+  θ-fill, WO-S), a new V-BC rung (WO-R) covers open boundaries, V8 is pulled forward in minimal
+  form (WO-T) because the examples must run on the collocated grid too. See `VOF_PLAN.md` §12.
+
+---
+
 Written 2026-08-31 at the end of the session that built V0–V4. **Read this first**, then
 `VOF_PLAN.md` (the campaign plan, now carrying measured results), then the findings logs in
 `flow/doc/vof_workorders*.md`. Everything below is *decided and unstarted* — the user
