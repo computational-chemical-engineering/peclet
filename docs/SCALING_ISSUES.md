@@ -19,7 +19,7 @@ is reproducible; the remaining defect is narrower.*
 | 2 | MG depth capped by the per-rank block | High (scaling shape) | **Fixed 2026-09-02** (telescoping, opt-in), **measured**: iterations flat 24 → 1536 ranks, ≥ 99 % efficiency on the bed |
 | 3 | Solid intersecting an OPEN domain face stalls the solve | Medium, silently wrong (narrow) | Open, new |
 | 4 | Intermittent multi-node hang in warmup | **High, silently wrong** (was: Medium) | **Root-caused and fixed 2026-09-02** (core `10294e6`): NBX inter-round tag race |
-| 5 | Velocity multigrid is single-rank only | Medium (unverified impact) | Known restriction |
+| 5 | Momentum solve: cap-bound RB-GS (update criterion) | High (63 % of the packed step) | **Fixed 2026-09-02**: residual stop + velocity MG under MPI (mixed operator); measuring at scale |
 | 6 | `check_decomposition.py` unusable above ~100 ranks | Low (tooling) | Open |
 
 ---
@@ -169,25 +169,53 @@ and the halo uses tag 0, so they cannot collide, but a new caller passing a smal
 `ob1` and 16×96 discriminators were both consistent with the real cause (the race is
 transport-independent and sensitive to skew, not rank density).
 
-## 5. Velocity multigrid is single-rank only — now the LARGEST cost on the packed case
+## 5. The momentum solve — was the LARGEST cost on the packed case; FIXED 2026-09-02 (two ways)
 
 **Measured 2026-09-02, packed bed with FoxBerry BCs, 384 ranks, telescoped pressure MG:** momentum
 4.55 s of a 7.28 s step (63 %), projection 2.55 s. Once telescoping flattens the pressure iteration
-count, the RB-GS momentum solve at ν·dt/dx² ≈ 3.8e4 is what the step is made of. And it **hits its
-sweep cap on every step**: 600 sweeps/step = 3 components × the 200-sweep cap, so the 1e-3
-tolerance stop never engages — the momentum solve is under-converged as well as expensive (its
-cost is then a fixed 600 sweeps × cells, which strong-scales perfectly but is where the absolute
-time lives). A distributed velocity multigrid (`VelocityMG::initMpi` is what is missing) would
-attack both at once; it is the next lever on this case now that the pressure side is flat.
+count, the RB-GS momentum solve at ν·dt/dx² ≈ 3.8e4 is what the step is made of, and it **hits
+its sweep cap on every step** (600 = 3 × 200).
 
-`IbmSolver` never calls `VelocityMG::initMpi`, so under MPI the momentum solve is RB-GS with a
-sweep cap and there is no alternative. This campaign did not measure whether that bit, but it is
-worth checking here specifically: FoxBerry's packed case uses `u = 0.001`, giving `dt = 0.26` and
-therefore **ν·dt/dx² ≈ 3.8e4** — an extremely stiff implicit diffusion for a point smoother, where
-the single-phase case sits at ≈ 38. If the momentum solve is under-converged at the sweep cap, the
-projection is chasing a moving target and some of issue 2's iteration growth may not be the
-hierarchy at all. *Cheap check:* sweep `VSWEEPS` at fixed rank count and see whether the pressure
-iteration count moves.
+**What it actually was — the stopping rule, not the smoother.** The update criterion stops when
+max|Δu| ≤ rtol × the *first sweep's* update. On a warm-started near-steady step the first update
+is already noise (measured at 96³: the update-stopped RB-GS and an RB-GS run 25× longer agree to
+1e-14 — both are the same stalled iteration), so the rule demands a 10³ reduction of noise and
+the cap is the only exit. The fix is a **residual-based stop**, `set_velocity_residual_tolerance
+(rtol)`: max|b − A u| ≤ rtol · max(max|b|, max|A u|) over the solved unknowns (flow `d6b3eb5`;
+the forcing can enter through the inflow *ghost* rather than `b`, hence the scale, and the held
+inflow face is imposed, not solved, hence excluded). Measured at 96³ on the bed, 3 steps:
+
+| solver | stop | sweeps or cycles / step | momentum s/step | rel. error vs converged |
+|---|---|---:|---:|---:|
+| RB-GS | update 1e-3 (production) | 468 | 0.47 | 1.2e-5 (stalled, lucky) |
+| RB-GS | residual 1e-3 | 24 | **0.05** | 9.8e-4 |
+| RB-GS | residual 1e-5 | 51 | 0.10 | 1.2e-5 |
+| mixed V-cycle, 2–5 levels | residual 1e-3 | 4.7 | 0.13 | 2.7e-4 |
+| mixed V-cycle, 2–5 levels | residual 1e-5 | 7.7 | 0.18 | 1.2e-5 |
+
+**The velocity multigrid now runs under MPI** (`VelocityMG::initMpi(dec, …)` on the solver's
+decomposition, coarsened in place), with a new **mixed operator** for a solid WITH domain BCs
+(`setStaircaseBc`: unfolded cut-cell stencil + solid pin + clean-fluid/held-face exclude at level
+0; staircase Helmholtz + upwind advection + domain-face folds on the coarse levels). Gate
+`test_velocitymg_bc_mpi` (np 1/2/4, bit-exact distributed, V-cycle == RB-GS fixed point to 4e-9).
+Two traps it cost: (i) the RHS treatment and the advection scheme are decided by `bcStencilPath()`
+/ `implicitAdv()`, which used to flip with `useVelocityMg_` — turning the MG on silently switched
+to *explicit* advection, and two solves converged to 1e-11 residual sat 3e-4 apart; with the same
+stencil they agree to 2e-11. (ii) Level 0 is the *unfolded* stencil, so its ghosts are reflections
+(`fold=0`), not the folded operator's zeros — with `fold=1` the V-cycle diverges.
+
+**Depth does not matter on a pore-confined bed** (2, 3 and 5 levels identical): the coarse grid
+serves only the clean fluid interior and the smoother owns the band, so **the velocity hierarchy
+does not need telescoping** where the pressure one did. Single-rank at 96³ RB-GS with the
+residual stop is the cheaper of the two; whether the V-cycle's fewer halo exchanges win at 1536
+ranks is measured on the ladder (benchmark page).
+
+**Open.** (a) The const-coefficient domain-BC smoother (all-fluid inlet/outlet, the single-phase
+case) has no residual functor yet and keeps the update criterion (204 sweeps/step there — likely
+the same waste); the all-fluid velocity MG does take the residual stop. (b) The residual stop is
+opt-in; defaulting it needs the regression suite re-baselined (it records sweep counts).
+(c) A max-residual relative to the row scale pins the solution only to ~rtol × 5·10⁴ on this
+operator (μ/Δx² against ρ/Δt); the errors above are what rtol buys in practice.
 
 ## 6. `check_decomposition.py` is unusable above ~100 ranks — LOW (tooling)
 
