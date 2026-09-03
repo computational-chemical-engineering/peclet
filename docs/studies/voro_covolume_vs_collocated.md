@@ -96,6 +96,23 @@ through the wall value, the cell and its neighbours (tangential variation remove
 gradient) is flow's wall-anchored reconstruction on the unstructured mesh, and it also makes the
 Poiseuille parabola the exact discrete steady state (wall-row residual 5e-11).
 
+## DEC viscous term for the covolume scheme (C2a′, shelved)
+
+The Nicolaides curl-curl Laplacian on the Voronoi edges is exactly symmetric and dissipative but
+does not raise the covolume order: its linear-field residual converges at order 1.0 / 0.93 on the
+jittered / centroidal meshes (Perot 0.58 / 0.56, similar magnitude), it is inconsistent on the
+degenerate cubic lattice, and its explicit stability constant is about eight times the two-point
+Laplacian's. Both covolume viscous terms carry the same skewness error (face-average flux versus
+connector-midpoint value); the collocated scheme's skew-corrected pair is the second-order route.
+
+## Semi-implicit step (C2c)
+
+The collocated solver's implicit-diffusion step (flow's structure) reaches the same steady states
+as the explicit RK3 march with a step 50–100× larger: Poiseuille exact to 4e-13 in 154 steps at
+Δt = 20 h²/ν; the sphere-array drag identical to four digits with 340 / 270 / 260 steps at
+n = 16 / 24 / 32 against 1100 / 2200 / 3700. On the transient Taylor–Green the first-order time
+error is below the spatial error at CFL ≤ 0.2.
+
 ## Distributed (C5, `tests/kokkos_mpi/test_flow_mpi`)
 
 Collocated solver on a 12³ jittered lattice split by the ORB decomposition, TGV, 20 steps:
