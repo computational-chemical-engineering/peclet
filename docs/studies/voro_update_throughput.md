@@ -41,16 +41,18 @@ emission in every gather and rebuild.
 | 1e-3 | 1.75 | 3.9 | 1.86 | 1.7 | 4e-12 | 74 |
 | 2e-3 | 1.12 | 2.5 | 1.55 | 1.5 | 9e-12 / 9e-7 | 58 |
 | 5e-3 | 0.63 | 1.4 | 1.00 | 1.0 | 1e-11 | 34 |
-| ≥ 1e-2 (gate → rebuild) | 0.30 | 0.67 | 0.59 | 0.6 | 1e-15 | 0 |
+| ≥ 1e-2 (gate → rebuild) | 0.38 | 0.86 | 0.85 | 0.8–0.88 | 1e-15 | 0 |
 
-(After voro 75f4926: the clip reports the gap its commit test computes, so the near-miss
-recording costs no second vertex scan.)
+(After voro 75f4926 the clip reports the gap its commit test computes, so the near-miss
+recording costs no second vertex scan; after voro 45d5adf a gate-rebuild skips the emission
+and the first low-churn step pays one emitting rebuild — the adjacency's lazy pattern — so the
+rebuild guard is back near a cold build.)
 
 The residual "missed" relations are zero-area slivers below the certificate tolerance (the
 volumes agree to 1e-11). Over 400 steps (`test_sdf_dynamic`) the wall-free drift fell from
 1.6e-3 to 5.5e-11 (default tolerance) and 1.2e-15 (tight); the SDF path from 1.6e-3 to 5.9e-8.
-The gate's rebuild now costs 0.67× a cold build (the near-miss emission's wider search reach);
-a lazy emission scheme like the adjacency's is the follow-up.
+The gate's rebuild costs 0.86× a cold build (lazy emission; the remaining gap is the store
+emission itself, as before).
 
 ## Cold build vs N (CUDA, FP64, MAXP 64 / MAXT 112)
 
