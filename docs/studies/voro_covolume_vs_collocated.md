@@ -71,27 +71,30 @@ with the two-point no-slip wall flux `ν A (U_wall − U_i)/h_A`, marched to the
 | **order** | **2.00** | **2.00** |
 
 Both solvers coincide to the digit on the lattice for this one-dimensional flow. The exact
-parabola satisfies the interior discrete equations to round-off (4e-16); the wall row carries a
-residual of exactly f/4 because the two-point wall flux is the derivative at h_A/2 rather than at
-the wall — the classic half-cell truncation that converges at second order globally. Wall flux 0,
-face divergence 3e-16.
+parabola satisfies the interior discrete equations to round-off (4e-16); with the two-point wall
+flux the wall row carries a residual of exactly f/4 (the derivative at h_A/2 rather than at the
+wall — the classic half-cell truncation, second order globally); with the quadratic wall gradient
+(the default) the residual is 5e-11 and the marched error 7e-6 at every n — the parabola is the
+exact discrete steady state. Wall flux 0, face divergence 3e-16.
 
 ## Stokes drag of a simple-cubic sphere array (C4, `test_permeability`)
 
 φ = 0.216, Zick & Homsy K = 7.442; collocated solver, Stokes, marched to a tight steady state;
 0.15h-jittered lattice seeds clipped by the sphere (fluid volume exact to 2e-5).
 
-| cells per box edge | cells per diameter | cells | K | error |
-|---|---|---|---|---|
-| 16 | 12 | 3031 | 6.442 | −13.4 % |
-| 24 | 18 | 10417 | 6.883 | −7.5 % |
+| cells per box edge | cells per diameter | cells | K (quadratic wall gradient) | error | error with the two-point wall flux |
+|---|---|---|---|---|---|
+| 16 | 12 | 3031 | 7.261 | −2.43 % | −13.4 % |
+| 24 | 18 | 10417 | 7.371 | −0.96 % | −7.5 % |
+| 32 | 24 | 24945 | 7.414 | −0.37 % | — |
 
-Order ≈ 1.4; flow's cut-cell IBM reaches −0.5 % at 32 cells per box edge. The geometry is exact
-(the SDF clip tiles the fluid volume to 2e-5) but the wall SHEAR is first order: seeds within
-0.4 h of the wall are dropped, so the wall cells are fat (h_A up to 1.4 h) and the two-point wall
-flux is the derivative at h_A/2. Two remedies, both open: wall-adapted seeding (a seed shell at
-h/2 from the surface — overflows the 64-plane cell cap today), or a second-order one-sided wall
-gradient as flow's gauge-exact gradient uses at cut cells.
+Second order with the wall-anchored quadratic wall gradient, on par with flow's cut-cell IBM
+(−0.49 % at 32 cells per box edge). The geometry was never the limit (the SDF clip tiles the
+fluid volume to 2e-5): with the two-point wall flux the fat wall cells (seeds within 0.4 h of the
+wall dropped, h_A up to 1.4 h) made the wall shear first order (order 1.4). The quadratic fit
+through the wall value, the cell and its neighbours (tangential variation removed with the cell
+gradient) is flow's wall-anchored reconstruction on the unstructured mesh, and it also makes the
+Poiseuille parabola the exact discrete steady state (wall-row residual 5e-11).
 
 ## Consequences for the plan
 
