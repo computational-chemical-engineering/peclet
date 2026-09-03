@@ -1042,7 +1042,7 @@ pattern — the ABC counterpart of the V4 rule).
   Also found: `max_open_divergence()` MUTATES the velocity at an outflow (non-mutating sibling
   `max_open_divergence_projected()`; the default is a user decision).
 - **Merged-main validation 09-03 19:00 (nvidia-cuda)**: `tests/kokkos` 33/33, `tests/kokkos_mpi` VoF/varRho/phase-change/wall-slip battery 46/46 at np 1/2/4.
-- Pending (09-03 19:00): P3d (joined area) running; P23 + P3b + P3c LANDED (P3 open at 1.3 % with mode 3; P3d = joined area); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
+- Pending (09-03 20:30): P3d LANDED (default → mode 6); P3e (regression instrument) running; P23 + P3b + P3c LANDED (P3 open at 1.3 % with mode 3; P3d = joined area); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
 
 ## 13. Revised ladder for the remainder (2026-09-02, evening) — review and execution plan
 
@@ -1141,23 +1141,21 @@ gates, twice-failed gates escalate.
    (the meniscus between two plates, the cap's foot on both walls): the next probe is the same
    instrument on the slot (`tests/study/vof_wetting_dynamic.py`'s plate scene). Until V6c
    closes, dynamic wetting is qualitative; static and drainage results stand.
-8. **P3 (Scriven) at 2 %: the growth deficit IS an interfacial-AREA deficit, and a per-cell
-   area is first order in h/R (WO-P3b → WO-P3c).** P3b's "PLIC area 5–9 % low because of the
-   MYC normal" was the probe's own 4³ sub-sampled initialisation (cells below 1/128 leave the
-   interface: a quarter of the interfacial cells, 6 % of the area, 1e-4 % of the volume); with
-   the exact normal the same field gives the same deficit, and with 16³ sub-sampling every mode
-   is within 0.5 % at R ≥ 8. What does not go away: **no per-cell area construction converges
-   (order ~0–1)** — an exact-fraction circle with the exact normal and the analytic chord sums to
-   −2.9…−0.8 % of 2πR at R = 8…28; the pieces do not JOIN across cells, and marching cubes,
-   whose triangles do, is 3–10× closer on the same fields. In the Scriven run the interfacial
-   area sits 3.4 % below 4πR² and `Δβ_eff ≈ ε/2` reproduces the −2.5 % growth rate; the
-   height-footprint area (`set_phase_change_area(3)`, `vof_interface_area()`) recovers a third
-   (Ja 0.5: 2.00 → 1.31 %, β_eff −2.52 → −1.86 %) and is identical on every planar gate, but
-   the 1 % gate is still missed (rule 4: third failure, stopped). **Default stays mode 0**
-   (a default changes on a passed gate). **P3d**: an area from a JOINED reconstruction —
-   marching cubes on the C = ½ level set, or a partition-of-unity paraboloid over the band —
-   gated on the sub-16 sphere probe with order ≥ 1.5; W12's `vof_block_stats()['area']`
-   keeps the PLIC polygon (its premise for switching was the same non-defect).
+8. **P3 (Scriven): the area is solved, the deficit is not (WO-P3b → P3c → P3d).** P3b's "PLIC
+   area 5–9 % low" was the probe's 4³ initialisation; P3c showed no per-cell area converges
+   (first order in h/R, the pieces do not join); **P3d built the joined sheet** — marching
+   tetrahedra on the PLIC signed-distance level set with the two endpoint distance functions
+   blended (`set_phase_change_area(6)`; the raw C = ½ level set, mode 4, is refuted: +5 % on a
+   sphere, +21 % on a 45° plane, because the SZ cubic interpolated along √3 diagonals wrinkles
+   the sheet). Mode 6 is at the floor on every a-priori geometry (sphere 1e-4, tilted planes
+   2e-6 via the periodic-torus co-area identity, cylinder order 2.04), does not drift under 100
+   WY steps while 57 % of the domain fills with wisps (mode 0: 0.4–0.5 pp), is byte-identical on
+   every planar gate, makes the P2 MPI gate bitwise, and removes the pure-gas deposit fallback
+   entirely. **Default flipped to mode 6 (coordinator's decision on the re-derived gate).**
+   Scriven still misses: 1.04 % (Ja 0.5) / 1.49 % (Ja 2), β_eff −1.66 / −1.48 %, with the RUN's
+   area −2.15 % below 4πR² although the estimator is exact on the same fields → the remaining
+   lever is the **regression step** (plane shift + clip-and-redistribute on a curved moving
+   interface) — **WO-P3e** (running), with an a-priori one-step instrument first.
 9. **`step()` is not atomic across the Weymouth–Yue boundedness throw** (E6 finding): the colour
    survives and a retry works, but the momentum half has already advanced by the rejected dt
    (`max|w|` moves by exactly g·dt), so catch-and-halve desynchronises colour and momentum.
