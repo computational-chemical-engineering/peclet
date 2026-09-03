@@ -1135,15 +1135,21 @@ gates, twice-failed gates escalate.
    (the meniscus between two plates, the cap's foot on both walls): the next probe is the same
    instrument on the slot (`tests/study/vof_wetting_dynamic.py`'s plate scene). Until V6c
    closes, dynamic wetting is qualitative; static and drainage results stand.
-8. **P3 (Scriven) at 2 %: check the initialisation before the method.** WO-P23 measured the
-   deficit as accumulated in the first steps (`ṁ` +9.5 % → −2.7 %) and independent of box and
-   mesh. The classic trap in this benchmark is starting from a UNIFORM superheat with a sharp
-   bubble: Scriven's solution has a thermal boundary layer of thickness ~R₀/(2β²) at t₀ that
-   must be initialised from the similarity profile (Sato & Ničeno 2013; Malan 2021 both do
-   this), otherwise the first steps evaporate the superheat sitting at the interface and the
-   radius carries a permanent offset. Next P3 attempt: initialise T(r, t₀) from the similarity
-   profile with R₀ = 2β√(α_l t₀) and compare; only if the 2 % survives is it the method (then
-   the quadratic fit's stencil under motion and the `pcIsInterfacial` switch are the suspects).
+8. **P3 (Scriven) at 2 %: REFUTED as initialisation, LOCATED in the PLIC area sum (WO-P3b).**
+   The driver already started from Scriven's similarity profile; the uniform-superheat control
+   is worse in the transient and only looks better at Ja = 2 by cancellation. The right
+   discriminator is the growth RATE (`R² = 4β²α t` fitted through the origin): β_eff is
+   **−2.5 % under both starts and does not converge with mesh** (64³/128³/192³: −2.7/−2.5/−3.2 %).
+   Ablations kill dt, the energy sweeps, the start radius and the deposit fallback. What is
+   left: the flux PER UNIT AREA is within ±0.5 % of Scriven while **the summed PLIC area of a
+   sphere is 5.5–9.3 % low at R = 4…28 with no convergence** (a-priori probe on exact fractions;
+   marching cubes on the same field gives 4πR² to 0.4 %; `plicArea` is exact on a plane) —
+   `plicArea = |m|₂ dV/dα` is linear in the MYC normal, whose angle error V0 measured as
+   non-convergent (order 0.83). Every earlier phase-change gate is planar, where that normal
+   is exact — which is why P0–P2 are second order and P3 is not. **P3c** (next): take `A_Γ`
+   from the same geometry the curvature comes from (height-function `√(1+h_x²+h_y²)` per
+   column on tiers 1/2, the paraboloid's area on the PV branch), gate Σ A on the sphere probe
+   (< 0.5 %, convergent) and re-run Scriven; quote β_eff beside every P3 number.
 9. **Momentum consistency in cut cells diverges under a nonzero-mean periodic body force**
    (WO-Q open question). Closed or open columns are fine; a periodic driven bed with a heavy
    phase is not. V7 uses inflow/outflow or closed columns, never a periodic net force.
