@@ -1036,7 +1036,7 @@ pattern — the ABC counterpart of the V4 rule).
   orders of flux divergence on Hysing 2, nothing else moves), and adds the advector wisp guard.
   Also found: `max_open_divergence()` MUTATES the velocity at an outflow (non-mutating sibling
   `max_open_divergence_projected()`; the default is a user decision).
-- Pending (09-03 00:30): E6/E7 pages, WO-P23, WO-W12 running; **WO-V6b (Navier slip) next, coordinated with the velocity-solve session**; WO-V9 after them; V7's page needs a frozen render (~6 h) before publication.
+- Pending (09-03 00:30): E6/E7 pages, WO-P23, WO-W12 running; WO-V6b LANDED; **V6c next (Fable)**; WO-V9 after them; V7's page needs a frozen render (~6 h) before publication.
 
 ## 13. Revised ladder for the remainder (2026-09-02, evening) — review and execution plan
 
@@ -1056,7 +1056,7 @@ gates, twice-failed gates escalate.
 | V5b static θ | **done 09-02** (WO-S) | ≤1.3° for θ ≤ 90°, −3.6° at 120°; Jurin inconclusive |
 | V-BC open boundaries | **done 09-02** (WO-R + WO-R2) | outflow operator fixed on BOTH faces (Nusselt film at ratio 100/1000 within 0.2 %); cut-cell × boundary composed; `enable_vof` sets the exact residual and the wisp guard; open: a gas stream over a pool at ratio 1000 still stirs the pool (~3 % of the inlet speed) |
 | V8 collocated (minimal) | **done 09-02** (WO-T) | all-fluid, rated ratio ~100; cut-cell + collocated = later |
-| V6 dynamic θ / hysteresis | **done 09-02 (angle half)** (WO-V6) | Cox–Voinov + pinning exact at the kernel level, Jurin −1 %; contact-line MOBILITY is 180× too low: the velocity-side Navier slip is missing → **V6b** |
+| V6 dynamic θ / hysteresis | **done 09-02/03 (angle half + Navier slip)** (WO-V6, WO-V6b) | Cox–Voinov + pinning exact; Jurin −1 %; slip closure exact at the float floor, Cox–Voinov slip sensitivity −22 %; **contact-line mobility still ~175× low and the bottleneck is in the WETTING BAND, not the wall condition** (front speed ∝ 1/w, apparent 70° vs imposed 37°) → **V6c** (Fable instrument) |
 | V7 pore-scale campaign | **run 09-02/03** (WO-V7) | drainage right at every Ca; **imbibition inverted** (contact-line mobility, V6b) — the campaign's binding limitation; page drafted, NOT frozen |
 | V9 performance | after E7 (WO-V9) | profile first on the gallery cases, then the levers |
 | V10 AMR | design only (§13.4) | blocked on varRho-on-AMR and cut-cell + collocated |
@@ -1096,7 +1096,15 @@ gates, twice-failed gates escalate.
    the model's sensitivity. **V6b = a Navier slip length in the cut-cell IBM momentum wall
    closure** (velocity side; touches `cut_cell_ibm.hpp`, i.e. the velocity-solve session's
    files — coordinate before starting). Until then dynamic-wetting results are qualitative.
-6. **Flat SDF walls are safe only OFF the grid lines.** Half-integer walls close the wall cell's
+6. **[FIXED 09-03 by WO-V6b Part A]** The wall-on-a-grid-plane divergence was ONE velocity-DOF
+   classification disagreeing with four: `ibmSolidMask` used `sdf < 0` (a DOF exactly on the
+   wall stayed a free unknown) while `ibmIsCut`, `ibmCleanFluidMask` and the face openness use
+   `<= 0`. Tie-break `<= 0`: the WO-V7 slit goes from `max|u|` 1e8 / frozen time to 0.68 /
+   normal; the only shipped test whose output moves is `vof_cutcell` (its half-integer-wall G5
+   band velocity 0.788 → 0.005, i.e. WO-S's "artefact" was this defect), 32/33 binaries and the
+   regression bit-identical. Half-integer and integer flat walls are now both usable; the
+   previous text is kept below for the record.
+   **(previous)** Flat SDF walls are safe only OFF the grid lines. Half-integer walls close the wall cell's
    tangential faces and pin the contact line (WO-S); INTEGER-coordinate walls (a wall exactly on
    a cell face) make a driven two-phase run diverge geometrically with NO diagnostic firing
    (WO-V7: `max|u|` 1.1e+2 on step 1, growing 5 %/step while the interface-local dt limiter
@@ -1108,7 +1116,19 @@ gates, twice-failed gates escalate.
    is state-dependent (the first dt of a gas-filled domain is 7× too large — re-pick dt from the
    solver's limiter EVERY step), and `CutcellMG::solveFCG` prints "preconditioner produced
    non-finite z" and then silently zeroes the correction (rule 3b's cap check does not see it).
-7. **Momentum consistency in cut cells diverges under a nonzero-mean periodic body force**
+7. **V6c — the band-local contact-line resistance (Fable instrument, next).** With the Navier
+   slip in, Lucas–Washburn is still 175× slow and the pore-doublet verdict does not flip; the
+   gap-width probe (front speed ∝ 1/w instead of ∝ w) and the persistent apparent-vs-imposed
+   angle gap locate the resistance in the θ-fill/curvature/force chain at the contact cell,
+   not in the momentum wall condition. Instrument to build: the one-step force–response test at
+   a contact line (prescribed θ_app − θ_imp mismatch → the CSF force actually applied on the
+   contact cell's faces vs the velocity the projection returns), on the plate scene, with the
+   HF/PV branch census in the band. Candidates, in order: the force lands on faces whose DOFs
+   are masked/closed (openness 0 or the new tie-break) and is lost; the PV fallback smears the
+   contact-cell curvature over 5³; the fill's neighbour averaging (WO-S item 3) damps the
+   contact-cell curvature signal. Until V6c lands, dynamic wetting is qualitative; static and
+   drainage results stand.
+8. **Momentum consistency in cut cells diverges under a nonzero-mean periodic body force**
    (WO-Q open question). Closed or open columns are fine; a periodic driven bed with a heavy
    phase is not. V7 uses inflow/outflow or closed columns, never a periodic net force.
 
