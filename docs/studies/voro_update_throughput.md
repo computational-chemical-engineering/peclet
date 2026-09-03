@@ -35,19 +35,22 @@ emission in every gather and rebuild.
 
 | disp | host repair Mcells/s | host speedup | CUDA repair Mcells/s | CUDA speedup | max rel. ΔV | missed nbrs/step |
 |---|---|---|---|---|---|---|
-| 1e-4 | 3.69 | 8.7 | 2.32 | 2.1 | 6e-11 | 62 |
-| 2e-4 | 3.35 | 8.0 | 2.30 | 2.0 | 4e-11 | 75 |
-| 5e-4 | 1.69 | 3.9 | 2.43 | 2.2 | 1.5e-7 / 2e-11 | 55 |
-| 1e-3 | 1.65 | 4.8 | 1.74 | 1.6 | 4e-12 | 70 |
-| 2e-3 | 1.01 | 2.3 | 1.42 | 1.3 | 9e-12 / 9e-7 | 65 |
-| 5e-3 | 0.57 | 1.3 | 0.88 | 0.8 | 1e-11 | 31 |
-| ≥ 1e-2 (gate → rebuild) | 0.25 | 0.6 | 0.51 | 0.5 | 1e-15 | 0 |
+| 1e-4 | 4.23 | 9.7 | 2.48 | 2.6 | 6e-11 | 64 |
+| 2e-4 | 3.62 | 8.2 | 2.57 | 2.4 | 4e-11 | 71 |
+| 5e-4 | 2.39 | 5.4 | 2.74 | 2.8 | 1.5e-7 / 2e-11 | 58 |
+| 1e-3 | 1.75 | 3.9 | 1.86 | 1.7 | 4e-12 | 74 |
+| 2e-3 | 1.12 | 2.5 | 1.55 | 1.5 | 9e-12 / 9e-7 | 58 |
+| 5e-3 | 0.63 | 1.4 | 1.00 | 1.0 | 1e-11 | 34 |
+| ≥ 1e-2 (gate → rebuild) | 0.30 | 0.67 | 0.59 | 0.6 | 1e-15 | 0 |
+
+(After voro 75f4926: the clip reports the gap its commit test computes, so the near-miss
+recording costs no second vertex scan.)
 
 The residual "missed" relations are zero-area slivers below the certificate tolerance (the
 volumes agree to 1e-11). Over 400 steps (`test_sdf_dynamic`) the wall-free drift fell from
 1.6e-3 to 5.5e-11 (default tolerance) and 1.2e-15 (tight); the SDF path from 1.6e-3 to 5.9e-8.
-The gate's rebuild now costs 0.6× a cold build (the near-miss emission with its wider reach); a
-lazy emission scheme like the adjacency's is the follow-up.
+The gate's rebuild now costs 0.67× a cold build (the near-miss emission's wider search reach);
+a lazy emission scheme like the adjacency's is the follow-up.
 
 ## Cold build vs N (CUDA, FP64, MAXP 64 / MAXT 112)
 
