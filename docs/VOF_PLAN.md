@@ -1135,7 +1135,16 @@ gates, twice-failed gates escalate.
    (the meniscus between two plates, the cap's foot on both walls): the next probe is the same
    instrument on the slot (`tests/study/vof_wetting_dynamic.py`'s plate scene). Until V6c
    closes, dynamic wetting is qualitative; static and drainage results stand.
-8. **Momentum consistency in cut cells diverges under a nonzero-mean periodic body force**
+8. **P3 (Scriven) at 2 %: check the initialisation before the method.** WO-P23 measured the
+   deficit as accumulated in the first steps (`ṁ` +9.5 % → −2.7 %) and independent of box and
+   mesh. The classic trap in this benchmark is starting from a UNIFORM superheat with a sharp
+   bubble: Scriven's solution has a thermal boundary layer of thickness ~R₀/(2β²) at t₀ that
+   must be initialised from the similarity profile (Sato & Ničeno 2013; Malan 2021 both do
+   this), otherwise the first steps evaporate the superheat sitting at the interface and the
+   radius carries a permanent offset. Next P3 attempt: initialise T(r, t₀) from the similarity
+   profile with R₀ = 2β√(α_l t₀) and compare; only if the 2 % survives is it the method (then
+   the quadratic fit's stencil under motion and the `pcIsInterfacial` switch are the suspects).
+9. **Momentum consistency in cut cells diverges under a nonzero-mean periodic body force**
    (WO-Q open question). Closed or open columns are fine; a periodic driven bed with a heavy
    phase is not. V7 uses inflow/outflow or closed columns, never a periodic net force.
 
