@@ -1036,7 +1036,7 @@ pattern — the ABC counterpart of the V4 rule).
   orders of flux divergence on Hysing 2, nothing else moves), and adds the advector wisp guard.
   Also found: `max_open_divergence()` MUTATES the velocity at an outflow (non-mutating sibling
   `max_open_divergence_projected()`; the default is a user decision).
-- Pending (09-03 00:30): E6/E7 pages, WO-P23, WO-W12 running; WO-V6b LANDED; **V6c next (Fable)**; WO-V9 after them; V7's page needs a frozen render (~6 h) before publication.
+- Pending (09-03 10:30): E6 page and WO-P23 running; W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
 
 ## 13. Revised ladder for the remainder (2026-09-02, evening) — review and execution plan
 
@@ -1064,7 +1064,7 @@ gates, twice-failed gates escalate.
 | P0/P1 phase change | **done 09-02** (WO-P01) | Stefan 0.2 % at N=256; ṁ sign, analytic `plicArea`, liquid-aware redistribute corrected |
 | P2/P3 | running (WO-P23) | plane-anchored Dirichlet first |
 | W0 block container | **done 09-02** (WO-W0) | L1 kernels now `peclet::core::vof`; two markers never coalesce; np 1/2/4 bitwise |
-| W1/W2 | running (WO-W12) | weighted masters, block CSF, channel_18 |
+| W1/W2 | **done 09-03** (WO-W12) | LPT masters (imbalance 1.00 vs 2.18 round-robin at np 8), device packing, block CSF; Hysing 1 block == global to 0.00 %; Grace −6 %; two touching markers never merge; `channel_18` transcribed and run (no reference data ships with TBFsolver — ours is the first datum; the cross-code comparison needs TBFsolver built and ~20 eddy turnovers) |
 | W3–W5 | after W2 | unchanged |
 | examples E1–E5, E8 | **published** | E6 (after R2), E7 (running) |
 
