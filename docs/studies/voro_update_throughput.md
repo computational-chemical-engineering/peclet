@@ -26,6 +26,29 @@ per-step displacement in units of the spacing.
 (`flagged %` = cells the certificate flagged, i.e. the Pass-1 gather set; identical on both
 backends, as it must be. Rows ≥ 1e-2 are the adaptive gate routing the step to a full rebuild.)
 
+## The same sweep with the near-miss certificate (default since voro 4953948)
+
+Finding 4 below was fixed the same day: every (re)build records the candidates whose plane
+missed the cell by less than half a skin, and the certificate re-tests them each step
+(`MovingTessellation::useNearMiss`). The repair becomes exact; the price is the extended-reach
+emission in every gather and rebuild.
+
+| disp | host repair Mcells/s | host speedup | CUDA repair Mcells/s | CUDA speedup | max rel. ΔV | missed nbrs/step |
+|---|---|---|---|---|---|---|
+| 1e-4 | 3.69 | 8.7 | 2.32 | 2.1 | 6e-11 | 62 |
+| 2e-4 | 3.35 | 8.0 | 2.30 | 2.0 | 4e-11 | 75 |
+| 5e-4 | 1.69 | 3.9 | 2.43 | 2.2 | 1.5e-7 / 2e-11 | 55 |
+| 1e-3 | 1.65 | 4.8 | 1.74 | 1.6 | 4e-12 | 70 |
+| 2e-3 | 1.01 | 2.3 | 1.42 | 1.3 | 9e-12 / 9e-7 | 65 |
+| 5e-3 | 0.57 | 1.3 | 0.88 | 0.8 | 1e-11 | 31 |
+| ≥ 1e-2 (gate → rebuild) | 0.25 | 0.6 | 0.51 | 0.5 | 1e-15 | 0 |
+
+The residual "missed" relations are zero-area slivers below the certificate tolerance (the
+volumes agree to 1e-11). Over 400 steps (`test_sdf_dynamic`) the wall-free drift fell from
+1.6e-3 to 5.5e-11 (default tolerance) and 1.2e-15 (tight); the SDF path from 1.6e-3 to 5.9e-8.
+The gate's rebuild now costs 0.6× a cold build (the near-miss emission with its wider reach); a
+lazy emission scheme like the adjacency's is the follow-up.
+
 ## Cold build vs N (CUDA, FP64, MAXP 64 / MAXT 112)
 
 | N | plain build Mcells/s | build emitting the resident store Mcells/s | store bytes/cell |
@@ -54,14 +77,12 @@ backends, as it must be. Rows ≥ 1e-2 are the adaptive gate routing the step to
    clip-only kernel benchmark (`bench_convexcell`) is the 14–17 Mcells/s figure recorded earlier;
    the gap is the worklist gather + publish. This is the number to set against the 2026 GPU
    power-diagram paper in the SOTA comparison the plan asks for.
-4. **The repair is not exact: `missed nbrs/step` ≈ 250 and `max rel. ΔV` up to 5e-4 at 5e-3
-   spacing per step** (both backends, identical counts). The certificate sees lost faces and
-   flip partners but misses ~0.1 % of the gained neighbour relations per step; the volume error
-   accumulates to the ~1.6e-3 measured over 400 steps in `test_sdf_dynamic` (also recorded there
-   as not tightening with the certificate tolerance). The gate forces exactness only above ~1 %
-   displacement. Fixing this (a complete gain detection — the `ConnectivityArena` 2-ring the
-   dynamic-update study parked) is an engine-hardening item that should precede any physics that
-   integrates volumes over long runs (track D).
+4. **The repair was not exact: `missed nbrs/step` ≈ 250 and `max rel. ΔV` up to 5e-4 at 5e-3
+   spacing per step** (both backends, identical counts). The certificate saw lost faces and
+   flip partners but missed ~0.1 % of the gained neighbour relations per step; the volume error
+   accumulated to the ~1.6e-3 measured over 400 steps in `test_sdf_dynamic` (and did not tighten
+   with the certificate tolerance). **Fixed by the near-miss certificate** (table above): exact
+   to 1e-11 per step, 5.5e-11 over 400 steps, at ~70 % of the previous host speedup.
 5. The gate's rebuild costs 0.78–0.98× a cold build (the store emission), so the "never much
    slower than a cold build" guard holds on both backends.
 
