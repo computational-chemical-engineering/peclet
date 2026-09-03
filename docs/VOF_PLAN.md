@@ -1126,8 +1126,15 @@ gates, twice-failed gates escalate.
    HF/PV branch census in the band. Candidates, in order: the force lands on faces whose DOFs
    are masked/closed (openness 0 or the new tie-break) and is lost; the PV fallback smears the
    contact-cell curvature over 5³; the fill's neighbour averaging (WO-S item 3) damps the
-   contact-cell curvature signal. Until V6c lands, dynamic wetting is qualitative; static and
-   drainage results stand.
+   contact-cell curvature signal. **First instrument results (09-03, flat-wall hemisphere,
+   θ_set = 30° from 90°, 400 steps):** the force IS present at the contact cells (Σ|F| 46–86 vs
+   16 at equilibrium, κ_contact −0.2…−0.6 vs 2/R = 0.17), 20–30 % of it lands on the CLOSED wall
+   faces (lost), and the contact cells move at 0.04–0.08 cells/time (Ca 0.015–0.03) while the
+   contact radius grows 12.0 → 15.3 (λ = 0) / 16.5 (λ = 0.3 Δ) — within a factor 3–6 of the
+   Cox–Voinov expectation for this mismatch, NOT 175×. So the slot's 175× is scene-specific
+   (the meniscus between two plates, the cap's foot on both walls): the next probe is the same
+   instrument on the slot (`tests/study/vof_wetting_dynamic.py`'s plate scene). Until V6c
+   closes, dynamic wetting is qualitative; static and drainage results stand.
 8. **Momentum consistency in cut cells diverges under a nonzero-mean periodic body force**
    (WO-Q open question). Closed or open columns are fine; a periodic driven bed with a heavy
    phase is not. V7 uses inflow/outflow or closed columns, never a periodic net force.
