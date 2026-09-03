@@ -1014,8 +1014,13 @@ pattern — the ABC counterpart of the V4 rule).
   ≥ 10 cells needed), cap radius on a sphere within 2.1 %. Trap: a flat SDF wall at a
   HALF-INTEGER coordinate closes the wall cell's tangential faces (`sdf > 0` = fluid) and pins
   the contact line; Jurin gate inconclusive (scene defects). Domain-BC walls get no θ fill.
-- **Examples E1–E5 PUBLISHED** (`peclet-examples` main): vof-advection-benchmarks,
-  parasitic-currents, capillary-oscillations, rising-bubble, droplet-wetting.
+- **Examples E1–E8 PUBLISHED** (`peclet-examples` main): vof-advection-benchmarks,
+  parasitic-currents, capillary-oscillations, rising-bubble, droplet-wetting (E1–E5, with the
+  collocated columns of E8), bubble-through-packing (E7, movie inline), trickle-flow-packing
+  (E6: colour budget 3e-14, ratio 100 and 1000 both clean; a filling transient, stated as such;
+  the contact-angle census reads 135° apparent against 60° prescribed on an advancing front over
+  dry grains — V6c's mechanism in the field). The pore-scale page (V7) is drafted, unfrozen,
+  unpublished.
 - **Citation caveat**: the "Huang et al. JCP 2025/2026, arXiv:2603.10045" solid-clipped flux
   polygon reference in §2/§3 could not be resolved by the E5 session; the verified paper on
   volume-conserving cut-cell VoF with dynamic contact lines is **Chen, Han, Pan, Fuster &
@@ -1036,7 +1041,7 @@ pattern — the ABC counterpart of the V4 rule).
   orders of flux divergence on Hysing 2, nothing else moves), and adds the advector wisp guard.
   Also found: `max_open_divergence()` MUTATES the velocity at an outflow (non-mutating sibling
   `max_open_divergence_projected()`; the default is a user decision).
-- Pending (09-03 13:00): E6 page running; P23 + P3b + P3c LANDED (P3 open at 1.3 % with mode 3; P3d = joined area); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
+- Pending (09-03 18:00): E6 PUBLISHED; P3d (joined area) running; P23 + P3b + P3c LANDED (P3 open at 1.3 % with mode 3; P3d = joined area); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
 
 ## 13. Revised ladder for the remainder (2026-09-02, evening) — review and execution plan
 
@@ -1152,7 +1157,13 @@ gates, twice-failed gates escalate.
    marching cubes on the C = ½ level set, or a partition-of-unity paraboloid over the band —
    gated on the sub-16 sphere probe with order ≥ 1.5; W12's `vof_block_stats()['area']`
    keeps the PLIC polygon (its premise for switching was the same non-defect).
-9. **Momentum consistency in cut cells diverges under a nonzero-mean periodic body force**
+9. **`step()` is not atomic across the Weymouth–Yue boundedness throw** (E6 finding): the colour
+   survives and a retry works, but the momentum half has already advanced by the rejected dt
+   (`max|w|` moves by exactly g·dt), so catch-and-halve desynchronises colour and momentum.
+   Fix (small, VoF section): evaluate the interface-local Courant check and the capillary limit
+   BEFORE the predictor and throw there; until then re-pick dt from `vof_step_limits()` every
+   step (every ten is not enough when a pendant body bridges onto a packing).
+10. **Momentum consistency in cut cells diverges under a nonzero-mean periodic body force**
    (WO-Q open question). Closed or open columns are fine; a periodic driven bed with a heavy
    phase is not. V7 uses inflow/outflow or closed columns, never a periodic net force.
 
