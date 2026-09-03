@@ -1042,7 +1042,7 @@ pattern — the ABC counterpart of the V4 rule).
   Also found: `max_open_divergence()` MUTATES the velocity at an outflow (non-mutating sibling
   `max_open_divergence_projected()`; the default is a user decision).
 - **Merged-main validation 09-03 19:00 (nvidia-cuda)**: `tests/kokkos` 33/33, `tests/kokkos_mpi` VoF/varRho/phase-change/wall-slip battery 46/46 at np 1/2/4.
-- Pending (09-03 23:30): P3e LANDED (regression exonerated; P3 = flux); P3f (energy-budget + fit-bias instruments) next; P23 + P3b + P3c LANDED (P3 open at 1.3 % with mode 3; P3d = joined area); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
+- Pending (09-04 02:00): P3f LANDED (three first-order errors cancel); P3g (second-order interfacial energy operator) next; P23 + P3b + P3c LANDED (P3 open at 1.3 % with mode 3; P3d = joined area); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
 
 ## 13. Revised ladder for the remainder (2026-09-02, evening) — review and execution plan
 
@@ -1141,34 +1141,22 @@ gates, twice-failed gates escalate.
    (the meniscus between two plates, the cap's foot on both walls): the next probe is the same
    instrument on the slot (`tests/study/vof_wetting_dynamic.py`'s plate scene). Until V6c
    closes, dynamic wetting is qualitative; static and drainage results stand.
-8. **P3 (Scriven): the area is solved, the deficit is not (WO-P3b → P3c → P3d).** P3b's "PLIC
-   area 5–9 % low" was the probe's 4³ initialisation; P3c showed no per-cell area converges
-   (first order in h/R, the pieces do not join); **P3d built the joined sheet** — marching
-   tetrahedra on the PLIC signed-distance level set with the two endpoint distance functions
-   blended (`set_phase_change_area(6)`; the raw C = ½ level set, mode 4, is refuted: +5 % on a
-   sphere, +21 % on a 45° plane, because the SZ cubic interpolated along √3 diagonals wrinkles
-   the sheet). Mode 6 is at the floor on every a-priori geometry (sphere 1e-4, tilted planes
-   2e-6 via the periodic-torus co-area identity, cylinder order 2.04), does not drift under 100
-   WY steps while 57 % of the domain fills with wisps (mode 0: 0.4–0.5 pp), is byte-identical on
-   every planar gate, makes the P2 MPI gate bitwise, and removes the pure-gas deposit fallback
-   entirely. **Default flipped to mode 6 (coordinator's decision on the re-derived gate).**
-   Scriven still misses: 1.04 % (Ja 0.5) / 1.49 % (Ja 2), β_eff −1.66 / −1.48 %, with the RUN's
-   area −2.15 % below 4πR² although the estimator is exact on the same fields → the remaining
-   lever was the **regression step** — **WO-P3e** measured it: the shift's volume error is
-   exactly the linearisation `−δ/R` and the run's δ/R is 1e-4 (at ratio 100 the regression
-   supplies only ρ_v/ρ_l of the interface motion; WY advection supplies 99 %), the redistribute
-   is quiet and isotropic, and the "−2.15 % area in the run" was a STALE diagnostic (area
-   computed at the head of `step()`, radius at its end, one dR apart): recomputed on the same
-   field the run's area is **+0.04 %**. So area, shift and deposit are all right and P3 is a
-   **FLUX** problem: the area-averaged ṁ drifts +10 % → −2.7 % (Ja 0.5) and Ja 2 acquires its
-   whole constant-relative deficit in the first ~40 steps. **P3f** (next, instruments first):
-   (a) the energy budget of a liquid cell that becomes interfacial — its superheat is lost to
-   the plane-anchored `T_sat` row, a one-signed sink scaling with the cells swept per step;
-   (b) the O(h/R) curvature bias of the 5³ one-sided gradient fit, measured a priori on an
-   imposed Scriven profile at R = 6/10/14/20 (never measured off a plane so far); (c) the
-   confinement/mesh ladder re-taken on mode 6. Trap recorded: `vof_interface_area()` under
-   `enable_phase_change` runs at `wispEps = 0` and drifts +0.4 % over 100 WY steps (vs +0.02 %
-   under `enable_vof`).
+8. **P3 (Scriven) — the 1–1.5 % is the residue of a CANCELLATION of three first-order errors
+   (WO-P23 → P3b → P3c → P3d → P3e → P3f).** Retired en route: initialisation (P3b), the area
+   estimator (P3c/P3d: the joined marching-tetrahedra sheet is exact to 1e-4 and is now the
+   default), the regression step and the deposit (P3e; the "run area deficit" was a stale
+   diagnostic). P3f's a-priori instruments then found: (F1) the GFM Dirichlet row is a two-point
+   flux, first order in the row (−17 % at a 2.4-cell thermal layer, −5 % at 8 cells, on a FLAT
+   interface); (F2) the one-sided fit measures the distance to the tangent plane, not the sphere
+   (+19/+12/+9/+6 % at R = 6/10/14/20, order 0.9 — the estimator had never been run off a plane);
+   (F3) the Dirichlet overwrite destroys −0.7 % (Ja 0.5) / −4.3 % (Ja 2) of the latent heat.
+   Fixing any one alone makes the gate WORSE (measured: +carry 0.49 %/3.18 %, +κ-fit 7 %/8 %),
+   and the mesh ladder is anti-convergent (the compensating term is the O(h/R) one) — so
+   "refine it" is retired too. Also corrected: a cell changing class is a flux between two
+   books, not an energy sink. **WO-P3g** (next): ṁ defined as the operator's own discrete flux
+   (F3 gone by construction), a Gibou–Fedkiw second-order GFM row (F1), curvature-consistent
+   distances from the V3 cascade in the row and the fit (F2), gated by P3f's instruments and the
+   96/128/192 ladder, which must then converge.
 9. **`step()` is not atomic across the Weymouth–Yue boundedness throw** (E6 finding): the colour
    survives and a retry works, but the momentum half has already advanced by the rejected dt
    (`max|w|` moves by exactly g·dt), so catch-and-halve desynchronises colour and momentum.
