@@ -1,0 +1,107 @@
+# Covolume vs collocated Navier–Stokes on Voronoi meshes (track C2, 2026-09-03)
+
+The Voronoi methods plan (V4) builds both static solvers on one operator layer (`voro`
+`fv/mesh.hpp`, `fv/operators.hpp`) and gates them against each other. Both are on the periodic
+Voronoi face mesh, both use the same two-point pressure Laplacian `L = Σ A_f/d_f` (exact on
+Voronoi orthogonality), the same GraphAMG-preconditioned CG, SSP-RK3 with a projection after every
+stage, and the same cell-centred convection/diffusion kernel; they differ in WHERE the velocity
+lives and how the projection reaches it.
+
+| | covolume (`fv/covolume.hpp`) | collocated (`fv/collocated.hpp`) |
+|---|---|---|
+| unknown | face-normal flux `u_f` | seed velocity vector `U_i` + the projected face flux `u_f` |
+| momentum on faces | exact transpose of the Perot reconstruction `Rᵀ` | — |
+| projection | exact (face field) | `flow`'s approximate projection: constraint `T` (centre→face), exact face projection, cell correction with `G = Tᵀ∘grad_f` (the constraint transpose — flow's gauge-exact gradient) |
+| pressure in the predictor | none needed (the flux IS the projected field) | incremental: `−G P^n` at the cells, `P += φ` (flow's `incremental_`) |
+| energy (inviscid, semi-discrete) | conserved exactly (`⟨Ru,a⟩_V = ⟨u,Rᵀa⟩_F`, convection skew-symmetric) | not exactly: the cell correction is approximate — measured drift O(dt·h²) |
+| unstructured accuracy | Perot reconstruction first-order consistent on non-symmetric cells | plain `T` first order ∝ skewness; **skew-corrected `T` (default) second order** |
+
+## Taylor–Green (viscous, ν = 0.01, T = 0.25, CFL 0.2), relative errors at t = T
+
+`test_collocated_ns` (C), host-openmp; cell error = seed velocity in the V-norm, face error = face
+flux in the F-norm; "Stokes" = the convective term switched off.
+
+| mesh | n | skew | collocated plain: cell / face | collocated skew-corrected: cell / face | covolume: face / Perot cell | Stokes plain / skew |
+|---|---|---|---|---|---|---|
+| cubic lattice | 8 | 0 | 9.16e-3 / 6.77e-2 | 9.16e-3 / 6.77e-2 | 3.81e-2 / 4.09e-2 | 9.99e-3 / 9.99e-3 |
+| | 16 | 0 | 2.48e-3 / 1.68e-2 | 2.48e-3 / 1.68e-2 | 9.99e-3 / 9.42e-3 | 2.53e-3 / 2.53e-3 |
+| | 32 | 0 | 6.30e-4 / 4.19e-3 | 6.30e-4 / 4.19e-3 | 2.53e-3 / 2.30e-3 | 6.34e-4 / 6.34e-4 |
+| **order** | | | **1.97** / 2.00 | **1.97** / 2.00 | 1.98 / 2.03 | 2.00 / 2.00 |
+| 0.2h-jittered lattice | | 0.08 | | | | |
+| **order** | | | 1.72 / 1.26 | **2.11** / 2.03 | 0.82 / 1.70 | 1.32 / 2.02 |
+| random seeds + 30 Lloyd sweeps (CVT) | 8 | 0.039 | 1.22e-1 / 1.02e-1 | 8.42e-2 / 7.65e-2 | 7.85e-2 / 3.19e-2 | 1.00e-1 / 5.29e-2 |
+| | 16 | 0.040 | 3.85e-2 / 3.34e-2 | 2.12e-2 / 1.98e-2 | 2.94e-2 / 1.08e-2 | 3.25e-2 / 9.16e-3 |
+| | 32 | 0.040 | 1.71e-2 / 1.45e-2 | 4.99e-3 / 4.84e-3 | 1.21e-2 / 2.95e-3 | 1.64e-2 / 2.27e-3 |
+| **order** | | | 1.17 / 1.21 | **2.08** / 2.03 | 1.29 / 1.87 | 0.99 / 2.01 |
+
+Reading: on the cubic lattice the collocated and the covolume schemes are the MAC pair `flow`
+has (both second order; the collocated cell error is 4× smaller at equal n because the seed value
+is a point sample of a smooth field while the covolume flux carries the face-average error). On
+unstructured Voronoi meshes the covolume scheme is limited to first order by the Perot
+reconstruction (the face midpoint rule misses the facet second moments; `Rᵀ Δ₂ R` inherits it — the
+Stokes-only column of `test_covolume_ns` isolates the viscous term), while the collocated scheme
+with the plain constraint is limited by the skewness of the connector-foot interpolation (B4:
+skewness limits flux consistency). The skew-corrected constraint pair removes that and is second
+order on both the jittered lattice and the centroidal mesh; its Stokes-only order (2.02 / 2.01)
+shows the two-point Laplacian of the cell field converges at second order in the solution — the
+supra-convergence B4 measured for the pressure Poisson problem.
+
+## Structure gates (a priori)
+
+| gate | covolume | collocated |
+|---|---|---|
+| adjointness (`⟨Ru,a⟩_V = ⟨u,Rᵀa⟩_F` / `⟨TU,g⟩_F = ⟨U,Tᵀg⟩_V`) | 1e-15 | 1e-15 (plain and skew-corrected) |
+| convection skew-symmetry with the projected flux | 1e-16 | 1e-17 |
+| linear field reproduced at the face centroid (random mesh, skewness 0.24) | — | plain 2.2e-2, skew-corrected 5e-16 |
+| inviscid TGV energy drift, 16³ jittered, T = 1.25 | 9.7e-7 (RK3 time error only: dt-order 2.96) | −7.0e-4 at CFL 0.2, −2.3e-4 at CFL 0.1; h-order 1.7–2.0 (O(dt·h²), flow's approximate-projection analysis) |
+| face divergence | 6e-14 | 3e-14 |
+| pressure PCG (GraphAMG on −V L) | 12 iterations vs 76 CG | same |
+
+## Plane Poiseuille between SDF slabs (C3, `test_body_fitted`)
+
+Body force, ν = 1, cubic lattice of seeds with the walls halfway between seed rows, both solvers
+with the two-point no-slip wall flux `ν A (U_wall − U_i)/h_A`, marched to the steady state
+(SSP-RK3, diffusion number 0.2).
+
+| cells across the gap | collocated cell / face error | covolume face / Perot cell error |
+|---|---|---|
+| 4 | 8.54e-2 / 8.54e-2 | 8.54e-2 / 8.54e-2 |
+| 8 | 2.14e-2 / 2.14e-2 | 2.14e-2 / 2.14e-2 |
+| 16 | 5.34e-3 / 5.34e-3 | 5.34e-3 / 5.34e-3 |
+| **order** | **2.00** | **2.00** |
+
+Both solvers coincide to the digit on the lattice for this one-dimensional flow. The exact
+parabola satisfies the interior discrete equations to round-off (4e-16); the wall row carries a
+residual of exactly f/4 because the two-point wall flux is the derivative at h_A/2 rather than at
+the wall — the classic half-cell truncation that converges at second order globally. Wall flux 0,
+face divergence 3e-16.
+
+## Stokes drag of a simple-cubic sphere array (C4, `test_permeability`)
+
+φ = 0.216, Zick & Homsy K = 7.442; collocated solver, Stokes, marched to a tight steady state;
+0.15h-jittered lattice seeds clipped by the sphere (fluid volume exact to 2e-5).
+
+| cells per box edge | cells per diameter | cells | K | error |
+|---|---|---|---|---|
+| 16 | 12 | 3031 | 6.442 | −13.4 % |
+| 24 | 18 | 10417 | 6.883 | −7.5 % |
+
+Order ≈ 1.4; flow's cut-cell IBM reaches −0.5 % at 32 cells per box edge. The geometry is exact
+(the SDF clip tiles the fluid volume to 2e-5) but the wall SHEAR is first order: seeds within
+0.4 h of the wall are dropped, so the wall cells are fat (h_A up to 1.4 h) and the two-point wall
+flux is the derivative at h_A/2. Two remedies, both open: wall-adapted seeding (a seed shell at
+h/2 from the surface — overflows the 64-plane cell cap today), or a second-order one-sided wall
+gradient as flow's gauge-exact gradient uses at cut cells.
+
+## Consequences for the plan
+
+* The collocated skew-corrected adjoint pair is the default static solver for body-fitted work
+  (C3 walls, C4 permeability); its structure is `peclet.flow`'s, so the two codes solve the same
+  problem the same way (the unstructured pieces — `T`, `Tᵀ`, `(I − S)⁻¹` — reduce to flow's
+  ½/½ average and central difference on a lattice).
+* The covolume scheme keeps its exact energy conservation and exact projection, which track D's
+  moving-mesh Lagrangian needs; its viscous term wants the DEC (Nicolaides) curl-curl form on the
+  Voronoi edges (C2a′) to reach second order on unstructured cells.
+* Immersed solids do not exist on the body-fitted mesh, so flow's invisible-subspace / ghost
+  projection machinery has no counterpart here; the wall treatment is the (T, Tᵀ) pair at the
+  wall faces (C3).
