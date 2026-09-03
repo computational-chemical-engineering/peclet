@@ -1041,7 +1041,8 @@ pattern — the ABC counterpart of the V4 rule).
   orders of flux divergence on Hysing 2, nothing else moves), and adds the advector wisp guard.
   Also found: `max_open_divergence()` MUTATES the velocity at an outflow (non-mutating sibling
   `max_open_divergence_projected()`; the default is a user decision).
-- Pending (09-03 18:00): E6 PUBLISHED; P3d (joined area) running; P23 + P3b + P3c LANDED (P3 open at 1.3 % with mode 3; P3d = joined area); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
+- **Merged-main validation 09-03 19:00 (nvidia-cuda)**: `tests/kokkos` 33/33, `tests/kokkos_mpi` VoF/varRho/phase-change/wall-slip battery 46/46 at np 1/2/4.
+- Pending (09-03 19:00): P3d (joined area) running; P23 + P3b + P3c LANDED (P3 open at 1.3 % with mode 3; P3d = joined area); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
 
 ## 13. Revised ladder for the remainder (2026-09-02, evening) — review and execution plan
 
