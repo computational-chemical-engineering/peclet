@@ -96,6 +96,13 @@ through the wall value, the cell and its neighbours (tangential variation remove
 gradient) is flow's wall-anchored reconstruction on the unstructured mesh, and it also makes the
 Poiseuille parabola the exact discrete steady state (wall-row residual 5e-11).
 
+## Distributed (C5, `tests/kokkos_mpi/test_flow_mpi`)
+
+Collocated solver on a 12³ jittered lattice split by the ORB decomposition, TGV, 20 steps:
+np = 1 is bit-exact to the single-rank run; np = 2 and 4 agree with it to 3e-15 in velocity and
+2e-16 in energy, face divergence 2e-14. The per-rank block-Jacobi GraphAMG costs 28 / 36 PCG
+iterations against 11 on one rank.
+
 ## Consequences for the plan
 
 * The collocated skew-corrected adjoint pair is the default static solver for body-fitted work
