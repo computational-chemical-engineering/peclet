@@ -1036,7 +1036,7 @@ pattern — the ABC counterpart of the V4 rule).
   orders of flux divergence on Hysing 2, nothing else moves), and adds the advector wisp guard.
   Also found: `max_open_divergence()` MUTATES the velocity at an outflow (non-mutating sibling
   `max_open_divergence_projected()`; the default is a user decision).
-- Pending (09-03 13:00): E6 page running; P23 LANDED (P3 open at 2 %); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
+- Pending (09-03 13:00): E6 page running; P23 + P3b + P3c LANDED (P3 open at 1.3 % with mode 3; P3d = joined area); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
 
 ## 13. Revised ladder for the remainder (2026-09-02, evening) — review and execution plan
 
@@ -1135,21 +1135,23 @@ gates, twice-failed gates escalate.
    (the meniscus between two plates, the cap's foot on both walls): the next probe is the same
    instrument on the slot (`tests/study/vof_wetting_dynamic.py`'s plate scene). Until V6c
    closes, dynamic wetting is qualitative; static and drainage results stand.
-8. **P3 (Scriven) at 2 %: REFUTED as initialisation, LOCATED in the PLIC area sum (WO-P3b).**
-   The driver already started from Scriven's similarity profile; the uniform-superheat control
-   is worse in the transient and only looks better at Ja = 2 by cancellation. The right
-   discriminator is the growth RATE (`R² = 4β²α t` fitted through the origin): β_eff is
-   **−2.5 % under both starts and does not converge with mesh** (64³/128³/192³: −2.7/−2.5/−3.2 %).
-   Ablations kill dt, the energy sweeps, the start radius and the deposit fallback. What is
-   left: the flux PER UNIT AREA is within ±0.5 % of Scriven while **the summed PLIC area of a
-   sphere is 5.5–9.3 % low at R = 4…28 with no convergence** (a-priori probe on exact fractions;
-   marching cubes on the same field gives 4πR² to 0.4 %; `plicArea` is exact on a plane) —
-   `plicArea = |m|₂ dV/dα` is linear in the MYC normal, whose angle error V0 measured as
-   non-convergent (order 0.83). Every earlier phase-change gate is planar, where that normal
-   is exact — which is why P0–P2 are second order and P3 is not. **P3c** (next): take `A_Γ`
-   from the same geometry the curvature comes from (height-function `√(1+h_x²+h_y²)` per
-   column on tiers 1/2, the paraboloid's area on the PV branch), gate Σ A on the sphere probe
-   (< 0.5 %, convergent) and re-run Scriven; quote β_eff beside every P3 number.
+8. **P3 (Scriven) at 2 %: the growth deficit IS an interfacial-AREA deficit, and a per-cell
+   area is first order in h/R (WO-P3b → WO-P3c).** P3b's "PLIC area 5–9 % low because of the
+   MYC normal" was the probe's own 4³ sub-sampled initialisation (cells below 1/128 leave the
+   interface: a quarter of the interfacial cells, 6 % of the area, 1e-4 % of the volume); with
+   the exact normal the same field gives the same deficit, and with 16³ sub-sampling every mode
+   is within 0.5 % at R ≥ 8. What does not go away: **no per-cell area construction converges
+   (order ~0–1)** — an exact-fraction circle with the exact normal and the analytic chord sums to
+   −2.9…−0.8 % of 2πR at R = 8…28; the pieces do not JOIN across cells, and marching cubes,
+   whose triangles do, is 3–10× closer on the same fields. In the Scriven run the interfacial
+   area sits 3.4 % below 4πR² and `Δβ_eff ≈ ε/2` reproduces the −2.5 % growth rate; the
+   height-footprint area (`set_phase_change_area(3)`, `vof_interface_area()`) recovers a third
+   (Ja 0.5: 2.00 → 1.31 %, β_eff −2.52 → −1.86 %) and is identical on every planar gate, but
+   the 1 % gate is still missed (rule 4: third failure, stopped). **Default stays mode 0**
+   (a default changes on a passed gate). **P3d**: an area from a JOINED reconstruction —
+   marching cubes on the C = ½ level set, or a partition-of-unity paraboloid over the band —
+   gated on the sub-16 sphere probe with order ≥ 1.5; W12's `vof_block_stats()['area']`
+   keeps the PLIC polygon (its premise for switching was the same non-defect).
 9. **Momentum consistency in cut cells diverges under a nonzero-mean periodic body force**
    (WO-Q open question). Closed or open columns are fine; a periodic driven bed with a heavy
    phase is not. V7 uses inflow/outflow or closed columns, never a periodic net force.
