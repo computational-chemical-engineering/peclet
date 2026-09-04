@@ -1,0 +1,57 @@
+# The `peclet-cu13` metapackage — the single-GPU CUDA twin of `peclet`. `pip install peclet-cu13` pulls
+# the CUDA-13 builds of the compute members (`peclet-flow-cu13`, `peclet-pnm-cu13`, `peclet-dem-cu13`,
+# `peclet-voro-cu13`; Kokkos-CUDA static inside each module, libcudart from the `nvidia-cuda-runtime`
+# dependency wheel, only the NVIDIA driver host-provided) plus the pure-CPU `peclet-morton`. It ships NO
+# code of its own (the `peclet` PEP-420 namespace is owned by the member packages) — purely a convenience
+# dependency set, exactly like ../pyproject.toml.
+#
+#   pip install peclet-cu13          # CUDA family: peclet-morton + peclet-{flow,pnm,dem,voro}-cu13
+#   pip install peclet-cu13[mpi]     # + peclet-core (MPI particle halo / AMR — builds from sdist, needs MPI)
+#
+# `peclet-cu13` and `peclet` are MUTUALLY EXCLUSIVE in one environment (both install the same
+# `peclet.<member>` imports; the CuPy `cupy` vs `cupy-cuda12x` model) — use one venv per backend.
+# AMD/HIP and multi-GPU MPI stay source/container builds (docs/DEPLOYMENT.md).
+#
+# The umbrella release workflow's build-cu13 job copies this over pyproject.toml; keep the `==` pins in
+# lockstep with ../pyproject.toml (tools/release/check_release_state.sh compares them).
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "peclet-cu13"
+version = "0.6.0"
+description = "GPU-accelerated & parallel simulation of transport phenomena (CFD, DEM, Voronoi) — single-GPU CUDA family metapackage"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Frank Peters", email = "e.a.j.f.peters@gmail.com" }]
+dependencies = [
+  "peclet-morton==0.2.1",
+  "peclet-flow-cu13==0.4.0",
+  "peclet-pnm-cu13==0.1.0",
+  "peclet-dem-cu13==0.4.0",
+  "peclet-voro-cu13==0.4.0",
+]
+
+[project.optional-dependencies]
+# peclet-core is sdist-only (MPI particle halo + Kokkos AMR): installing it builds from source and needs
+# an MPI toolchain (+ optional Kokkos prefix for the AMR module).
+mpi = ["peclet-core==0.5.0"]
+# peclet-coupling is the unresolved point-particle CFD-DEM coupling of peclet.flow + peclet.dem
+# (sdist-only: builds its Kokkos kernels from source against a bootstrapped prefix).
+cfd-dem = ["peclet-coupling==0.3.0"]
+
+[project.urls]
+Homepage = "https://github.com/computational-chemical-engineering/peclet"
+Documentation = "https://github.com/computational-chemical-engineering/peclet"
+
+# No Python package is built — this metapackage is dependencies only. Point hatchling at an empty target
+# so it produces a valid (code-free) wheel/sdist.
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.hatch.build.targets.sdist]
+include = ["pyproject.toml", "README.md", "LICENSE"]

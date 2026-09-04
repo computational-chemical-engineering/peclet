@@ -32,8 +32,17 @@ gfx90a), a CUDA/ROCm version, *and* an MPI ABI — there is no single portable G
   **self-contained PyPI wheels** — the compute ones vendor-build Kokkos (OpenMP+Serial) inside the wheel,
   so `pip install peclet` (the CPU-family metapackage) or any individual `pip install peclet-flow` runs
   multi-threaded with no prefix. `peclet-morton` is pure CPU with runtime ISA dispatch.
-- **GPU (CUDA/HIP) or multi-rank MPI:** **build from source** (`pip install` against a Kokkos prefix) or
-  use a **container**. `peclet-core` (MPI particle halo + Kokkos AMR) is **sdist-only** for the same reason.
+- **Single-GPU CUDA:** `pip install peclet-cu13` — the CUDA twin of the metapackage, pulling
+  `peclet-flow-cu13`, `peclet-pnm-cu13`, `peclet-dem-cu13`, `peclet-voro-cu13` (+ `peclet-morton`). Each
+  module embeds a static Kokkos-CUDA build (one SASS baseline + PTX, so it runs Turing..Blackwell by JIT)
+  and gets `libcudart.so.13` from the `nvidia-cuda-runtime` dependency wheel via its rpath; only the
+  NVIDIA driver (`libcuda.so.1`, CUDA ≥ 13) must be on the host — no system CUDA toolkit. The `-cu13`
+  packages install the **same `peclet.*` imports** as the CPU ones and are therefore **mutually
+  exclusive with `peclet`** in one environment (the CuPy `cupy` vs `cupy-cuda12x` model): one venv per
+  backend. Single-rank only; built by the `cuda-wheel` job of each member's release workflow
+  (`packaging/pyproject-cuda.toml`) and the umbrella's `build-cu13` job (`packaging/pyproject-cu13.toml`).
+- **AMD/HIP or multi-rank MPI:** **build from source** (`pip install` against a Kokkos prefix) or use a
+  **container**. `peclet-core` (MPI particle halo + Kokkos AMR) is **sdist-only** for the same reason.
 
 ## One-time dependency bootstrap
 
@@ -61,8 +70,12 @@ backend is whatever that prefix targets:
 
 ```bash
 # CPU / multicore — the easy path: portable wheels straight from PyPI, no prefix:
-pip install peclet                 # peclet-morton + peclet-flow + peclet-dem + peclet-voro
+pip install peclet                 # peclet-morton + peclet-flow + peclet-pnm + peclet-dem + peclet-voro
 pip install peclet-flow            # or any one on its own
+
+# Single NVIDIA GPU — CUDA wheels straight from PyPI (needs only the driver; NOT alongside `peclet`):
+pip install peclet-cu13            # peclet-morton + peclet-{flow,pnm,dem,voro}-cu13 (+ nvidia-cuda-runtime)
+pip install peclet-flow-cu13       # or any one on its own
 
 # CPU / multicore — from a source checkout against a bootstrapped prefix (dev, or to add MPI):
 PREFIX=$PWD/extern/install/host-openmp

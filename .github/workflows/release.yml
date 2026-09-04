@@ -1,7 +1,9 @@
 name: Release
 
-# Publish the `peclet` metapackage (a code-free, dependencies-only convenience package) to PyPI on a
-# version tag, via Trusted Publishing (OIDC). The member packages (peclet-morton/flow/dem/voro/core) are
+# Publish the `peclet` metapackage (a code-free, dependencies-only convenience package) AND its
+# single-GPU CUDA twin `peclet-cu13` (packaging/pyproject-cu13.toml, pinning the *-cu13 members) to PyPI on
+# a version tag, via Trusted Publishing (OIDC) — register the publisher for BOTH project names. The
+# member packages (peclet-morton/flow/pnm/dem/voro/core, and the flow/pnm/dem/voro -cu13 variants) are
 # released from their own submodule repos' release workflows.
 
 on:
@@ -24,8 +26,25 @@ jobs:
           name: dist
           path: dist/*
 
+  # peclet-cu13: the same code-free metapackage built from packaging/pyproject-cu13.toml (copied over
+  # pyproject.toml), depending on the CUDA-13 member wheels instead of the CPU ones.
+  build-cu13:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: cp packaging/pyproject-cu13.toml pyproject.toml   # -> peclet-cu13 (+ *-cu13 member pins)
+      - run: python -m build          # pure-python sdist + wheel (hatchling)
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-cu13
+          path: dist/*
+
   publish:
-    needs: [build]
+    needs: [build, build-cu13]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     environment: pypi
@@ -34,6 +53,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          path: dist
+          path: dist              # both artifacts (dist + dist-cu13) merged into one upload
           merge-multiple: true
+      # Uploads both peclet and peclet-cu13; PyPI routes each file by its metadata name. Both projects must
+      # have this workflow registered as a trusted publisher.
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true   # completing a partial upload (e.g. adding peclet-cu13 after peclet) must
+                                # not fail on the already-published files
