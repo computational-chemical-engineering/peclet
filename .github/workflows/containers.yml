@@ -21,6 +21,10 @@ on:
         description: "Version tag for the images (e.g. 0.1.0)"
         type: string
         default: "0.1.0"
+      push:
+        description: "Push the built images to GHCR (false = build only, for experiments such as the HIP link fix)"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -99,7 +103,8 @@ jobs:
           apptainer build "${{ matrix.image }}.sif" "$DEF"
 
       - name: Push to GHCR
-        if: steps.gate.outputs.run == 'true'
+        # tag pushes always publish; a manual dispatch publishes only when push=true (default)
+        if: steps.gate.outputs.run == 'true' && (github.event_name != 'workflow_dispatch' || github.event.inputs.push == 'true')
         run: |
           owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "${{ secrets.GITHUB_TOKEN }}" | apptainer registry login -u "${{ github.actor }}" --password-stdin oras://ghcr.io

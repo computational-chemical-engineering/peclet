@@ -50,6 +50,10 @@ The design contract lives in `docs/`:
 - [docs/DECOMPOSITION_AND_MULTIGRID.md](docs/DECOMPOSITION_AND_MULTIGRID.md) — how the MPI decomposition and the pressure multigrid constrain each other: the per-axis coarsening rule, why grid dimensions' factors of two decide solver cost, aligned vs coarse-first partitions, the measured evidence, and the open problems. **Read before touching decomposition, load balancing or MG depth.**
 - [docs/ROADMAP.md](docs/ROADMAP.md) — phased plan; the decomposition, async halo engine, and dynamic load balancing (Phase 7) are done — remaining work is at-scale multi-GPU tuning.
 - [docs/SCALING_ISSUES.md](docs/SCALING_ISSUES.md) — prioritized register of the issues the FoxBerry head-to-head scaling campaign surfaced (2026-09-01). The top two are float operator storage **silently invalidating** dense-bed runs and the multigrid depth cap that costs a third of the strong-scaling efficiency at 1536 ranks. **Read before starting scaling or IBM work.**
+- [docs/RELEASE.md](docs/RELEASE.md) — the family release workflow (PyPI CPU + CUDA wheels, containers,
+  Snellius/LUMI site packages, Zenodo, gallery re-check) with the current cycle's state and decisions in
+  [docs/RELEASE_PREP.md](docs/RELEASE_PREP.md); pre-flight + audits in `tools/release/`, site scripts in
+  `tools/hpc/`. **Read before bumping a version or tagging anything.**
 - [docs/SNELLIUS.md](docs/SNELLIUS.md) — running on the Snellius cluster: the 2024a toolchain, building (and the CMake/venv traps), the sbatch conventions every benchmark script shares, and pre-flight checks. **Read before queueing anything there.**
 
 ## The projects
