@@ -1042,7 +1042,7 @@ pattern — the ABC counterpart of the V4 rule).
   Also found: `max_open_divergence()` MUTATES the velocity at an outflow (non-mutating sibling
   `max_open_divergence_projected()`; the default is a user decision).
 - **Merged-main validation 09-03 19:00 (nvidia-cuda)**: `tests/kokkos` 33/33, `tests/kokkos_mpi` VoF/varRho/phase-change/wall-slip battery 46/46 at np 1/2/4.
-- Pending (09-04 02:00): P3f LANDED (three first-order errors cancel); P3g (second-order interfacial energy operator) next; P23 + P3b + P3c LANDED (P3 open at 1.3 % with mode 3; P3d = joined area); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
+- Pending (09-04 09:00): P3g LANDED (Ja 0.5 closes, Ja 2 open; energy_order default 1); P3h is a user decision; WO-V9 (profiling) next; P23 + P3b + P3c LANDED (P3 open at 1.3 % with mode 3; P3d = joined area); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
 
 ## 13. Revised ladder for the remainder (2026-09-02, evening) — review and execution plan
 
@@ -1156,7 +1156,19 @@ gates, twice-failed gates escalate.
    books, not an energy sink. **WO-P3g** (next): ṁ defined as the operator's own discrete flux
    (F3 gone by construction), a Gibou–Fedkiw second-order GFM row (F1), curvature-consistent
    distances from the V3 cascade in the row and the fit (F2), gated by P3f's instruments and the
-   96/128/192 ladder, which must then converge.
+   96/128/192 ladder, which must then converge. **WO-P3g result (09-04): Ja 0.5 CLOSES for the
+   first time — 0.027 % / β_eff +0.027 %, ladder −0.015 % (96³) → +0.027 % (128³), i.e.
+   converged at the noise floor** — with the operator-flux ṁ, the Gibou–Fedkiw row (exact on
+   quadratics), curvature-consistent distances, AND the deposit fallback ON (a volume audit
+   showed 6.5 % of the vapour never materialising on zero-area interfacial cells whose `+n`
+   deposit walk fails). **Ja 2 still fails (3.6 %)** and 192³ R 9→30 diverges (dt collapse), so
+   `energy_order` stays 1 by the rule. Remaining, in order: the θ-clamp bias on near-tangential
+   faces (now the largest a-priori error, +27 % → never swept), the structural point that a
+   conserved ṁ is a cell-FACE flux where the physics wants the flux at the interface (fix: give
+   the interfacial cell its own Robin row instead of a Dirichlet identity row), the P2 order
+   ladder with the new row, and the Ja 2 verdict at a second resolution → **P3h**, a research
+   rung; seven work orders have each retired a mechanism, and the user should decide whether to
+   continue now or after the rest of the ladder.
 9. **`step()` is not atomic across the Weymouth–Yue boundedness throw** (E6 finding): the colour
    survives and a retry works, but the momentum half has already advanced by the rejected dt
    (`max|w|` moves by exactly g·dt), so catch-and-halve desynchronises colour and momentum.
