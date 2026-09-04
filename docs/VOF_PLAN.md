@@ -1170,7 +1170,8 @@ gates, twice-failed gates escalate.
    ladder with the new row, and the Ja 2 verdict at a second resolution → **P3h** — the full
    dossier (what is proven, what remains R1–R6, acceptance) is `flow/doc/vof_workorders_v6.md`
    § WO-P3h.
-9. **`step()` is not atomic across the Weymouth–Yue boundedness throw** (E6 finding): the colour
+9. **[FIXED 09-04, ISSUES sweep]** `step()` is now atomic across the two explicit two-phase stability throws (the checks run before the predictor; state bitwise unchanged after a throw); `step_adaptive()` re-picks dt from the current state every call (bitwise equal to the gallery drivers' loops); `set_contact_angle` binds to domain-BC walls (within the SDF wall's own error); `vof_geometry()` on all-fluid solvers; collocated `set_state` seeds the face field; a preconditioner breakdown is visible (`pressure_solve_failed()`, the cap; `PECLET_FLOW_PRESSURE_STRICT=1` raises). The free-slip domain BC (type 4) lands with another session's `rel-issues` branch (`35d951c`).
+   **(previous)** `step()` is not atomic across the Weymouth–Yue boundedness throw (E6 finding): the colour
    survives and a retry works, but the momentum half has already advanced by the rejected dt
    (`max|w|` moves by exactly g·dt), so catch-and-halve desynchronises colour and momentum.
    Fix (small, VoF section): evaluate the interface-local Courant check and the capillary limit
