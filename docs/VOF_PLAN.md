@@ -1042,7 +1042,7 @@ pattern — the ABC counterpart of the V4 rule).
   Also found: `max_open_divergence()` MUTATES the velocity at an outflow (non-mutating sibling
   `max_open_divergence_projected()`; the default is a user decision).
 - **Merged-main validation 09-03 19:00 (nvidia-cuda)**: `tests/kokkos` 33/33, `tests/kokkos_mpi` VoF/varRho/phase-change/wall-slip battery 46/46 at np 1/2/4.
-- Pending (09-04 12:00): V9 LANDED. Open for the user: P3h (Scriven Ja 2), W3 (44 GPU-h), the `rebalance_by_weights` crash (load-balancing code, outside VoF), the V7 page freeze render (~6 h), the YouTube upload. V6c (band-local contact-line resistance) and V10 (AMR) remain Fable design items. P23 + P3b + P3c LANDED (P3 open at 1.3 % with mode 3; P3d = joined area); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
+- 09-04 13:00 (user decisions taken): P3h DOCUMENTED (dossier); **W3 running on Snellius** (1-GPU chain, checkpointed); **`rebalance_by_weights` being debugged** (ASan); **V7 page being frozen** for publication; YouTube later today. V6c (band-local contact-line resistance) and V10 (AMR) remain Fable design items. P23 + P3b + P3c LANDED (P3 open at 1.3 % with mode 3; P3d = joined area); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
 
 ## 13. Revised ladder for the remainder (2026-09-02, evening) — review and execution plan
 
@@ -1166,9 +1166,9 @@ gates, twice-failed gates escalate.
    faces (now the largest a-priori error, +27 % → never swept), the structural point that a
    conserved ṁ is a cell-FACE flux where the physics wants the flux at the interface (fix: give
    the interfacial cell its own Robin row instead of a Dirichlet identity row), the P2 order
-   ladder with the new row, and the Ja 2 verdict at a second resolution → **P3h**, a research
-   rung; seven work orders have each retired a mechanism, and the user should decide whether to
-   continue now or after the rest of the ladder.
+   ladder with the new row, and the Ja 2 verdict at a second resolution → **P3h** — the full
+   dossier (what is proven, what remains R1–R6, acceptance) is `flow/doc/vof_workorders_v6.md`
+   § WO-P3h.
 9. **`step()` is not atomic across the Weymouth–Yue boundedness throw** (E6 finding): the colour
    survives and a retry works, but the momentum half has already advanced by the rejected dt
    (`max|w|` moves by exactly g·dt), so catch-and-halve desynchronises colour and momentum.
