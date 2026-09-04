@@ -212,7 +212,21 @@ The gallery site itself is unaffected by the release (it renders from `_freeze/`
 
 ---
 
-## 7. Decisions needed [D]
+## 7. Decisions [D] — taken 2026-09-04
+
+- **D1** VoF defects: handed to the VoF session. The non-VoF items of §1.4 (free-slip domain BC,
+  inflow/outflow NaN, Poiseuille metric closure, Kokkos teardown warning) are being worked in this
+  release-prep session (flow worktrees `flow-rel-issues`, `flow-rel-teardown`).
+- **D2** yes: pnm 0.1.1 repinned to core v0.6.0 at release time.
+- **D3** yes, full CUDA family: `peclet-pnm-cu13`, `peclet-dem-cu13`, `peclet-voro-cu13` +
+  `peclet-cu13` metapackage (implementation in progress, validated locally before CI).
+- **D4** version numbers of §0 accepted (family 0.7.0).
+- **D5** attempt the HIP link experiments now via CI: experiment 1 (visibility override, all
+  modules) dispatched as Containers run 33868865327 (`only=hip, push=false`, version tag
+  `0.7.0-hipexp1`). Results are appended to §3.4 below as they come in.
+
+Original questions, for the record:
+
 
 - **D1** Which of the open flow VoF defects in §1.4 are fixed before 0.7.0 vs listed as known limitations (recommendation: fix the inert divergence guard and the collocated zero-face-field case, list the rest).
 - **D2** Re-tag pnm 0.1.0 → 0.1.1 to repin core headers at v0.6.0 (recommendation: yes, one-line change, keeps the family on one core header set).
