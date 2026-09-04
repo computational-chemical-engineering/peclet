@@ -73,8 +73,19 @@ Other facts of the snapshot:
    - `set_contact_angle` ignored on a domain-BC wall; `vof_geometry()` throws on an all-fluid solver;
      `step()` not atomic across the Weymouth–Yue throw; `set_state` + `advect_vof` on the collocated
      solver advects with a zero face field (flow VoF).
-   - no free-slip domain BC (flow); VoF interface area not exposed (flow).
-   - inflow/outflow diverging to NaN in one configuration — "investigating" since July (flow).
+   - free-slip domain BC (flow) — **IMPLEMENTED, UNMERGED**: branch `rel-issues` on peclet-flow
+     (worktree `flow-rel-issues`, commits e6c2c4e free-slip/symmetry `set_domain_bc` type 4 on both
+     grids + MPI with a tests/kokkos gate, eda0029 outflow-reversal census + warning for the NaN entry,
+     e5e1bbf CLAUDE.md note). The agent that wrote it was cut off before its test matrix reported
+     (OpenMP/CUDA ctests, MPI np=1,2,4, regression suite, BFS verify) and before updating ISSUES.md.
+     **Before tagging [B]: run the flow matrix on that branch, then merge to main** — or park it and
+     keep the ISSUES entries open. Not merged to main by the release-prep session on purpose
+     (unverified numerics).
+   - VoF interface area not exposed (flow) — VoF session.
+   - inflow/outflow diverging to NaN — see the `rel-issues` census/warning above; the mechanism
+     statement is in commit eda0029's message; the ISSUES.md entry is NOT yet updated.
+   - Poiseuille metric closure — NOT done; verify `scripts/verify_poiseuille_flow.py` is pointwise
+     (flow 6f0a312) and mark the entry resolved [A].
    - ~~Kokkos "deallocated after finalize" warning under Jupyter~~ **RESOLVED 2026-09-04**: it was a
      `Kokkos::abort` (exit 134) whenever a bound object or zero-copy view outlived the atexit
      finalize. One shared pattern now (`core/include/peclet/core/python/kokkos_teardown.hpp`:
