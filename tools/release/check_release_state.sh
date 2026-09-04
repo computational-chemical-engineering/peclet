@@ -23,7 +23,10 @@ pyver() { grep -m1 -E '^version\s*=' "$1/pyproject.toml" 2>/dev/null | sed -E 's
 initver() {  # packaging/<name>_init.py or morton's package __init__
   local f
   for f in "$1"/packaging/*_init.py "$1"/bindings/python/peclet/morton/__init__.py "$1"/python/peclet_coupling/__init__.py; do
-    [ -f "$f" ] && grep -m1 -E '__version__\s*=' "$f" | sed -E 's/.*"([^"]+)".*/\1/' && return
+    if [ -f "$f" ]; then
+      grep -q '_dist_version("' "$f" && { echo "meta"; return; }   # importlib.metadata: cannot drift
+      grep -m1 -E '__version__\s*=' "$f" | sed -E 's/.*"([^"]+)".*/\1/' && return
+    fi
   done; echo "-"
 }
 doxver() { local f; for f in "$1"/docs/Doxyfile "$1"/Doxyfile; do [ -f "$f" ] && grep -m1 -E '^PROJECT_NUMBER' "$f" | sed -E 's/.*=\s*//' && return; done; echo "-"; }
@@ -40,7 +43,7 @@ for s in $SUBS; do
   behind=$(git -C "$s" rev-list --count HEAD..origin/main 2>/dev/null); ahead=$(git -C "$s" rev-list --count origin/main..HEAD 2>/dev/null)
   dirty=$(git -C "$s" status --porcelain | wc -l); wt=$(git -C "$s" worktree list | wc -l)
   printf '%-9s %-8s %-8s %-8s %-9s %6s %7s %6s %6s %s\n' "$s" "$pv" "$iv" "$dv" "$tag" "$since" "$behind" "$ahead" "$dirty" "$wt"
-  [ "$iv" != "-" ] && [ "$iv" != "$pv" ] && bad "$s: __version__ $iv != pyproject $pv"
+  [ "$iv" != "-" ] && [ "$iv" != "meta" ] && [ "$iv" != "$pv" ] && bad "$s: __version__ $iv != pyproject $pv"
   [ "$dv" != "-" ] && [ "$dv" != "$pv" ] && bad "$s: Doxyfile PROJECT_NUMBER $dv != pyproject $pv"
   [ "$tag" != "-" ] && [ "$tag" != "v$pv" ] && [ "$since" != "0" ] && say "  .. $s: $since commits since $tag (pyproject $pv) -> needs a bump + tag v$pv? or is unchanged"
   [ "$tag" = "v$pv" ] && [ "$since" != "0" ] && bad "$s: pyproject still $pv but $since commits since tag $tag -> bump before tagging"
