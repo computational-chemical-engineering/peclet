@@ -2,7 +2,7 @@
 # Snellius (SURF) — multi-GPU (NVIDIA A100 / H100) distributed CFD with the peclet CUDA container.
 # Adjust the account, partition, node/GPU counts, module versions and the .sif path/arch to your setup.
 #
-#   apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.1.0-sm80   # A100
+#   apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.6.0-sm80   # A100
 #   sbatch containers/submit/snellius.slurm
 #
 #SBATCH --job-name=peclet-cfd
@@ -18,7 +18,7 @@ set -euo pipefail
 # Host CUDA-aware OpenMPI — match the 4.1.x series the container was built against (cuda.def OMPI_VER).
 module load 2023 OpenMPI/4.1.5-GCC-12.3.0 CUDA/12.4.0
 
-SIF="${SIF:-$HOME/peclet-cuda_0.1.0-sm80.sif}"     # sm90 image on the H100 partition
+SIF="${SIF:-$HOME/peclet-cuda_0.6.0-sm80.sif}"     # sm90 image on the H100 partition
 SCRIPT="${SCRIPT:-benchmarks/profile_mpi_flow.py}"
 
 # One container per GPU; --mpi=pmix lets the host PMIx launch the container's OpenMPI ranks.

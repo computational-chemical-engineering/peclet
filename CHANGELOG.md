@@ -4,6 +4,73 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 0.7.0 (in preparation, see docs/RELEASE_PREP.md)
+
+Family: peclet-core 0.6.0, peclet-flow 0.5.0 (+ peclet-flow-cu13), **new** peclet-pnm-cu13 /
+peclet-dem-cu13 / peclet-voro-cu13 and the `peclet-cu13` CUDA metapackage, peclet-pnm 0.1.1 (core
+header repin), peclet-dem 0.5.0, peclet-voro 0.5.0, peclet-coupling 0.4.0, peclet-morton 0.2.1 (unchanged).
+
+### Added
+- **flow**: geometric VoF two-phase flow (Weymouth–Yue advection, CSF surface tension with curvature
+  branches, contact angle, phase change), analytic-SDF **scenes with moving instances** (`set_scene`,
+  `set_solid_from_scene`, `set_instance_motion/transform`, `hydro_force_torque_reaction`), momentum
+  residual stop + velocity multigrid, telescoping pressure hierarchy, `rebalance_by_weights`, ghost MASK exchange.
+- **core**: `peclet.core.geom.SceneBuilder` (analytic CSG scene authoring, mass properties), weighted
+  rebalancing hooks, GPU-aware halo option; NBX inter-round tag-race fix.
+- **dem**: analytic SDF walls with `set_wall_transform` / `wall_sdf_at`, `set_external_torques`, scene
+  particles (`peclet.dem.scene_particle`), `set_shape_ids`; two out-of-bounds writes fixed.
+- **voro**: `FlowSolver` (covolume + collocated Navier–Stokes on a Voronoi mesh), `redistribute_pore_mesh`,
+  covolume MPI hooks, device-packed ghost exchange.
+- **coupling**: `ResolvedCfdDem` (resolved cut-cell CFD-DEM), reaction torque opt-in.
+- **Packaging**: CUDA wheels for the whole family (`pip install peclet-cu13`); containers now include pnm
+  and coupling; `__version__` derived from the installed metadata; release workflow documented in
+  `docs/RELEASE.md` with pre-flight and audit tools under `tools/release/`; Snellius family install +
+  smoke scripts under `tools/hpc/`; LUMI recipe (`docs/LUMI.md`, untested).
+
+### Changed / Fixed
+- (filled in at release time from the per-package logs — see RELEASE_PREP §1.4 for the gallery-found defects)
+
+### Known limitations
+- LUMI / HIP: see docs/LUMI.md — status of the link-error experiments recorded in docs/RELEASE_PREP.md §3.4.
+
+## [0.6.0] — 2026-07-25
+
+Family release: peclet-flow 0.4.0 (**BREAKING**: pore-network extraction split out of `peclet.flow.pnm`),
+**new** peclet-pnm 0.1.0 (`peclet.pnm`: extraction + distributed MPI extraction + DNS network flow with
+per-patch throats), peclet-dem 0.4.0, peclet-voro 0.4.0, peclet-morton 0.2.1 (cp38 wheels dropped),
+peclet-core 0.5.0, peclet-coupling 0.3.0; peclet-flow-cu13 0.4.0. Zenodo DOIs minted per repo.
+
+## [0.5.0] — 2026-07-06
+
+peclet-coupling 0.2.0 joins the family as the `[cfd-dem]` extra (unresolved point-particle CFD-DEM
+`CfdDem`: void fraction, drag laws, semi-implicit feedback); dem event-level restitution + multilevel
+contact stabiliser; flow porous (ε-weighted) momentum for coupled runs.
+
+## [0.4.4] / [0.4.3] / [0.4.2] / [0.4.1] — 2026-07-04
+
+voro 0.3.1 → 0.3.3: SDF pore-mesh optimiser in the Python API (`optimize_pore_mesh`), O(N)
+`sdf_voronoi_cells`, `ConvexCell::sectionPolygon` / `sdf_voronoi_section`; dem 0.3.1 `to_stl` mesh export.
+
+## [0.4.0] — 2026-07-04
+
+peclet-flow 0.3.0 (verify_bfs shear-layer stability, inflow/outflow + immersed solid fixed, deferred
+correction), peclet-flow-cu13 first published (single-GPU CUDA wheel on `nvidia-cuda-runtime`),
+dem 0.3.0, voro 0.3.0, core 0.3.0.
+
+## [0.3.0] — 2026-07-03
+
+voro graph-AMG mesh-optimiser preconditioner (host + device).
+
+## [0.2.2] — 2026-07-03
+
+peclet-flow 0.2.1: inflow/outflow domain BCs with immersed solids, `set_backflow_stabilization`,
+`set_deferred_correction`.
+
+## [0.2.1] — 2026-07-03
+
+peclet-dem 0.2.1: periodic collision detection fix (unfilled ghost halo layers in the Kokkos port;
+found through the gallery's random-packed-bed g(r)).
+
 ## [0.2.0] — 2026-07-02
 
 Feature release: multi-rank Python API + HPC MPI containers.
@@ -65,5 +132,7 @@ First public release.
 - Multi-node / multi-GPU container runs on Snellius/LUMI/TU-e have not been validated on-cluster (match
   your site's exact OpenMPI module for the bind model).
 
+[0.6.0]: https://github.com/computational-chemical-engineering/peclet/releases/tag/v0.6.0
+[0.5.0]: https://github.com/computational-chemical-engineering/peclet/releases/tag/v0.5.0
 [0.2.0]: https://github.com/computational-chemical-engineering/peclet/releases/tag/v0.2.0
 [0.1.0]: https://github.com/computational-chemical-engineering/peclet/releases/tag/v0.1.0

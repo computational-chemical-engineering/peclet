@@ -6,23 +6,26 @@ de-facto runtime on both **Snellius** and **LUMI** (Docker is not allowed on the
 Pre-built images are published to the **GitHub Container Registry (GHCR)** on each release, and you can
 also build your own from the [`containers/`](https://github.com/computational-chemical-engineering/peclet/tree/main/containers)
 definition files. Every image bakes the Kokkos/ArborX toolchain and the full `peclet.*` family
-(flow, dem, voro, core, morton).
+(flow, pnm, dem, voro, coupling, core, morton — pnm and coupling since 0.7.0).
 
 ## 1. Pull a pre-built image (recommended)
+
+Image tags follow the family version (`0.6.0` below is the latest published family; the GHCR package
+pages list every tag). The moving tags `latest` / `sm80` / `sm90` track the newest release.
 
 The `peclet-cpu` and `peclet-cuda` images are **public** on GHCR — no login or token required. No
 toolchain, no build; just pull on the login node:
 
 ```bash
 # CPU (laptops, CI, CPU partitions) — Kokkos OpenMP + Serial:
-apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cpu:0.1.0
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cpu:0.6.0
 
 # NVIDIA GPU (Snellius) — pick your arch:
-apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.1.0-sm80   # A100
-apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.1.0-sm90   # H100
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.6.0-sm80   # A100
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.6.0-sm90   # H100
 
 # AMD GPU (LUMI-G, MI250X):
-apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-hip:0.1.0-gfx90a
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-hip:0.6.0-gfx90a
 ```
 
 !!! warning "LUMI / HIP image is work-in-progress"
@@ -46,16 +49,16 @@ tracks the newest release.
 
 ```bash
 # --- Laptop / CPU node ---
-apptainer exec peclet-cpu_0.1.0.sif python3 -c "import peclet.flow as f; print(f.execution_space)"  # -> OpenMP
-OMP_NUM_THREADS=16 apptainer exec peclet-cpu_0.1.0.sif python3 my_run.py
-mpirun -np 4 apptainer exec peclet-cpu_0.1.0.sif python3 my_distributed_run.py   # single-node MPI (flow/dem/voro)
+apptainer exec peclet-cpu_0.6.0.sif python3 -c "import peclet.flow as f; print(f.execution_space)"  # -> OpenMP
+OMP_NUM_THREADS=16 apptainer exec peclet-cpu_0.6.0.sif python3 my_run.py
+mpirun -np 4 apptainer exec peclet-cpu_0.6.0.sif python3 my_distributed_run.py   # single-node MPI (flow/dem/voro)
 
 # --- Snellius (NVIDIA) --- request a GPU, then bind the host driver with --nv:
-srun apptainer exec --nv peclet-cuda_0.1.0-sm80.sif python3 my_run.py
+srun apptainer exec --nv peclet-cuda_0.6.0-sm80.sif python3 my_run.py
 
 # --- LUMI-G (AMD) --- the launcher wrapper binds the host Cray-MPICH stack (see below):
 module load LUMI partition/G cray-mpich rocm
-srun -n8 --gpus-per-node=8 containers/lumi-run.sh peclet-hip_0.1.0-gfx90a.sif my_run.py
+srun -n8 --gpus-per-node=8 containers/lumi-run.sh peclet-hip_0.6.0-gfx90a.sif my_run.py
 ```
 
 `--nv` (NVIDIA) / `--rocm` (AMD) binds the host GPU driver into the container. `execution_space`
@@ -71,7 +74,7 @@ for the CFD, `Simulation.step_mpi(...)` for dem, `peclet.voro.VoronoiHalo` for t
 **Single node** is trivial — the container's own MPI launches the ranks:
 
 ```bash
-mpirun -np 4 apptainer exec peclet-cpu_0.1.0.sif python3 my_run.py
+mpirun -np 4 apptainer exec peclet-cpu_0.6.0.sif python3 my_run.py
 ```
 
 **Multiple nodes / GPUs** use the Apptainer *bind* model: the container is built against a compatible MPI,
@@ -89,11 +92,11 @@ The wrapper is launched **by** `srun`, one container per rank:
 ```bash
 # Snellius — 4 A100/node, one rank per GPU:
 module load 2023 OpenMPI/4.1.5-GCC-12.3.0 CUDA/12.4.0
-srun --mpi=pmix containers/snellius-run.sh peclet-cuda_0.1.0-sm80.sif benchmarks/profile_mpi_flow.py --L 128
+srun --mpi=pmix containers/snellius-run.sh peclet-cuda_0.6.0-sm80.sif benchmarks/profile_mpi_flow.py --L 128
 
 # TU/e SMM (chem.smm03.q) — hybrid 4 ranks × 8 threads/node:
 export OMP_NUM_THREADS=8
-srun --mpi=pmix containers/tue-run.sh peclet-cpu_0.1.0.sif benchmarks/profile_mpi_flow.py --L 96
+srun --mpi=pmix containers/tue-run.sh peclet-cpu_0.6.0.sif benchmarks/profile_mpi_flow.py --L 96
 ```
 
 !!! warning "Match the OpenMPI version"
