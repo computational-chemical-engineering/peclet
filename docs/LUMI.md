@@ -93,7 +93,14 @@ ld.lld: error: undefined hidden symbol: vtable for std::_Sp_counted_ptr_inplace<
 >>> the vtable symbol may be undefined because the class is missing its key function
 ```
 
-nanobind marks the module target `CXX_VISIBILITY_PRESET hidden`; under hipcc the host-side objects
+**Update 2026-09-04:** overriding nanobind's visibility preset to `default` on the HIP path (now in
+every module's CMakeLists under `if(Kokkos_ENABLE_HIP)`) makes flow, dem and voro link and install in
+the container build (CI run 33868865327). The same error class then surfaced for core's `amr`
+module, whose virtual wrapper classes sat in an anonymous namespace (being moved to a named one).
+Until the container job is green, the status stays "untested"; once it is, the image is published at
+the next tag and the on-hardware validation of §5 is what remains.
+
+Original diagnosis: nanobind marks the module target `CXX_VISIBILITY_PRESET hidden`; under hipcc the host-side objects
 reference these template vtables as hidden while no object defines them. The same link happens in a
 source build, so this blocks the pip route too. Experiments are ordered in
 [RELEASE.md §8](RELEASE.md#8-phase-g-lumi-package-untested); the first (override the visibility

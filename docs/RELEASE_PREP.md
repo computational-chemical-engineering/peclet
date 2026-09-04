@@ -158,10 +158,17 @@ names missing (all VoF, scenes, MPI, rebalance), dem 43 of 91, voro 38 of 63 (`F
 3. **Containers**: DONE 2026-09-04 — `push` input added to `containers.yml`; pnm + coupling added to
    the three `.def` files and proven by a `only=cpu, push=false` dispatch (run 33869278789: every member
    installed, `peclet-cpu.sif` built). cuda/hip defs carry the same lines, untested until the next tag/dispatch.
-4. **HIP link error** — the LUMI blocker: run RELEASE.md §8 experiment 1 (override
-   `CXX_VISIBILITY_PRESET` to `default` under `Kokkos_ENABLE_HIP` in flow/pnm/dem/voro/coupling)
-   through a `only=hip, push=false` dispatch. If it links, publish `peclet-hip:0.7.0-gfx90a` as
-   *untested*; if not, the release ships without a HIP image and says so.
+4. **HIP link error** — the LUMI blocker. **Experiment 1 (visibility override) WORKS for the method
+   codes**: Containers run 33868865327 (`only=hip, push=false`) built and installed `peclet-flow`,
+   `peclet-dem`, `peclet-voro` (all with `PECLET_*_MPI=ON`) under hipcc/lld for the first time since
+   0.3.0. The job then failed on **core's `amr` module** with the same class of error but for the
+   binding TU's own wrapper classes (`undefined hidden symbol: vtable for (anonymous
+   namespace)::Octree / Releasable / Poisson / Flow / DistributedOctree`, `core/python/amr_bindings.cpp`
+   L61–632): virtual classes in an anonymous namespace under hipcc's host/device split. Fix in
+   progress (move them to a named namespace, folded into the teardown work on that file); then
+   re-dispatch `only=hip, push=false`. pnm and coupling were never reached in that run (they install
+   after core) — expect them to link like flow/dem/voro. If the re-run passes, tag time publishes
+   `peclet-hip:0.7.0-gfx90a` as *untested on hardware*.
 5. Optional but cheap: `check_release_state.sh --ci` as the first step of each `release.yml`
    (tag == version == `__version__`), and a `workflow_dispatch` dry run of the CUDA wheel job.
 6. Dependabot action majors differ across repos (`upload-artifact` v4 in flow vs v7 in the umbrella) — harmless per repo, but keep each repo's upload/download pair on the same major.

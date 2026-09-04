@@ -283,6 +283,10 @@ visibility because nanobind sets `CXX_VISIBILITY_PRESET hidden` on the module ta
 are not emitted in the same object. The same link will fail for a source build on LUMI, so **this
 blocks every LUMI delivery, container or not.**
 
+**Result of experiment 1 (2026-09-04, run 33868865327):** flow, dem, voro link and install under
+hipcc; core's `amr` module then fails on its own anonymous-namespace virtual wrapper classes (fix:
+named namespace). Keep the list below for the record; RELEASE_PREP §3.4 tracks the re-run.
+
 Experiments, in order of plausibility (each is one `workflow_dispatch` of `Containers` with
 `only=hip`, `push=false`, ≈25 min; no GPU is needed to link):
 
