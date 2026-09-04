@@ -59,7 +59,10 @@ From: rocm/dev-ubuntu-22.04:6.2.4-complete
         --config-settings=cmake.define.PECLET_DEM_MPI=ON /opt/peclet/dem
     CMAKE_PREFIX_PATH=$PREFIX CXX=hipcc $PIP \
         --config-settings=cmake.define.PECLET_VORO_MPI=ON /opt/peclet/voro
+    CMAKE_PREFIX_PATH=$PREFIX CXX=hipcc $PIP \
+        --config-settings=cmake.define.PECLET_PNM_MPI=ON /opt/peclet/pnm
     CMAKE_PREFIX_PATH=$PREFIX CXX=hipcc $PIP /opt/peclet/core
+    CMAKE_PREFIX_PATH=$PREFIX CXX=hipcc $PIP /opt/peclet/coupling   # CFD-DEM glue (Kokkos kernels + pure-Python driver); needs flow + dem installed
     $PIP /opt/peclet/morton
 
 %environment
