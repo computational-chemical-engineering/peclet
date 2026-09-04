@@ -70,6 +70,7 @@ nav:
       - peclet-pnm: https://computational-chemical-engineering.github.io/peclet-pnm/
       - peclet-dem: https://computational-chemical-engineering.github.io/peclet-dem/
       - peclet-voro: https://computational-chemical-engineering.github.io/peclet-voro/
+  - Privacy: privacy.md
 
 # DOC_CI_WORK_NOTES.md is an internal work log; keep it out of the nav.
 not_in_nav: |
