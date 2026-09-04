@@ -155,8 +155,9 @@ names missing (all VoF, scenes, MPI, rebalance), dem 43 of 91, voro 38 of 63 (`F
    in a fresh venv before tagging; register the four new PyPI project names' trusted publishers.
    Multi-arch SASS (only sm_75 + PTX today) stays as is; note JIT on first import in the docs.
 2. **coupling CI**: none exists — add `ci.yml` (OpenMP prefix, build flow + dem + coupling, run `tests/test_terminal_velocity.py`).
-3. **Containers**: `push` input added to `containers.yml` (this prep); add pnm + coupling to the
-   three `.def` files; then one `only=cpu, push=false` dispatch to prove the recipe.
+3. **Containers**: DONE 2026-09-04 — `push` input added to `containers.yml`; pnm + coupling added to
+   the three `.def` files and proven by a `only=cpu, push=false` dispatch (run 33869278789: every member
+   installed, `peclet-cpu.sif` built). cuda/hip defs carry the same lines, untested until the next tag/dispatch.
 4. **HIP link error** — the LUMI blocker: run RELEASE.md §8 experiment 1 (override
    `CXX_VISIBILITY_PRESET` to `default` under `Kokkos_ENABLE_HIP` in flow/pnm/dem/voro/coupling)
    through a `only=hip, push=false` dispatch. If it links, publish `peclet-hip:0.7.0-gfx90a` as
