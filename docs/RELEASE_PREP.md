@@ -53,7 +53,7 @@ Other facts of the snapshot:
    |---|---|---|---|---|
    | core | | | | |
    | morton | | – | – | |
-   | flow (kokkos / kmpi / regression / verify_*) | | | | |
+   | flow (kokkos / kmpi / regression / verify_*) | 36/36 | 36/36, regression PASS, verify 5/5 | 103/103 np=1,2,4 | 2026-09-04, main at the rel-issues merge; OMP_NUM_THREADS=4 |
    | pnm | | | | |
    | dem (kokkos / kmpi / verify_packing) | | | | |
    | voro | | | | |
@@ -73,19 +73,27 @@ Other facts of the snapshot:
    - `set_contact_angle` ignored on a domain-BC wall; `vof_geometry()` throws on an all-fluid solver;
      `step()` not atomic across the Weymouth–Yue throw; `set_state` + `advect_vof` on the collocated
      solver advects with a zero face field (flow VoF).
-   - free-slip domain BC (flow) — **IMPLEMENTED, UNMERGED**: branch `rel-issues` on peclet-flow
-     (worktree `flow-rel-issues`, commits e6c2c4e free-slip/symmetry `set_domain_bc` type 4 on both
-     grids + MPI with a tests/kokkos gate, eda0029 outflow-reversal census + warning for the NaN entry,
-     e5e1bbf CLAUDE.md note). The agent that wrote it was cut off before its test matrix reported
-     (OpenMP/CUDA ctests, MPI np=1,2,4, regression suite, BFS verify) and before updating ISSUES.md.
-     **Before tagging [B]: run the flow matrix on that branch, then merge to main** — or park it and
-     keep the ISSUES entries open. Not merged to main by the release-prep session on purpose
-     (unverified numerics).
+   - ~~free-slip domain BC (flow)~~ **MERGED + VERIFIED 2026-09-04**: flow main `e6c2c4e`
+     (free-slip/symmetry `set_domain_bc` type 4, both grids, MPI), `eda0029` (outflow-reversal census +
+     warning), `e5e1bbf`/`b7669d3` (CLAUDE.md notes) — the `rel-issues` branch, fast-forwarded onto
+     main (it already sat on top of `84189ae`, no rebase conflict). Matrix on fresh trees: `tests/kokkos`
+     36/36 OpenMP + 36/36 CUDA (incl. `freeslip`, `outflow_backflow`), `tests/kokkos_mpi` 103/103 at
+     np=1,2,4 (free-slip pass of `test_velocitymg_bc_mpi` bit-exact at np=1, 1.6e-14 at np=2/4),
+     regression suite 0.00 % on every metric vs baseline (not re-recorded), the five verify scripts
+     PASS on CUDA. Physical gate: half channel + symmetry plane == full Poiseuille channel node for
+     node to 2.5e-13 / 3.4e-12 / 2.6e-11 at N=16/32/64 on both grids; uniform flow along four slip
+     faces stays uniform to 7e-12. ISSUES.md entry closed with the hashes.
    - VoF interface area not exposed (flow) — VoF session.
-   - inflow/outflow diverging to NaN — see the `rel-issues` census/warning above; the mechanism
-     statement is in commit eda0029's message; the ISSUES.md entry is NOT yet updated.
-   - Poiseuille metric closure — NOT done; verify `scripts/verify_poiseuille_flow.py` is pointwise
-     (flow 6f0a312) and mark the entry resolved [A].
+   - inflow/outflow diverging to NaN — **DETECTOR LANDED 2026-09-04** (flow `eda0029`), NaN not
+     reproducible: the entry's own configuration is steady with β=0.2 and β=0 alike (bit-identical,
+     no reversal, nothing to warn about); where the outlet does reverse (BFS Re_S=800, β=0) the
+     warning fires at step 693, the run stays finite but episodic (reversed fraction up to 0.34,
+     `max_open_divergence` up to 1e-2 during the episodes), β=0.2 the same. A census + warning, not a
+     fix — a convective/energy-stable outflow stays the remedy if a case ever needs one. Channel and
+     cylinder-vortex-street configurations bit-identical to pre-merge main. ISSUES.md entry updated.
+   - ~~Poiseuille metric closure~~ **DONE 2026-09-04**: `scripts/verify_poiseuille_flow.py` (flow
+     6f0a312) is the pointwise node metric, re-run on CUDA at main `b7669d3` (6.49e-8 / 1.10e-6 /
+     2.47e-5 at N=16/32/64, both meshes); ISSUES.md entry marked resolved.
    - ~~Kokkos "deallocated after finalize" warning under Jupyter~~ **RESOLVED 2026-09-04**: it was a
      `Kokkos::abort` (exit 134) whenever a bound object or zero-copy view outlived the atexit
      finalize. One shared pattern now (`core/include/peclet/core/python/kokkos_teardown.hpp`:
@@ -96,8 +104,7 @@ Other facts of the snapshot:
      segfaults; a Python-callable `set_solid` deadlocks under the OpenMP host backend (worker threads
      re-enter Python without the GIL; `set_solid_spheres` is fine) and `core/python/test_amr.py`
      uses the callable form, so it hangs on the host-openmp prefix. Guard both before 0.7.0 or list.
-   - Poiseuille verify metric ("fake convergence") — `verify_poiseuille_flow.py` was renamed and
-     re-metricked; confirm the issue entry can close.
+   - ~~Poiseuille verify metric ("fake convergence")~~ closed with the item above.
 5. dem root-level `verify_*.py` / `test_*.py` / `build_log*.txt` scratch: they are inside the
    package repo and ship in the sdist tree-walk — move under `dem/tests/scratch/` or gitignore [A].
 
