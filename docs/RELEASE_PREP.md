@@ -183,8 +183,12 @@ names missing (all VoF, scenes, MPI, rebalance), dem 43 of 91, voro 38 of 63 (`F
    L61–632): virtual classes in an anonymous namespace under hipcc's host/device split. Fix in
    progress (move them to a named namespace, folded into the teardown work on that file); then
    re-dispatch `only=hip, push=false`. pnm and coupling were never reached in that run (they install
-   after core) — expect them to link like flow/dem/voro. If the re-run passes, tag time publishes
-   `peclet-hip:0.7.0-gfx90a` as *untested on hardware*.
+   after core) — expect them to link like flow/dem/voro. **Re-runs:** 33873014855 got past core.amr and
+   died on voro's own anonymous-namespace wrappers (Tess/Flow/Sim, introduced by the teardown rewrite;
+   moved to `peclet::voro::pybind`, voro dfc1def); **33874788583 (2026-09-04 13:20 UTC) BUILT
+   `peclet-hip.sif` WITH THE WHOLE FAMILY** (flow, dem, voro, pnm, core, coupling, morton, MPI on),
+   push skipped by design. RESOLVED as a build: the next tag publishes `peclet-hip:0.7.0-gfx90a`
+   (still *untested on AMD hardware* — docs/LUMI.md §5).
 5. Optional but cheap: `check_release_state.sh --ci` as the first step of each `release.yml`
    (tag == version == `__version__`), and a `workflow_dispatch` dry run of the CUDA wheel job.
 6. Dependabot action majors differ across repos (`upload-artifact` v4 in flow vs v7 in the umbrella) — harmless per repo, but keep each repo's upload/download pair on the same major.

@@ -36,7 +36,8 @@ header repin), peclet-dem 0.5.0, peclet-voro 0.5.0, peclet-coupling 0.4.0, pecle
 - (more at release time from the per-package logs — see RELEASE_PREP §1.4 for the gallery-found defects)
 
 ### Known limitations
-- LUMI / HIP: see docs/LUMI.md — status of the link-error experiments recorded in docs/RELEASE_PREP.md §3.4.
+- LUMI / HIP: the `peclet-hip` image builds and is published for the first time, but has not run on AMD
+  hardware (no LUMI allocation yet) — see docs/LUMI.md.
 
 ## [0.6.0] — 2026-07-25
 

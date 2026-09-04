@@ -31,10 +31,9 @@ apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-hip:0.6.
 !!! warning "LUMI / HIP image — untested on hardware"
     The `peclet-cpu` and `peclet-cuda` images are published and MPI-enabled. The **HIP** image did not
     build for 0.1.0–0.6.0 (a hipcc/lld `undefined hidden symbol: vtable` link error under nanobind's
-    hidden visibility). That is fixed for flow/dem/voro (default visibility on the HIP path) and being
-    closed for core's `amr` module; the first published HIP image will be the one of the next family
-    release, and it will not have run on an AMD GPU until a LUMI allocation exists — see
-    [LUMI.md](LUMI.md).
+    hidden visibility); since 2026-09-04 it builds with the whole family (default visibility on the HIP
+    path, virtual wrapper classes in named namespaces) and is published from the next family release
+    on. It has not run on an AMD GPU until a LUMI allocation exists — see [LUMI.md](LUMI.md).
 
 Each image also carries a moving tag (`peclet-cpu:latest`, `peclet-cuda:sm80`, `peclet-hip:gfx90a`) that
 tracks the newest release.

@@ -1,10 +1,10 @@
 # Running peclet on LUMI (CSC / EuroHPC) — UNTESTED
 
-> **Status: no peclet build has ever run on LUMI.** This page is the recipe we intend to validate
+> **Status: the HIP container image builds (since 2026-09-04, CI run 33874788583, whole family with
+> MPI on) but no peclet build has ever RUN on LUMI.** This page is the recipe we intend to validate
 > once a LUMI allocation is granted. Every command below is derived from the LUMI documentation and
-> from the Snellius recipe ([SNELLIUS.md](SNELLIUS.md)), not from a run. The one known blocker is
-> a link error in the HIP build of the Python modules (§4) — expect the first session on LUMI to be
-> spent there. Treat the version pins as hypotheses.
+> from the Snellius recipe ([SNELLIUS.md](SNELLIUS.md)), not from a run. The former blocker, a link
+> error in the HIP build of the Python modules, is fixed (§4). Treat the version pins as hypotheses.
 
 ## Coordinates (fill in when the project exists)
 
@@ -56,8 +56,9 @@ Differences from Snellius that the script encodes:
 - **No `--gpus-per-task` binding by default**: LUMI's recommended GPU↔CPU affinity is a
   `select_gpu` wrapper that sets `ROCR_VISIBLE_DEVICES=$SLURM_LOCALID` and a CPU mask per GCD; the
   smoke job below carries a minimal version.
-- The `-Wl,--no-gc-sections` link option that flow/pnm/voro/coupling add under `Kokkos_ENABLE_HIP`
-  is **known not to fix** the link error in §4.
+- Under `Kokkos_ENABLE_HIP` every module sets `CXX_VISIBILITY_PRESET default` (the fix of §4);
+  `-Wl,--no-gc-sections` alone did not help. Virtual wrapper classes in binding TUs must live in named
+  namespaces.
 
 ## 3. Running
 
@@ -83,9 +84,9 @@ The container route: `containers/hip.def` (ROCm 6.2.4 base, vanilla MPICH) launc
 container's MPICH ABI (`libmpi.so.12`), and `containers/submit/lumi.slurm`. The image has never
 been built successfully (§4); pin the base ROCm ≤ the host driver's ROCm when it is.
 
-## 4. The blocker: HIP link error in the nanobind modules
+## 4. The former blocker: HIP link error in the nanobind modules (FIXED 2026-09-04)
 
-Every HIP container build since 0.3.0 dies linking `_flow`/`_voro` with
+Every HIP container build from 0.3.0 to 0.6.0 died linking `_flow`/`_voro` with
 
 ```
 ld.lld: error: undefined hidden symbol: vtable for Kokkos::Impl::SharedAllocationRecord<Kokkos::HIPSpace, Kokkos::Impl::ViewValueFunctor<Kokkos::Device<Kokkos::HIP, Kokkos::HIPSpace>, double>>
@@ -96,9 +97,9 @@ ld.lld: error: undefined hidden symbol: vtable for std::_Sp_counted_ptr_inplace<
 **Update 2026-09-04:** overriding nanobind's visibility preset to `default` on the HIP path (now in
 every module's CMakeLists under `if(Kokkos_ENABLE_HIP)`) makes flow, dem and voro link and install in
 the container build (CI run 33868865327). The same error class then surfaced for core's `amr`
-module, whose virtual wrapper classes sat in an anonymous namespace (being moved to a named one).
-Until the container job is green, the status stays "untested"; once it is, the image is published at
-the next tag and the on-hardware validation of §5 is what remains.
+module and then voro, whose virtual wrapper classes sat in anonymous namespaces (moved to named
+ones). Run 33874788583 then built `peclet-hip.sif` with the whole family. The image is published at
+the next tag; the on-hardware validation of §5 is what remains.
 
 Original diagnosis: nanobind marks the module target `CXX_VISIBILITY_PRESET hidden`; under hipcc the host-side objects
 reference these template vtables as hidden while no object defines them. The same link happens in a
