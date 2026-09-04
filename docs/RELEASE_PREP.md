@@ -59,7 +59,8 @@ Other facts of the snapshot:
    | voro | | | | |
    | coupling | | | | |
 
-3. Fix the **`__version__` drift** [B]: every `packaging/*_init.py` (flow 0.3.0, dem 0.3.2, voro 0.3.3,
+3. ~~Fix the **`__version__` drift**~~ **DONE 2026-09-04** (all seven packages derive `__version__` from
+   `importlib.metadata`, with the `-cu13` distribution as fallback; pre-flight reports `meta`). Original item: every `packaging/*_init.py` (flow 0.3.0, dem 0.3.2, voro 0.3.3,
    coupling 0.2.0) and morton's package `__init__` (0.1.0) lag their pyproject. Recommended permanent
    fix: derive it at import — `from importlib.metadata import version; __version__ = version("peclet-flow")`
    with a `PackageNotFoundError` fallback to `"0+dev"` for `PYTHONPATH=<build>` use — so the number
@@ -74,8 +75,16 @@ Other facts of the snapshot:
      solver advects with a zero face field (flow VoF).
    - no free-slip domain BC (flow); VoF interface area not exposed (flow).
    - inflow/outflow diverging to NaN in one configuration — "investigating" since July (flow).
-   - Kokkos "deallocated after finalize" warning under Jupyter (packaging; the live() registry fix
-     covers flow's FlowSolver — check dem/voro under a notebook teardown).
+   - ~~Kokkos "deallocated after finalize" warning under Jupyter~~ **RESOLVED 2026-09-04**: it was a
+     `Kokkos::abort` (exit 134) whenever a bound object or zero-copy view outlived the atexit
+     finalize. One shared pattern now (`core/include/peclet/core/python/kokkos_teardown.hpp`:
+     `Releasable` registry + `ViewCapsule` + release-then-finalize atexit) in flow/dem/voro/pnm/
+     coupling/core.amr — harness: 6 modules × 5 exit paths × OpenMP/CUDA all silent, exit 0
+     (core c1df85a, flow 3035320, dem 90366c0, voro 2c2e819, pnm af0c692, coupling 684513e).
+   - NEW (found by the teardown work, open): `peclet.core.amr.Flow.step()` without any `set_solid`
+     segfaults; a Python-callable `set_solid` deadlocks under the OpenMP host backend (worker threads
+     re-enter Python without the GIL; `set_solid_spheres` is fine) and `core/python/test_amr.py`
+     uses the callable form, so it hangs on the host-openmp prefix. Guard both before 0.7.0 or list.
    - Poiseuille verify metric ("fake convergence") — `verify_poiseuille_flow.py` was renamed and
      re-metricked; confirm the issue entry can close.
 5. dem root-level `verify_*.py` / `test_*.py` / `build_log*.txt` scratch: they are inside the
@@ -148,7 +157,14 @@ names missing (all VoF, scenes, MPI, rebalance), dem 43 of 91, voro 38 of 63 (`F
 
 ## 3. Packaging and CI [R]
 
-1. **CUDA family** [D3]: today only `peclet-flow-cu13`. Recommended for 0.7.0: add `cuda-wheel`
+1. **CUDA family** [D3] — **DONE 2026-09-04** (pnm 76fd56e, dem 1f72dc4, voro 749cd26, umbrella ed3ec42):
+   `packaging/pyproject-cuda.toml` + `cuda-wheel` jobs in pnm/dem/voro, `peclet-cu13` metapackage
+   (`packaging/pyproject-cu13.toml`, umbrella `build-cu13` job). Validated locally in one fresh venv: all four
+   modules `execution_space == Cuda`, libcudart from the `nvidia-cuda-runtime` wheel, pnm 7199 pores, dem
+   bit-identical to the dev tree, voro smoke PASS, flow exact (its exit-134 teardown abort is now fixed too).
+   CI-only unknowns: dem's ArborX build inside the manylinux container; the jobs need core 0.6.0 + repinned
+   `PECLET_TPX_TAG` (an isolated build at v0.5.0 lacks the geom headers); Trusted Publishers for the four
+   new names. Original item: today only `peclet-flow-cu13`. Recommended for 0.7.0: add `cuda-wheel`
    jobs + `packaging/pyproject-cuda.toml` for **pnm, dem, voro** (dem: add the ArborX build to the
    prefix step) and a `peclet-cu13` metapackage from the umbrella, so `pip install peclet-cu13`
    mirrors `pip install peclet`. Validate each with a local `pip wheel` against `extern/install/nvidia-cuda`

@@ -28,7 +28,12 @@ header repin), peclet-dem 0.5.0, peclet-voro 0.5.0, peclet-coupling 0.4.0, pecle
   smoke scripts under `tools/hpc/`; LUMI recipe (`docs/LUMI.md`, untested).
 
 ### Changed / Fixed
-- (filled in at release time from the per-package logs — see RELEASE_PREP §1.4 for the gallery-found defects)
+- **Clean interpreter teardown in every module** (was a `Kokkos::abort`, exit 134, whenever a solver or a
+  zero-copy view outlived the atexit finalize — scripts, `python -c`, notebooks): shared
+  `kokkos_teardown.hpp` registry, release-then-finalize; explicit `finalize()` per module.
+- `__version__` reports the installed distribution's version (was a stale literal in every package).
+- HIP (LUMI) link: default symbol visibility on the HIP path + AMR wrappers in a named namespace.
+- (more at release time from the per-package logs — see RELEASE_PREP §1.4 for the gallery-found defects)
 
 ### Known limitations
 - LUMI / HIP: see docs/LUMI.md — status of the link-error experiments recorded in docs/RELEASE_PREP.md §3.4.
