@@ -32,6 +32,15 @@ Other facts of the snapshot:
   `drag-study-harness`; flow `analysis/high-re-stability`, `vof-v6`, `vof-w0`, `vof-w12`, `vof-w3`,
   `vof-wor2`; voro `feature/flexible-cell-storage`. **Each must be merged or declared parked before
   the freeze [B].**
+  - **flow, re-audited 2026-09-05 (VoF session, cherry-pick aware):** MERGED into main — `vof-w3`,
+    `vof-v9`, `vof-w0`, `vof-wor2`, `telescope`, `rel-issues`, `rel-teardown`, `issues-merge`;
+    merged in substance (their findings docs were re-landed rebased, the refs point at the
+    pre-rebase commits) — `vof-v6`, `vof-w12`; PARKED — `vof-w4` (rung W4, WIP commit f29c8e7,
+    gates not met, see §7 D1), `vof-issues` (its two free-slip commits are the duplicate that
+    `rel-issues` superseded), `analysis/high-re-stability` (one debug-tracing commit), `dc-p1`
+    (worktree `flow-dc`). core `dev/aperture-compat-rhs` and `drag-study-harness` are one-commit
+    experiments/studies: PARKED. Worktrees `flow-vof`, `flow-w3`, `flow-v9`, `flow-issues`,
+    `flow-rel-*`, `tel/flow` hold nothing unmerged and can be removed at the freeze.
 - PecletDeps pins in flow/pnm/dem/voro/coupling: core `v0.5.0`, morton `v0.2.1`, Kokkos `5.1.1`,
   ArborX `v2.1`. core moves → repin in all five [R].
 - `CITATION.cff` says 0.5.0 / 2026-07-06; `CHANGELOG.md` stops at 0.2.0.
@@ -67,12 +76,19 @@ Other facts of the snapshot:
    can never drift again. `check_release_state.sh` flags the mismatch.
 4. Gallery-found suite defects still open (from `peclet-examples/ISSUES.md`): decide per item
    whether it is fixed or listed as a known limitation in the notes [D1]:
-   - `max_open_divergence()` returns 0 on a bare box, so `advect_vof`'s divergence guard is inert
-     without a pressure geometry (flow) — a user-facing silent-wrong; fix or make `advect_vof` refuse.
-   - interface-local Courant band has no wisp guard (flow VoF) — usability.
-   - `set_contact_angle` ignored on a domain-BC wall; `vof_geometry()` throws on an all-fluid solver;
+   - ~~`max_open_divergence()` returns 0 on a bare box, so `advect_vof`'s divergence guard is inert
+     without a pressure geometry~~ **RESOLVED 2026-09-03** (flow WO-R2: `advect_vof` throws without a
+     cut-cell pressure operator and gates on `max_open_divergence_projected()`; ISSUES.md closed).
+   - ~~interface-local Courant band has no wisp guard~~ **RESOLVED 2026-09-03** (WO-R2 item 4b: the
+     band predicate uses `wispEps`, 1e-8 by `enable_vof`; Zalesak's reported CFL tracks the bound).
+   - ~~`set_contact_angle` ignored on a domain-BC wall; `vof_geometry()` throws on an all-fluid solver;
      `step()` not atomic across the Weymouth–Yue throw; `set_state` + `advect_vof` on the collocated
-     solver advects with a zero face field (flow VoF).
+     solver advects with a zero face field~~ **RESOLVED 2026-09-04, the ISSUES sweep on flow main**:
+     `2f54317` (atomic `step()`), `709d038` (`step_adaptive`), `ea70354` (contact angle binds to a
+     domain-BC wall), `81dd6a3` (`vof_geometry` on an all-fluid solver), `4649878` (collocated
+     `set_state` seeds the face field; `advect_vof` refuses a blank one), `2f9f238`
+     (`pressure_solve_failed()` makes a preconditioner breakdown visible); battery 34/34 on both
+     trees + 12/12 and 3/3 MPI (flow `0f06f18`).
    - ~~free-slip domain BC (flow)~~ **MERGED + VERIFIED 2026-09-04**: flow main `e6c2c4e`
      (free-slip/symmetry `set_domain_bc` type 4, both grids, MPI), `eda0029` (outflow-reversal census +
      warning), `e5e1bbf`/`b7669d3` (CLAUDE.md notes) — the `rel-issues` branch, fast-forwarded onto
@@ -83,7 +99,8 @@ Other facts of the snapshot:
      PASS on CUDA. Physical gate: half channel + symmetry plane == full Poiseuille channel node for
      node to 2.5e-13 / 3.4e-12 / 2.6e-11 at N=16/32/64 on both grids; uniform flow along four slip
      faces stays uniform to 7e-12. ISSUES.md entry closed with the hashes.
-   - VoF interface area not exposed (flow) — VoF session.
+   - ~~VoF interface area not exposed~~ **RESOLVED** on flow main: `vof_interface_area()` and
+     `vof_geometry()['interface_area']` (per-block areas in `vof_block_stats()`).
    - inflow/outflow diverging to NaN — **DETECTOR LANDED 2026-09-04** (flow `eda0029`), NaN not
      reproducible: the entry's own configuration is steady with β=0.2 and β=0 alike (bit-identical,
      no reversal, nothing to warn about); where the outlet does reverse (BFS Re_S=800, β=0) the
@@ -263,6 +280,28 @@ The gallery site itself is unaffected by the release (it renders from `_freeze/`
 - **D1** VoF defects: handed to the VoF session. The non-VoF items of §1.4 (free-slip domain BC,
   inflow/outflow NaN, Poiseuille metric closure, Kokkos teardown warning) are being worked in this
   release-prep session (flow worktrees `flow-rel-issues`, `flow-rel-teardown`).
+  **Outcome 2026-09-05 (VoF session):** every VoF item of §1.4 is fixed on flow main (hashes there);
+  nothing VoF-side is left to list as a defect. **The VoF scope of 0.7.0 and its stated limitations**
+  (the release notes should carry these, wording as in `flow/CLAUDE.md`'s VoF section):
+  1. Geometric VoF (PLIC + Weymouth–Yue + HF curvature cascade + balanced-force CSF), cut-cell
+     transport over SDF solids, static/dynamic contact angle with hysteresis and Navier slip, open
+     two-phase boundaries, phase change (Stefan/sucking at the noise floor; Scriven bubble growth
+     closes at Ja 0.5 to 0.03 % but NOT at Ja 2 — 3.6 %, `energy_order` default 1, the P3h dossier),
+     the multiple-marker block container (checkpointable bitwise), MPI + CUDA throughout.
+  2. **Colliding bubbles are outside the block container's rating**: `channel_18` (Re_τ 127,
+     D/Δ = 10) ends at ~1.5 eddy turnovers when two markers interpenetrate, independent of dt
+     (WO-W3 §7). Rung W4 is parked (flow branch `vof-w4`, WIP f29c8e7) and resumes after 0.7.0.
+  3. The block container is all-fluid, staggered-only for the block CSF, ratio ≲ 100 with motion;
+     the collocated two-phase path (V8) is all-fluid, ratio ≲ 100 with motion; staggered is the
+     reference.
+  4. Wall-bounded turbulence at Re_τ ≈ 127 needs `dy⁺ ≲ 1.6`; flow's cubic cells give 3.18 on the
+     `channel_18` grid, so the near-wall turbulence decays and the bubbles do not disperse (W3 §8) —
+     a `flow` limitation (no anisotropic cells), not a VoF one. TBFsolver's 16-turnover `channel_18`
+     statistics (`flow/tests/study/channel_18/results/`) are the first reference for the case.
+  5. Dynamic wetting: the contact-line mobility inside the wetting band (V6c) is open; the V7
+     pore-scale campaign's packing imbibition shows no wettability effect and the micromodel is
+     non-monotone in θ (documented on the V7 gallery page). The Lamb mode-2 ~4 % band-force residual
+     on curved interfaces is a known, characterised deviation (inviscid reference; not a κ bias).
 - **D2** yes: pnm 0.1.1 repinned to core v0.6.0 at release time.
 - **D3** yes, full CUDA family: `peclet-pnm-cu13`, `peclet-dem-cu13`, `peclet-voro-cu13` +
   `peclet-cu13` metapackage (implementation in progress, validated locally before CI).
