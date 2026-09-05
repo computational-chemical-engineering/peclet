@@ -26,21 +26,23 @@ does not block · **[D]** decision needed from the maintainer.
 
 Other facts of the snapshot:
 
-- Open worktrees: flow has 9 (`flow-dc` dc-p1, `flow-rebalance` vof-rebalance, `flow-v9` vof-v9,
-  `flow-vof` p3h-doc, `flow-w3` vof-w3, `tel/flow` telescope, + detached `flow-ex*`, `flow-rebal-base`);
-  core has `tel/core` telescope. Unmerged branches: core `dev/aperture-compat-rhs`,
-  `drag-study-harness`; flow `analysis/high-re-stability`, `vof-v6`, `vof-w0`, `vof-w12`, `vof-w3`,
-  `vof-wor2`; voro `feature/flexible-cell-storage`. **Each must be merged or declared parked before
-  the freeze [B].**
-  - **flow, re-audited 2026-09-05 (VoF session, cherry-pick aware):** MERGED into main — `vof-w3`,
-    `vof-v9`, `vof-w0`, `vof-wor2`, `telescope`, `rel-issues`, `rel-teardown`, `issues-merge`;
-    merged in substance (their findings docs were re-landed rebased, the refs point at the
-    pre-rebase commits) — `vof-v6`, `vof-w12`; PARKED — `vof-w4` (rung W4, WIP commit f29c8e7,
-    gates not met, see §7 D1), `vof-issues` (its two free-slip commits are the duplicate that
-    `rel-issues` superseded), `analysis/high-re-stability` (one debug-tracing commit), `dc-p1`
-    (worktree `flow-dc`). core `dev/aperture-compat-rhs` and `drag-study-harness` are one-commit
-    experiments/studies: PARKED. Worktrees `flow-vof`, `flow-w3`, `flow-v9`, `flow-issues`,
-    `flow-rel-*`, `tel/flow` hold nothing unmerged and can be removed at the freeze.
+- **Worktrees and branches — verdicts taken 2026-09-05** (by patch identity against `origin/main`,
+  `git cherry`): everything with code value is on main; nothing here blocks the freeze.
+
+  | repo | branch (worktree) | state | verdict |
+  |---|---|---|---|
+  | flow | `rel-issues`, `rel-teardown`, `issues-merge` (flow-vof), `vof-v9`, `vof-w3`, `dc-p1` (flow-dc), `telescope` (tel/flow) | 0 ahead of main | **merged**; worktrees can be pruned when their sessions close |
+  | flow | `vof-w4` (flow-w4) | 0 ahead, 7 files modified | **active** (VoF W4 session) — leave alone |
+  | flow | `vof-issues` (flow-issues) | 2 patches not on main | **superseded** — the older free-slip type-4 draft; main carries the rel-issues implementation (e6c2c4e) |
+  | flow | `vof-v6`, `vof-w0`, `vof-w12`, `vof-wor2` | ≤ 2 doc patches not on main | **merged by rebase** (W1/W12 content is on main as 0755bf6…ba62a7e; only the pre-rebase doc commits differ) — parked, deletable |
+  | flow | `analysis/high-re-stability` | 1 debug commit, 2026-04, 570 behind | **parked** (historical debug branch) |
+  | core | `telescope` (tel/core) | 0 ahead | merged |
+  | core | `dev/aperture-compat-rhs`, `drag-study-harness` | 1 commit each (experiment with a negative result; a study harness) | **parked** |
+  | voro | `feature/flexible-cell-storage` | 14 commits, 2026-03 | **parked** (pre-Kokkos era; would not apply) |
+
+  Shared checkouts: `flow/` fast-forwarded to `2a89c67` (was 55 behind, then 4 behind after the
+  rel-issues merge); `core/` carries another session's uncommitted AMR edits
+  (`ghost_projection_sampled.hpp`, the mixed-level plan) — commit from named paths only.
 - PecletDeps pins in flow/pnm/dem/voro/coupling: core `v0.5.0`, morton `v0.2.1`, Kokkos `5.1.1`,
   ArborX `v2.1`. core moves → repin in all five [R].
 - `CITATION.cff` says 0.5.0 / 2026-07-06; `CHANGELOG.md` stops at 0.2.0.
@@ -58,15 +60,22 @@ Other facts of the snapshot:
 1. Merge/park the worktree branches above; fast-forward `flow/` (`git -C flow pull --ff-only`).
 2. Run RELEASE.md §3 on host **and** CUDA, MPI np=1,2,4, and paste the counts here:
 
-   | project | host | CUDA | MPI | notes |
+   | project | host (`extern/install/host-openmp`, fresh `build_rel*`, 2026-09-05) | CUDA | MPI | notes |
    |---|---|---|---|---|
-   | core | | | | |
-   | morton | | – | – | |
-   | flow (kokkos / kmpi / regression / verify_*) | 36/36 | 36/36, regression PASS, verify 5/5 | 103/103 np=1,2,4 | 2026-09-04, main at the rel-issues merge; OMP_NUM_THREADS=4 |
-   | pnm | | | | |
-   | dem (kokkos / kmpi / verify_packing) | | | | |
-   | voro | | | | |
-   | coupling | | | | |
+   | core | plain 103/103 (np 1–8) · Kokkos-OpenMP 157/157 (np 1–8; the 5 AMR np4/np8 failures of the pre-fix run gone) · python module builds (mpi/geom/amr import) | not run (see below) | in the counts | **after** the NBX tag-range fix (core 5ca7037): before it, `particle_halo_np8` hung on 2 pinned cores (the CI hang) and `amr_distributed_{fv,mg,graded_mg,openness,poisson}_np{4,8}` failed intermittently (1–3 per run on a pristine main) |
+   | morton | ctest 1/1 · non-BMI2 build ctest 1/1 · pytest 9/9 | – | – | |
+   | flow (kokkos / kmpi / regression / verify_*) | 36/36 | 36/36, regression PASS, verify 5/5 | 103/103 np=1,2,4 | 2026-09-04, main at the rel-issues merge; OMP_NUM_THREADS=4. Host module rebuilt 2026-09-05 at 2a89c67 for the coupling tests |
+   | pnm | module builds · `test_extraction.py packing_ring.vti` = **7199 pores** | not run | `tests/kokkos_mpi` 6/6 (np 1,2,4) | |
+   | dem (kokkos / kmpi / verify_packing) | `tests/kokkos` 8/8 · `verify_packing_spheres.py` runs to completion (final overlap 0.000) | not run | `tests/kokkos_mpi` 24/24 (host) | module built with `PECLET_DEM_MPI=ON` |
+   | voro | in-tree Kokkos+Python+MPI build **24/24** (352 s) | not run | `tests/kokkos_mpi` 18/18 (np 1,2,4; `OMP_NUM_THREADS=1`) | H100 np=4 gates all OK on Snellius 2026-09-05 (job 26366044, [VORONOI_METHODS_PLAN C5](VORONOI_METHODS_PLAN.md)) |
+   | coupling | `terminal_velocity`, `fixed_bed_ergun` **2/2** (flow + dem host modules on PYTHONPATH) | not run | – | |
+   | whole family | import smoke: flow/dem/voro/pnm/core.amr report `OpenMP`; core.mpi, core.geom, morton, coupling import | – | – | `PYTHONPATH` over the seven `build_rel*` trees |
+
+   **CUDA column not run on 2026-09-05:** the workstation's GPU was carrying another session's
+   long run (88 % busy) all afternoon; the CUDA half of the matrix (§3 of RELEASE.md, `nvidia-cuda`
+   prefix) is the remaining local obligation before the tag. flow's CUDA row is from 2026-09-04.
+   Driver script for the host half: it lives in the session scratch, not the repo — the commands are
+   RELEASE.md §3 verbatim with `build_rel*` trees; re-run them, do not reuse the trees.
 
 3. ~~Fix the **`__version__` drift**~~ **DONE 2026-09-04** (all seven packages derive `__version__` from
    `importlib.metadata`, with the `-cu13` distribution as fallback; pre-flight reports `meta`). Original item: every `packaging/*_init.py` (flow 0.3.0, dem 0.3.2, voro 0.3.3,
@@ -227,6 +236,24 @@ names missing (all VoF, scenes, MPI, rebalance), dem 43 of 91, voro 38 of 63 (`F
 5. Optional but cheap: `check_release_state.sh --ci` as the first step of each `release.yml`
    (tag == version == `__version__`), and a `workflow_dispatch` dry run of the CUDA wheel job.
 6. Dependabot action majors differ across repos (`upload-artifact` v4 in flow vs v7 in the umbrella) — harmless per repo, but keep each repo's upload/download pair on the same major.
+
+7. **CI on `main` made green again, 2026-09-05** (pre-flight showed every code repo red):
+   - **core**: `CI` hung in `particle_halo_np8` for the 6 h job limit on every push since 09-04
+     (cancelled, not failed — easy to miss). Cause: the per-round NBX tag (10294e6, `baseTag + round`)
+     collided with the particle halo's direct tags (7501 + 1 = 7502) and with the AMR gather tags
+     (family 0 over 11/41/45) on oversubscribed ranks. Fix core `5ca7037`: rounds use a reserved
+     tag range, gated by `test_nbx_rounds`. Rule recorded in `core/CLAUDE.md`.
+   - **flow / pnm / dem** `CI`: died at the first `#include` because CI vendors core at the
+     `PECLET_TPX_TAG` default (`v0.5.0`, no geom / teardown headers). Workflows now pass
+     `-DPECLET_TPX_TAG=main` (flow 20756a6, pnm 3cbfffc, dem d6afedc + f2650f1 for the kernel tests'
+     `TPX_DIR`). The vendored default still moves to `v0.6.0` at release time (§0).
+   - **flow** `Quality`: ruff F821 in `tests/study/vof_momentum_consistency.py` (a `del` of a name a
+     closure still binds) — flow 2a89c67.
+   - **voro** `CI`: built Kokkos 4.5.00 while the family pins 5.1.1 (`test_energy_layer` no longer
+     compiles against 4.5) — voro b8a49a9; then `test_mesh_optimizer` used a `(real_t[3]){…}`
+     compound literal that g++ 13 rejects — voro 91daffc.
+   - The `clang-format (informational)` jobs are `continue-on-error` already; a red badge on Quality
+     means ruff.
 
 ---
 
