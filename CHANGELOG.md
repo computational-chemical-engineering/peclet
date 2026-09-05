@@ -4,6 +4,17 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] — 2026-09-06
+
+CUDA wheels only. `peclet-flow-cu13` 0.5.1, `peclet-pnm-cu13` 0.1.2, `peclet-dem-cu13` 0.5.1,
+`peclet-voro-cu13` 0.5.1 (their CPU twins re-released at the same numbers with no code change) now embed
+native machine code for Turing (sm_75), Ampere (sm_80), Hopper (sm_90) and Blackwell (sm_100, sm_120) plus
+the Turing PTX, and are built with the oldest CUDA 13 toolkit so that PTX JIT-compiles on every 13.x
+driver. The 0.4.0–0.5.0 wheels carried sm_75 code + PTX from CUDA 13.2 only: on a non-Turing GPU with a
+driver older than 13.2 every import aborted with Kokkos "likely mismatch of architecture" (the driver
+cannot JIT PTX newer than itself, and under minor-version compatibility the launch silently no-ops).
+`peclet-cu13` / `peclet` 0.7.2 pin the new numbers; `peclet[mpi]` still pins peclet-core 0.6.1.
+
 ## [0.7.1] — 2026-09-06
 
 Metapackage-only follow-up: `peclet[mpi]` / `peclet-cu13[mpi]` pin **peclet-core 0.6.1**, whose

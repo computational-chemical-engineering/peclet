@@ -226,9 +226,16 @@ Traps recorded from 0.1.0–0.6.0:
 - macOS Intel runners queue for 40+ minutes and gate publish — morton dropped `macos-13`; do not add it back.
 - `skip-existing: true` in the flow publish step lets a partial upload be completed (e.g. adding the cu13 wheels after the CPU files); leave it.
 - A `pypi/pyversions` badge renders "missing" without trove classifiers; the static python badge is deliberate.
+- **CUDA wheels must carry native SASS for every GPU major you support** (sm_75/80/90/100/120 today) —
+  PTX does NOT carry a wheel forward: a driver older than the toolkit that emitted the PTX cannot JIT it,
+  and under minor-version compatibility the launch silently no-ops, so Kokkos aborts at import with
+  "likely mismatch of architecture" (0.4.0–0.5.0 shipped sm_75 + CUDA-13.2 PTX only and failed on every
+  non-Turing GPU with a 13.0/13.1 driver). The extra SASS goes in through `NVCC_APPEND_FLAGS` (nvcc reads it
+  itself; nvcc_wrapper rejects a second `-arch`/`-gencode`), and the job pins the OLDEST 13.x toolkit so
+  the PTX JITs on any 13.x driver. Check a wheel with `cuobjdump --list-elf <module>.so`.
 - **Smoke test in a fresh venv** after the metapackage is live:
   `python -m venv /tmp/rel && /tmp/rel/bin/pip install peclet==<family> && /tmp/rel/bin/python -c "import peclet.flow, peclet.dem, peclet.voro, peclet.pnm, peclet.morton"`, then run one gallery example
-  (`poiseuille-ibm`) against it; repeat with `peclet-flow-cu13` on the GPU box.
+  (`poiseuille-ibm`) against it; repeat with `peclet-cu13` on the GPU box AND `peclet[mpi,cfd-dem]` (the sdist members: core, coupling — the core sdist was silently unbuildable 0.1.0–0.6.0).
 
 ---
 
