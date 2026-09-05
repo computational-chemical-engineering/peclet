@@ -38,7 +38,12 @@ toolkit generation. So the split is:
   multi-threaded with no prefix. `peclet-morton` is pure CPU with runtime ISA dispatch.
 - **Single-GPU CUDA:** `pip install peclet-cu13` — the CUDA twin of the metapackage, pulling
   `peclet-flow-cu13`, `peclet-pnm-cu13`, `peclet-dem-cu13`, `peclet-voro-cu13` (+ `peclet-morton`). Each
-  module embeds a static Kokkos-CUDA build (one SASS baseline + PTX, so it runs Turing..Blackwell by JIT)
+  module embeds a static Kokkos-CUDA build with Turing (sm_75) machine code plus PTX. **The PTX only
+  JIT-compiles on a driver at least as new as the toolkit that built the wheel** (CUDA 13.2 for the
+  current wheels): on an older 13.x driver with a non-Turing GPU, Kokkos aborts at import with
+  "likely mismatch of architecture" — update the driver, or build from source against the local
+  toolkit (`CMAKE_PREFIX_PATH=<nvidia-cuda prefix> pip install .`), which compiles native machine code
+  for your GPU. A multi-architecture wheel is planned
   and gets `libcudart` from the `nvidia-cuda-runtime` dependency wheel via its rpath; only the NVIDIA
   driver (CUDA ≥ 13 capable) must be on the host — no system CUDA toolkit. The `-cu13` packages install
   the **same `peclet.*` imports** as the CPU ones and are therefore **mutually exclusive with `peclet`**

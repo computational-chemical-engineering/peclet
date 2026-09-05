@@ -259,7 +259,19 @@ names missing (all VoF, scenes, MPI, rebalance), dem 43 of 91, voro 38 of 63 (`F
    prefix step) and a `peclet-cu13` metapackage from the umbrella, so `pip install peclet-cu13`
    mirrors `pip install peclet`. Validate each with a local `pip wheel` against `extern/install/nvidia-cuda`
    in a fresh venv before tagging; register the four new PyPI project names' trusted publishers.
-   Multi-arch SASS (only sm_75 + PTX today) stays as is; note JIT on first import in the docs.
+   ~~Multi-arch SASS (only sm_75 + PTX today) stays as is; note JIT on first import in the docs.~~
+   **MEASURED 2026-09-06, the cu13 wheels do NOT run on this workstation** (RTX 5080 sm_120, driver
+   590.44 = CUDA 13.1): every `-cu13` import aborts with `Kokkos::Cuda::initialize ERROR: likely
+   mismatch of architecture`; `peclet-flow-cu13` 0.4.0 (July) fails identically, so this is not a
+   regression. Mechanism, proven with a 10-line kernel: the wheel carries sm_75 SASS + compute_75 PTX
+   with ISA 9.2 (nvcc 13.2 in CI); a driver older than the build toolkit cannot JIT that PTX and
+   under minor-version compatibility the launch silently does nothing (kernel arch 0) — Kokkos's probe
+   reads 0 and aborts. sm_120 SASS built locally runs. So the wheels work only on a Turing GPU or on a
+   driver ≥ 13.2; the "runs Turing..Blackwell by JIT" claim was wrong and is corrected in DEPLOYMENT.md.
+   Fix for the next cu13 cycle: SASS for sm_75/80/90/100/120 (+ compute_75 PTX) — modules are small
+   (flow 13 MB single-arch, so ~50 MB with five) — and pin the CI toolkit to the OLDEST 13.x so the PTX
+   JITs on every 13.x driver; needs a cu13 re-release of flow/pnm/dem/voro (same-version rule ⇒ x.y.1 of
+   each) + peclet-cu13 0.7.2. Not done in the 0.7.x window; the CPU family is unaffected.
 2. **coupling CI**: none exists — add `ci.yml` (OpenMP prefix, build flow + dem + coupling, run `tests/test_terminal_velocity.py`).
 3. **Containers**: DONE 2026-09-04 — `push` input added to `containers.yml`; pnm + coupling added to
    the three `.def` files and proven by a `only=cpu, push=false` dispatch (run 33869278789: every member
