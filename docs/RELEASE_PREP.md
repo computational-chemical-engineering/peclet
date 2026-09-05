@@ -145,6 +145,18 @@ Other facts of the snapshot:
    `docs/Doxyfile` PROJECT_NUMBER, CITATION.cff; morton unchanged at 0.2.1 (its one commit since the tag is
    the `__version__`-from-metadata change; not re-released, per D4 — the pre-flight's one remaining `!!`).
    `tools/release/check_release_state.sh` at umbrella 54cfc8a: no other mismatch.
+7. **Released 2026-09-05** (tags core v0.6.0, flow v0.5.0, pnm v0.1.1, dem v0.5.0, voro v0.5.0,
+   coupling v0.4.0, umbrella v0.7.0): every Release run green after one publisher fix (the new
+   `*-cu13` pending publishers had `environment: pypi` while the July ones had none — PyPI scopes the
+   OIDC token to ONE publisher record, so pnm's first publish got a token valid only for
+   `peclet-pnm-cu13`; fixed by making the new publishers field-identical to the old, blank environment).
+   Containers run green: `peclet-cpu`, `peclet-cuda` sm80/sm90 and, first time on a tag, `peclet-hip` gfx90a.
+   **Fresh-venv smoke test:** `peclet==0.7.0` installs + imports (OpenMP), `peclet-coupling` sdist builds,
+   but the `[mpi]` extra FAILED: the `peclet-core` sdist has never been self-contained (SuiteNanobind
+   from the umbrella's `cmake/`; 0.5.0 fails identically). Fixed as **core 0.6.1** (749a8fb + 2a6eb4f,
+   vendored `core/cmake/SuiteNanobind.cmake`, verified sdist → fresh venv → `peclet.core.mpi` import) and
+   **peclet 0.7.1** (metapackage pins only). Known drift shipped: installed `peclet.morton.__version__`
+   reads 0.1.0 (morton 0.2.1 not re-released; the metadata fix waits on its main).
    Every consumer's `PecletDeps.cmake` pins core **v0.6.0** — that tag does not exist until core is
    tagged, so **tag core first** (RELEASE.md order); CI is unaffected (flow/pnm/dem build core `main`,
    voro checks out the sibling), only a local `pip install .` of a consumer needs the tag. `CITATION.cff`
@@ -159,6 +171,20 @@ Other facts of the snapshot:
 ## 2. Documentation [R] (line numbers from the 2026-09-04 audit)
 
 ### 2.1 Wrong or stale statements (fix)
+
+**Umbrella items DONE 2026-09-05/06** (parallel docs session, umbrella `cc0920a`; release session `a77343f`+):
+`docs/DEPLOYMENT.md`, `docs/containers.md`, `docs/PORTABILITY.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`,
+`docs/index.md`, umbrella `README.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `docs/SNELLIUS.md` (venv path,
+`tools/hpc/` section), `docs/python/*` regenerated (§2.2), `containers/README.md` (family list, moving-tag
+pulls, CI-built paragraph), `containers/submit/*.slurm` (moving-tag pulls + SIF defaults), umbrella
+`pyproject.toml` Documentation URL → the docs site, `CHANGELOG.md` 0.7.0 + 0.7.1 sections, `CITATION.cff`
+(version/date; **rule change**: concept DOI only — do NOT add version DOIs after Zenodo mints them,
+RELEASE.md §9.2). **Rule (RELEASE.md §5.2):** no version literals on `docs/index.md`, `docs/DEPLOYMENT.md`,
+`docs/containers.md`, `docs/python/index.md`, `README.md` — the pre-flight flags them.
+The `.def` files carry pnm + coupling since 2026-09-04 (§3.3). Still open, submodule-side, for the next
+cycle (not by retagging): `flow/README.md`, `dem/README.md`, `voro/README.md`, `core/README.md` +
+`core/CLAUDE.md`, `morton/README.md` badge, `coupling/README.md` / `pnm/README.md` badge rows; the flow
+`rank()/size()` non-MPI docstring is fixed on flow main after v0.5.0. Original list, for the record:
 
 - `docs/DEPLOYMENT.md` L15-16: "the flow Python module is single-rank, its multi-rank solver lives
   in the C++ tests" — **wrong** (`Solver.init_mpi`, `mpi_block`, `has_mpi`); L31/L64/L78-80 package

@@ -4,6 +4,16 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] — 2026-09-06
+
+Metapackage-only follow-up: `peclet[mpi]` / `peclet-cu13[mpi]` pin **peclet-core 0.6.1**, whose
+standalone sdist builds again. `pip install peclet-core` (and therefore the `[mpi]` extra) had failed
+since the nanobind port (0.1.0 through 0.6.0): the build included `SuiteNanobind.cmake` from the
+umbrella checkout, which an sdist does not contain. The file is now vendored under `core/cmake/`
+(searched after the umbrella's copy). Found by the 0.7.0 fresh-venv smoke test; no other member
+changes. The docs site carries no version literals any more (PyPI badge + this file + the moving
+container tags are the version surface); `CITATION.cff` carries the concept DOI only.
+
 ## [0.7.0] — 2026-09-05
 
 Family: peclet-core 0.6.0, peclet-flow 0.5.0 (+ peclet-flow-cu13), **new** peclet-pnm-cu13 /

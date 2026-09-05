@@ -18,7 +18,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "peclet"
-version = "0.7.0"
+version = "0.7.1"
 description = "GPU-accelerated & parallel simulation of transport phenomena (CFD, DEM, Voronoi) — CPU family metapackage"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -36,14 +36,14 @@ dependencies = [
 [project.optional-dependencies]
 # peclet-core is sdist-only (MPI particle halo + Kokkos AMR): installing it builds from source and needs
 # an MPI toolchain (+ optional Kokkos prefix for the AMR module).
-mpi = ["peclet-core==0.6.0"]
+mpi = ["peclet-core==0.6.1"]
 # peclet-coupling is the unresolved point-particle CFD-DEM coupling of peclet.flow + peclet.dem
 # (sdist-only: builds its Kokkos kernels from source against a bootstrapped prefix).
 cfd-dem = ["peclet-coupling==0.4.0"]
 
 [project.urls]
 Homepage = "https://github.com/computational-chemical-engineering/peclet"
-Documentation = "https://github.com/computational-chemical-engineering/peclet"
+Documentation = "https://computational-chemical-engineering.github.io/peclet/"
 
 # No Python package is built — this metapackage is dependencies only. Point hatchling at an empty target
 # so it produces a valid (code-free) wheel/sdist.

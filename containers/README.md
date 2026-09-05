@@ -1,7 +1,7 @@
 # Containers
 
 Apptainer (Singularity) definition files that bake the toolchain + a bootstrapped Kokkos/ArborX prefix
-and pip-install the full `peclet.*` family (flow, dem, voro, core, morton). Apptainer is the de-facto
+and pip-install the full `peclet.*` family (flow, pnm, dem, voro, coupling, core, morton). Apptainer is the de-facto
 container runtime on HPC (both **Snellius** and **LUMI** use it; Docker is not permitted on the compute
 nodes).
 
@@ -17,9 +17,9 @@ The [`.github/workflows/containers.yml`](../.github/workflows/containers.yml) wo
 version tags and publishes them to the GitHub Container Registry. Pull on a login node without building:
 
 ```bash
-apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cpu:0.7.0
-apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.7.0-sm80   # Snellius A100
-apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-hip:0.7.0-gfx90a  # LUMI MI250X
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cpu:latest
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:sm80   # Snellius A100
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-hip:gfx90a  # LUMI MI250X
 ```
 
 Or build them yourself from the `.def` files below.
@@ -97,5 +97,8 @@ Notes / gotchas:
 - **Arch.** `cuda.def` defaults to A100 (`sm_80`); pass `KOKKOS_ARCH=HOPPER90 CUDA_ARCH=90` for H100.
   `hip.def` targets MI250X (`gfx90a`).
 
-These `.def` files have **not** been built/tested in CI (no GPU runners); treat them as a starting
-point to build on the target cluster. Roadblocks/assumptions are noted in `../docs/DEPLOYMENT.md`.
+All three `.def` files are built by the umbrella `Containers` workflow on every family tag (and on a
+manual dispatch) and pushed to GHCR under the moving tags above plus a pinned `X.Y.Z` tag per release.
+The CPU and CUDA images are exercised on Snellius; the HIP image links and installs the whole family
+but has not yet run on AMD hardware (no LUMI allocation) — see `../docs/LUMI.md`. Assumptions are
+noted in `../docs/DEPLOYMENT.md`.
