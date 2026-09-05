@@ -271,7 +271,14 @@ names missing (all VoF, scenes, MPI, rebalance), dem 43 of 91, voro 38 of 63 (`F
    Fix for the next cu13 cycle: SASS for sm_75/80/90/100/120 (+ compute_75 PTX) — modules are small
    (flow 13 MB single-arch, so ~50 MB with five) — and pin the CI toolkit to the OLDEST 13.x so the PTX
    JITs on every 13.x driver; needs a cu13 re-release of flow/pnm/dem/voro (same-version rule ⇒ x.y.1 of
-   each) + peclet-cu13 0.7.2. Not done in the 0.7.x window; the CPU family is unaffected.
+   each) + peclet-cu13 0.7.2. **DONE 2026-09-06 as 0.7.2**: flow d9b9809 (0.5.1), pnm a55a19a (0.1.2), dem fd15782 (0.5.1), voro 1a00831
+   (0.5.1) — cuda-wheel job: `NVCC_APPEND_FLAGS` with sm_80/90/100/120 gencodes beside Kokkos's Turing baseline
+   (nvcc reads the variable itself; nvcc_wrapper errors on a second -arch/-gencode, so CMAKE_CXX_FLAGS was not
+   an option), toolkit 13.0 (oldest 13.x in the rhel8 repo: nvcc/crt/cudart-devel/driver-devel 13.0.88,
+   nvml-devel 13.0.87). Validated locally first with the 13.2 toolkit: Kokkos 5.1.1 + flow module carry
+   sm_75/80/90/100/120 + compute_75 PTX (flow 21 MB vs 13 MB), import on the RTX 5080 / 13.1 driver with
+   `execution_space == Cuda`, verify_poiseuille PASS. CPU twins re-released at the same numbers (no code
+   change); core pin v0.6.1 in all five consumers; peclet / peclet-cu13 0.7.2.
 2. **coupling CI**: none exists — add `ci.yml` (OpenMP prefix, build flow + dem + coupling, run `tests/test_terminal_velocity.py`).
 3. **Containers**: DONE 2026-09-04 — `push` input added to `containers.yml`; pnm + coupling added to
    the three `.def` files and proven by a `only=cpu, push=false` dispatch (run 33869278789: every member
