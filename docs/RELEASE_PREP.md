@@ -140,9 +140,11 @@ Other facts of the snapshot:
    files; verified in a fresh clone — the sdist root holds only CITATION.cff, CMakeLists.txt, LICENSE,
    README.md, pyproject.toml, requirements.txt, .clang-format, .gitignore.
 6. **Phase C (versions) DONE 2026-09-05 — the tree is release-ready; only the tags remain.** Per D4:
-   core `be9db10` (0.6.0), flow `8767878` (0.5.0, +cu13), pnm `bcc79e8` (0.1.1, +cu13), dem `6c74aa6`
-   (0.5.0, +cu13), voro `29dcaaf` (0.5.0, +cu13), coupling `812c107` (0.4.0), morton unchanged at 0.2.1
-   (its one commit since the tag is the `__version__`-from-metadata change; not re-released, per D4).
+   core `27e34f9` (0.6.0), flow `9a8f70e` (0.5.0, +cu13), pnm `1093d19` (0.1.1, +cu13), dem `b6eb8ab`
+   (0.5.0, +cu13), voro `d310f2b` (0.5.0, +cu13), coupling `812c107` (0.4.0) — pyproject, `packaging/pyproject-cuda.toml`,
+   `docs/Doxyfile` PROJECT_NUMBER, CITATION.cff; morton unchanged at 0.2.1 (its one commit since the tag is
+   the `__version__`-from-metadata change; not re-released, per D4 — the pre-flight's one remaining `!!`).
+   `tools/release/check_release_state.sh` at umbrella 54cfc8a: no other mismatch.
    Every consumer's `PecletDeps.cmake` pins core **v0.6.0** — that tag does not exist until core is
    tagged, so **tag core first** (RELEASE.md order); CI is unaffected (flow/pnm/dem build core `main`,
    voro checks out the sibling), only a local `pip install .` of a consumer needs the tag. `CITATION.cff`
