@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`suite/` is the **`peclet`** umbrella repository for GPU-accelerated and parallel scientific computing — particle dynamics, CFD, and the spatial-indexing primitives they build on. It holds **five method/infrastructure projects as git submodules** (`flow`, `dem`, `core`, `voro`, `morton`), each its own self-contained repo with its own `CMakeLists.txt`, build system, and (in some cases) its own `CLAUDE.md`. There is no top-level build or test runner — work happens *inside* a submodule, not at this level.
+`suite/` is the **`peclet`** umbrella repository for GPU-accelerated and parallel scientific computing — particle dynamics, CFD, and the spatial-indexing primitives they build on. It holds **seven method/infrastructure projects as git submodules** (`core`, `morton`, `flow`, `pnm`, `dem`, `voro`, `coupling`), each its own self-contained repo with its own `CMakeLists.txt`, build system, and (in some cases) its own `CLAUDE.md`. There is no top-level build or test runner — work happens *inside* a submodule, not at this level.
 
 **Consequence for any task:** `cd` into the relevant submodule before building, testing, or running git. A `git status` / commit / diff issued from `suite/` itself acts on the **umbrella** (submodule pointers + shared `docs/`), not on a method code — so commit code changes inside the submodule first, then bump the pointer in the umbrella.
 
@@ -24,8 +24,7 @@ host-staged variant); the Lagrangian halo (`peclet::core::halo::ParticleMigrator
 `BlockDecomposer::init(…, weights)` + `DistributedOctree::rebalance` for AMR leaf/field migration and
 `rebalanceByParticleCount` for the Lagrangian path). See `core/CLAUDE.md`.
 
-**Consumers:** both GPU codes are now **Kokkos**-based (CUDA retired — see
-[docs/CUDA_RETIREMENT.md](docs/CUDA_RETIREMENT.md)). `flow` has a **complete, validated distributed
+**Consumers:** the compute codes are all **Kokkos**-based (raw CUDA retired 2026-06-20). `flow` has a **complete, validated distributed
 Navier–Stokes solver** (`flow`) on the core: the whole cut-cell IBM + MG-PCG step runs multi-rank,
 bit-exact to single-rank (`tests/kokkos_mpi`, 18 ctests np=1,2,4, gated `PECLET_FLOW_MPI`). `flow` is **THE**
 flow solver; pore-network extraction is the separate `pnm/` project (`peclet.pnm`, split out of flow
@@ -66,6 +65,7 @@ The design contract lives in `docs/`:
 | `pnm/` | **Kokkos** + C++20 + nanobind (`peclet.pnm`) | Pore-network extraction from SDF geometry: pore detection, marker-controlled watershed segmentation, throat topology (`SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu`, fused `extract_pore_network`). **Distributed MPI extraction** on the core ORB (`extract_pore_network_mpi`, gated `PECLET_PNM_MPI`) — bit-exact to single-rank, `tests/kokkos_mpi` ctests np=1,2,4 host+CUDA. Split out of `flow` (2026-07) with its git history. | Yes (brief) |
 | `dem/` | **Kokkos + ArborX** + C++20 + nanobind (`dem`) | Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). README still calls it `peclet-dem`. | No |
 | `voro/` | **Kokkos** + C++17/20 (+ core MPI, nanobind; Voro++ fetched as a benchmark reference) | Dynamic 3D Voronoi tessellation of moving particles; periodic & Lees–Edwards boxes, incremental cell repair, Euler/NS/multiphase dynamics. Kokkos (CUDA/HIP/OpenMP) + core MPI; the legacy half-edge CPU oracle has been **retired**. | No |
+| `coupling/` | **Kokkos** + Python (`peclet.coupling`) | CFD-DEM coupling of `flow` + `dem`: unresolved volume-averaged (`CfdDem`) and resolved cut-cell (`ResolvedCfdDem`) drivers; one shared `BlockDecomposer`, distributed when both codes are. Pure-Python drivers live in `python/peclet_coupling/` (see "Local dev imports" below). | No |
 
 Common threads worth knowing when moving between them: SDFs (signed distance fields) are the shared geometry representation across `flow` and `dem`; VTI/VTP files (ParaView/Ovito) are the shared I/O format; periodic boundary conditions appear everywhere; and the GPU codes (`flow`, `dem`, `core`'s device halo) are now **Kokkos**-based — the backend (CUDA/HIP/OpenMP) and arch are chosen by the `extern/install/<backend>` prefix the build is pointed at, not hard-coded in the sources (`tools/bootstrap_deps.sh` + `CMakePresets.json`).
 

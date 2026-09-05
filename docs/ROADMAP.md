@@ -23,7 +23,7 @@
 - [x] Architecture, conventions, style, interfaces, roadmap documents (`suite/docs/`).
 - [x] Link the documents from the top-level `suite/CLAUDE.md`.
 - [x] Scaffold `core`: header-only C++20, CMake ≥3.24 with install/export target
-      (`peclet::core::core`/`peclet::core::halo`), `include/tpx/{common,decomp,halo}/` layout, `.clang-format` from
+      (`peclet::core::core`/`peclet::core::halo`), `include/peclet/core/{common,decomp,halo}/` layout, `.clang-format` from
       `voro`, auto-detects `morton`. Git repo initialized.
 - [x] Extract the reusable code from `block_decomposer` into `peclet::core::decomp` + `peclet::core::halo` (ported &
       modernized): `BlockDecomposer` (+`ownerOf`), `BlockIndexer`, the `MPISync` NBX engine.
@@ -119,15 +119,23 @@ flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The
 
 - [x] Add nanobind bindings (Kokkos device module) — first Python surface for voro, on the shared
       zero-copy bridge, following the binding conventions.
-- [ ] Block decomposition + ghost particles (one interaction radius) so boundary Voronoi cells close
-      correctly; validate vs serial tessellation.
+- [x] Block decomposition + ghost particles (one interaction radius) so boundary Voronoi cells close
+      correctly — `VoronoiHalo` / the distributed moving tessellation on the core particle halo
+      (`PECLET_VORO_MPI`), validated against the single-rank tessellation; device-packed ghost exchange.
+- [x] `FlowSolver`: covolume / collocated Navier–Stokes on the Voronoi mesh (2026-09; see
+      [VORONOI_METHODS_PLAN](VORONOI_METHODS_PLAN.md) for the open method items).
 
 ## Phase 6 — Consolidation
 
 - [ ] Promote the common **IBM** library; share cut-cell machinery between Eulerian solvers.
 - [ ] Cross-code verification harness (same SDF geometry through CFD + packing + voronoi).
-- [ ] Unified Python packaging + CI templates across all repos; migrate stragglers to shared
-      conventions; reconcile remaining divergences (namespaces, C++ standard, dep management).
+- [x] Unified Python packaging + CI templates across all repos: one `peclet.*` namespace, family
+      releases on PyPI (CPU + CUDA wheels, `peclet` / `peclet-cu13` metapackages), per-repo
+      `ci.yml` / `docs.yml` / `release.yml`, GHCR containers — see [RELEASE](RELEASE.md).
+- [x] **CFD-DEM coupling** as its own package (`peclet-coupling`): unresolved volume-averaged
+      (`CfdDem`) and resolved cut-cell (`ResolvedCfdDem`) drivers over `flow` + `dem`, distributed
+      when both are (see [MULTIPHYSICS_PLAN](MULTIPHYSICS_PLAN.md)).
+- [ ] Reconcile remaining divergences (namespaces, C++ standard, dep management).
 
 ## Phase 7 — Dynamic load balancing (cross-cutting infra) — DONE
 
@@ -153,7 +161,7 @@ drift far apart). The fix is the same primitive for both, so it lives in `core`.
   SoA, migrates ownership, and re-uploads; wired into `demStepMpi` via
   `enable_mpi_step(rebalance_every=N)` / the `rebalance()` binding. (`test_particle_rebalance` np=1,2,4,8;
   dem `tests/kokkos_mpi/test_rebalance_mpi` np=1,2,4 on OpenMP + CUDA/Blackwell.)
-- [x] **Python**: `tpx_mpi.Migrator.rebalance()` (core, mpi4py) and `Sim.rebalance()` /
+- [x] **Python**: `peclet.core.mpi.Migrator.rebalance()` (core, mpi4py) and `Sim.rebalance()` /
   `enable_mpi_step(rebalance_every=…)` (dem) expose it; validated count-conserving with an imbalance drop.
 
 ## Phase 8 — At-scale multi-GPU tuning (2026-08 status)

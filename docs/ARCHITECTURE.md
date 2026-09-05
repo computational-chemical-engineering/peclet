@@ -18,7 +18,9 @@ conventions, and the same interfaces.
 |------|------|----------------------|--------|
 | `flow` | **Eulerian** | Structured grid: staggered MAC (default) or collocated/cell-centered, via a `GridLayout` policy | Extensively developed |
 | `dem` | **Lagrangian** | Particles (DEM/XPBD), SoA on GPU | Extensively developed |
-| `voro` | **Mixed** | Moving particles + their Voronoi cells (Lagrangian carriers, Eulerian-like fluxes across cell faces) | Developed; Kokkos + nanobind Python |
+| `voro` | **Mixed** | Moving particles + their Voronoi cells (Lagrangian carriers, Eulerian-like fluxes across cell faces); also a mesh generator + Navier–Stokes on the Voronoi mesh | Developed; Kokkos + nanobind Python |
+| `pnm` | Eulerian post-processing | Pore/throat network extracted from an SDF grid (watershed), network flow from a `flow` DNS | Developed; split out of `flow` 2026-07 |
+| `coupling` | **Coupled** | `flow` + `dem` in one process: unresolved (volume-averaged drag, void fraction) and resolved (cut-cell reaction) two-way coupling | Developed; distributed when both are |
 | `morton` | Primitive | Z-order codes / spatial index | Mature |
 
 (`block_decomposer`, the original source of the shared MPI layer, has been **retired/archived**; its
@@ -32,7 +34,7 @@ decomposition (all use the same block decomposition) nor the geometry (all use t
 
 ```
             ┌──────────────────────────────────────────────────────────┐
- methods    │  flow     dem     voro   (future)  │   separate repos
+ methods    │  flow  pnm  dem  voro  coupling  │   separate repos
             └──────────────────────────────────────────────────────────┘
                    │             │                │
                    ▼             ▼                ▼
@@ -70,7 +72,7 @@ depends on primitives. No method depends on another method; primitives depend on
 - **ibm** — the common Immersed Boundary Method interface: cut-cell / boundary data derived from an
   SDF, consumed by Eulerian solvers (and the point-shell collision analog in `dem`).
 - **python** — the shared **nanobind** zero-copy array bridge (`peclet::core::python`,
-  `include/tpx/python/ndarray_interop.hpp`) so every method exposes Python the same way (array shapes,
+  `include/peclet/core/python/ndarray_interop.hpp`) so every method exposes Python the same way (array shapes,
   ownership, naming). Host Views/vectors export as NumPy without a copy; device Views export as DLPack
   for CuPy/PyTorch. Provisioned via `cmake/SuiteNanobind.cmake`; see CONVENTIONS §6.
 
@@ -86,10 +88,17 @@ depends on primitives. No method depends on another method; primitives depend on
   also needs **ghost particles** one interaction radius deep to close the Voronoi cells touching the
   block boundary; fluxes across Voronoi faces are the Eulerian aspect. Gets nanobind bindings via
   `python`.
+- **pnm (post-processing):** the SDF grid is partitioned like `flow`'s; the distributed extraction
+  runs the watershed per block and reconciles labels across the halo, bit-exact to the single-rank
+  extraction on the gathered grid.
+- **coupling (flow + dem):** one shared `BlockDecomposer` for the grid and the particles; the
+  particle→grid deposition uses the add-reduce halo (`exchange_field_add`) and the grid→particle
+  interpolation the ordinary ghost exchange, so the coupled step is distributed whenever both codes
+  are.
 
 ## What stays method-specific
 
-Numerical schemes and solvers: the CFD Newton/projection solver, the XPBD constraint solver, the
-Voronoi tessellation/half-edge machinery, the ADI solver (kept in `block_decomposer` as a core
-*consumer*, not in the core). The core provides *where data lives and how it moves*, not *how the
+Numerical schemes and solvers: the CFD projection solver and its multigrid, the VoF advection, the
+XPBD / Hertz–Mindlin contact solvers, the device Voronoi tessellator, the pore-network watershed,
+the CFD-DEM drag closures. The core provides *where data lives and how it moves*, not *how the
 physics is integrated*.

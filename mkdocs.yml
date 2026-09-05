@@ -35,9 +35,12 @@ markdown_extensions:
   - pymdownx.details
 
 # Reuse the in-repo design docs as the single source of truth (also rendered on GitHub).
-# The API references live on each submodule's own Doxygen Pages site (external links).
+# The API references live on each submodule's own Doxygen Pages site (external links); the worked
+# examples are the sibling peclet-examples Quarto site. Keep version numbers OUT of the pages
+# listed here — the PyPI badge on the home page and the CHANGELOG carry the current version.
 nav:
   - Home: index.md
+  - Examples gallery: https://computational-chemical-engineering.github.io/peclet-examples/
   - Install & run: DEPLOYMENT.md
   - Containers (HPC): containers.md
   - HPC sites:
@@ -49,6 +52,7 @@ nav:
       - peclet.dem: python/dem.md
       - peclet.voro: python/voro.md
       - peclet.pnm: python/pnm.md
+      - peclet.coupling: python/coupling.md
       - peclet.core: python/core.md
       - peclet.morton: python/morton.md
   - Design:
@@ -63,6 +67,8 @@ nav:
       - Release preparation (current): RELEASE_PREP.md
   - Studies:
       - Staggered vs collocated (flow): studies/staggered_vs_colocated.md
+      - Covolume vs collocated on a Voronoi mesh (voro): studies/voro_covolume_vs_collocated.md
+      - Voronoi update throughput (voro): studies/voro_update_throughput.md
   - C++ API (Doxygen):
       - peclet-core: https://computational-chemical-engineering.github.io/peclet-core/
       - peclet-morton: https://computational-chemical-engineering.github.io/peclet-morton/

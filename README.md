@@ -16,8 +16,12 @@ The name nods to the [Péclet number](https://en.wikipedia.org/wiki/P%C3%A9clet_
 advective to diffusive transport, the dimensionless heart of transport phenomena.
 
 📖 **Documentation site:** <https://computational-chemical-engineering.github.io/peclet/> — the suite's front
-door (design docs + install/deployment guide + links to each code's Doxygen API). Built from `docs/`
-via MkDocs ([mkdocs.yml](mkdocs.yml)).
+door (Python API reference, install/deployment guide, design docs, links to each code's Doxygen API).
+Built from `docs/` via MkDocs ([mkdocs.yml](mkdocs.yml)).
+
+🧪 **Examples gallery:** <https://computational-chemical-engineering.github.io/peclet-examples/> — runnable,
+validated notebooks (single-phase and two-phase flow, packings, DEM, CFD-DEM, scaling benchmarks), each
+with an *Open in Colab* button.
 
 This is an **umbrella repository**: each code is a git **submodule** (its own repo and history); this
 repo pins compatible commits and holds the shared design docs.
@@ -38,10 +42,11 @@ git submodule update --init --recursive
 | `flow/` | Eulerian **Kokkos** incompressible Navier–Stokes (porous media; staggered MAC grid + cut-cell IBM). Complete, validated, MPI-optional distributed solver on `core`. |
 | `pnm/` | **Kokkos** pore-network extraction from SDF geometry (pores, watershed segmentation, throat topology). Split out of `flow`. |
 | `dem/` | Lagrangian **Kokkos + ArborX** DEM/XPBD particle packing. Full XPBD step with a validated distributed `step_mpi` (core particle halo). |
-| `voro/` | Mixed Lagrangian/Eulerian dynamic 3D Voronoi tessellation (header-only C++17; periodic & Lees–Edwards). |
+| `voro/` | Mixed Lagrangian/Eulerian dynamic 3D Voronoi tessellation (**Kokkos** device tessellator; periodic & Lees–Edwards), mesh generator and Navier–Stokes on the Voronoi mesh. |
+| `coupling/` | **CFD-DEM coupling** of `flow` + `dem` (Kokkos kernels + Python drivers): unresolved volume-averaged drag and resolved cut-cell coupling. |
 | `morton/` | Morton/Z-order spatial-index primitive — arithmetic directly in Morton space (header-only C++17 + BMI2/AVX-512, Python). |
 
-Both GPU codes are **Kokkos**-based; the same source runs on CUDA, HIP (AMD/LUMI), and OpenMP backends,
+The compute codes are **Kokkos**-based; the same source runs on CUDA, HIP (AMD/LUMI), and OpenMP backends,
 chosen by the bootstrapped install prefix (`tools/bootstrap_deps.sh`). The reusable parts of the original
 `block_decomposer` prototype were extracted into `core/`.
 
@@ -63,25 +68,33 @@ Everything ships under one **`peclet` namespace** — installable parts of one f
 | `peclet-pnm` | `peclet.pnm` | Pore-network extraction from SDF geometry |
 | `peclet-dem` | `peclet.dem` | Lagrangian DEM/XPBD particle packing |
 | `peclet-voro` | `peclet.voro` | Dynamic Voronoi tessellation + mesh generator |
-| `peclet-core` | `peclet.core` (`.mpi`, `.amr`) | Shared infra (particle halo, AMR) — sdist only |
+| `peclet-coupling` | `peclet.coupling` | CFD-DEM coupling drivers over flow + dem — sdist only (`peclet[cfd-dem]`) |
+| `peclet-core` | `peclet.core` (`.mpi`, `.amr`, `.geom`) | Shared infra (particle halo, AMR, analytic-SDF scenes) — sdist only (`peclet[mpi]`) |
 | `peclet` | — | metapackage: `pip install peclet` pulls the CPU family |
+| `peclet-cu13` | — | metapackage: `pip install peclet-cu13` pulls the CUDA family (`peclet-{flow,pnm,dem,voro}-cu13`) |
 
 **Multicore CPU (OpenMP):** the compute packages ship **self-contained wheels** — `pip install peclet`
 (or an individual `pip install peclet-flow`) just works and runs multi-threaded (`OMP_NUM_THREADS`).
 
-**GPU (CUDA/HIP) and multi-rank MPI:** a portable binary wheel is impossible (arch × CUDA/ROCm × MPI-ABI),
-so you build the packages from source against a Kokkos prefix, or use a container. Because the backend
-(Serial / OpenMP / CUDA / HIP) is compiled in, you build for your hardware —
-[**docs/DEPLOYMENT.md**](docs/DEPLOYMENT.md) is the guide: the backend×MPI matrix, `pip install` recipes
-per environment, and **Apptainer containers** for Snellius (CUDA) and LUMI (HIP) in [`containers/`](containers).
+**Single NVIDIA GPU:** `pip install peclet-cu13` — CUDA wheels of the same family (only the NVIDIA driver is
+needed; not alongside `peclet` in one venv).
+
+**AMD/HIP and multi-rank MPI:** a wheel cannot carry an MPI ABI, so you build the packages from source
+against a Kokkos prefix, or use a container. Because the backend (Serial / OpenMP / CUDA / HIP) is compiled
+in, you build for your hardware — [**docs/DEPLOYMENT.md**](docs/DEPLOYMENT.md) is the guide: the backend×MPI
+matrix, `pip install` recipes per environment, the Snellius site install (`tools/hpc/`), and the
+**Apptainer containers** (GHCR, built by CI on every release) for Snellius (CUDA) and LUMI (HIP) in
+[`containers/`](containers).
 
 ## Continuous integration & docs
 
-Each submodule carries its own `.github/workflows/`: a **CI** workflow (build + test where feasible —
-`core` and `morton` run full CPU/MPI suites; `flow` and `dem` build the Kokkos OpenMP host
-backend) and a **Documentation** workflow that builds the Doxygen API docs and publishes them to that
-repo's GitHub Pages. Enabling Pages once per repo (Settings → Pages → "Source: GitHub Actions") is the
-only manual step.
+Each submodule carries its own `.github/workflows/`: a **CI** workflow (build + test — `core` and `morton`
+run full CPU/MPI suites; the Kokkos codes build the OpenMP host backend and run their single-rank suites),
+a **Documentation** workflow that builds the Doxygen API docs and publishes them to that repo's GitHub
+Pages, and a **Release** workflow that builds the sdist + CPU wheels (+ the CUDA wheel) and publishes them
+to PyPI on a version tag. The umbrella adds the documentation site (`site.yml`), the metapackages
+(`release.yml`) and the containers (`containers.yml`). The whole procedure is written down in
+[docs/RELEASE.md](docs/RELEASE.md).
 
 ## Contributing & community
 
@@ -97,7 +110,7 @@ If you use Peclet in your research, please cite it. Each release is archived on 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21132445.svg)](https://doi.org/10.5281/zenodo.21132445)
 
 - **All versions (concept DOI):** [10.5281/zenodo.21132445](https://doi.org/10.5281/zenodo.21132445) — always resolves to the latest release; use this unless you need to pin an exact version.
-- **This release (v0.2.0):** [10.5281/zenodo.21132446](https://doi.org/10.5281/zenodo.21132446).
+- **A specific version:** the Zenodo record lists a version DOI per release, and each [GitHub release](https://github.com/computational-chemical-engineering/peclet/releases) links to its own.
 
 Machine-readable metadata is in [CITATION.cff](CITATION.cff) — use GitHub's "Cite this repository"
 button for ready-made BibTeX/APA.

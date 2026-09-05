@@ -81,8 +81,9 @@ srun --cpu-bind=mask_cpu:0xfe000000000000,0xfe00000000000000,0xfe0000,0xfe000000
 
 The container route: `containers/hip.def` (ROCm 6.2.4 base, vanilla MPICH) launched through
 `containers/lumi-run.sh`, which binds the host Cray-MPICH + libfabric/cxi + GTL over the
-container's MPICH ABI (`libmpi.so.12`), and `containers/submit/lumi.slurm`. The image has never
-been built successfully (§4); pin the base ROCm ≤ the host driver's ROCm when it is.
+container's MPICH ABI (`libmpi.so.12`), and `containers/submit/lumi.slurm`. The image builds in CI
+since 2026-09-04 (§4) and is published with the family releases as `peclet-hip:<version>-gfx90a`; pin
+the base ROCm ≤ the host driver's ROCm.
 
 ## 4. The former blocker: HIP link error in the nanobind modules (FIXED 2026-09-04)
 
@@ -118,4 +119,4 @@ LUMI login node in seconds — or without LUMI through the `Containers` workflow
 3. One gallery page (`zick-homsy`) re-rendered against the LUMI venv.
 4. `peclet-hip:<family>-gfx90a` pulled from GHCR and the same smoke job run through `lumi-run.sh`.
 
-Until then, release notes say: *LUMI/HIP — recipe provided, untested; no container image published.*
+Until then, release notes say: *LUMI/HIP — recipe and container image provided, untested on AMD hardware.*

@@ -1,7 +1,7 @@
 # Portability (Kokkos + ArborX)
 
-Status: **Kokkos is canonical.** flow (`flow`), pnm (`peclet.pnm`, its own project since 2026-07), dem (`dem`), and core all build and run on Kokkos
-([ArborX](https://github.com/arborx/ArborX) provides dem's broad-phase). This document is the contract for the suite's portability across NVIDIA
+Status: **Kokkos is canonical.** flow, pnm, dem, voro, coupling and core all build and run on Kokkos
+([ArborX](https://github.com/arborx/ArborX) provides dem's broad-phase); raw CUDA was retired in 2026-06. This document is the contract for the suite's portability across NVIDIA
 (Snellius) and AMD (LUMI/MI250X) GPUs and covers *how the toolchain is provisioned and built* — the
 bootstrapped install prefix (`tools/bootstrap_deps.sh`) is now a **hard build dependency** of every
 method code's main build (`cmake -S . -B build -DCMAKE_PREFIX_PATH=extern/install/<backend>;...`).
@@ -31,7 +31,7 @@ in `cmake/SuiteKokkos.cmake` / `cmake/SuiteArborX.cmake` — bump them in one pl
 
 ## Provisioning policy: find_package against a shared prefix
 
-Each repo stays independently buildable (the suite is six sibling repos, not a
+Each repo stays independently buildable (the suite is seven sibling repos, not a
 superbuild). Kokkos and ArborX are consumed via **`find_package(... CONFIG)`** —
 one mechanism that composes correctly, because ArborX itself does
 `find_package(Kokkos CONFIG)` and cannot consume an in-tree (FetchContent) Kokkos.
@@ -41,6 +41,10 @@ The package is provided by either:
 2. a **local install prefix** built once by `tools/bootstrap_deps.sh <backend>`,
    which the matching CMake preset puts on `CMAKE_PREFIX_PATH`
    (`extern/install/<backend>`). This is the local-dev stand-in for a module.
+3. for single-process use, the **PyPI wheels** carry their own Kokkos: the CPU wheels vendor-build
+   Kokkos (OpenMP + Serial) inside the wheel, the `-cu13` wheels embed a static Kokkos-CUDA build
+   (CUDA 13 toolkit, PTX + one SASS baseline, `libcudart` from the `nvidia-cuda-runtime` wheel) — see
+   [DEPLOYMENT](DEPLOYMENT.md). No prefix is involved.
 
 The shared helpers `cmake/SuiteKokkos.cmake` / `cmake/SuiteArborX.cmake` expose
 `suite_require_kokkos()` / `suite_require_arborx()` (find_package + a clear error
@@ -50,7 +54,7 @@ wires up the `kokkos_launch_compiler` / device flags for any target linking
 `Kokkos::kokkos`), so **suite device sources are plain `.cpp` compiled as CXX, not
 `.cu`** — a key migration convention.
 
-## Building (Phase 0 smoke tests)
+## Building the toolchain smoke tests
 
 The top-level `CMakeLists.txt` is a **toolchain harness only** — it does not build
 the method codes; it builds the smoke tests under `tools/` to validate provisioning.
@@ -77,12 +81,14 @@ cmake --preset lumi-hip && cmake --build --preset lumi-hip -j
 On a cluster, `module load` the deps instead of bootstrapping and drop the
 `CMAKE_PREFIX_PATH` from the preset. `build/` and `extern/` are git-ignored.
 
-## GPU-aware MPI (relevant from Phase 1 on)
+## GPU-aware MPI
 
-core's halo exchange will offer two paths: host-staged (portable
-fallback) and **GPU-aware MPI** (`Kokkos::View::data()` passed straight to
-`MPI_Isend/Irecv`). GPU-aware transport is available on Snellius (OpenMPI+UCX) and
-LUMI (cray-mpich); selectable at runtime so non-GPU-aware stacks still work.
+core's halo exchange offers two paths: **host-staged** (the portable default — the field stays on
+the device, only the compact halo buffers cross to the host for MPI) and **GPU-aware MPI**
+(`Kokkos::View::data()` passed straight to `MPI_Isend/Irecv`, opt-in via
+`PECLET_CORE_GPU_AWARE_MPI`). GPU-aware transport is available on Snellius (OpenMPI+UCX, the
+`UCX-CUDA` module) and LUMI (Cray-MPICH, `MPICH_GPU_SUPPORT_ENABLED=1`); the host-staged path works
+on every stack. See `core/docs/cuda-aware-mpi.md`.
 
 ## Notes / gotchas
 
@@ -90,7 +96,10 @@ LUMI (cray-mpich); selectable at runtime so non-GPU-aware stacks still work.
   on a cluster, `module load` Kokkos/ArborX instead of bootstrapping.
 - Kokkos 5.x requires **C++20** (the suite was C++20 host / C++17 device; the device
   side moves to C++20 under Kokkos). The presets set `CMAKE_CXX_STANDARD=20`.
-- `morton` is already `__host__/__device__` + HIP-guarded and is *not* on
-  the packing broad-phase path — it needs no Kokkos work.
-- `voro` uses the **OpenMP backend** only for now (its half-edge mesh
-  repair stays on the host).
+- `morton` ships a portable Kokkos backend (`include/morton/kokkos.hpp`) consumed by `core`'s
+  `MortonIndexer` and `voro`'s Z-order grid ordering; its raw CUDA path is retired.
+- `voro` is device-native: the tessellator, the incremental repair and the Voronoi-mesh flow solver
+  run on the Kokkos backend (CUDA/HIP/OpenMP); the legacy half-edge CPU engine is retired.
+- HIP builds need `CXX_VISIBILITY_PRESET default` on the nanobind modules and virtual wrapper
+  classes in named namespaces (the `hipcc` "undefined hidden symbol: vtable" link error) — every
+  module's CMakeLists carries this under `if(Kokkos_ENABLE_HIP)`.

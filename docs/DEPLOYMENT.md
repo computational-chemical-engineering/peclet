@@ -1,52 +1,57 @@
 # Deployment & environments
 
 How to get the suite's Python packages running on a laptop, a multicore CPU node, an NVIDIA GPU
-(Snellius), or an AMD GPU (LUMI) — and how the single "different environments" question actually
-decomposes.
+(workstation or Snellius), or an AMD GPU (LUMI) — and how the single "different environments" question
+actually decomposes. Runnable, validated examples for every route are on the
+**[examples gallery](https://computational-chemical-engineering.github.io/peclet-examples/)**.
 
 ## The mental model
 
-There are **two orthogonal choices**, both made at *build* time, not at `pip install`-from-PyPI time:
+There are **two orthogonal choices**, both made at *build* time, not at run time:
 
-1. **Compute backend** — *where the kernels run.* The GPU codes (`flow`, `dem`) are
-   [Kokkos](https://kokkos.org); the backend (Serial / OpenMP / CUDA / HIP) is **compiled in**. You do
-   not pick it at runtime; you build (or pull a container) for your hardware.
+1. **Compute backend** — *where the kernels run.* The compute codes (`flow`, `pnm`, `dem`, `voro`,
+   `coupling`, `core.amr`) are [Kokkos](https://kokkos.org); the backend (Serial / OpenMP / CUDA / HIP)
+   is **compiled in**. You do not pick it at runtime; you install the wheel flavour, build, or pull the
+   container that matches your hardware.
 2. **MPI** — *how many processes.* Orthogonal to the backend: any backend can run single-process or
-   multi-process. It is a build option (`PECLET_DEM_MPI` for dem; the flow Python module is single-rank, its
-   multi-rank solver lives in the C++ `tests/kokkos_mpi` suite).
+   multi-process. It is a build option per code (`PECLET_FLOW_MPI`, `PECLET_PNM_MPI`, `PECLET_DEM_MPI`,
+   `PECLET_VORO_MPI`; `coupling` follows `flow` + `dem`) that adds the distributed API
+   (`init_mpi`, `mpi_block`, `step_mpi`, `VoronoiHalo`, …) to the same Python module. `has_mpi` on a
+   module tells you whether the build you imported carries it.
 
 So "1 MPI process / multicore / GPU" is really **backend × MPI**:
 
-| You want | Backend | MPI | Prefix (built by `tools/bootstrap_deps.sh`) |
-|----------|---------|-----|---------------------------------------------|
-| 1 process, 1 core | Serial (in OpenMP build) | off | `extern/install/host-openmp` |
-| 1 process, multicore | OpenMP (`OMP_NUM_THREADS`) | off | `extern/install/host-openmp` |
-| many processes, CPU | OpenMP/Serial | on | `extern/install/host-openmp` |
-| NVIDIA GPU | CUDA | off/on | `extern/install/nvidia-cuda` |
-| AMD GPU (LUMI) | HIP | off/on | `extern/install/lumi-hip` |
+| You want | Backend | MPI | How you get it |
+|----------|---------|-----|----------------|
+| 1 process, multicore CPU | OpenMP (`OMP_NUM_THREADS`) | off | `pip install peclet` (PyPI wheels) |
+| 1 process, 1 NVIDIA GPU | CUDA | off | `pip install peclet-cu13` (PyPI wheels) |
+| many processes, CPU | OpenMP/Serial | on | source build against `extern/install/host-openmp`, or the `peclet-cpu` container |
+| many GPUs (NVIDIA) | CUDA | on | source build against `extern/install/nvidia-cuda` (Snellius: `tools/hpc/install_snellius.sh`), or the `peclet-cuda` container |
+| AMD GPU (LUMI) | HIP | off/on | source build against `extern/install/lumi-hip`, or the `peclet-hip` container (untested on hardware) |
 
-**Why not just PyPI wheels for everything?** A *GPU* wheel is pinned to a GPU arch (sm_80 vs sm_90 vs
-gfx90a), a CUDA/ROCm version, *and* an MPI ABI — there is no single portable GPU wheel. So the split is:
+**Why not PyPI wheels for everything?** A wheel cannot carry an MPI ABI, and a GPU wheel is pinned to a
+toolkit generation. So the split is:
 
-- **Multicore CPU (OpenMP):** `peclet-morton`, `peclet-flow`, `peclet-dem`, `peclet-voro` ship
-  **self-contained PyPI wheels** — the compute ones vendor-build Kokkos (OpenMP+Serial) inside the wheel,
+- **Multicore CPU (OpenMP):** `peclet-morton`, `peclet-flow`, `peclet-pnm`, `peclet-dem`, `peclet-voro` ship
+  **self-contained PyPI wheels** — the compute ones vendor-build Kokkos (OpenMP + Serial) inside the wheel,
   so `pip install peclet` (the CPU-family metapackage) or any individual `pip install peclet-flow` runs
   multi-threaded with no prefix. `peclet-morton` is pure CPU with runtime ISA dispatch.
 - **Single-GPU CUDA:** `pip install peclet-cu13` — the CUDA twin of the metapackage, pulling
   `peclet-flow-cu13`, `peclet-pnm-cu13`, `peclet-dem-cu13`, `peclet-voro-cu13` (+ `peclet-morton`). Each
   module embeds a static Kokkos-CUDA build (one SASS baseline + PTX, so it runs Turing..Blackwell by JIT)
-  and gets `libcudart.so.13` from the `nvidia-cuda-runtime` dependency wheel via its rpath; only the
-  NVIDIA driver (`libcuda.so.1`, CUDA ≥ 13) must be on the host — no system CUDA toolkit. The `-cu13`
-  packages install the **same `peclet.*` imports** as the CPU ones and are therefore **mutually
-  exclusive with `peclet`** in one environment (the CuPy `cupy` vs `cupy-cuda12x` model): one venv per
-  backend. Single-rank only; built by the `cuda-wheel` job of each member's release workflow
-  (`packaging/pyproject-cuda.toml`) and the umbrella's `build-cu13` job (`packaging/pyproject-cu13.toml`).
+  and gets `libcudart` from the `nvidia-cuda-runtime` dependency wheel via its rpath; only the NVIDIA
+  driver (CUDA ≥ 13 capable) must be on the host — no system CUDA toolkit. The `-cu13` packages install
+  the **same `peclet.*` imports** as the CPU ones and are therefore **mutually exclusive with `peclet`**
+  in one environment (the CuPy `cupy` vs `cupy-cuda12x` model): one venv per backend. Single-rank only.
+- **Source-only packages:** `peclet-core` (MPI particle halo, AMR octree, `core.geom` scene authoring)
+  and `peclet-coupling` (CFD-DEM) are published as **sdists** — `pip install peclet[mpi]` /
+  `pip install peclet[cfd-dem]` builds them against your MPI and Kokkos prefix.
 - **AMD/HIP or multi-rank MPI:** **build from source** (`pip install` against a Kokkos prefix) or use a
-  **container**. `peclet-core` (MPI particle halo + Kokkos AMR) is **sdist-only** for the same reason.
+  **container** — both routes below.
 
-## One-time dependency bootstrap
+## One-time dependency bootstrap (source builds)
 
-`flow` and `dem` need a Kokkos (+ ArborX for dem) install. Build it **once per backend** into a local
+The compute codes need a Kokkos (+ ArborX for dem) install. Build it **once per backend** into a local
 prefix — the local stand-in for a cluster `module load`:
 
 ```bash
@@ -63,38 +68,47 @@ KOKKOS_ARCH=HOPPER90 CUDA_ARCH=90 tools/bootstrap_deps.sh nvidia-cuda   # Snelli
 #                                       LUMI MI250X = gfx90a (the lumi-hip default)
 ```
 
-## Installing the Python packages
+The pinned versions (Kokkos, ArborX) live in `cmake/SuiteKokkos.cmake` / `cmake/SuiteArborX.cmake` — see
+[Portability](PORTABILITY.md).
 
-Point `pip` at the prefix you bootstrapped (CMake reads `CMAKE_PREFIX_PATH` from the environment); the
-backend is whatever that prefix targets:
+## Installing the Python packages
 
 ```bash
 # CPU / multicore — the easy path: portable wheels straight from PyPI, no prefix:
 pip install peclet                 # peclet-morton + peclet-flow + peclet-pnm + peclet-dem + peclet-voro
+pip install peclet[cfd-dem]        # + peclet-coupling (builds from sdist; needs a Kokkos prefix on CMAKE_PREFIX_PATH)
+pip install peclet[mpi]            # + peclet-core (builds from sdist; needs MPI)
 pip install peclet-flow            # or any one on its own
 
 # Single NVIDIA GPU — CUDA wheels straight from PyPI (needs only the driver; NOT alongside `peclet`):
 pip install peclet-cu13            # peclet-morton + peclet-{flow,pnm,dem,voro}-cu13 (+ nvidia-cuda-runtime)
 pip install peclet-flow-cu13       # or any one on its own
 
-# CPU / multicore — from a source checkout against a bootstrapped prefix (dev, or to add MPI):
-PREFIX=$PWD/extern/install/host-openmp
-CMAKE_PREFIX_PATH=$PREFIX pip install ./flow
-CMAKE_PREFIX_PATH=$PREFIX pip install --config-settings=cmake.define.PECLET_DEM_MPI=ON ./dem
-pip install ./morton               # pure-CPU, no prefix needed
-
-# NVIDIA GPU (Snellius) — build from source against the CUDA prefix:
-PREFIX=$PWD/extern/install/nvidia-cuda
-PATH=/usr/local/cuda/bin:$PATH CMAKE_PREFIX_PATH=$PREFIX pip install ./flow ./dem
+# From a source checkout against a bootstrapped prefix (dev, GPU + MPI, or to add MPI to a CPU build).
+# CMake reads CMAKE_PREFIX_PATH from the environment; the backend is whatever that prefix targets:
+PREFIX=$PWD/extern/install/host-openmp             # or nvidia-cuda (put nvcc on PATH) / lumi-hip
+CMAKE_PREFIX_PATH=$PREFIX pip install ./core ./morton
+CMAKE_PREFIX_PATH=$PREFIX pip install --config-settings=cmake.define.PECLET_FLOW_MPI=ON ./flow
+CMAKE_PREFIX_PATH=$PREFIX pip install --config-settings=cmake.define.PECLET_PNM_MPI=ON  ./pnm
+CMAKE_PREFIX_PATH=$PREFIX pip install --config-settings=cmake.define.PECLET_DEM_MPI=ON  ./dem
+CMAKE_PREFIX_PATH=$PREFIX pip install --config-settings=cmake.define.PECLET_VORO_MPI=ON ./voro
+CMAKE_PREFIX_PATH=$PREFIX pip install ./coupling   # after flow + dem
 ```
 
-The dist names are `peclet-flow` (repo `flow`), `peclet-dem` (`dem`), `peclet-voro` (`voro`),
-`peclet-morton` (`morton`), `peclet-core` (`core`); a source `pip install ./<repo>` builds the
-matching one.
+The dist names are `peclet-core` (repo `core`), `peclet-morton` (`morton`), `peclet-flow` (`flow`),
+`peclet-pnm` (`pnm`), `peclet-dem` (`dem`), `peclet-voro` (`voro`), `peclet-coupling` (`coupling`); a
+source `pip install ./<repo>` builds the matching one. Install in dependency order (core and morton
+first, coupling last).
 
 `pip install` builds the same CMake targets the developer build does; the install rule is gated on
 `SKBUILD`, so a plain `cmake --build build` is unchanged. Use a virtualenv/conda env per backend if you
 need more than one on the same machine.
+
+On **Snellius** the release procedure installs the whole family from a tag with
+`tools/hpc/install_snellius.sh <tag> h100|a100|cpu` (venv + site-specific wheelhouse, `PECLET_*_MPI=ON`)
+and certifies it with `tools/hpc/smoke_snellius.slurm`; the toolchain and the traps are in
+[Snellius](SNELLIUS.md). The LUMI counterpart (`tools/hpc/install_lumi.sh`, [LUMI](LUMI.md)) is written
+but has not run on the machine yet.
 
 ### Running
 
@@ -102,15 +116,15 @@ need more than one on the same machine.
 # multicore, one process:
 OMP_NUM_THREADS=16 python my_run.py
 
-# distributed (dem): one process per rank
+# distributed: one process per rank (flow / pnm / dem / voro / coupling built with the MPI flag)
 mpirun -np 4 python my_distributed_run.py
 
 # GPU: just import — the device backend is compiled in
-python -c "import peclet.flow as f; print(f.execution_space)"   # -> Cuda / HIP / OpenMP / Serial
+python -c "import peclet.flow as f; print(f.execution_space, f.has_mpi)"   # -> Cuda True / OpenMP False / ...
 ```
 
-`execution_space` (exposed by `peclet.flow`, `peclet.dem`, `peclet.voro`) reports the compiled-in Kokkos
-backend — the quickest way to confirm you imported the build you meant to.
+`execution_space` (exposed by every Kokkos module) reports the compiled-in backend and `has_mpi` whether
+the distributed API is present — the quickest way to confirm you imported the build you meant to.
 
 ## Containers (Snellius, LUMI, other HPC)
 
@@ -118,49 +132,51 @@ backend — the quickest way to confirm you imported the build you meant to.
 
 For HPC, prefer **Apptainer** (both Snellius and LUMI use it; Docker is barred on compute nodes). The
 [`containers/`](https://github.com/computational-chemical-engineering/peclet/tree/main/containers)
-directory has definition files that bake the toolchain + Kokkos prefix
-and pip-install the packages:
+directory has definition files that bake the toolchain + Kokkos prefix and pip-install the whole family
+with the MPI flags on; CI builds them on every release tag and publishes them to GHCR:
 
-- `containers/cpu.def`  — OpenMP + OpenMPI (laptops, CI, CPU partitions)
-- `containers/cuda.def` — CUDA, defaults to Snellius A100 (`sm_80`)
-- `containers/hip.def`  — HIP, LUMI MI250X (`gfx90a`)
+- `containers/cpu.def`  — OpenMP + OpenMPI (laptops, CI, CPU partitions) → `peclet-cpu`
+- `containers/cuda.def` — CUDA, Snellius A100 (`sm_80`) and H100 (`sm_90`) → `peclet-cuda:*-sm80` / `-sm90`
+- `containers/hip.def`  — HIP, LUMI MI250X (`gfx90a`) → `peclet-hip:*-gfx90a` (builds; not yet run on AMD hardware)
 
 ```bash
-git submodule update --init --recursive
-apptainer build peclet-cpu.sif containers/cpu.def
-srun apptainer exec --nv peclet-cuda.sif python3 my_run.py      # Snellius
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:sm90    # moving tag = newest release
+srun apptainer exec --nv peclet-cuda_sm90.sif python3 my_run.py                     # Snellius, one GPU
 # LUMI: Cray-MPICH is injected at runtime by the launcher wrapper —
 module load LUMI partition/G cray-mpich rocm
-srun -n8 --gpus-per-node=8 containers/lumi-run.sh peclet-hip.sif my_run.py   # LUMI
+srun -n8 --gpus-per-node=8 containers/lumi-run.sh peclet-hip_gfx90a.sif my_run.py
 ```
 
 For LUMI the container is built against vanilla MPICH and the host **Cray-MPICH** + Slingshot stack is
 bound over it at runtime (`containers/lumi-run.sh`) — the MPICH-ABI hybrid model. See
-[`containers/README.md`](https://github.com/computational-chemical-engineering/peclet/blob/main/containers/README.md#lumi--cray-mpich-the-hipdef-mpi-model).
-
-See [`containers/README.md`](https://github.com/computational-chemical-engineering/peclet/blob/main/containers/README.md)
+[`containers/README.md`](https://github.com/computational-chemical-engineering/peclet/blob/main/containers/README.md)
 for MPI-ABI, GPU-aware-MPI, and arch details.
 
 ## Python API surface (what `import` gives you)
 
 | Package | Import | Key API |
 |---------|--------|---------|
-| `peclet-flow` | `import peclet.flow` | `peclet.flow.Solver(nx,ny,nz)` — set_rho/mu/dt, set_solid, set_domain_bc, step, get_u/v/w/p; `peclet.flow.execution_space` |
-| `peclet-pnm` | `import peclet.pnm` | `SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu`, `extract_pore_network` |
-| `peclet-dem` | `import peclet.dem` | `peclet.dem.Simulation(capacity)` — initialize_shape, set_domain, set_material_params, set_positions, step, get_positions, get_sdf_grid; gated MPI: init_mpi/enable_mpi_step/step_mpi |
-| `peclet-voro` | `import peclet.voro` | `peclet.voro.Tessellation`, `peclet.voro.Simulation` — moving-cell Voronoi + dynamics |
+| `peclet-flow` | `import peclet.flow` | `Solver(nx,ny,nz)` / `SolverColocated` — set_rho/mu/dt, set_solid, set_domain_bc, scalars, VoF, scenes, step, get_u/v/w/p; MPI: `init_mpi`, `mpi_block`, `rebalance_by_weights` |
+| `peclet-pnm` | `import peclet.pnm` | `SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu`, `extract_pore_network`, network flow from a DNS; MPI: `mpi_block`, `extract_pore_network_mpi` |
+| `peclet-dem` | `import peclet.dem` | `Simulation(capacity)` — initialize_shape, set_domain, set_material_params, set_positions, SDF walls, scene particles, step / step_hertz, get_positions, get_sdf_grid; MPI: `init_mpi`, `enable_mpi_step`, `step_mpi`, `step_hertz_mpi`, `rebalance` |
+| `peclet-voro` | `import peclet.voro` | `Tessellation`, `Simulation` (moving-cell Voronoi + dynamics), `FlowSolver` (Navier–Stokes on the Voronoi mesh); MPI: `VoronoiHalo` |
+| `peclet-coupling` | `import peclet.coupling` | `CfdDem` (unresolved, volume-averaged) and `ResolvedCfdDem` (cut-cell) two-way coupling drivers over `flow` + `dem` |
+| `peclet-core` | `from peclet.core import mpi, amr, geom` | MPI particle halo (`mpi.Migrator`, `mpi.Halo`), Kokkos AMR octree (`amr.Flow`, `amr.DistributedOctree`), analytic-SDF scene authoring (`geom.SceneBuilder`) |
 | `peclet-morton` | `from peclet.morton import encode, decode, shift, box_zorder` | vectorised NumPy Morton ops |
-| `peclet-core` | `from peclet.core import mpi, amr` | MPI particle halo (`mpi.Migrator`) + Kokkos AMR octree (`amr.Flow`) |
 
-Every binding method carries a one-line docstring (`help(peclet.flow.Solver.step)`); the full C++/Python API
-is published as Doxygen on each repo's GitHub Pages.
+Every binding method carries a docstring (`help(peclet.flow.Solver.step)`); the
+[Python API reference](python/index.md) is generated from them, and the full C++ API is published as
+Doxygen on each repo's GitHub Pages.
 
 ## Status / caveats
 
-- The `pip install` path is verified for the **OpenMP** backend (both modules install at the wheel root
-  and import). The CUDA/HIP paths use the identical mechanism but were not built in this environment (no
-  GPU); validate on first use on the target cluster.
-- The container `.def` files are **not** CI-built (no GPU runners) — a tested starting point, not a
-  guaranteed image. The MPI-ABI / GPU-aware-MPI binding is site-specific (notes in `containers/README.md`).
-- Exact Snellius/LUMI module names and ROCm/CUDA versions drift; the recipes pin the *suite* deps
-  (Kokkos 5.1.1, ArborX v2.1) and leave the site toolchain to `module load` / the container base image.
+- **Verified routes:** the CPU wheels (every gallery page runs from `pip install peclet`), the CUDA wheels
+  (`peclet-cu13`, single GPU), source builds with MPI on the OpenMP and CUDA backends (the `tests/kokkos_mpi`
+  suites of every code, np = 1, 2, 4, bit-exact to single-rank where claimed), the `peclet-cpu` and
+  `peclet-cuda` containers, and the Snellius site install.
+- **HIP / LUMI** is the one untested route: the code builds for HIP (the `peclet-hip` image is produced in
+  CI) but has not run on an AMD GPU — see [LUMI](LUMI.md).
+- Multi-node container runs depend on the site's MPI bind model (OpenMPI/UCX on Snellius, Cray-MPICH on
+  LUMI); the wrappers under `containers/` encode it, and the OpenMPI series must match the image's.
+- Cluster module names and CUDA/ROCm versions drift; the recipes pin the *suite* dependencies (Kokkos,
+  ArborX) and leave the site toolchain to `module load` / the container base image.

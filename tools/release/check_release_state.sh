@@ -103,6 +103,10 @@ fi
 say ""
 say "== CITATION.cff: $(grep -m1 -E '^version' CITATION.cff | sed 's/version: *//') ($(grep -m1 date-released CITATION.cff | sed 's/date-released: *//'))   CHANGELOG top: $(grep -m1 -E '^## \[' CHANGELOG.md)"
 say "== hard-coded image tags in docs: $(grep -ohE 'peclet-(cpu|cuda|hip):[0-9]+\.[0-9]+\.[0-9]+' docs/containers.md containers/README.md containers/submit/*.slurm | sort | uniq -c | tr '\n' ' ')"
+# The site pages must not carry version literals (RELEASE.md §5.2): the PyPI badge, the CHANGELOG and the
+# moving container tags carry the current version. A hit here is a line that will go stale next release.
+stale=$(grep -nE '\bv?0\.[0-9]+\.[0-9]+\b' docs/index.md docs/DEPLOYMENT.md docs/containers.md docs/python/index.md README.md 2>/dev/null)
+if [ -n "$stale" ]; then bad "version literal on a site page:"; printf '%s\n' "$stale" | sed 's/^/     /'; fi
 if [ "$OFFLINE" = 0 ]; then
   say ""
   say "== live PyPI"

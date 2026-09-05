@@ -12,7 +12,7 @@ document explains them and the conventions the benchmark job scripts share.
 | host | `snellius` (SSH config alias; `int4.local.snellius.surf.nl` etc.) |
 | account | `tes24005` (every `#SBATCH --account`) |
 | project space | `/projects/0/prjs1022/peclet` — the suite lives at `.../peclet/suite` |
-| the venv | `$SUITE/flow/.venv` — **one** venv for everything, as on the workstation |
+| the venv | `$SUITE/.venv` — **one** venv for everything, as on the workstation |
 | CPU partition | `genoa` — 192 cores/node, 336 GiB; `--exclusive` |
 | GPU partition | `gpu_h100` — 4× H100 94 GB/node, 16 cores/GPU (also `gpu_a100`) |
 
@@ -37,7 +37,27 @@ Module versions on Snellius **do drift**. The one hard requirement is that the O
 is the same one `mpi4py` was pip-built against, since `pip install mpi4py` compiles against
 whatever `mpicc` is on `PATH`. Never mix module stacks between build and run.
 
-## Building
+## Installing a release (`tools/hpc/`)
+
+For a *released* family, use the site-install script instead of the campaign tree: it clones the
+umbrella at the tag into its own tree + venv, bootstraps Kokkos for the backend and builds every
+package with `PECLET_*_MPI=ON`, leaving a site-specific wheelhouse other project members can
+`pip install --no-index --find-links` from (never upload those wheels to PyPI — they link the
+module OpenMPI and CUDA):
+
+```bash
+sbatch --nodes=1 --gpus-per-node=1 --ntasks-per-node=1 tools/hpc/install_snellius.sh v<family> h100
+sbatch -p gpu_a100 --gpus-per-node=1 --ntasks-per-node=1 tools/hpc/install_snellius.sh v<family> a100
+sbatch -p genoa --gpus=0 -c 32                             tools/hpc/install_snellius.sh v<family> cpu
+sbatch tools/hpc/smoke_snellius.slurm                      # certifies it: 1- vs 8-rank permeability, dem step_mpi
+```
+
+Arguments are positional (SURF's `sbatch` drops leading `VAR=x`); `snellius_env.sh` next to it is the
+shared module recipe. The pre-built containers are the other route ([containers](containers.md)).
+The releases validated this way are recorded in [RELEASE_PREP](RELEASE_PREP.md) (Snellius section)
+by the release procedure ([RELEASE](RELEASE.md) §7).
+
+## Building the development tree
 
 ```bash
 cd <peclet-examples>/examples/wall-bounded-turbulence

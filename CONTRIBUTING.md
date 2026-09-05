@@ -1,7 +1,7 @@
 # Contributing to peclet
 
-Thanks for your interest in contributing! `peclet` is an **umbrella repository** of five method/infrastructure
-codes as git **submodules** (`core`, `flow`, `dem`, `voro`, `morton`), each its own repo with its own build.
+Thanks for your interest in contributing! `peclet` is an **umbrella repository** of seven method/infrastructure
+codes as git **submodules** (`core`, `morton`, `flow`, `pnm`, `dem`, `voro`, `coupling`), each its own repo with its own build.
 Work happens *inside* a submodule; the umbrella only pins compatible commits and holds the shared docs.
 
 ## Getting set up
@@ -16,14 +16,16 @@ tools/bootstrap_deps.sh host-openmp            # or nvidia-cuda / lumi-hip
 Then build a code against that prefix (example: `flow`):
 
 ```bash
-cd flow && python -m venv .venv && source .venv/bin/activate && pip install nanobind numpy
+python -m venv .venv && source .venv/bin/activate && pip install nanobind numpy   # ONE venv at the suite root, shared by every code
+cd flow
 cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/host-openmp"
 cmake --build build -j
-PYTHONPATH=$PWD/build python scripts/verify_poiseuille_sdflow.py
+PYTHONPATH=$PWD/build python scripts/verify_poiseuille_flow.py
 ```
 
-Each code has its own `README`/`CLAUDE.md` with build + test commands. Header-only codes (`core`, `morton`,
-`voro`) run their tests via `ctest`; the Kokkos codes are driven from Python (`verify_*.py`, `tests/`).
+Each code has its own `README`/`CLAUDE.md` with build + test commands. `core`, `morton` and `voro` run their
+tests via `ctest`; the other Kokkos codes are driven from Python (`verify_*.py`, `tests/`). Worked examples
+that double as end-to-end checks live in the sibling [peclet-examples](https://github.com/computational-chemical-engineering/peclet-examples) repo.
 
 ## Making changes
 
