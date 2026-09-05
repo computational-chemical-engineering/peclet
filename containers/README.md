@@ -17,9 +17,9 @@ The [`.github/workflows/containers.yml`](../.github/workflows/containers.yml) wo
 version tags and publishes them to the GitHub Container Registry. Pull on a login node without building:
 
 ```bash
-apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cpu:0.6.0
-apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.6.0-sm80   # Snellius A100
-apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-hip:0.6.0-gfx90a  # LUMI MI250X
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cpu:0.7.0
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.7.0-sm80   # Snellius A100
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-hip:0.7.0-gfx90a  # LUMI MI250X
 ```
 
 Or build them yourself from the `.def` files below.

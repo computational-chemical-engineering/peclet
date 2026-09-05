@@ -2,7 +2,7 @@
 # TU/e Umbrella cluster — multi-node CPU MPI (hybrid MPI+OpenMP) on the SMM partition chem.smm03.q
 # (AMD Genoa, 32 cores / node) with the peclet CPU container.
 #
-#   apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cpu:0.6.0
+#   apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cpu:0.7.0
 #   sbatch containers/submit/tue-smm.slurm
 #
 #SBATCH --job-name=peclet-cfd

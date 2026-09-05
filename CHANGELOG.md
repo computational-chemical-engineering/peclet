@@ -22,6 +22,9 @@ header repin), peclet-dem 0.5.0, peclet-voro 0.5.0, peclet-coupling 0.4.0, pecle
 - **voro**: `FlowSolver` (covolume + collocated Navier–Stokes on a Voronoi mesh), `redistribute_pore_mesh`,
   covolume MPI hooks, device-packed ghost exchange.
 - **coupling**: `ResolvedCfdDem` (resolved cut-cell CFD-DEM), reaction torque opt-in.
+- **flow**: free-slip / symmetry domain boundary (`set_domain_bc(face, 4)`, both grids, MPI; a half domain
+  closed by a symmetry plane reproduces the full one pointwise) and the outflow-reversal census
+  (`outflow_backflow()`, a one-time warning when an outlet reverses with the backflow stabilization off).
 - **Packaging**: CUDA wheels for the whole family (`pip install peclet-cu13`); containers now include pnm
   and coupling; `__version__` derived from the installed metadata; release workflow documented in
   `docs/RELEASE.md` with pre-flight and audit tools under `tools/release/`; Snellius family install +
@@ -33,6 +36,14 @@ header repin), peclet-dem 0.5.0, peclet-voro 0.5.0, peclet-coupling 0.4.0, pecle
   `kokkos_teardown.hpp` registry, release-then-finalize; explicit `finalize()` per module.
 - `__version__` reports the installed distribution's version (was a stale literal in every package).
 - HIP (LUMI) link: default symbol visibility on the HIP path + AMR wrappers in a named namespace.
+- **core.amr**: `Flow.step()`/`project()` before `set_solid` raise a named `RuntimeError` (was a segfault);
+  `set_solid`/`finish_adapt`/`rebalance_mpi` with a Python callable no longer hang under the OpenMP host
+  backend (the bindings release the GIL around the multithreaded operator build).
+- **core**: NBX round tags live in a reserved range (fixes the np=8 particle-halo hang and the
+  intermittent distributed-AMR ghost errors).
+- **dem**: `add_scene_shape` sizes the contact buffers and every capacity-sized array follows the
+  particle capacity (was a silent contact drop, then heap corruption); root-level scratch scripts are
+  excluded from the sdist.
 - (more at release time from the per-package logs — see RELEASE_PREP §1.4 for the gallery-found defects)
 
 ### Known limitations

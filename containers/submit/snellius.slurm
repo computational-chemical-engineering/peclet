@@ -2,7 +2,7 @@
 # Snellius (SURF) — multi-GPU (NVIDIA A100 / H100) distributed CFD with the peclet CUDA container.
 # Adjust the account, partition, node/GPU counts, module versions and the .sif path/arch to your setup.
 #
-#   apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.6.0-sm80   # A100
+#   apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.7.0-sm80   # A100
 #   sbatch containers/submit/snellius.slurm
 #
 #SBATCH --job-name=peclet-cfd

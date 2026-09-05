@@ -62,20 +62,19 @@ Other facts of the snapshot:
 
    | project | host (`extern/install/host-openmp`, fresh `build_rel*`, 2026-09-05) | CUDA | MPI | notes |
    |---|---|---|---|---|
-   | core | plain 103/103 (np 1–8) · Kokkos-OpenMP 157/157 (np 1–8; the 5 AMR np4/np8 failures of the pre-fix run gone) · python module builds (mpi/geom/amr import) | not run (see below) | in the counts | **after** the NBX tag-range fix (core 5ca7037): before it, `particle_halo_np8` hung on 2 pinned cores (the CI hang) and `amr_distributed_{fv,mg,graded_mg,openness,poisson}_np{4,8}` failed intermittently (1–3 per run on a pristine main) |
+   | core | plain 103/103 (np 1–8) · Kokkos-OpenMP 157/157 (np 1–8; the 5 AMR np4/np8 failures of the pre-fix run gone; re-run 157/157 at 730a6e1) · python module builds (mpi/geom/amr import) | Kokkos-CUDA **157/157** (np 1–8, fresh `build_rel_k_cuda` at 730a6e1); `python/test_amr.py` serial + np=4 on both prefixes | in the counts | **after** the NBX tag-range fix (core 5ca7037): before it, `particle_halo_np8` hung on 2 pinned cores (the CI hang) and `amr_distributed_{fv,mg,graded_mg,openness,poisson}_np{4,8}` failed intermittently (1–3 per run on a pristine main) |
    | morton | ctest 1/1 · non-BMI2 build ctest 1/1 · pytest 9/9 | – | – | |
    | flow (kokkos / kmpi / regression / verify_*) | 36/36 | 36/36, regression PASS, verify 5/5 | 103/103 np=1,2,4 | 2026-09-04, main at the rel-issues merge; OMP_NUM_THREADS=4. Host module rebuilt 2026-09-05 at 2a89c67 for the coupling tests |
-   | pnm | module builds · `test_extraction.py packing_ring.vti` = **7199 pores** | not run | `tests/kokkos_mpi` 6/6 (np 1,2,4) | |
-   | dem (kokkos / kmpi / verify_packing) | `tests/kokkos` 8/8 · `verify_packing_spheres.py` runs to completion (final overlap 0.000) | not run | `tests/kokkos_mpi` 24/24 (host) | module built with `PECLET_DEM_MPI=ON` |
-   | voro | in-tree Kokkos+Python+MPI build **24/24** (352 s) | not run | `tests/kokkos_mpi` 18/18 (np 1,2,4; `OMP_NUM_THREADS=1`) | H100 np=4 gates all OK on Snellius 2026-09-05 (job 26366044, [VORONOI_METHODS_PLAN C5](VORONOI_METHODS_PLAN.md)) |
-   | coupling | `terminal_velocity`, `fixed_bed_ergun` **2/2** (flow + dem host modules on PYTHONPATH) | not run | – | |
-   | whole family | import smoke: flow/dem/voro/pnm/core.amr report `OpenMP`; core.mpi, core.geom, morton, coupling import | – | – | `PYTHONPATH` over the seven `build_rel*` trees |
+   | pnm | module builds · `test_extraction.py packing_ring.vti` = **7199 pores** | module builds (`PECLET_PNM_MPI=ON`), 7199 pores; `tests/kokkos_mpi` **6/6** (np 1,2,4) | `tests/kokkos_mpi` 6/6 (np 1,2,4) | |
+   | dem (kokkos / kmpi / verify_packing) | `tests/kokkos` 8/8 · `verify_packing_spheres.py` runs to completion (final overlap 0.000) | `tests/kokkos` **8/8** · `tests/kokkos_mpi` **24/24** · `verify_packing_spheres.py` to completion | `tests/kokkos_mpi` 24/24 (host) | module built with `PECLET_DEM_MPI=ON` |
+   | voro | in-tree Kokkos+Python+MPI build **24/24** (352 s); `tests/kokkos_mpi` 18/18 re-run at 29dcaaf (np=1 gate 0.000e+00) | in-tree **24/24** · `tests/kokkos_mpi` **18/18** at 29dcaaf — was 15/18: the three `flow_mpi_*_np1` gates demanded bit-exactness, which a device backend cannot give (round-off, run-to-run nondeterministic via the tessellator's atomics); the gate is now 1e-13 / 1e-14 on a device backend, 0.0 on host (voro 29dcaaf) | `tests/kokkos_mpi` 18/18 (np 1,2,4; `OMP_NUM_THREADS=1`) | H100 np=4 gates all OK on Snellius 2026-09-05 (job 26366044, [VORONOI_METHODS_PLAN C5](VORONOI_METHODS_PLAN.md)) |
+   | coupling | `terminal_velocity`, `fixed_bed_ergun` **2/2** (flow + dem host modules on PYTHONPATH) | **2/2** (flow 8767878 + dem CUDA modules on PYTHONPATH) | – | |
+   | whole family | import smoke: flow/dem/voro/pnm/core.amr report `OpenMP`; core.mpi, core.geom, morton, coupling import | flow/dem/voro/pnm/core.amr report `Cuda`; core.mpi, core.geom, morton, coupling import | – | `PYTHONPATH` over the seven `build_rel*` trees |
 
-   **CUDA column not run on 2026-09-05:** the workstation's GPU was carrying another session's
-   long run (88 % busy) all afternoon; the CUDA half of the matrix (§3 of RELEASE.md, `nvidia-cuda`
-   prefix) is the remaining local obligation before the tag. flow's CUDA row is from 2026-09-04.
-   Driver script for the host half: it lives in the session scratch, not the repo — the commands are
-   RELEASE.md §3 verbatim with `build_rel*` trees; re-run them, do not reuse the trees.
+   **CUDA column run 2026-09-05** (fresh `build_rel*_cuda` trees, `nvidia-cuda` prefix, `OMP_NUM_THREADS=4`,
+   GPU otherwise idle): every project green; the only red on first pass was voro's np=1 bit-exact gate on
+   the GPU (test fixed, see the row). morton has no CUDA row. The flow CUDA row is from 2026-09-04 at
+   b7669d3; the commits since touch CI/docs/study files only (`git diff b7669d3..20756a6 --stat`).
 
 3. ~~Fix the **`__version__` drift**~~ **DONE 2026-09-04** (all seven packages derive `__version__` from
    `importlib.metadata`, with the `-cu13` distribution as fallback; pre-flight reports `meta`). Original item: every `packaging/*_init.py` (flow 0.3.0, dem 0.3.2, voro 0.3.3,
@@ -126,13 +125,32 @@ Other facts of the snapshot:
      `Releasable` registry + `ViewCapsule` + release-then-finalize atexit) in flow/dem/voro/pnm/
      coupling/core.amr — harness: 6 modules × 5 exit paths × OpenMP/CUDA all silent, exit 0
      (core c1df85a, flow 3035320, dem 90366c0, voro 2c2e819, pnm af0c692, coupling 684513e).
-   - NEW (found by the teardown work, open): `peclet.core.amr.Flow.step()` without any `set_solid`
-     segfaults; a Python-callable `set_solid` deadlocks under the OpenMP host backend (worker threads
-     re-enter Python without the GIL; `set_solid_spheres` is fine) and `core/python/test_amr.py`
-     uses the callable form, so it hangs on the host-openmp prefix. Guard both before 0.7.0 or list.
+   - ~~NEW (found by the teardown work): `peclet.core.amr.Flow.step()` without any `set_solid` segfaults; a
+     Python-callable `set_solid` deadlocks under the OpenMP host backend~~ **RESOLVED 2026-09-05, core
+     `730a6e1`**: `AmrFlow` carries a readiness flag and `step()`/`project()`/`beginAdapt()` throw a
+     named `std::runtime_error` without an operator (Python `RuntimeError`); the callable bindings
+     (`set_solid`, `finish_adapt`, `rebalance_mpi`) release the GIL around the multithreaded host build
+     (nanobind's callable wrapper re-takes it per sample — serialised, cannot deadlock). Both reproduced
+     first (SIGSEGV; hang at 4 threads, fine at 1), then gated: `tests/test_amr_flow_solver.cpp` (device)
+     and `python/test_amr.py` (raises before `set_solid`; the callable form completes) — 157/157 Kokkos
+     ctests host + CUDA, `test_amr.py` serial + np=4 on both prefixes.
    - ~~Poiseuille verify metric ("fake convergence")~~ closed with the item above.
-5. dem root-level `verify_*.py` / `test_*.py` / `build_log*.txt` scratch: they are inside the
-   package repo and ship in the sdist tree-walk — move under `dem/tests/scratch/` or gitignore [A].
+5. ~~dem root-level `verify_*.py` / `test_*.py` / `build_log*.txt` scratch ship in the sdist~~ **DONE
+   2026-09-05** (dem 6c74aa6): `sdist.exclude` for the root-level scripts, logs, `.vtp` and helper shell
+   files; verified in a fresh clone — the sdist root holds only CITATION.cff, CMakeLists.txt, LICENSE,
+   README.md, pyproject.toml, requirements.txt, .clang-format, .gitignore.
+6. **Phase C (versions) DONE 2026-09-05 — the tree is release-ready; only the tags remain.** Per D4:
+   core `be9db10` (0.6.0), flow `8767878` (0.5.0, +cu13), pnm `bcc79e8` (0.1.1, +cu13), dem `6c74aa6`
+   (0.5.0, +cu13), voro `29dcaaf` (0.5.0, +cu13), coupling `812c107` (0.4.0), morton unchanged at 0.2.1
+   (its one commit since the tag is the `__version__`-from-metadata change; not re-released, per D4).
+   Every consumer's `PecletDeps.cmake` pins core **v0.6.0** — that tag does not exist until core is
+   tagged, so **tag core first** (RELEASE.md order); CI is unaffected (flow/pnm/dem build core `main`,
+   voro checks out the sibling), only a local `pip install .` of a consumer needs the tag. `CITATION.cff`
+   in every member + the umbrella: version + `date-released: 2026-09-05` (re-set the date if tagging
+   slips). Umbrella `pyproject.toml` 0.7.0 with the new `==` pins, `packaging/pyproject-cu13.toml` 0.7.0,
+   container image tags 0.7.0 in `docs/containers.md`, `containers/README.md`, `containers/submit/*.slurm`,
+   `CHANGELOG.md` section filled (rename the `[Unreleased]` heading to `[0.7.0] — <tag date>` when tagging).
+   `tools/release/check_release_state.sh` is the readiness readout.
 
 ---
 

@@ -18,14 +18,14 @@ toolchain, no build; just pull on the login node:
 
 ```bash
 # CPU (laptops, CI, CPU partitions) — Kokkos OpenMP + Serial:
-apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cpu:0.6.0
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cpu:0.7.0
 
 # NVIDIA GPU (Snellius) — pick your arch:
-apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.6.0-sm80   # A100
-apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.6.0-sm90   # H100
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.7.0-sm80   # A100
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-cuda:0.7.0-sm90   # H100
 
 # AMD GPU (LUMI-G, MI250X):
-apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-hip:0.6.0-gfx90a
+apptainer pull oras://ghcr.io/computational-chemical-engineering/peclet-hip:0.7.0-gfx90a
 ```
 
 !!! warning "LUMI / HIP image — untested on hardware"
