@@ -360,6 +360,11 @@ PLIC in normalised stretched cells, height-function curvature with physical colu
 force, the phase-change layer's `V_cell`; AMR per-axis root spacing through the mixed-level cut band and
 the sampled builders. Fable designs each; Opus implements against the design note's gates.
 
+**Design notes written 2026-09-06 (every ⚑ decided, gates with numbers):**
+`flow/doc/anisotropic_vof.md` (VoF half — on flow branch `aniso3` until Phase 2 is on main) and
+`core/docs/amr_anisotropic.md` (AMR half — on core main). The VoF kernel gates K1–K5 and the AMR
+gates A1–A6 run before Phase 2 lands; the VoF solver gates S1–S5 need Phase 2's operators.
+
 ### 9.8 Starting Phase 2 or Phase 3 from here (written 2026-09-06, after Phase 1 landed)
 
 Read this before §9.4 / §9.5: it says what Phase 1 built that you inherit, where the anchors moved to,
