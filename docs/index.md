@@ -26,8 +26,9 @@ pip install peclet-cu13     # the same family as CUDA wheels (NVIDIA driver only
 pip install peclet-flow     # or any single package
 ```
 
-Stokes flow past a sphere, start to finish (about half a minute on two cores); run it as is, or open the
-same steps as a notebook in Colab — the first cell installs the wheels:
+Stokes flow past a sphere in a box of side `L`, start to finish (about half a minute on two cores). The
+physical problem is stated in your own units and `N` sets the resolution, so a grid-refinement study is one
+number away. Run it as is, or open the same steps as a notebook in Colab — the first cell installs the wheels:
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/computational-chemical-engineering/peclet/blob/main/docs/notebooks/quickstart_sphere.ipynb)
 
@@ -35,25 +36,45 @@ same steps as a notebook in Colab — the first cell installs the wheels:
 import numpy as np
 import peclet.flow as flow
 
-N, R = 48, 9.0                                            # box of N^3 cells, sphere radius R
-x = np.arange(N)
+# --- the physical problem, in any consistent unit system -------------------------------------
+L, R = 1.0, 0.2              # side of the periodic box and radius of the sphere at its centre
+rho, mu = 1.0, 0.1           # fluid density and viscosity
+F = 1.0                      # driving pressure gradient along x (force per unit volume)
+N = 48                       # cells per side: change this for a grid-refinement study
+
+# --- the grid: the solver works in CELL units, so every length is divided by h = L / N --------
+h = L / N
+x = (np.arange(N) + 0.5) * h                                   # cell-centre coordinates
 X, Y, Z = np.meshgrid(x, x, x, indexing="ij")
-sdf = np.sqrt((X - N/2)**2 + (Y - N/2)**2 + (Z - N/2)**2) - R   # signed distance, < 0 inside the solid
+sdf = (np.sqrt((X - L/2)**2 + (Y - L/2)**2 + (Z - L/2)**2) - R) / h   # signed distance in cells, < 0 in the solid
 
-s = flow.Solver(N, N, N)                                  # periodic box -> a cubic lattice of spheres
-s.set_rho(1.0); s.set_mu(0.1); s.set_dt(60.0)             # creeping flow; a large dt marches to steady state
-s.set_body_force(1e-3, 0.0, 0.0)                          # driving pressure gradient along x
-s.set_solid(sdf, cutcell_pressure=True)                   # no-slip cut-cell immersed boundary
-for _ in range(40):
+s = flow.Solver(N, N, N)                                       # a periodic box: a cubic lattice of spheres
+s.set_rho(rho); s.set_mu(mu / h**2); s.set_dt(1e3)             # mu and F rescaled to cell units; a large dt
+s.set_body_force(F / h, 0.0, 0.0)                              #   marches straight to the steady Stokes flow
+s.set_solid(sdf, cutcell_pressure=True)                        # no-slip cut-cell immersed boundary
+u_prev = 0.0
+for it in range(200):
     s.step()
-u, v, w, p = s.get_u(), s.get_v(), s.get_w(), s.get_p()   # numpy arrays indexed [x, y, z]
-print(flow.execution_space)                               # -> OpenMP / Cuda / HIP / Serial
+    u_mean = s.get_u().mean()
+    if it > 5 and abs(u_mean - u_prev) < 1e-5 * abs(u_mean):   # steady: the mean velocity has settled
+        break
+    u_prev = u_mean
+u, v, w = s.get_u() * h, s.get_v() * h, s.get_w() * h          # back to physical velocity
+p = s.get_p() * h**2                                           # and pressure
+k = mu * u.mean() / F                                          # Darcy permeability of the sphere lattice
+print(f"{flow.execution_space}: N = {N}, h = {h:.4f}, {it + 1} steps, permeability k = {k:.5e}")
 
-import matplotlib.pyplot as plt                           # speed + streamlines on the mid-plane
-k = N // 2
-plt.imshow(np.ma.masked_where(sdf[:, :, k] < 0, np.hypot(u[:, :, k], v[:, :, k])).T, origin="lower")
-plt.streamplot(x, x, u[:, :, k].T, v[:, :, k].T, color="w", density=1.2, linewidth=0.6)
-plt.colorbar(label="|u|"); plt.show()
+# --- a look at the flow: speed and streamlines on the mid-plane through the sphere ---------------
+import matplotlib.pyplot as plt
+c = N // 2
+speed = np.hypot(u[:, :, c], v[:, :, c])
+plt.figure(figsize=(5, 4.2))
+plt.imshow(np.ma.masked_where(sdf[:, :, c] < 0, speed).T, origin="lower", cmap="viridis",
+           extent=[0, L, 0, L])
+plt.streamplot(x, x, u[:, :, c].T, v[:, :, c].T, color="w", density=1.2, linewidth=0.6)
+plt.colorbar(label="|u|"); plt.title("Stokes flow past a sphere (periodic box)")
+plt.xlabel("x"); plt.ylabel("y"); plt.tight_layout()
+plt.show()
 ```
 
 <img src="img/quickstart_sphere.png" width="420" alt="Stokes flow past a sphere: speed and streamlines on the mid-plane">
