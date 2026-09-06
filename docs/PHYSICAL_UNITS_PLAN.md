@@ -1,6 +1,7 @@
 # Physical domains and units — the solver takes the world in its own units
 
-*Plan, 2026-09-06. Status: PROPOSED, awaiting the decisions in §8. Nothing implemented yet.*
+*Plan, 2026-09-06. Status: **APPROVED** — D1–D5 accepted as recommended (2026-09-06). Implementation starts in a
+fresh session following §9. Nothing implemented yet.*
 
 ## 0. The decision in one paragraph
 
@@ -202,7 +203,7 @@ core and coupling (new API, old form kept).
   cell coordinates keep working while `extent=None`.
 - Phase 4 is the only breaking step and is a decision, one release after Phase 1.
 
-## 8. Decisions requested
+## 8. Decisions — all five ACCEPTED as recommended (2026-09-06)
 
 - **D1** Consistent units without dimension checking (§2) — recommended yes.
 - **D2** Constructor form: `Solver((nx,ny,nz), extent=..., origin=...)` with `extent=None` = cell units for
@@ -214,3 +215,153 @@ core and coupling (new API, old form kept).
   quick start and every gallery page benefit immediately.
 - **D5** Whether `pnm`'s physical outputs and `coupling`'s API change ship in the same minor release as flow's
   (recommended: yes, one family release 0.8.0 named "physical domains").
+
+
+## 9. Execution guide for the implementing session
+
+This section is written for a Claude Opus session that starts cold. It gives the order of work, the exact
+anchors, the recipes, the gates, and the points at which to stop and hand a *design* question to a Fable
+session (§9.6) instead of guessing. Read `suite/CLAUDE.md`, `flow/CLAUDE.md` ("Build Commands", "Running
+Tests and Verification", "MPI") and `core/CLAUDE.md` first; then this file top to bottom.
+
+### 9.1 Ground rules (non-negotiable)
+
+- Work inside a **flow worktree** (`git -C flow worktree add ../flow-units -b units`), never in the shared
+  `flow/` checkout; core edits in the shared `core/` checkout are fine if `git status` is clean there.
+  Commit **named paths only** (never `git add -A`), push the submodule first, bump the umbrella pointer last.
+- `OMP_NUM_THREADS=4 OMP_PROC_BIND=false` on every run; fresh build trees `build_u_*`; delete a tree before
+  reconfiguring; `-DMPIEXEC_EXECUTABLE=/usr/bin/mpirun` on MPI test trees; `PATH=/usr/local/cuda-13.2/bin:$PATH`
+  for CUDA.
+- **Bit-identity is the first gate of every commit**: with `extent=None` every existing test must produce
+  the same bytes. Run `tests/kokkos` (OpenMP + CUDA), `tests/kokkos_mpi` np=1,2,4, the regression suite
+  (never `--update`) and the five verify scripts before each push. A changed digit anywhere is a bug in the
+  change, not a new baseline.
+- Never change numerics while adding the metric. If a kernel needs a *different* algorithm for `h ≠ 1`
+  (not just a constant), stop and escalate (§9.6).
+- One work order per commit; the commit message names the gate it passed and its numbers.
+
+### 9.2 Recipes
+
+```bash
+cd /home/frankp/Codes/suite/flow-units && source ../.venv/bin/activate
+export OMP_NUM_THREADS=4 OMP_PROC_BIND=false PATH=/usr/local/cuda-13.2/bin:$PATH
+P=$PWD/../extern/install/host-openmp            # or nvidia-cuda
+cmake -S . -B build_u_omp -DCMAKE_PREFIX_PATH=$P && cmake --build build_u_omp -j8
+cmake -S tests/kokkos -B build_u_kokkos -DCMAKE_PREFIX_PATH=$P && cmake --build build_u_kokkos -j8 && ctest --test-dir build_u_kokkos --output-on-failure
+cmake -S tests/kokkos_mpi -B build_u_kmpi -DCMAKE_PREFIX_PATH=$P -DMPIEXEC_EXECUTABLE=/usr/bin/mpirun && cmake --build build_u_kmpi -j8 && ctest --test-dir build_u_kmpi --output-on-failure
+PYTHONPATH=$PWD/build_u_omp python tests/regression/sdflow_regression.py          # CUDA tree for the recorded baseline
+SDFLOW_BUILD=build_u_omp python scripts/verify_poiseuille_flow.py                  # + periodic_spheres, channel, bfs, lid_cavity
+```
+Byte comparison of two Python runs: dump `get_u/get_v/get_w/get_p` to `.npz` and compare with `np.array_equal`
+(the release session's `bytecmp.py` pattern); OpenMP with a fixed thread count is deterministic, CUDA is not
+(atomics in voro's tessellator; flow's kernels are deterministic but compare on OpenMP first).
+
+### 9.3 Phase 1 work orders (in this order)
+
+**U1 — `core/include/peclet/core/domain.hpp`** (new, header-only, C++20). `Box{origin, length, periodic}`,
+`UniformGrid{Box, cells}` with `spacing()`, `cellCentre(i,j,k)`, `faceCentre`, `contains`, `wrap` (min-image),
+satisfying `docs/INTERFACES.md` §1 (`dim()`, `length()`, `origin()`, `periodic(axis)`, `resolution()`).
+Gate: a core ctest `domain` (round trips, min-image, anisotropic spacing) — plain tree, 30 lines.
+
+**U2 — flow constructor + reference scales.** `Solver(int,int,int)` (`flow_ibm.hpp:76`) gains an overload
+`Solver(IVec3 cells, Vec3 extent, Vec3 origin)`; store `h_[3]`, `origin_[3]`, `hRef_ = min h`, `rhoRef_`,
+`tRef_` (set on the first `setDt`, `flow_ibm.hpp:162`; `rhoRef_` on the first `setRho`, :160). Add
+`toIndex*()/toPhysical*()` helpers: velocity component a: `v = u / h_a`, pressure `p' = p·?` — derive from
+§3.2 with the reference scales and WRITE THE DERIVATION as a comment block above the helpers; the
+mapping must reduce to the identity for `extent = cells, dt = 1, rho = 1`. Bindings (`flow_bindings.cpp:119`):
+`nb::init` overload with `nb::arg("cells"), nb::arg("extent") = nb::none(), nb::arg("origin") = (0,0,0)`;
+read-only properties `cells, extent, origin, spacing`; `cell_centres()` → three 1-D arrays;
+`get_spacing()` (:2488) returns the real spacing. Gate: bit-identity with `extent=None`; a new ctest
+`units_identity` constructing with `extent = cells` explicitly and checking every getter.
+
+**U3 — setters and getters convert at the boundary.** Apply the helpers in: `setMu` (:161 — internal
+`mu' = mu·tRef/(rhoRef·hRef²)`), `setRho` (:160), `setDt` (:162), `setBodyForce` (:169), `setDomainBc`
+velocities (:831), `setDomainBcProfile` (:861), `setVelocity` (:2393) / `getVelocity` (:2389),
+`getPressure` (:2446), `maxOpenDivergence` (:2489), `setSurfaceTension` (:7887), the drag/porous setters
+(:10213–:10385), `setContactAngle`'s slip length. In the operator assembly the internal quantities are
+what today's code sees, so `rebuildStencils` (:4203), `buildRhs*` (:4441–:4759), `setupBcDiffusion`
+(:5688), `project` (:5758) do **not** change in Phase 1 (isotropic: `beta = mu'`). Gate: scale invariance
+(§5.2) as ctest `units_scale_invariance`: the sphere-array Stokes case at `extent = cells` and at
+`extent = 1e-3·cells` (mu, F, dt rescaled physically) agree in physical units to 1e-13 relative; and the
+same on Poiseuille (verify script geometry).
+
+**U4 — geometry in physical coordinates.** `setSolid` (:1475) / `setSolidDevice` (:1539) /
+`setPressureGeometry` (:897): the SDF is a physical signed distance sampled at `cellCentre` → divide by
+`hRef` on entry (isotropic Phase 1; document that anisotropic needs Phase 2's metric). `setScene` (:929):
+node/instance reals in physical coordinates → scale translations by `1/h`, radii/params by `1/hRef`, motion
+velocities by `1/h` per axis (`set_instance_motion`, :1012 comment says CELL UNITS today). `setSolidSpheres`
+likewise. Gate: `units_scale_invariance` extended to the scene path (`set_scene` + `set_solid_from_scene`),
+and `test_freeslip` / `test_outflow_backflow` unchanged.
+
+**U5 — VoF on a physical h.** `vofAdv_.init(nx_, ny_, nz_, 1.0, kVofG)` (:2836) and
+`vofBlocks_->init(..., 1.0)` (:7274) receive `hRef` (Phase 1 requires `h_x = h_y = h_z`; assert with a
+clear message otherwise). `setSurfaceTension` physical; `vof_geometry()['kappa']` (:7802) returned in
+1/length. Gate: the VoF ctests bit-identical at `extent=None`; `vof_surface_tension.py`'s Laplace-pressure
+and capillary-wave gates re-run with `extent = 1e-2·cells` and physical `sigma` — same physical numbers to
+the existing tolerances.
+
+**U6 — core AMR.** `Octree(brick, lmax, origin, h0)` (`core/python/amr_bindings.cpp`) and
+`AmrFlow::init(t, h0, origin)` (`amr/flow.hpp:471`): accept `cells, extent, origin`; Phase 1 keeps `h0`
+scalar (assert isotropic). Gate: `core/python/test_amr.py` unchanged + one physical-units case (Poiseuille
+channel with `h0 = 1/Nc` already exists there — make it the model).
+
+**U7 — pnm and coupling.** `extract_pore_network(sdf, spacing, origin)` returns physical radii/volumes/
+lengths (multiply by the VTI spacing it already reads, `pnm_bindings.cpp:88–115`); coupling drivers
+(`driver.py:87 self.h`, `resolved.py` scene bridge) take `flow.spacing`/`flow.origin` and drop their own
+`h`. Gate: pnm 7199 pores unchanged with spacing 1; `test_terminal_velocity`, `test_fixed_bed_ergun` at
+spacing 1 unchanged, then once more with the whole problem in metres.
+
+**U8 — docs + quick start.** `docs/CONVENTIONS.md` §7, `flow/CLAUDE.md` units paragraphs, the API
+docstrings (every "cell units" string in `flow_bindings.cpp` — 8 today), the gallery quick start
+(`docs/index.md`, `README.md`, `docs/notebooks/quickstart_sphere.ipynb`) rewritten without `h`. Gate:
+`tools/release/check_release_state.sh` literal rule; the notebook re-executed.
+
+### 9.4 Phase 2 work orders (anisotropic, single phase) — design points marked ⚑ go to Fable first
+
+**U9 ⚑ derivation note** — `flow/doc/anisotropic_metric.md`: the §3.2 equations carried into every
+discrete operator flow has (const-coefficient fold, cut-cell/FOU stencil with implicit FOU + deferred
+correction, velocity MG restriction/prolongation, the incremental-rotational projection, the Robust-Scaled
+ghost closure with an anisotropic index-space normal, domain BCs, outflow census, backflow stabilisation),
+with the exact per-axis constants and where each enters. Fable writes it; Opus implements from it.
+
+**U10 momentum** — `beta = mu_` at `flow_ibm.hpp:4204, :4998, :5365, :5689` becomes `beta_b = mu'/h_b'²`
+per derivative axis (`h_b' = h_b/hRef`); `Ac = rho/dt + 2Σ_b beta_b`. Gate: anisotropic Poiseuille exactness
+(§5.3) as ctest `units_anisotropic_poiseuille`.
+
+**U11 pressure** — `CutcellMG::setOpenness(..., idx2, idy2, idz2)` (`mac_cutcell_mg.hpp:987`) already takes
+per-axis factors: pass `1/h_a'²`; the projection's gradient/correction (`mac_approx_projection.hpp`) gets the
+same weights. ⚑ coarsening order for aspect ratios (coarsen the finest axis first; extends the
+semi-coarsening rule in `DECOMPOSITION_AND_MULTIGRID.md`) — Fable decides the rule, Opus implements.
+Gate: pressure-only ctest (`cutcellmg_*`) with `(dx, 0.5dx, 2dx)` converging at the cubic rate.
+
+**U12 ⚑ ghost closure** — the Robust-Scaled foot point and normal with the metric
+(`mac_approx_projection.hpp:373–510`, `cut_cell_ibm.hpp`). Gate: §5.4 sphere-array drag on a stretched
+grid; TGV on a stretched box.
+
+### 9.5 Phase 3 (anisotropic VoF, AMR) — ⚑ throughout
+
+PLIC in normalised stretched cells, height-function curvature with physical column heights, the CSF face
+force, the phase-change layer's `V_cell`; AMR per-axis root spacing through the mixed-level cut band and
+the sampled builders. Fable designs each; Opus implements against the design note's gates.
+
+### 9.6 When to stop and hand over to Fable
+
+Escalate (write the question + the evidence into `flow/doc/units_escalation.md`, commit, and say so) when:
+1. a bit-identity gate fails and two focused attempts have not found the cause;
+2. a kernel would need a different *algorithm* for `h ≠ 1` (anything beyond a per-axis constant);
+3. the scale-invariance gate (§5.2) is off by more than round-off (1e-12) — that means an `h` still leaks,
+   and finding it needs the equations, not more runs;
+4. any ⚑ item above;
+5. the regression suite's recorded **iteration counts** change at `extent=None` (they must not), or the
+   reference scales change the float-operator behaviour (the SI-water gate §5.5 fails);
+6. MPI np=1 stops being bit-exact to single-rank on OpenMP.
+
+Everything else — plumbing, conversions, bindings, docs, tests, gallery pages — is Opus work.
+
+### 9.7 Definition of done, Phase 1
+
+All U1–U8 landed on flow/core/pnm/coupling main with the umbrella pointers bumped; every existing gate green
+and bit-identical; the five new ctests (`domain`, `units_identity`, `units_scale_invariance`, its scene
+extension, the VoF physical-`sigma` re-run) green on OpenMP and CUDA; the quick start on the site reads
+`Solver((N, N, N), extent=(L, L, L))` with `mu`, `F`, `sdf` physical and no `h` anywhere; RELEASE_PREP
+gets a "0.8.0 physical domains" section listing the gates and their numbers.
