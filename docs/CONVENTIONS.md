@@ -110,6 +110,31 @@ labels and stay local to voronoi; they are not suite-wide types.
 
 ## 7. Units
 
-Codes are dimensionless/consistent-unit: the caller supplies `spacing`, `L`, `rho`, `mu`, forces in a
-self-consistent system; the core stores and moves values without imposing SI. Document the unit system
-at the *method* level (each solver's README), not in the core.
+**Consistent units, no dimension checking, and the caller never writes a cell size.** Every solver is
+given a *physical domain* — a cell count, an extent and an origin — and derives its own spacing
+(`peclet::core::UniformGrid`, `core/include/peclet/core/domain.hpp`). Material properties, time steps,
+forces, boundary velocities, surface tension and geometry are stated in one self-consistent system of
+the caller's choosing, and they do not change when the grid is refined. Nothing imposes SI and nothing
+checks dimensions (decision D1 of [PHYSICAL_UNITS_PLAN](PHYSICAL_UNITS_PLAN.md)); a unit table in each
+method's API reference does that job.
+
+```python
+s = flow.Solver((nx, ny, nz), extent=(Lx, Ly, Lz), origin=(0, 0, 0))
+s.spacing            # derived: extent / cells — read-only, and the user never needs it
+s.cell_centres()     # the coordinates an SDF or an initial field is sampled at
+```
+
+Omitting `extent` selects the historical **cell units** (spacing exactly 1, origin 0, every length in
+cells) and is bit-identical to the pre-2026-09 solvers; it warns one release after the physical form
+ships and is removed one release after that.
+
+Internally the Eulerian solvers keep computing on the **unit lattice**: the metric is folded into
+per-axis constants at operator assembly and into the conversions at the API boundary, with reference
+scales (`h_ref`, `rho_ref`, `t_ref`) that keep every stored coefficient O(1) whatever unit system the
+caller uses. Two consequences worth knowing: at `extent = cells` with `rho = 1` and `dt = 1` every
+conversion is exactly 1.0, and **the raw field registry** (`field_view` / `get_field` / `set_field`)
+hands out those internal arrays, unlike `get_u` / `get_p`, which convert — a solver exposes the factors
+as `unit_scales` for the few drivers that need them.
+
+Anisotropic cells (a different spacing per axis) are carried by the domain type and reach the solvers in
+Phase 2 of the plan; Phase 1 asserts `dx == dy == dz` with a message naming the three.

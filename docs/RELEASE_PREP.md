@@ -410,3 +410,59 @@ Original questions, for the record:
 - **D3** CUDA family scope: flow-only (as today) or flow+pnm+dem+voro + `peclet-cu13` (recommendation: full family; the job is a copy of a working one and the user-facing story becomes "CPU or CUDA, same names").
 - **D4** Version numbers in §0 (all minors; 0.7.0 family).
 - **D5** Whether to attempt the HIP link experiments before the release (≈ 3 CI dispatches, no local hardware needed) or ship 0.7.0 without a HIP image.
+
+---
+
+## 8. Physical domains — the 0.8.0 headline feature (Phase 1 landed 2026-09-06)
+
+[PHYSICAL_UNITS_PLAN.md](PHYSICAL_UNITS_PLAN.md) Phase 1 is on main in core, flow, pnm and coupling:
+every solver takes a physical domain (cells, extent, origin) and derives its own cell size, and the
+user never writes `h`. `extent=None` keeps the historical cell units and is bit-identical, so this is
+a **minor** bump for all four (new API, old form kept), and the plan's D5 says they ship together —
+proposed family name "**physical domains**".
+
+What a release note should say, in one paragraph: `flow.Solver((nx,ny,nz), extent=(Lx,Ly,Lz))` puts
+the problem in the caller's own consistent units — density, viscosity, time step, body forces,
+boundary velocities and profiles, surface tension, slip length, the SDF handed to `set_solid`, the
+coordinates of `set_scene` — and everything read back is in them too, including the curvature
+(1/length), the open divergence (1/time), the hydrodynamic force and torque, and the capillary time
+step. `cell_centres()` gives the grid an SDF is sampled on. The AMR octree takes the same `extent`.
+The CFD-DEM drivers take the domain from the flow solver and drop their own `h`. Two things to state
+plainly: **Phase 1 is isotropic** (an extent that does not give one spacing on all three axes
+raises, with the numbers), and the **raw field registry** (`field_view` / `get_field` / `set_field`)
+hands out solver-internal arrays while `get_u` / `get_p` convert — `unit_scales` is the dict of
+factors for the drivers that need them.
+
+### 8.1 The gates, with their numbers (host-openmp unless stated, `OMP_NUM_THREADS=4`)
+
+| gate | result |
+|---|---|
+| core ctests (plain Release tree) | **104/104**, including the new `domain` |
+| flow `tests/kokkos` (OpenMP) | **38/38** existing + `units_identity`, `units_scale_invariance`; `units_vof_sigma` green |
+| flow `tests/kokkos` (CUDA) | see the run of the day — the same 36 pre-existing tests plus the three units gates |
+| flow `tests/kokkos_mpi` np = 1, 2, 4 (OpenMP) | **103/103** |
+| flow regression suite (CUDA, no `--update`) | **PASS** — every metric +0.00 %, every recorded `p_iter_tot` +0.0 %, every step count equal |
+| flow verify scripts (OpenMP) | poiseuille / periodic-spheres / lid-cavity / channel byte-identical to a build of the unmodified tree; bfs PASS |
+| bit-identity at `extent=None` | a 15-array field battery (Poiseuille cut-cell, periodic sphere with cut-cell MG, the same collocated) and a 4-array scene battery, `np.array_equal` **IDENTICAL** |
+| scale invariance, factor 1000 in the length unit | Poiseuille u **8.9e-17**, p **0.0e+00**; sphere Stokes sampled SDF u **4.1e-16** / v **1.5e-15** / p **1.8e-15**; analytic scene u **6.1e-16** / v **1.2e-15** / p **1.4e-15** (target 1e-13) |
+| VoF with a physical sigma at extent = 1e-2·cells | exactness `max\|u\|` 1.916e-17 vs 1.916e-19 (same machine zero); Young-Laplace dp = 0.25 = sigma·kappa in both; capillary_dt 3.989422804e-01 in both; computed curvature: currents **bitwise** equal after rescaling, jump 2.2e-16 |
+| core `test_amr.py` (np 1, 2, 4) | OK, with the new physical-units case |
+| pnm | 7199 pores and 53020 throat connections unchanged; radii double **bitwise** when the unit system does |
+| coupling `test_terminal_velocity`, `test_fixed_bed_ergun` | PASS and numerically identical at spacing 1; restated in a 1000x length unit, Ergun U agrees to **4e-16** and the terminal slip to **2.5e-06** (the float32 floor of the particle arrays) |
+
+### 8.2 Open, and deliberately so
+
+- **Phase 2 (anisotropic cells)** and **Phase 3 (anisotropic VoF and AMR)** are not in this release.
+  Say so: `dx == dy == dz` is asserted, not assumed.
+- The **cell-unit path does not warn yet**. The plan's Phase 4 makes the omitted `extent` warn one
+  release after this one and error the release after that; nothing here breaks a script.
+- The **raw field registry and the multiphysics / phase-change layer** stay in solver-internal
+  units. Documented in `docs/CONVENTIONS.md` §7, `flow/CLAUDE.md` and the `unit_scales` docstring;
+  only the LinearMix closures on `rho` and `mu` convert, and the others print a notice.
+- **pnm's sub-voxel centre offset** is guarded by an absolute `sw > 1e-6`, which is not scale-free:
+  a near-degenerate peak's centre can move by up to 0.37 cells between unit systems. Radii, counts
+  and topology are unaffected. Recorded, not fixed (it would move recorded centres at spacing 1).
+- The **gallery pages** still state their problems in cell units. They keep working unchanged; the
+  plan's Phase 4 is where they get shorter. The quick start (README, `docs/index.md`, the Colab
+  notebook) is already rewritten and re-executed — k = 1.23512e-01 at N = 48, matching the recorded
+  refinement ladder.
