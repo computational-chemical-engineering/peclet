@@ -26,16 +26,38 @@ pip install peclet-cu13     # the same family as CUDA wheels (NVIDIA driver only
 pip install peclet-flow     # or any single package
 ```
 
+Stokes flow past a sphere, start to finish (about half a minute on two cores); run it as is, or open the
+same steps as a notebook in Colab — the first cell installs the wheels:
+
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/computational-chemical-engineering/peclet/blob/main/docs/notebooks/quickstart_sphere.ipynb)
+
 ```python
+import numpy as np
 import peclet.flow as flow
-s = flow.Solver(32, 32, 32)
-s.set_rho(1.0); s.set_mu(0.01); s.set_dt(60.0)
-s.set_solid(sdf)                      # SDF geometry (<0 inside solid)
-for _ in range(100):
+
+N, R = 48, 9.0                                            # box of N^3 cells, sphere radius R
+x = np.arange(N)
+X, Y, Z = np.meshgrid(x, x, x, indexing="ij")
+sdf = np.sqrt((X - N/2)**2 + (Y - N/2)**2 + (Z - N/2)**2) - R   # signed distance, < 0 inside the solid
+
+s = flow.Solver(N, N, N)                                  # periodic box -> a cubic lattice of spheres
+s.set_rho(1.0); s.set_mu(0.1); s.set_dt(60.0)             # creeping flow; a large dt marches to steady state
+s.set_body_force(1e-3, 0.0, 0.0)                          # driving pressure gradient along x
+s.set_solid(sdf, cutcell_pressure=True)                   # no-slip cut-cell immersed boundary
+for _ in range(40):
     s.step()
-u, p = s.get_u(), s.get_p()           # numpy arrays [x,y,z]
-print(flow.execution_space)           # -> OpenMP / Cuda / HIP / Serial
+u, v, w, p = s.get_u(), s.get_v(), s.get_w(), s.get_p()   # numpy arrays indexed [x, y, z]
+print(flow.execution_space)                               # -> OpenMP / Cuda / HIP / Serial
+
+import matplotlib.pyplot as plt                           # speed + streamlines on the mid-plane
+k = N // 2
+plt.imshow(np.ma.masked_where(sdf[:, :, k] < 0, np.hypot(u[:, :, k], v[:, :, k])).T, origin="lower")
+plt.streamplot(x, x, u[:, :, k].T, v[:, :, k].T, color="w", density=1.2, linewidth=0.6)
+plt.colorbar(label="|u|"); plt.show()
 ```
+
+<img src="img/quickstart_sphere.png" width="420" alt="Stokes flow past a sphere: speed and streamlines on the mid-plane">
+
 
 → **[Examples gallery](https://computational-chemical-engineering.github.io/peclet-examples/)** (runnable,
 validated notebooks) · **[Python API reference](python/index.md)** · **[Install & run](DEPLOYMENT.md)**
