@@ -360,6 +360,80 @@ PLIC in normalised stretched cells, height-function curvature with physical colu
 force, the phase-change layer's `V_cell`; AMR per-axis root spacing through the mixed-level cut band and
 the sampled builders. Fable designs each; Opus implements against the design note's gates.
 
+### 9.8 Starting Phase 2 or Phase 3 from here (written 2026-09-06, after Phase 1 landed)
+
+Read this before §9.4 / §9.5: it says what Phase 1 built that you inherit, where the anchors moved to,
+and how two concurrent sessions stay out of each other's way.
+
+**What Phase 1 gives you.** `Solver::UnitScales` in `flow/src/flow_ibm.hpp` holds the metric
+(`h[3]`, `org[3]`, `ext[3]`, `cells[3]`) and the reference scales (`hRef`, `rhoRef`, `tRef`), with the
+full derivation as a comment block above it — read that block first, it is the contract every operator
+change has to keep. `refreshUnitDerived()` re-derives every internal quantity from the stored physical
+ones and is where a new converted input belongs. `SceneMap` (same file) is the index↔scene affine map
+the geometry kernels take by value. `Solver::spacing()` already reports per-axis `h`, so the data an
+anisotropic operator needs is present; **only the isotropy asserts and the operator coefficients are
+missing.** The Python side exposes `cells`, `global_cells`, `extent`, `origin`, `spacing`,
+`physical_units`, `unit_scales` and `cell_centres()`.
+
+**The three isotropy asserts, and who relaxes which.** Do not hunt for them:
+
+| where | what it refuses | relaxed by |
+|---|---|---|
+| `Solver::setPhysicalDomain`, `flow/src/flow_ibm.hpp` (~:216) | an extent that does not give one spacing | **Phase 2** (single phase); Phase 3 must not touch it until the VoF path is ready |
+| `h0FromExtent`, `core/python/amr_bindings.cpp` (~:147) | a non-cubic octree extent | **Phase 3** (AMR half) |
+| `CfdDem.__init__`, `coupling/python/peclet_coupling/driver.py` (~:66) | a non-cubic flow spacing | neither, until the coupling deposit kernel takes a per-axis `h` — a Phase 2 follow-up, not a blocker |
+
+**Anchors, refreshed against flow `1e3d67d`.** Line numbers rot; the greps do not.
+
+- **U10 momentum** — `grep -n 'beta = mu_' flow/src/flow_ibm.hpp` gives four sites, in
+  `rebuildStencils()` (~:4589), `buildAdvStencil()` (~:5383), `smoothComp()` (~:5750, which also
+  hard-codes `Ac = rho_/dt_ + 6.0*mu_`) and `setupBcDiffusion()` (~:6074). Those four are the whole
+  const-coefficient fold; `beta = backflowBeta_` (~:5477) is the backflow stabilisation, NOT this.
+- **U11 pressure** — `CutcellMG::setOpenness(ox, oy, oz, idx2, idy2, idz2)` is
+  `flow/src/mac_cutcell_mg.hpp:987` and already takes the per-axis factors; its three call sites all
+  pass `1.0, 1.0, 1.0` today (`flow/src/flow_ibm.hpp` ~:2356, ~:6299, ~:6334 —
+  `grep -n 'setOpenness(' flow/src/*.hpp`). The projection's gradient and correction are in
+  `flow/src/mac_approx_projection.hpp`.
+- **U12 ghost closure** — the Robust-Scaled foot point and fragment normal are
+  `flow/src/mac_approx_projection.hpp` ~:317–:380 (`W[3]`/`of[3]`, the `p* = x − sdi·n̂` foot point)
+  and the wall-flux block at ~:475–:520, plus `flow/src/cut_cell_ibm.hpp`.
+- **Phase 3, AMR** — `AmrGeometry` is `core/include/peclet/core/amr/leaf_field.hpp:28` and its `h0` is
+  a scalar `Real` read by about twenty headers (`flow.hpp` 24 references,
+  `ghost_projection_sampled.hpp` 21, `poisson.hpp` 20, `multigrid.hpp`, `cut_cell.hpp`, the
+  `distributed_*` set). Turning it into a `Vec<Dim>` is the bulk of that half and it is mechanical;
+  `leafSize(level)` and `lowerCorner(lo)` are the two functions everything else goes through.
+- **Phase 3, VoF** — `flow/src/vof/*` are the drivers; the container-free kernels are
+  `core/include/peclet/core/vof/{plic,curvature,cutcell,wetting}.hpp` and **that is where a stretched
+  PLIC normalisation belongs** (flow's copies are thin includes). `WyAdvector::h_` stays 1: see the
+  deviation note at the top of this file before changing it.
+
+**Running two sessions at once.** Phase 2 and Phase 3 overlap in exactly one file,
+`flow/src/flow_ibm.hpp`, and in nothing else (Phase 2 touches `mac_*.hpp` + `cut_cell_ibm.hpp`;
+Phase 3 touches `flow/src/vof/*` + `core/.../amr/*` + `core/.../vof/*`). So:
+
+- separate worktrees and branches — `git -C flow worktree add ../flow-aniso -b aniso` for Phase 2 and
+  `git -C flow worktree add ../flow-aniso3 -b aniso3` for Phase 3. Never the shared `flow/` checkout.
+- inside `flow_ibm.hpp`, Phase 2 owns the momentum / pressure / domain-BC region and the
+  `setPhysicalDomain` assert; Phase 3 owns the VoF region. Both will want to add fields to
+  `UnitScales` — add, never reorder, and put a new member at the END of the struct so the two diffs
+  do not collide.
+- **Phase 2 lands first.** Phase 3 rebases onto flow's main once Phase 2 is pushed and re-runs its own
+  full battery before pushing. Whoever pushes second rebases; neither force-pushes.
+- core is Phase 3's alone. Bump the umbrella pointer LAST, after the submodule is pushed.
+
+**Gates.** Extend `flow/tests/kokkos/test_units.cpp` (three gates today: `units_identity`,
+`units_scale_invariance`, `units_vof_sigma`) rather than starting a new file — the helpers for
+"same physical problem, two unit systems" are already there and an anisotropic gate is one more
+`runChannel`/`runSphere` variant. **The isotropic gates must keep passing unchanged**: an anisotropic
+operator that is right must reduce to today's arithmetic when the three spacings are equal, and the
+`extent=None` bit-identity battery is still the first gate of every commit.
+
+**Escalation runs the other way in these phases.** §9.4 and §9.5 mark the design points ⚑ because a
+Fable session writes them; the implementation that follows a settled design note is ordinary work.
+The hand-back gate is the design note itself: when `flow/doc/anisotropic_metric.md` (Phase 2) or the
+Phase 3 design note exists, is committed, and its acceptance gates are written down with the numbers
+they must hit, the design half is done.
+
 ### 9.6 When to stop and hand over to Fable
 
 Escalate (write the question + the evidence into `flow/doc/units_escalation.md`, commit, and say so) when:
