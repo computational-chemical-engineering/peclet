@@ -1,7 +1,23 @@
 # Physical domains and units — the solver takes the world in its own units
 
-*Plan, 2026-09-06. Status: **APPROVED** — D1–D5 accepted as recommended (2026-09-06). Implementation starts in a
-fresh session following §9. Nothing implemented yet.*
+*Plan, 2026-09-06. Status: **PHASE 1 LANDED** (2026-09-06) — D1–D5 accepted as recommended.
+core, flow, pnm and coupling are on main; the gate table with its numbers is
+[RELEASE_PREP.md §8](RELEASE_PREP.md). Phases 2–4 are untouched and §9.4–§9.5 stand as written.*
+
+**Two deviations from §9, both deliberate, both measured:**
+
+1. **§9.3 U5 asked for `vofAdv_.init(..., hRef)` and it would have been wrong.** Under
+   representation (B) — which §3.2 adopts and U2 implements — the colour advector runs on the same
+   unit lattice as every other operator, and its Courant number `v*dt'` IS the physical `u*dt/h`.
+   Feeding it `hRef` alongside index velocities converts twice. The two literal `1.0` spacings stay;
+   what crosses the boundary converts instead (`sigma` in, `kappa` in 1/length out, and every TIME
+   both ways: `capillary_dt`, `vof_step_limits`, `advect_vof`, `advect_vof_blocks`,
+   `apply_phase_change`, `step_adaptive`).
+2. **§9.3 U3's list of setters was short by four.** `set_property_model` on `rho`/`mu` (THE
+   documented two-phase spelling), `enable_vof_momentum`, `set_vof_kappa_constant` and
+   `set_phase_change_fit_curvature` all carry physical quantities into registered fields or frozen
+   state. Without them a two-phase run at h != 1 got a density `lam^3` too high and a capillary time
+   step `lam^1.5` too large — silently. The `units_vof_sigma` gate is what found it.
 
 ## 0. The decision in one paragraph
 
