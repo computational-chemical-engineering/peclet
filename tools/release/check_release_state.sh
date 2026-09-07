@@ -45,6 +45,10 @@ for s in $SUBS; do
   printf '%-9s %-8s %-8s %-8s %-9s %6s %7s %6s %6s %s\n' "$s" "$pv" "$iv" "$dv" "$tag" "$since" "$behind" "$ahead" "$dirty" "$wt"
   [ "$iv" != "-" ] && [ "$iv" != "meta" ] && [ "$iv" != "$pv" ] && bad "$s: __version__ $iv != pyproject $pv"
   [ "$dv" != "-" ] && [ "$dv" != "$pv" ] && bad "$s: Doxyfile PROJECT_NUMBER $dv != pyproject $pv"
+  # QUALITY_PLAN D4: pyproject is the single source. A CMake project(VERSION <literal>) must not exist
+  # (CMake reads pyproject at configure time); a literal that differs is a drift.
+  cv=$(tr '\n' ' ' < "$s/CMakeLists.txt" 2>/dev/null | grep -m1 -oE 'project\s*\([^)]*VERSION\s+[0-9]+\.[0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$')
+  [ -n "$cv" ] && [ "$cv" != "$pv" ] && bad "$s: CMakeLists.txt project(VERSION $cv) != pyproject $pv (D4: read it from pyproject.toml)"
   [ "$tag" != "-" ] && [ "$tag" != "v$pv" ] && [ "$since" != "0" ] && say "  .. $s: $since commits since $tag (pyproject $pv) -> needs a bump + tag v$pv? or is unchanged"
   [ "$tag" = "v$pv" ] && [ "$since" != "0" ] && bad "$s: pyproject still $pv but $since commits since tag $tag -> bump before tagging"
   [ "${behind:-0}" != "0" ] && bad "$s: checkout is $behind commits BEHIND origin/main (git -C $s pull --ff-only)"
