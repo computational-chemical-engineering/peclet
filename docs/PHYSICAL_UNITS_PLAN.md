@@ -422,9 +422,19 @@ on box cells (A3) — a solver limit, not an operator one; it is a preconditione
 operators are exact (A2/A4). (2) `enable_vof`'s Phase 2 refusal is lifted, and Phase 2's
 `CHECK(threw)` gate inverted with it.
 
-**Still refusing an anisotropic domain: the CFD-DEM coupling driver alone** — `gmap()` collapses
-one spacing onto all three axes, `inv_vcell` is `1/h^3`, and the velocity/force conversions read
-component 0 of a per-axis vector that flow already exposes in full. A Phase 3 follow-up.
+**Still refusing an anisotropic domain: the CFD-DEM coupling driver alone — and NOT because of the
+metric.** An earlier version of this line said `gmap()` collapses one spacing onto all three axes;
+that is **wrong**, and the correction is in `flow/doc/anisotropic_metric.md` §7. The driver poses
+the whole coupling in the solver's INTERNAL units, so particle positions reach `gmap` already in
+index coordinates and a spacing of 1 is the correct map there. `inv_vcell` was `1/h^3` and is now
+`1/(h_x h_y h_z)` (coupling `9f7cd24`); reading component 0 of `velocity_to_internal` is real and
+is a few lines. What actually blocks the driver is the **particle model**: an unresolved particle
+has ONE radius and every drag law (Stokes … Beetstra, Tang) is a function of ONE `Re_p`, and on the
+unit lattice of a box mesh there is no single length with which to form `d_p`. Resolving it means
+posing the particle side in PHYSICAL units and converting per axis at the grid interface — a
+coupling design change, not a metric one. The part of the coupling that IS a length and therefore
+IS now per-axis is the porosity volume filter (`smooth_length`, `alpha_a = C/h_a^2`, gate
+`coupling/tests/test_smoothing_isotropy.py`).
 
 ### 9.8 Starting Phase 2 or Phase 3 from here (written 2026-09-06, after Phase 1 landed)
 
