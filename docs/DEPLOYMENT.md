@@ -162,7 +162,7 @@ for MPI-ABI, GPU-aware-MPI, and arch details.
 | Package | Import | Key API |
 |---------|--------|---------|
 | `peclet-flow` | `import peclet.flow` | `Solver(nx,ny,nz)` / `SolverColocated` — set_rho/mu/dt, set_solid, set_domain_bc, scalars, VoF, scenes, step, get_u/v/w/p; MPI: `init_mpi`, `mpi_block`, `rebalance_by_weights` |
-| `peclet-pnm` | `import peclet.pnm` | `SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu`, `extract_pore_network`, network flow from a DNS; MPI: `mpi_block`, `extract_pore_network_mpi` |
+| `peclet-pnm` | `import peclet.pnm` | `SDFReader`, `extract_pores`, `segment_volume`, `extract_topology`, `extract_pore_network`, network flow from a DNS; MPI: `mpi_block`, `extract_pore_network_mpi` |
 | `peclet-dem` | `import peclet.dem` | `Simulation(capacity)` — initialize_shape, set_domain, set_material_params, set_positions, SDF walls, scene particles, step / step_hertz, get_positions, get_sdf_grid; MPI: `init_mpi`, `enable_mpi_step`, `step_mpi`, `step_hertz_mpi`, `rebalance` |
 | `peclet-voro` | `import peclet.voro` | `Tessellation`, `Simulation` (moving-cell Voronoi + dynamics), `FlowSolver` (Navier–Stokes on the Voronoi mesh); MPI: `VoronoiHalo` |
 | `peclet-coupling` | `import peclet.coupling` | `CfdDem` (unresolved, volume-averaged) and `ResolvedCfdDem` (cut-cell) two-way coupling drivers over `flow` + `dem` |

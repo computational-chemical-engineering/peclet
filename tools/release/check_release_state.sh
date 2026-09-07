@@ -49,6 +49,11 @@ for s in $SUBS; do
   # (CMake reads pyproject at configure time); a literal that differs is a drift.
   cv=$(tr '\n' ' ' < "$s/CMakeLists.txt" 2>/dev/null | grep -m1 -oE 'project\s*\([^)]*VERSION\s+[0-9]+\.[0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$')
   [ -n "$cv" ] && [ "$cv" != "$pv" ] && bad "$s: CMakeLists.txt project(VERSION $cv) != pyproject $pv (D4: read it from pyproject.toml)"
+  # morton's vcpkg manifest cannot read pyproject.toml; it carries a literal that must be bumped by hand.
+  if [ "$s" = morton ] && [ -f morton/packaging/vcpkg/morton/vcpkg.json ]; then
+    vv=$(grep -m1 -oE '"version[^"]*"\s*:\s*"[0-9.]+"' morton/packaging/vcpkg/morton/vcpkg.json | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+    [ -n "$vv" ] && [ "$vv" != "$pv" ] && bad "morton: packaging/vcpkg/morton/vcpkg.json version $vv != pyproject $pv"
+  fi
   [ "$tag" != "-" ] && [ "$tag" != "v$pv" ] && [ "$since" != "0" ] && say "  .. $s: $since commits since $tag (pyproject $pv) -> needs a bump + tag v$pv? or is unchanged"
   [ "$tag" = "v$pv" ] && [ "$since" != "0" ] && bad "$s: pyproject still $pv but $since commits since tag $tag -> bump before tagging"
   [ "${behind:-0}" != "0" ] && bad "$s: checkout is $behind commits BEHIND origin/main (git -C $s pull --ff-only)"
