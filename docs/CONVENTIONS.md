@@ -95,9 +95,14 @@ labels and stay local to voronoi; they are not suite-wide types.
   strides `{1, nx, nx*ny}`. Document it once per module and keep it identical across modules.
 - **Particle arrays:** shape `(N, 3)` for vector quantities, `(N,)` for scalars, contiguous float/
   double matching the solver's precision.
+- **Names:** one spelling per concept across the whole suite — the domain quartet
+  `origin`/`extent`/`cells`/`spacing`, `num_*` counts, `periodic=`, `set_dt`, American spelling,
+  and `get_` reserved for a call that actually transfers. [NAMING.md](NAMING.md) is the canon, the
+  table of every current divergence, and the additive-alias rule for changing a shipped name.
 - **Lifecycle:** `Solver(...)` construct → `initialize(...)`/`set_*` config → `step(dt)` → `get_*`
   accessors returning numpy arrays. Keep verb names identical across modules (`step`, `get_positions`,
-  `get_u`, …). Kokkos is initialized at import and finalized via a Python **atexit** hook — this is
+  `get_u`, …). *`get_*` here means the array getters, which copy — it was never meant to make
+  `get_spacing()` preferable to the `spacing` property; see [NAMING.md](NAMING.md) §1.2.* Kokkos is initialized at import and finalized via a Python **atexit** hook — this is
   required on CUDA (without it, Kokkos's device state is torn down by static destructors *after* the
   CUDA runtime unloads → `cudaErrorCudartUnloading` at exit). To avoid the opposite abort ("deallocated
   after `Kokkos::finalize`"), the hook first releases any live View-holding objects, then finalizes:
