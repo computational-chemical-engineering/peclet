@@ -65,7 +65,7 @@ before tagging; ship E–H (the structural refactors) across 1.x under the alias
 
 | module | removed | use instead |
 |---|---|---|
-| flow | `get_spacing()`, `get_resolution()`, `global_resolution()`, `get_ox()/get_oy()/get_oz()` | `spacing`, `cells`, `global_cells`, `origin` |
+| flow | `get_spacing()`, `get_resolution()`, `global_resolution()` | `spacing`, `cells`, `global_cells` (`get_ox/oy/oz` are the openness *fields*, not origin accessors — they stay, with real docstrings) |
 | flow | `cell_centres()`, `scene_instance_count()`, `vof_block_colour()` | `cell_centers()`, `num_scene_instances()`, `vof_block_color()` |
 | flow | `set_velocity_streams()` (a no-op) | — |
 | flow | `set_solid(…, pressure_coarse=)` (commented-out parameter shown in docs) | drop from docs |

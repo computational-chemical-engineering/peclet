@@ -127,7 +127,7 @@ correct; **open** = recorded, not yet done.
 | `extent`, `origin`, `spacing`, `cells`, `global_cells` | — | **canon** (Phase 1 of the units plan) |
 | `get_spacing()` | `spacing` | **aliased** (both ship; `spacing` is canonical) |
 | `get_resolution()` | `cells` | **aliased** |
-| `get_ox()` / `get_oy()` / `get_oz()` | `origin` | **aliased** |
+| `get_ox()` / `get_oy()` / `get_oz()` | — | **canon** — NOT origin accessors: they return the per-face openness FIELDS of the cut-cell operator (a 2026-09-07 draft of this table mislabelled them; corrected 2026-09-08 when the gallery's uses were checked) |
 | `cell_centres()` | `cell_centers()` | **aliased** (both already ship) |
 | `scene_instance_count()` | `num_scene_instances()` | **aliased** |
 | `vof_block_colour(id)` | `vof_block_color(id)` | **aliased** (one shared body, so they cannot drift) |
