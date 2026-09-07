@@ -62,6 +62,7 @@ nav:
       - Style: STYLE.md
       - Portability: PORTABILITY.md
       - Roadmap: ROADMAP.md
+      - Quality plan (1.0.0): QUALITY_PLAN.md
   - Releasing:
       - Release workflow: RELEASE.md
       - Release preparation (current): RELEASE_PREP.md
@@ -78,6 +79,3 @@ nav:
       - peclet-voro: https://computational-chemical-engineering.github.io/peclet-voro/
   - Privacy: privacy.md
 
-# DOC_CI_WORK_NOTES.md is an internal work log; keep it out of the nav.
-not_in_nav: |
-  DOC_CI_WORK_NOTES.md

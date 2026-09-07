@@ -1,7 +1,7 @@
 # Suite naming — one spelling per concept
 
-`peclet` is seven repos and five shipped Python APIs (`peclet.flow`, `peclet.pnm`, `dem`,
-`peclet.voro`, `peclet.coupling`, plus `peclet.core`'s `tpx_amr`/`tpx_mpi`). They grew separately,
+`peclet` is seven repos and seven shipped Python packages (`peclet.flow`, `peclet.pnm`, `peclet.dem`,
+`peclet.voro`, `peclet.coupling`, `peclet.morton`, and `peclet.core`'s `mpi`/`amr`/`geom` modules). They grew separately,
 so the same idea acquired different spellings — `set_domain` in dem against `set_box` in voro,
 `cell_centers` beside `cell_centres` in flow, `num_particles` against `scene_instance_count`. A user
 who moves between two of them pays for that every time.
@@ -12,7 +12,14 @@ changing a shipped name. [CONVENTIONS.md](CONVENTIONS.md) §6 governs the *mecha
 
 ## 0. The rule for changing a shipped name
 
-**Additive, never breaking.** A rename lands as a NEW canonical name bound beside the old one, the
+**Until 1.0.0: one spelling, clean break.** Decision D1 of [QUALITY_PLAN.md](QUALITY_PLAN.md)
+(2026-09-08): the suite has no external users, so the release that follows 0.7.2 — **1.0.0**, because it
+breaks every API — *removes* every non-canonical spelling and *renames* keyword arguments outright.
+Nothing is aliased. The removals are listed with their replacements in the CHANGELOG and in
+QUALITY_PLAN §2; §2 below records them as **removed 1.0.0**. Two spellings of one concept must never
+ship again.
+
+**From 1.0.0 on: additive, never breaking.** A rename lands as a NEW canonical name bound beside the old one, the
 old one keeps working and keeps its docstring, and the divergence table below records the pair. One
 release later the old spelling gains a `DeprecationWarning`; one release after that it may go. No
 release removes a name it did not first warn on. This is the same ladder the physical-units plan
@@ -27,9 +34,9 @@ docstring of the old one says which is canonical.
 Everything above works because a method can be bound twice. A keyword *argument* cannot: nanobind
 resolves `f(sphere_centres=...)` against one spelling, and adding a second means either a wrapper
 that accepts both (and has to decide what a caller passing both meant) or a break. So an argument
-name that is merely spelled unusually — `sphere_centres`, `segment_volume(shape=...)` — is
-**recorded here and changed at the next major version**, not aliased. It is renamed earlier only if
-it is actively misleading, which none of the current ones are.
+name that is merely spelled unusually — `sphere_centres`, `extract_topology(shape=...)` — is
+**recorded here and changed at the next major version**, not aliased. 1.0.0 *is* that major
+version: both are renamed there (§2).
 
 The exception is an argument that is *added* rather than renamed: `set_domain(extent=..., ...)`
 beside `set_domain(lx, ly, lz)` is a new overload, and overloads are resolvable. That is why the
@@ -88,16 +95,16 @@ of this axis are periodic".
 
 ### 1.5 The time step is `set_dt(dt)` / `dt`
 
-Every stepper takes its time step through `set_dt` and reports it as `dt`, and `step()` advances one
-step of it. A code whose `step(n, dt)` also takes `dt` keeps that signature — it is a convenience,
-not a second way to configure — and `dt` there must default to the value `set_dt` last stored.
+Every stepper takes its time step through `set_dt` and reports it as `dt`; `step()` advances one
+step of it and `step(n)` advances `n`. No `step` takes a `dt` argument — that was a second way to
+configure the same value (voro's `step(n, dt)` was removed at 1.0.0).
 
 ### 1.6 Spelling: American, and one of them
 
 `center`, `color`, `neighbor`, `normalize`. The suite's C++ is already American throughout
 (`centers`, `neighbor_counts`, `coarsenOpenAvg`); the British spellings that leaked into the Python
 layer (`cell_centres`, `sphere_centres`, `colours`, `vof_block_colour`) are the outliers.
-`centre`-spelled names that already ship keep working — they are in the table.
+The `centre`-spelled names were removed at 1.0.0 (§2).
 
 ### 1.7 Axis order is x-fastest, and a name never has to say so
 
@@ -166,7 +173,7 @@ silently transposed spellings of the same quantity is worse than one module spel
 (An earlier draft of this file listed these as an open correctness item. That was wrong: they are
 consistent with the array they accompany, which is what CONVENTIONS §6 asks for.)
 
-### peclet.core (`tpx_amr`)
+### peclet.core (`peclet.core.amr`, `peclet.core.mpi`)
 
 | current | canonical | status |
 |---|---|---|

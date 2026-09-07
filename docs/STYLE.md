@@ -28,10 +28,10 @@ repo and `core`):
 
 ## Naming
 
-- **Namespaces:** lower-case, one per library/module. Suite root namespace `tpx` (transport phenomena);
-  modules `peclet::core::common`, `peclet::core::decomp`, `peclet::core::halo`, `peclet::core::geom`, `peclet::core::ibm`. Existing method
-  namespaces keep their identity (`peclet::voro::`, `pbs::`, `morton::`); flow/dem, currently in the
-  global namespace, move solver classes into a method namespace (`cfd::`, `dem::`) as they integrate.
+- **Namespaces:** lower-case, one per library/module, all under `peclet::` except the dependency-free
+  `morton::`. As shipped: `peclet::core::{common,decomp,halo,geom,vof,solver,scheme,amr,python}`,
+  `peclet::flow`, `peclet::pnm`, `peclet::dem`, `peclet::voro`. (The earlier `tpx`/`pbs`/`cfd` names are gone;
+  the CMake identifiers that still carried them are being retired under [QUALITY_PLAN.md](QUALITY_PLAN.md) C.2.)
 - **Kokkos kernels:** prefer named functors/tags or descriptive `parallel_*` labels over anonymous
   lambdas in the hot path; keep the `_kernel`/`_op` suffix on functor types so device work is greppable.
 - **GPU data:** Structure-of-Arrays for hot device data; `d_`-prefixed device pointers
@@ -62,7 +62,10 @@ Adopt the two-pronged CI already present in the suite:
   For MPI code, run `ctest` under `mpirun -np {1,2,4,8}`. For GPU code, a GPU runner builds and runs
   the device tests; CPU CI at least compiles the device TUs.
 - **Hygiene** (voronoi pattern): `clang-format --dry-run --Werror`, `clang-tidy -p build`, and Doxygen
-  build as a non-blocking doc check.
+  build as a non-blocking doc check. **State 2026-09-08:** clang-format runs *informationally* in
+  morton/flow/dem/voro/core (hundreds of pre-existing violations each), nowhere blocking; `.clang-tidy`
+  exists only in voro and runs in no CI. Making both blocking after one reformat commit per repo is
+  [QUALITY_PLAN.md](QUALITY_PLAN.md) D.7.
 - **Special emulation** (morton pattern): where SIMD/ISA paths exist, validate under Intel SDE.
 
 ## Documentation

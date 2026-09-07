@@ -9,3 +9,9 @@
 # submodule: coupling composes flow+dem in one interpreter, pnm already borrowed flow's, and
 # the per-project venvs had drifted (three nanobind copies, three numpy versions).
 /.venv/
+
+# Per-agent / per-campaign git worktrees of the submodules (flow-*, tel/) and stray logs.
+/flow-*/
+/tel/
+/.claude/worktrees/
+/*.log

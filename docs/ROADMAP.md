@@ -72,7 +72,8 @@ validated; see the "MPI / flow" section of `flow/CLAUDE.md` for the current deta
 - [x] `flow/src/mac_halo.cuh` (`MacGridHalo`) — ORB decomposition + ghost exchange (width 1/2) for
       `double` MAC cell-fields, on `peclet::core::halo::DeviceGridExchange`. Validated against cfd's own `get_idx`
       stencils.
-- [x] `flow/src/staggered_advection.cuh` — cfd's exact staggered Koren TVD advection (momentum-
+- [x] *(historical file names — the `.cuh` TUs below became Kokkos `.hpp` sources in 2026-06)*
+      `flow/src/staggered_advection.cuh` — cfd's exact staggered Koren TVD advection (momentum-
       conserving), templated accessor for full-grid / local-block.
 - [x] `flow/src/distributed_stokes.cuh` (`dstokes::DistributedStokes`) — reusable solver: implicit
       diffusion (RB-GS) + Chorin projection + optional nonlinear advection + body force + SDF solids

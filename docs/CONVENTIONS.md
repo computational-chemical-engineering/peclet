@@ -48,7 +48,12 @@ Precision is chosen per role, not globally — but stated explicitly so codes ma
 
 To stop every code inventing its own, the core `common` module defines (host side):
 
-- `peclet::core::Real` — default floating type alias (a build option; double on host, float on device kernels).
+- `peclet::core::Real` — **`double`**, a fixed alias (`common/types.hpp`), not a build option. Where a code
+  stores a *float* for speed it says so per role: flow's multigrid operator storage is `MReal = float` unless
+  built with `-DPECLET_FLOW_MREAL_DOUBLE` ([SCALING_ISSUES.md](SCALING_ISSUES.md) #1 — dense beds need the
+  double build), and core's ghost-projection closure weights (`scheme/ghost_closure.hpp`,
+  `amr/ghost_projection.hpp`) are float by design. Turning these into typed CMake options is
+  [QUALITY_PLAN.md](QUALITY_PLAN.md) G.6.
 - `peclet::core::Index` — signed index type for grids/particles (`std::int64_t`; supersedes block_decomposer's
   `long int IndxT`).
 - `peclet::core::Vec<Dim>` = `std::array<Real, Dim>`; `peclet::core::IVec<Dim>` = `std::array<Index, Dim>`.
@@ -70,13 +75,13 @@ labels and stay local to voronoi; they are not suite-wide types.
 
 ## 6. Python binding conventions
 
-- **Mechanism:** **nanobind** for every compiled solver (flow, `pnm` (own project), dem `dem`, core
-  `tpx_mpi`/`tpx_amr`, voro's device module), built through **scikit-build-core**. nanobind is
+- **Mechanism:** **nanobind** for every compiled solver (`peclet.flow`, `peclet.pnm`, `peclet.dem`,
+  `peclet.core.{mpi,amr,geom}`, `peclet.voro`, `peclet.coupling`'s kernels), built through **scikit-build-core**. nanobind is
   chosen over pybind11 because its `nb::ndarray` carries a DLPack device tag and arbitrary strides,
   which is what makes the zero-copy GPU path below possible. morton's lightweight ctypes/C-ABI shim
   stays as is (dependency-free by design, ships portable PyPI wheels) — the deliberate exception.
 - **The array bridge:** all Kokkos-backed modules cross the C++/Python boundary through one shared
-  header, `peclet::core::python` (`core/include/tpx/python/ndarray_interop.hpp`), provisioned via
+  header, `peclet::core::python` (`core/include/peclet/core/python/ndarray_interop.hpp`), provisioned via
   `cmake/SuiteNanobind.cmake`. Do **not** re-hand-roll per-module copy helpers.
   - `view_to_ndarray(View)` exports a Kokkos View **without copying**: a host View becomes a NumPy
     array referencing the View's memory; a device (CUDA/HIP) View becomes a DLPack array CuPy/PyTorch
@@ -89,10 +94,11 @@ labels and stay local to voronoi; they are not suite-wide types.
   with the existing semantics (so NumPy-only scripts keep working unchanged); a CuPy (device) array on
   the matching backend flows in/out copy-free. Mismatched device/dtype raises rather than silently
   staging a device array through the host.
-- **Array shape/order:** Python sees grids as shape `(nz, ny, nx)`; round-trip to the C++ x-fastest
-  layout with `numpy.reshape(..., order='F')` on `(nx, ny, nz)`. The bridge preserves this naturally:
-  an x-fastest `peclet::core::Field3D` (LayoutLeft) exports as a Fortran-order `(nx, ny, nz)` array with element
-  strides `{1, nx, nx*ny}`. Document it once per module and keep it identical across modules.
+- **Array shape/order:** Python sees grids as **Fortran-order `(nx, ny, nz)`** arrays: an x-fastest
+  `peclet::core::Field3D` (LayoutLeft) exports with element strides `{1, nx, nx*ny}`, so `a[i, j, k]` is
+  cell `(i, j, k)` and `a[:, 0, 0]` runs along x. `pnm` is the one documented exception
+  ([NAMING.md](NAMING.md) §1.7): its arrays are the C-order `(nz, ny, nx)` a VTI hands over and every
+  triple that describes them carries the `_zyx` suffix. A module ships one order, never both.
 - **Particle arrays:** shape `(N, 3)` for vector quantities, `(N,)` for scalars, contiguous float/
   double matching the solver's precision.
 - **Names:** one spelling per concept across the whole suite — the domain quartet
@@ -107,7 +113,7 @@ labels and stay local to voronoi; they are not suite-wide types.
   CUDA runtime unloads → `cudaErrorCudartUnloading` at exit). To avoid the opposite abort ("deallocated
   after `Kokkos::finalize`"), the hook first releases any live View-holding objects, then finalizes:
   modules with simulation objects keep a registry and do `releaseAll()` → `finalize()` (dem, voro,
-  tpx_amr); modules whose objects are short-lived just `finalize()` (flow, pnm) and document that a
+  `peclet.core.amr`); modules whose objects are short-lived just `finalize()` (flow, pnm) and document that a
   Solver kept alive to interpreter exit must be released first (`del s`). Getters return host
   `vector_to_ndarray` arrays (no device Views), so they never block finalize; a zero-copy *device*
   export (`view_to_ndarray` to CuPy) must be released before exit. Build note: pass `NOMINSIZE` to

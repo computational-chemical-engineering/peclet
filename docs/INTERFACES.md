@@ -1,6 +1,14 @@
 # Suite Interfaces
 
-> Status: design document (living). The common abstractions every method shares, expressed as **C++20
+> Status: **design sketch (2026-07), not realised as code.** Of the seven concepts below only `Sdf`
+> exists as a C++20 concept (`peclet::core::geom::Sdf`, `core/include/peclet/core/geom/sdf.hpp`); the
+> others are duck-typed contracts that `Box`, `BlockDecomposer`, `GridFieldView`, `GridHalo`,
+> `ParticleMigrator` and the solvers satisfy by convention. Names here predate the code: the namespace is
+> `peclet::core`, not `tpx`; the two halo engines are `NbxEngine` and `GridHalo::exchangePersistent`.
+> [QUALITY_PLAN.md](QUALITY_PLAN.md) D7 decides whether to add `concepts.hpp` + `static_assert`s or to
+> rewrite this file as the written contract.
+>
+> Original preamble: design document (living). The common abstractions every method shares, expressed as **C++20
 > concepts** (host-side). These are *contracts*, not base classes — a type satisfies a concept by
 > having the right members, so existing solvers adopt them incrementally without inheritance. At the
 > Kokkos device boundary, the same shape is carried by functors/Views (the device side is C++20 under

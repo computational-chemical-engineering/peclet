@@ -16,7 +16,7 @@ decomposition** with efficient **asynchronous ghost-layer exchange**, common **S
 `block_decomposer` (now **retired/archived**) were extracted into the shared **`core/`**
 library (header-only C++20, its own git repo + `CLAUDE.md`) that every method depends on.
 
-**`core/` status:** complete and tested (26 ctests, `mpirun -np 1..8`). Provides ORB block
+**`core/` status:** complete and tested (104 plain / 157 Kokkos ctests, `mpirun -np 1..8`). Provides ORB block
 decomposition; the async grid ghost-layer exchange (`peclet::core::halo::GridHalo` — topology/exchange split,
 field-agnostic, NBX + persistent neighborhood-collective engines, overlap-capable, plus a GPU-resident
 host-staged variant); the Lagrangian halo (`peclet::core::halo::ParticleMigrator` — particle migration +
@@ -28,7 +28,7 @@ host-staged variant); the Lagrangian halo (`peclet::core::halo::ParticleMigrator
 Navier–Stokes solver** (`flow`) on the core: the whole cut-cell IBM + MG-PCG step runs multi-rank,
 bit-exact to single-rank (`tests/kokkos_mpi`, 18 ctests np=1,2,4, gated `PECLET_FLOW_MPI`). `flow` is **THE**
 flow solver; pore-network extraction is the separate `pnm/` project (`peclet.pnm`, split out of flow
-2026-07). `dem`'s `dem` module runs the
+2026-07). `dem`'s `peclet.dem` module runs the
 full XPBD step (ArborX broad-phase) with a validated distributed `step_mpi` that drives the SAME
 modern solver stack as the single-GPU step (shared `demSolveContacts` driver, processor-block
 Gauss–Seidel: rank-local coloring + warm-started PGS with gid-keyed persistent contacts +
@@ -50,6 +50,7 @@ The design contract lives in `docs/`:
 - [docs/DECOMPOSITION_AND_MULTIGRID.md](docs/DECOMPOSITION_AND_MULTIGRID.md) — how the MPI decomposition and the pressure multigrid constrain each other: the per-axis coarsening rule, why grid dimensions' factors of two decide solver cost, aligned vs coarse-first partitions, the measured evidence, and the open problems. **Read before touching decomposition, load balancing or MG depth.**
 - [docs/ROADMAP.md](docs/ROADMAP.md) — phased plan; the decomposition, async halo engine, and dynamic load balancing (Phase 7) are done — remaining work is at-scale multi-GPU tuning.
 - [docs/SCALING_ISSUES.md](docs/SCALING_ISSUES.md) — prioritized register of the issues the FoxBerry head-to-head scaling campaign surfaced (2026-09-01). The top two are float operator storage **silently invalidating** dense-bed runs and the multigrid depth cap that costs a third of the strong-scaling efficiency at 1536 ranks. **Read before starting scaling or IBM work.**
+- [docs/QUALITY_PLAN.md](docs/QUALITY_PLAN.md) — the **quality work list** opened 2026-09-08 after a full audit: decisions D1–D9 (the next release is the clean-break **1.0.0**, one spelling per concept with no aliases, two API tiers, no numerics-changing env vars, one version source, honest CI, core = infrastructure with AMR *relocated* not deleted), the rename table, and work packages A–H in order. **Read before adding a public name, an env var, or a file at a repo root.**
 - [docs/RELEASE.md](docs/RELEASE.md) — the family release workflow (PyPI CPU + CUDA wheels, containers,
   Snellius/LUMI site packages, Zenodo, gallery re-check) with the current cycle's state and decisions in
   [docs/RELEASE_PREP.md](docs/RELEASE_PREP.md); pre-flight + audits in `tools/release/`, site scripts in
@@ -60,11 +61,11 @@ The design contract lives in `docs/`:
 
 | Directory | Language / stack | What it does | Has own CLAUDE.md |
 |-----------|------------------|--------------|-------------------|
-| `core/` | Header-only C++20 + MPI | **Shared infrastructure**: ORB block decomposition + asynchronous ghost-layer exchange (NBX + persistent engines) + particle migration + SDF geometry + dynamic load balancing + AMR octree. The layer every method code depends on. Tested (26 ctests, np 1–8). | **Yes — read it** |
-| `morton/` | Header-only C++17 (+ **Kokkos**, Python) | Morton/Z-order codes with **arithmetic in Morton space** (neighbour-find, axis add, Z-order step without decode→re-encode). BMI2/AVX-512 + runtime dispatch; the foundational spatial-index library. Portable **Kokkos** GPU backend (`include/morton/kokkos.hpp`, CUDA/HIP/OpenMP) — raw CUDA retired. | **Yes — read it** |
+| `core/` | Header-only C++20 + MPI | **Shared infrastructure**: ORB block decomposition + asynchronous ghost-layer exchange (NBX + persistent engines) + particle migration + SDF geometry + dynamic load balancing + AMR octree. The layer every method code depends on. Tested (104 plain / 157 Kokkos ctests, np 1–8). | **Yes — read it** |
+| `morton/` | Header-only C++17 (+ **Kokkos**, Python `peclet.morton`) | Morton/Z-order codes with **arithmetic in Morton space** (neighbour-find, axis add, Z-order step without decode→re-encode). BMI2/AVX-512 + runtime dispatch; the foundational spatial-index library. Portable **Kokkos** GPU backend (`include/morton/kokkos.hpp`, CUDA/HIP/OpenMP) — raw CUDA retired. | **Yes — read it** |
 | `flow/` | **Kokkos** + C++20 + nanobind (`flow`) | Incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). | **Yes — read it** |
 | `pnm/` | **Kokkos** + C++20 + nanobind (`peclet.pnm`) | Pore-network extraction from SDF geometry: pore detection, marker-controlled watershed segmentation, throat topology (`SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu`, fused `extract_pore_network`). **Distributed MPI extraction** on the core ORB (`extract_pore_network_mpi`, gated `PECLET_PNM_MPI`) — bit-exact to single-rank, `tests/kokkos_mpi` ctests np=1,2,4 host+CUDA. Split out of `flow` (2026-07) with its git history. | Yes (brief) |
-| `dem/` | **Kokkos + ArborX** + C++20 + nanobind (`dem`) | Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). README still calls it `peclet-dem`. | No |
+| `dem/` | **Kokkos + ArborX** + C++20 + nanobind (`peclet.dem`) | Discrete Element Method (DEM): XPBD solver + SDF point-shell collision for dense particle packing. Optional MPI. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). | Yes (brief) |
 | `voro/` | **Kokkos** + C++17/20 (+ core MPI, nanobind; Voro++ fetched as a benchmark reference) | Dynamic 3D Voronoi tessellation of moving particles; periodic & Lees–Edwards boxes, incremental cell repair, Euler/NS/multiphase dynamics. Kokkos (CUDA/HIP/OpenMP) + core MPI; the legacy half-edge CPU oracle has been **retired**. | No |
 | `coupling/` | **Kokkos** + Python (`peclet.coupling`) | CFD-DEM coupling of `flow` + `dem`: unresolved volume-averaged (`CfdDem`) and resolved cut-cell (`ResolvedCfdDem`) drivers; one shared `BlockDecomposer`, distributed when both codes are. Pure-Python drivers live in `python/peclet_coupling/` (see "Local dev imports" below). | No |
 
@@ -113,11 +114,11 @@ PYTHONPATH=$PWD/build python scripts/verify_segmentation.py ../flow/data/packing
 ```bash
 cd dem && source ../.venv/bin/activate        # the suite venv already has nanobind + numpy
 cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"
-cmake --build build -j$(nproc)                  # -> build/dem.cpython-*.so  (-DPECLET_DEM_MPI=ON for the MPI step)
+cmake --build build -j$(nproc)                  # -> build/peclet/dem/_dem.*.so (import peclet.dem; -DPECLET_DEM_MPI=ON for the MPI step)
 export PYTHONPATH=$PYTHONPATH:$(pwd)/build
 python verify_packing_spheres.py                # verify_*.py are the test/demo entry points
 ```
-The many root-level `verify_*.py` / `test_*.py` / `plan_*.md` / `build_log*.txt` files are this project's working scratch — verification scripts and design notes, not a packaged test suite.
+The root-level `verify_*.py` / `test_*.py` files are demo and validation entry points (not a packaged test suite); the one-off investigation scripts were removed 2026-09-08 (QUALITY_PLAN B) and the remaining ones are to be sorted into `tests/python/` (pytest) and `examples/`.
 
 ### voro
 ```bash
@@ -127,7 +128,7 @@ cd voro && source ../.venv/bin/activate
 cmake -B build_dev -DPECLET_VORO_KOKKOS=ON -DPECLET_VORO_BUILD_PYTHON=ON \
   -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"   # add -DPECLET_VORO_MPI=ON for the distributed path
 cmake --build build_dev --parallel        # -> build_dev/peclet/voro/_voro.*.so (import peclet.voro)
-OMP_PROC_BIND=false ctest --test-dir build_dev --output-on-failure    # 11 tests
+OMP_PROC_BIND=false ctest --test-dir build_dev --output-on-failure    # ~24 tests (21 test_* + gates + python)
 CLANG_FORMAT_BIN=clang-format-18 bash tools/clang_format_check.sh     # what CI runs (see below)
 ```
 `tools/clang_format_check.sh` is the canonical format command — it walks `include/` and `tests/`
