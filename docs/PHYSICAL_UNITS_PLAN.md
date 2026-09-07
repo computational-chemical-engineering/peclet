@@ -402,10 +402,29 @@ PLIC in normalised stretched cells, height-function curvature with physical colu
 force, the phase-change layer's `V_cell`; AMR per-axis root spacing through the mixed-level cut band and
 the sampled builders. Fable designs each; Opus implements against the design note's gates.
 
-**Design notes written 2026-09-06 (every ⚑ decided, gates with numbers):**
-`flow/doc/anisotropic_vof.md` (VoF half — on flow branch `aniso3` until Phase 2 is on main) and
-`core/docs/amr_anisotropic.md` (AMR half — on core main). The VoF kernel gates K1–K5 and the AMR
-gates A1–A6 run before Phase 2 lands; the VoF solver gates S1–S5 need Phase 2's operators.
+**PHASE 3 LANDED 2026-09-07** — both halves are on main. `flow/doc/anisotropic_vof.md` (VoF) and
+`core/docs/amr_anisotropic.md` (AMR) carry the design and the measured gate numbers.
+
+| gate | result |
+|---|---|
+| flow `tests/kokkos` OpenMP / CUDA | **44/44** (Phase 2's + Phase 3's together) / **39/39** pre-merge |
+| flow `tests/kokkos_mpi` np = 1, 2, 4 | **106/106** |
+| flow regression (never `--update`) | **PASS**, every metric +0.00 %, every `p_iter_tot` +0.0 % |
+| flow verify scripts | **PASS** ×5 |
+| core ctests plain / Kokkos | **104/104** / **158/158** |
+| `core/python/test_amr.py` np = 1, 2, 4 | OK |
+| K1–K5 (VoF kernels) | 1.22e-15 · L1 order 2.27 · 6.66e-16 · 5.34e-16 · 9.60e-16 (index-offset control 1.50e+00) |
+| S2 `units_vof_aniso` | exactness 2.30e-17 (aspect 2) / 1.92e-17 (aspect 4); Young-Laplace rel 0; `dt_sigma ~ h_min^{3/2}` to 1e-9 |
+| A2 / A4 (AMR) | Poiseuille 4.06e-15 / 1.58e-15 / 9.81e-15 · Zick & Homsy **-0.76 %** on a box mesh vs -2.69 % cubic |
+
+**Two measurements corrected the design, and both notes say so.** (1) The octree V-cycle DIVERGES
+on box cells (A3) — a solver limit, not an operator one; it is a preconditioner there, and the
+operators are exact (A2/A4). (2) `enable_vof`'s Phase 2 refusal is lifted, and Phase 2's
+`CHECK(threw)` gate inverted with it.
+
+**Still refusing an anisotropic domain: the CFD-DEM coupling driver alone** — `gmap()` collapses
+one spacing onto all three axes, `inv_vcell` is `1/h^3`, and the velocity/force conversions read
+component 0 of a per-axis vector that flow already exposes in full. A Phase 3 follow-up.
 
 ### 9.8 Starting Phase 2 or Phase 3 from here (written 2026-09-06, after Phase 1 landed)
 
