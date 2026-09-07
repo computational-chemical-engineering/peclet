@@ -1,5 +1,12 @@
 # Release preparation — state on 2026-09-04 (next family release, proposed **peclet 0.7.0**)
 
+> **2026-09-08 update.** 0.7.0, 0.7.1 and 0.7.2 shipped (2026-09-05/06); §0–§7 below are that cycle's
+> record. The NEXT release is **1.0.0**, not 0.8.0: it carries the physical-domains feature of §8 *and*
+> the API clean break of [QUALITY_PLAN.md](QUALITY_PLAN.md) (decisions D1/D9 — every non-canonical
+> name removed, no aliases, every package to 1.0.0). Gate before tagging: QUALITY_PLAN work packages
+> A–D green in every repo, the CHANGELOG's removal list complete, the gallery pages grep-clean of the
+> removed names. Re-run the three tools on the day and re-cut this file for 1.0.0.
+
 The one-off companion of [RELEASE.md](RELEASE.md) (the durable workflow). Everything here was
 measured on 2026-09-04 with `tools/release/check_release_state.sh`, `tools/release/audit_docstrings.py`,
 `tools/release/audit_examples.py` and two read-only audits of the docs and the gallery. It is a

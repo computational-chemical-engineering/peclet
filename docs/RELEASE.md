@@ -125,8 +125,12 @@ is the only place they are enforced.
 
 Semantic versioning per package; the family version is the metapackage's. Rules used so far:
 
+- **major** bump when a package removes or renames public Python API. The first one is the family's
+  **1.0.0** ([QUALITY_PLAN.md](QUALITY_PLAN.md) D9): every package ships 1.0.0 together, the umbrella
+  CHANGELOG lists every removed name with its replacement, and from then on the NAMING.md alias ladder
+  is binding, so a further break costs a major.
 - **minor** bump when a package gains public Python API or a numerical method (VoF, moving geometry,
-  a new drag law), or when it drops one (flow 0.4.0 removed `peclet.flow.pnm`).
+  a new drag law). (Before 1.0.0 a removal was also a minor — flow 0.4.0 removed `peclet.flow.pnm`.)
 - **patch** bump for fixes with no API change.
 - A package with **zero commits since its tag keeps its version** (morton and pnm at 0.6.0 time);
   it is not re-released, and its `==` pin in the metapackage stays.
@@ -136,7 +140,7 @@ Semantic versioning per package; the family version is the metapackage's. Rules 
 
 | File | Field | Notes |
 |---|---|---|
-| `<sub>/pyproject.toml` | `version` | the PyPI version; **tag must equal `v<version>`** |
+| `<sub>/pyproject.toml` | `version` | **the single source** (QUALITY_PLAN D4): CMake's `project(VERSION)` reads it at configure time, so no CMake literal to bump; **tag must equal `v<version>`** |
 | `<sub>/packaging/*_init.py` (`__version__`) and `morton/bindings/python/peclet/morton/__init__.py` | `__version__` | must match pyproject (0.2.0 shipped with a stale core `__version__`) |
 | `flow/packaging/pyproject-cuda.toml` (and each future `*-cu13`) | `version` | same number as the CPU package |
 | `<sub>/Doxyfile` | `PROJECT_NUMBER` | Doxygen sites show it |
