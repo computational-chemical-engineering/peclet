@@ -413,7 +413,7 @@ Original questions, for the record:
 
 ---
 
-## 8. Physical domains — the 0.8.0 headline feature (Phase 1 landed 2026-09-06)
+## 8. Physical domains — the 0.8.0 headline feature (Phase 1 landed 2026-09-06, Phase 2 2026-09-07)
 
 [PHYSICAL_UNITS_PLAN.md](PHYSICAL_UNITS_PLAN.md) Phase 1 is on main in core, flow, pnm and coupling:
 every solver takes a physical domain (cells, extent, origin) and derives its own cell size, and the
@@ -428,10 +428,33 @@ coordinates of `set_scene` — and everything read back is in them too, includin
 (1/length), the open divergence (1/time), the hydrodynamic force and torque, and the capillary time
 step. `cell_centres()` gives the grid an SDF is sampled on. The AMR octree takes the same `extent`.
 The CFD-DEM drivers take the domain from the flow solver and drop their own `h`. Two things to state
-plainly: **Phase 1 is isotropic** (an extent that does not give one spacing on all three axes
-raises, with the numbers), and the **raw field registry** (`field_view` / `get_field` / `set_field`)
-hands out solver-internal arrays while `get_u` / `get_p` convert — `unit_scales` is the dict of
-factors for the drivers that need them.
+plainly: **anisotropic cells are in** since Phase 2 (below) but geometric VoF on them is Phase 3, and
+the **raw field registry** (`field_view` / `get_field` / `set_field`) hands out solver-internal arrays
+while `get_u` / `get_p` convert — `unit_scales` is the dict of factors for the drivers that need them.
+
+### 8.0 Phase 2 — anisotropic cells, single phase (flow `12cac0f`, `735fb46`, `6cf870b`, `0d8417b`, C4b)
+
+`extent/cells` may now differ per axis on the staggered `Solver` AND on `SolverColocated`: sampled or
+scene geometry, constant or variable properties, variable density, porous continuity, every domain-BC
+type, every pressure driver and bottom, the velocity multigrid, scalar transport, the hydrodynamic
+force and torque (moving geometry included) and MPI. `enable_vof` still refuses one (Phase 3), and
+the AMR octree and the CFD-DEM coupling driver keep their own guards. `hRef = min_a h_a`, and three
+spacings agreeing to 1e-12 relative are SNAPPED to one so an isotropic domain stays bit-identical.
+Both geometric multigrids defer an axis already `theta = 2` times coarser than the finest coarsenable
+one (`PECLET_FLOW_MG_ASPECT`); `Solver.pressure_mg_level_ratios()` prints the level table. Its gates,
+on host-openmp AND nvidia-cuda:
+
+| gate | result |
+|---|---|
+| flow `tests/kokkos`, both backends | **43/43** (the five new: `units_anisotropic_poiseuille` / `_sphere` / `_tgv`, `cutcellmg_aniso`, and `cutcellmg_aniso_mpi` in the MPI suite) |
+| flow `tests/kokkos_mpi` np = 1, 2, 4, both backends | **106/106**; `sdflow_mpi_np1` bit-exact to single-rank, rel `0.00e+00` |
+| all THREE regression baselines (CUDA, no `--update`) | **PASS** — staggered, collocated-ghost and collocated, every number `+0.00 %`, every iteration and step count equal |
+| six verify scripts, byte-identical to the pre-Phase-2 tree | poiseuille 800/800, periodic_spheres 60/60, channel 23/23, bfs 221/221, lid_cavity 15/15, colocated_taylor_green 4/4 |
+| anisotropic Poiseuille exactness | **1.388e-15** at `spacing (1, 0.25, 2)`; the `(1, 0.3, 2)` row is a **tripwire for WO-M's float operator floor** at 1e-7 (3.052e-08; 8.674e-15 in a double build), not a metric defect |
+| anisotropic Z&H drag, `(N, 2N, N/2)` to N = 64 | `p_s = 2.2500`, `K_inf = 7.46034` = **0.2465 %** of the Zick & Homsy 7.442 (bound 2 %); stretched pressure iterations `<= cubic + 2` at every rung |
+| anisotropic Stokes Taylor-Green | amplitude ratio to **2.088e-15** of the exact anisotropic backward-Euler eigenvalue; the isotropic control BITWISE the cell-unit run |
+| the aspect-ratio coarsening rule (what makes stretched grids solvable) | stretched MG-PCG **500/500/500 CAPPED -> 7/8/8**; Z&H sphere **24 -> 10** iterations at N = 32; V-cycle rate **0.6920 -> 0.1501** |
+| periodic-Stokes force identity `F = F_body*V_fluid` | **6.5e-09** cubic, **8.3e-08** stretched |
 
 ### 8.1 The gates, with their numbers (host-openmp unless stated, `OMP_NUM_THREADS=4`)
 

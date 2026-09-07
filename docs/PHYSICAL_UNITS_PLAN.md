@@ -332,7 +332,49 @@ docstrings (every "cell units" string in `flow_bindings.cpp` — 8 today), the g
 (`docs/index.md`, `README.md`, `docs/notebooks/quickstart_sphere.ipynb`) rewritten without `h`. Gate:
 `tools/release/check_release_state.sh` literal rule; the notebook re-executed.
 
-### 9.4 Phase 2 work orders (anisotropic, single phase) — design points marked ⚑ go to Fable first
+### 9.4 Phase 2 work orders (anisotropic, single phase) — **LANDED 2026-09-07**
+
+**Status: DONE.** Design note `flow/doc/anisotropic_metric.md` (U9, flow `5285aae`); implementation
+flow `12cac0f` (C1 = U10 momentum), `735fb46` (C2 = U11 pressure weights + the snap + the §7
+refusals), `6cf870b` (C3 = U11 ⚑ A, the aspect-ratio coarsening rule), `0d8417b` (C4 = U12 ⚑ B, the
+embedded-boundary closures + the hydrodynamic forces), `f168436` (C4b = the v3 wall-torque reading, E3)
+and `c61544f` (C5 = docs); umbrella pointer at C5.
+Both ⚑ design points were decided in the note (§5 the coarsening order, §6 the closures) and two
+questions were escalated and answered during implementation (`flow/doc/units_escalation.md` E1, E2,
+E3). §10 of the note carries every measured number; the headline gates:
+
+- **G0 bit identity at `extent=None`**: `tests/kokkos` 43/43 and `tests/kokkos_mpi` 106/106 (np = 1,
+  2, 4) on host-openmp AND nvidia-cuda; `sdflow_mpi_np1` bit-exact to single-rank
+  (`k_dist = k_ref = 5.84542251e+00`, rel `0.00e+00`); all THREE regression baselines (staggered and
+  both collocated) at `+0.00 %` with every iteration and step count equal; six verify scripts
+  `np.array_equal` TRUE on every array (poiseuille 800/800, periodic_spheres 60/60, channel 23/23,
+  bfs 221/221, lid_cavity 15/15, colocated_taylor_green 4/4).
+- **G1** `units_anisotropic_poiseuille`: pointwise exact **1.388e-15** at `spacing (1, 0.25, 2)`;
+  `(1, 0.3, 2)` kept at 1e-7 as the WO-M float-storage tripwire (**3.052e-08**, and 8.674e-15 under
+  `-DPECLET_FLOW_MREAL_DOUBLE`) — see E1.
+- **G2** `units_anisotropic_sphere` + `scripts/verify_anisotropic_spheres.py`: Z&H drag on
+  `(N, 2N, N/2)` to N = 64, `p_s = 2.2500`, `K_s,inf = 7.46034` = **0.2465 %** of 7.442 (bound 2 %),
+  stretched pressure iterations `≤ cubic + 2` at every rung; the periodic-Stokes force identity
+  `F = F_body V_fluid` to **6.5e-09** (cubic) / **8.3e-08** (stretched).
+- **G3** `units_anisotropic_tgv`: the anisotropic backward-Euler amplitude ratio to **2.088e-15**,
+  `max|div_o| 1.07e-16`, and the isotropic control BITWISE the cell-unit run.
+- **G4** `cutcellmg_aniso` (+`_mpi`): order 2.0038 stretched / 2.0052 cubic; the §5 aspect rule takes
+  the stretched ladder from **500/500/500 CAPPED to 7/8/8** and the Z&H sphere from **24 to 10**
+  iterations at N = 32, V-cycle rate **0.6920 → 0.1501**.
+
+**Re-stated per E1:** §5.3's "`dy = 0.3 dx`, `dz = 2 dx` pointwise exact" gate cannot meet a 1e-9
+bound in the shipped FLOAT operator build — `mu' = 55.5…` and `AC = 124.61…` are unrepresentable, so
+the whole profile is scaled by `1 - 1.06e-07`. The U12/G1 gate therefore makes the EXACTNESS
+statement at a float-representable metric (`spacing (1, 0.25, 2)`, measured 1.388e-15) and keeps
+`(1, 0.3, 2)` at **1e-7** as a production-shaped tripwire for that floor. Both configurations are in
+the ctest; a double-precision-only gate was rejected (it would state the gate about a build nobody
+ships).
+
+**One caveat carried forward:** `flow/scripts/check_decomposition.py`'s pre-flight is a fifth copy of
+the multigrid level loop that takes no metric and still models the ISOTROPIC coarsening rule.
+
+The work orders below are the record of what was asked for.
+
 
 **U9 ⚑ derivation note** — `flow/doc/anisotropic_metric.md`: the §3.2 equations carried into every
 discrete operator flow has (const-coefficient fold, cut-cell/FOU stencil with implicit FOU + deferred
@@ -384,7 +426,7 @@ missing.** The Python side exposes `cells`, `global_cells`, `extent`, `origin`, 
 
 | where | what it refuses | relaxed by |
 |---|---|---|
-| `Solver::setPhysicalDomain`, `flow/src/flow_ibm.hpp` (~:216) | an extent that does not give one spacing | **Phase 2** (single phase); Phase 3 must not touch it until the VoF path is ready |
+| `Solver::setPhysicalDomain`, `flow/src/flow_ibm.hpp` (~:216) | an extent that does not give one spacing | **RELAXED by Phase 2 commit C2** (flow `735fb46`): the throw became the §1.4 SNAP — three spacings agreeing to 1e-12 relative are set equal, so the isotropic metric is EXACT; otherwise `hRef = min_a h_a`. Phase 3 must not touch it until the VoF path is ready |
 | `h0FromExtent`, `core/python/amr_bindings.cpp` (~:147) | a non-cubic octree extent | **Phase 3** (AMR half) |
 | `CfdDem.__init__`, `coupling/python/peclet_coupling/driver.py` (~:66) | a non-cubic flow spacing | neither, until the coupling deposit kernel takes a per-axis `h` — a Phase 2 follow-up, not a blocker |
 

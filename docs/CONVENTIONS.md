@@ -136,5 +136,8 @@ conversion is exactly 1.0, and **the raw field registry** (`field_view` / `get_f
 hands out those internal arrays, unlike `get_u` / `get_p`, which convert — a solver exposes the factors
 as `unit_scales` for the few drivers that need them.
 
-Anisotropic cells (a different spacing per axis) are carried by the domain type and reach the solvers in
-Phase 2 of the plan; Phase 1 asserts `dx == dy == dz` with a message naming the three.
+**Anisotropic cells** (a different spacing per axis) are admitted since Phase 2 of the plan, single
+phase, on both `flow` grid policies: `h_ref` is then `min_a h_a`, so the FINEST axis carries exactly
+1 and every stored coefficient stays bounded by its isotropic value. Three spacings that agree to
+1e-12 relative are snapped to one, so an isotropic domain stays bit-identical however its extent was
+written. Geometric VoF on anisotropic cells is Phase 3.
