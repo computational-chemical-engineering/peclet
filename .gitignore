@@ -14,4 +14,6 @@
 /flow-*/
 /tel/
 /.claude/worktrees/
+# agent briefs for the QUALITY_PLAN packages (see its handoff section)
+/.claude/preambles/
 /*.log

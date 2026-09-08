@@ -504,3 +504,71 @@ lands; F and G.2 follow in the same repo.*
   `flow/doc/history/…` in eight files, `docs/archive/AMR.md` cited `flow/doc/sdflow_colocated_plan.md`
   which never existed (it is `flow_colocated_plan.md`), and `docs/python/flow.md` was regenerated from
   the MPI build so it no longer documents the retired `PECLET_FLOW_MG_ASPECT`.
+
+## 6. Handoff — starting packages F and G
+
+Written 2026-09-08 at the end of the day A–E+H were executed, for whoever picks up F and G. Read
+§1 (decisions), §3.F/§3.G, `docs/NAMING.md` §1, and the repo's own `CLAUDE.md` before touching code.
+
+### Where the work stands
+
+**Done in every repo:** A (one spelling per concept), B (dead code and artefacts out), C (one version
+source, old identifiers gone), D (CI that is honest), E (no env var changes a result), H (docs
+describe the code). Every submodule pointer is bumped and pushed; CI is green in all eight repos;
+`tools/release/check_release_state.sh` flags only the deliberate "bump at tag time" versions.
+
+**Done in part:** F in dem only (`2213849`). G.3 in pnm only (`0e0c2cd`).
+
+**Remaining, and the order §4 wants:** F in voro, flow, pnm, core → G.2 (+G.5) → then the rest of G
+(G.1, G.4, G.6, G.7) → tag 1.0.0. F and G.2 are breaking, so they precede the tag; the rest of G is
+not breaking and could follow it, but doing it first keeps one release instead of two.
+
+### Start here, per repo
+
+- **voro F — half written, parked on a branch.** The agent was cut off before it built anything. Its
+  work is committed on `wip/package-f-tiering` (pushed): public/`diagnostics` split in
+  `src/voro_bindings.cpp`, `pore_mesh` and `scenes` lifted out of `packaging/voro_init.py` into lazily
+  imported submodules, plus touches to `mesh_optimizer.hpp` and `test_mesh_optimizer.cpp`. It is
+  UNBUILT and UNTESTED — read it critically against the current bindings, do not assume it is right.
+  Still open from §3.F: string modes → enums, `minimize_interface` returning energy through
+  `maxVolErr`, and the `DistributedMovingTessellation`-versus-`VoronoiHalo` decision.
+- **flow F** is the big one (~180 of 266 members to `diagnostics`, retired `set_face_interp` modes
+  deleted with their kernels). Do it before G.1, so the split moves a smaller surface.
+- **pnm F / core F** are small. core's F is entangled with G.2 and G.5 — all three touch
+  `python/amr_bindings.cpp`, so do them as one pass, not three.
+- **G.2** moves the AMR flow solver out of core into flow (D6: RELOCATED, never deleted; AMR is under
+  active development). G.5 (`Octree`/`DistributedOctree` sharing 14 verbatim members) is the same file.
+- **G.4** (dem `sim.hpp` split) carries a real numerics fix: single-rank periodic wrap contacts whose
+  far partner sits more than one radius beyond the face are resolved ONE-SIDEDLY (`ghostBand = maxRad`);
+  the MPI step is symmetric. Keep the structural commits bit-exact and isolate the fix in its own
+  commit with a test. Also unexplained: dem's XPBD path is not run-to-run deterministic at 4 threads.
+
+### Two lessons this work produced — they will bite F and G
+
+1. **When a process-global disappears, every pure or pre-flight function that read it needs the value
+   passed in.** E removed flow's decomposition statics; `CutcellMG::predict` kept calling
+   `decomposition()` with the defaults, so `flow.predict_hierarchy` silently predicted the *aligned*
+   hierarchy for coarse-first jobs while its docstring claimed otherwise (`628d3da`), and
+   `check_decomposition.py --predict` printed identical ladders under headings naming different depths
+   (`013d3b3`). F moves members and G moves whole files: grep for every reader before you move state.
+2. **With concurrent agents in one checkout, commit with a pathspec** — `git commit <paths> -m …`.
+   A bare `git commit` takes the whole shared index: flow `628d3da` swept another agent's staged docs
+   into an unrelated commit.
+
+### How the packages were run
+
+Agent briefs live in `.claude/preambles/` (gitignored): `preamble.md` is the shared git/build/report
+contract, `preamble_F.md` adds F's tiering rules and gates. There is no `preamble_G.md` — write one
+from §3.G, and require of every structural change what G.3 delivered: **a byte-comparison of the
+outputs against the pre-refactor build**, not just a green battery.
+
+Gates that caught real defects and should stay: a SHA-256 of the final state from a fixed-seed run per
+public entry path, before and after; the full registered battery on host-openmp (`OMP_NUM_THREADS=4
+OMP_PROC_BIND=false`, MPI at one thread); `gh run watch` green before reporting.
+
+### Callers to update after each breaking pass
+
+`suite/coupling` and the gallery at `~/Codes/peclet-examples`. The gallery has local commits (dem
+`6a749f8`, flow `ff21290`) that are deliberately NOT pushed and NOT re-rendered — that waits for the
+1.0.0 wheels. Dated records there (`ISSUES.md`, `PROGRESS.md`) keep their historical commands with a
+bracketed note naming the replacement; live instructions get updated.
