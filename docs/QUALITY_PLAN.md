@@ -180,7 +180,21 @@ the inverse mass — recorded in dem's CLAUDE.md); `docs/mpi.md`'s "np=2/4 diffe
 false on the stiff random IC (per-particle max 0.11, even np=1 at 2 threads gives 0.08 — asserted as
 measured). **Open numerics finding (not D):** single-rank periodic wrap contacts whose far partner
 sits more than one radius beyond the face are resolved one-sidedly (`sim.hpp` `ghostBand = maxRad`);
-the MPI step is symmetric. Fix under G.4. flow/voro/core in progress.
+the MPI step is symmetric. Fix under G.4.
+
+**core DONE 2026-09-08** (`69d6b0f`, `3ccf838`, `f3a2a34`, `6bd091d`): every morton-guarded binary (49 +
+4 studies + `bench_amr_flow`) exits 77 through one registration helper (`cmake/PecletCoreTest.cmake`,
+labels `mpi`/`np8`/`bench`/`python`); `tests/python` registered (7 ctests: `test_mpi.py` np=1,2,4,8,
+`test_amr.py` serial + np=2, ndarray interop); 104 → 109 plain, 158 → 164 Kokkos, 0 → 7 Python. CI:
+gcc/clang × Debug/Release with morton v0.2.1 checked out beside it (nothing skipped), Kokkos-OpenMP
++ MPI np=1,2,4 + the Python modules (15 min), a no-MPI stub job, Quality with blocking clang-format
+(one 60-file reformat, token-stream verified identical; `amr/` excluded from the check until the AMR
+branch lands — 19 of 35 AMR headers still differ). Findings: the Python MPI ctests had been running N
+singletons (ParaView's `mpiexec` cached — the CLAUDE.md trap; now pinned by
+`cmake/PecletCorePinMpiexec.cmake` and the scripts fail when `comm.size != PECLET_CORE_TEST_NP`); a
+rank exiting 77 before `MPI_Init` aborts prterun (Open MPI 5) → `tests/test_skip_mpi.hpp` inits
+first; the old CI matrix had no gcc job (`include:` overwrote the axis). `PECLET_CORE_BUILD_TESTS`
+stays default ON (the wheel builds from `python/`, not the root). flow/voro in progress.
 
 1. core: 50 of 80 test binaries `return 0` with "skipping" when morton is absent, and CI never
    provides morton → every AMR/octree test is green-by-no-op. Add morton (tag) + a Kokkos-OpenMP
@@ -211,7 +225,8 @@ ADV_FILL_MODE,UBC_EXCHANGE,CA,DECOMP_LEVELS,TELESCOPE,MG_BCGHOST}` and the proce
 `CutcellMG::setDecompositionLevels` static. dem: the 16 `PECLET_DEM_*` reads in the `Simulation`
 constructor and `solve_driver*.hpp` (`_REST_MODEL`, `_SLEEP*`, `_VERLET_SKIN`, `_NO_GRAPH`,
 `_NO_FUSED`, `_NO_INCR_COLOR`, `_REST_NEWTON_OFF`, `_REST_ONESIDED`, `_ML_GATES`, …). core:
-`PECLET_CORE_GPS_RHO/MAXN`. Each becomes a setter with a documented default, or is deleted with
+`PECLET_CORE_GPS_RHO/MAXN` (the only numerics-changing reads in core; both in `amr/`, so core's E is
+folded into G.2 — the AMR relocation — rather than touching `amr/` twice). Each becomes a setter with a documented default, or is deleted with
 the ablation it served. Keep `*_DEBUG`, `*_VERBOSE`, `*_PROFILE*`, `*_TIMEOUT`, `GPU_AWARE_MPI`.
 
 ### F. API tiering (M per repo, breaking) — D2
@@ -343,4 +358,4 @@ lands; F and G.2 follow in the same repo.*
 - **2026-09-08, package D** — pnm `ec646c8`…`72cf6f4` (0→9 ctests, CI 39 s + 74 s) and G.3
   `5ad3898`/`0e0c2cd` (one kernel set, 2873→2458 lines, 54-file output byte-identical, 9/9 host +
   CUDA); dem `5bb9bfd`…`8124d57` (47 ctests in one tree, scripts sorted, CI 2 m 47 s + 3 m 17 s).
-  Details under §3.D / §3.G.3.
+  Details under §3.D / §3.G.3. core `69d6b0f`…`6bd091d` (109/164/7 ctests, six CI jobs, longest 17 min).
