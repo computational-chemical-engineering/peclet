@@ -20,8 +20,9 @@ PAGES = [
     ("dem.md", "peclet.dem — Lagrangian DEM (XPBD + Hertz–Mindlin)",
      "Discrete-element simulation with SDF point-shell collision, analytic SDF walls (static and "
      "moving), scene particles, and the distributed (MPI) step. The MPI methods are present only in "
-     "an MPI-enabled build.",
-     [("peclet.dem", ["Simulation"])]),
+     "an MPI-enabled build. `Simulation` is the public tier; developer instruments, ablations and "
+     "GPU execution policies live on `Simulation.diagnostics` (`Diagnostics` below).",
+     [("peclet.dem", ["Simulation", "Diagnostics"])]),
     ("voro.md", "peclet.voro — dynamic Voronoi tessellation + Voronoi-mesh flow",
      "Moving-cell Voronoi tessellation, moving-cell dynamics, the unstructured-mesh generator that "
      "feeds `peclet.flow`, the covolume / collocated Navier–Stokes solver on a Voronoi mesh "

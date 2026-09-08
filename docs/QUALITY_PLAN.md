@@ -364,8 +364,11 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
    `doc/history/`; `doc/` (31 files, five `vof_workorders*.md` = 853 KB) split reference/history;
    README `-DCFD_BUILD_MPI` → `PECLET_FLOW_MPI`, `SolverColocated` default "ghost"; `pyproject`
    "single-rank"; `ci.yml` "pybind11"; `AGENTS.md`/`GEMINI.md` either made true or deleted.
-3. dem: write `dem/CLAUDE.md` (build matrix, three test projects, hidden call orders); README
-   folder listing (12 of 22 headers), venv paragraph, `docs/solver_details.md` still narrating `src/cuda/*.cu`.
+3. dem — **DONE 2026-09-08** (`f680c3d`, `acb0fd5`): README quick-start written and RUN against the
+   1.0.0 API, folder listing and venv paragraph corrected, `docs/solver_details.md` rewritten for the
+   Kokkos stack (it narrated the retired `src/cuda/*.cu`), CLAUDE.md carries the E/F traps and the
+   right ctest counts, two campaign notes → `docs/archive/` with an index, zero broken links; the
+   `max_overlap` docstring and `examples/pack.py` follow the moved path.
 4. voro — **DONE 2026-09-08** (`23c088f`): CLAUDE.md written by D + H (5 KB, one-tree recipe, `docs/`
    vs `docs/archive/` rule); Lees–Edwards and the half-edge oracle dropped from README/CITATION.cff
    (zero occurrences in `include/`); 23 campaign notes (not 17) → `docs/archive/` with an index;
@@ -438,3 +441,7 @@ lands; F and G.2 follow in the same repo.*
   `packaging/voro_init.py`, `tests/kokkos/test_mesh_optimizer.cpp`) — inspect with `git -C voro diff`
   before starting anything there; dem's G.4 (sim.hpp split + the periodic-wrap one-sidedness) never
   started.
+- **2026-09-08, after the model switch** — dem H.3 landed (`f680c3d`, `acb0fd5`, CI green) and
+  `docs/python/dem.md` was regenerated from the tiered module; `tools/gen_python_api.py` now emits
+  `Diagnostics` beside `Simulation`, so the developer tier is documented rather than hidden behind a
+  property. The other generated pages are untouched (their modules did not change).
