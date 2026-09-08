@@ -4,6 +4,47 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 1.0.0, the clean break
+
+**Every package goes to 1.0.0.** This release removes every non-canonical Python name instead of
+aliasing it (the suite had no external users; [docs/QUALITY_PLAN.md](docs/QUALITY_PLAN.md) D1/D9 and
+[docs/NAMING.md](docs/NAMING.md) §0). From 1.0.0 on a rename is additive and deprecated for two
+releases before removal, and a break costs a major. The full old→new table is NAMING.md §2; in short:
+
+- **peclet.flow**: `get_spacing()`→`spacing`, `get_resolution()`→`cells`, `global_resolution()`→
+  `global_cells`, `cell_centres()`→`cell_centers()`, `scene_instance_count()`→`num_scene_instances()`,
+  `vof_block_colour`/`vof_filled_colour`/`enable_vof_blocks_from_colours(colours=)`→`…color…`;
+  `set_velocity_streams()` (a no-op) and the ignored `set_solid(pressure_coarse=)` keyword are gone.
+  `get_ox/oy/oz` stay (they are the openness fields).
+- **peclet.dem**: `initialize()`→`initialize_shape(shape_type, radius, …)` (radius mandatory),
+  `enable_periodicity()`→`set_periodic()`, `get_domain_min/max()`→`origin`/`extent`, positional
+  `set_domain(lx,ly,lz,px,py,pz)`→`set_domain(extent=, origin=, periodic=)`, `get_num_contacts()`/
+  `get_num_manifolds()`/`get_max_overlap()`→`num_contacts()`/`num_manifolds()`/`max_overlap()`,
+  `add_plane(6 scalars)`→`add_plane(point, normal)`, `export_lammps(pbc_enabled=)`→`periodic=`.
+- **peclet.voro**: `set_box(L)`→`set_domain(extent=)`, `step(n, dt)`→`set_dt(dt)`+`step(n)`,
+  `sphere_centres=`/`centres=`→`sphere_centers=`/`centers=`; getters made uniform — arrays copied out
+  carry `get_` (`get_volumes()`, `get_neighbor_counts()`, `get_wall_counts()`, `get_velocities()`),
+  stored scalars are properties (`time`, `num_cells`, `num_faces`, `num_wall_faces`, `layout`,
+  `pressure_iterations`), computed scalars are bare methods (`kinetic_energy()`, `internal_energy()`).
+- **peclet.pnm**: `extract_topology_gpu(shape=)`→`extract_topology(shape_zyx=)`; `Pore` gained
+  constructors and `__repr__`; malformed VTI files and non-convergence now raise instead of printing.
+- **peclet.core**: `mpi.Migrator`/`Halo`→`ParticleMigrator`/`ParticleHalo` with `(origin, extent,
+  cells, periodic)`; `num_ghost`/`num_owned` are properties; `amr.Octree(brick, lmax, …)`→
+  `Octree(cells, *, lmax=0, origin=, spacing=None, extent=None)` (`cells` is the finest grid),
+  `.h0`→`.spacing`; `.pyi` stubs for `amr`/`mpi`/`geom` ship in the wheel; `find_package(peclet-core
+  CONFIG)` works.
+- **peclet.coupling**: `CfdDem(smooth_width=, h=)`→`smooth_length=` (spacing from the flow solver);
+  `ResolvedCfdDem(rho_f=, periodic=bool, move=)`→`rho=`, `periodic=(…)`, `move_particles=`;
+  drag names `bvk`/`bvk2`→`beetstra`/`tang`; one `eps_min` default.
+- **peclet.morton**: C library `libmortonarith_c`→`libpeclet_morton_c` with a shipped `morton_c.h`;
+  the `legacy/` tree removed (tag `pre-legacy-removal`).
+
+Also: every repo's CMake `project(VERSION)` now reads `pyproject.toml`; the `transport_core`/`tpx_*`
+CMake names became `peclet_core`/`peclet::core`, `PECLET_TPX_TAG`→`PECLET_CORE_TAG`, flow's target
+`sdflow`→`peclet_flow`, voro's `vorflow` remnants gone; tracked artefacts removed (a third-party PDF,
+logs, PNGs, dem's 2.5 MB run log, voro's retired-engine zip); dead test harnesses deleted; new
+`dem/CLAUDE.md`, `voro/CLAUDE.md`; pnm and coupling gained CI/quality workflows.
+
 ## [0.7.2] — 2026-09-06
 
 CUDA wheels only. `peclet-flow-cu13` 0.5.1, `peclet-pnm-cu13` 0.1.2, `peclet-dem-cu13` 0.5.1,

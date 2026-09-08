@@ -13,7 +13,7 @@
 #     target_link_libraries(mymod PRIVATE Kokkos::kokkos)
 #
 # The Kokkos View <-> nanobind ndarray zero-copy bridge consumed by every binding lives in
-# transport-core/include/tpx/python/ndarray_interop.hpp.
+# core/include/peclet/core/python/ndarray_interop.hpp (peclet-core).
 
 include_guard(GLOBAL)
 

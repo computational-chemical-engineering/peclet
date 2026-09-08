@@ -71,8 +71,11 @@ Four names, and they mean the same thing in every code:
 A value the object simply *has* is a bare name: `extent`, `origin`, `spacing`, `cells`, `dt`,
 `periodic`, `volumes`, `positions`. A `get_`/`set_` pair is for a value that is **converted,
 copied or computed** on access — `get_u()`, `get_field(name)`, `set_positions(a)` — where the call
-parentheses tell the reader a transfer happens. voro's `Tessellation` already follows this
-(`volumes()`, `faces()`); dem's `Simulation` and flow's `Solver` are the ones with the split.
+parentheses tell the reader a transfer happens. Concretely (the rule voro applied at 1.0.0 and
+every module follows): a stored scalar or count is a **property** (`time`, `num_cells`, `layout`); a
+scalar that is *computed* on call, e.g. a device reduction, is a bare-name **method**
+(`kinetic_energy()`, `max_divergence()`); an **array copied out** carries `get_` (`get_volumes()`,
+`get_velocities()`, `get_neighbor_counts()`). So `volumes()` without `get_` was wrong, not a model.
 
 CONVENTIONS §6 previously wrote the lifecycle as "`step(dt)` → `get_*` accessors". That stays true
 of the array getters, which do copy; it was never meant to make `get_spacing()` preferable to
@@ -117,80 +120,81 @@ is that a module never ships both spellings — one order per module, marked.
 
 ## 2. The divergence table
 
-Status: **aliased** = the canonical name is bound and the old one still works; **canon** = already
-correct; **open** = recorded, not yet done.
+Status: **removed 1.0.0** = the non-canonical spelling was deleted in the clean-break release
+(QUALITY_PLAN D1; the per-repo commits of 2026-09-08 carry the lists); **canon** = correct;
+**open** = recorded, not yet done.
 
 ### peclet.flow
 
-| current | canonical | status |
+| former | canonical | status |
 |---|---|---|
 | `extent`, `origin`, `spacing`, `cells`, `global_cells` | — | **canon** (Phase 1 of the units plan) |
-| `get_spacing()` | `spacing` | **aliased** (both ship; `spacing` is canonical) |
-| `get_resolution()` | `cells` | **aliased** |
-| `get_ox()` / `get_oy()` / `get_oz()` | — | **canon** — NOT origin accessors: they return the per-face openness FIELDS of the cut-cell operator (a 2026-09-07 draft of this table mislabelled them; corrected 2026-09-08 when the gallery's uses were checked) |
-| `cell_centres()` | `cell_centers()` | **aliased** (both already ship) |
-| `scene_instance_count()` | `num_scene_instances()` | **aliased** |
-| `vof_block_colour(id)` | `vof_block_color(id)` | **aliased** (one shared body, so they cannot drift) |
+| `get_spacing()` | `spacing` (a list `[dx, dy, dz]`) | **removed 1.0.0** |
+| `get_resolution()` / `global_resolution()` | `cells` / `global_cells` | **removed 1.0.0** |
+| `get_ox()` / `get_oy()` / `get_oz()` | — | **canon** — NOT origin accessors: the per-face openness FIELDS of the cut-cell operator (an earlier draft of this table mislabelled them; corrected 2026-09-08 against the gallery's uses) |
+| `cell_centres()` | `cell_centers()` | **removed 1.0.0** |
+| `scene_instance_count()` | `num_scene_instances()` | **removed 1.0.0** |
+| `vof_block_colour(id)`, `vof_filled_colour()`, `enable_vof_blocks_from_colours(colours=)` | `vof_block_color`, `vof_filled_color`, `enable_vof_blocks_from_colors(colors=)` | **removed 1.0.0** |
+| `set_velocity_streams(on)` (a no-op) | — | **removed 1.0.0** |
+| `set_solid(…, pressure_coarse=)` (accepted, ignored) | `set_solid(sdf, cutcell_pressure)` | **removed 1.0.0** |
 | `set_domain_bc(face, type)` | — | **canon** (the per-face API; `periodic=` is not a substitute) |
 
-### dem
+### peclet.dem
 
-| current | canonical | status |
+| former | canonical | status |
 |---|---|---|
-| `set_domain(lx, ly, lz, px, py, pz)` | `set_domain(extent=, origin=, periodic=)` | **aliased** — the keyword form is a third overload bound AFTER the two positional ones, so every existing call resolves exactly where it did |
+| `initialize(shape_type, radius=0.5, height=2.0, …)` | `initialize_shape(shape_type, radius, height=0, thickness=0)` — `radius` mandatory | **removed 1.0.0** |
+| `set_domain(lx, ly, lz, px, py, pz)` | `set_domain(extent=, origin=, periodic=)` | **removed 1.0.0** |
 | `set_domain(min, max)` | — | **canon** (a corner overload, correctly named) |
-| `get_domain_min()` / `get_domain_max()` | `origin` / `origin + extent` | **aliased** (`origin`, `extent`, `periodic` properties added) |
-| `enable_periodicity(x, y, z)` | `set_periodic(x, y, z)` + `periodic` | **aliased** |
-| `num_particles`, `num_shapes`, `num_contacts`, … | — | **canon** |
-| `get_positions()`, `get_velocities()`, … | — | **canon** (they copy) |
+| `get_domain_min()` / `get_domain_max()` | `origin` / `origin + extent` | **removed 1.0.0** |
+| `enable_periodicity(x, y, z)`; `export_lammps(pbc_enabled=)` | `set_periodic(x, y, z)` + `periodic`; `export_lammps(periodic=)` | **removed 1.0.0** |
+| `get_num_contacts()` / `get_num_manifolds()` / `get_max_overlap()` | `num_contacts()` / `num_manifolds()` / `max_overlap()` (methods, like `num_particles()`) | **removed 1.0.0** |
+| `add_plane(px, py, pz, nx, ny, nz)` | `add_plane(point, normal)` | **removed 1.0.0** |
+| `num_particles`, `num_shapes`, … ; `get_positions()`, `get_velocities()`, … | — | **canon** |
 
 ### peclet.voro
 
-| current | canonical | status |
+| former | canonical | status |
 |---|---|---|
-| `set_box(L)` (`Tessellation`, `Simulation`) | `set_domain(extent=, origin=, periodic=)` | **aliased** — `origin` and `periodic` are CHECKED, not ignored: this engine's box is origin-anchored and periodic on every axis, and a caller writing the suite-wide form gets an error naming that |
-| `Simulation.step(num_steps, dt)` | `set_dt(dt)` + `step(num_steps)` | **aliased** (also on `FlowSolver`); `dt` is now optional and defaults to the stored value, overriding for that call only |
-| `sphere_centres` (kwarg of `sdf_voronoi_cells` etc.) | `sphere_centers` | **deferred to a major** — see §0.1 |
-| `Tessellation.volumes()`, `faces()`, `neighbor_counts()` | — | **canon** (the model for §1.2) |
-| `Simulation.get_positions()`, `get_volumes()`, … | — | **canon** (they copy) |
+| `set_box(L)` (`Tessellation`, `Simulation`) | `set_domain(extent=, origin=, periodic=)` — origin and periodic are CHECKED (origin-anchored, all-periodic engine) | **removed 1.0.0** |
+| `Simulation.step(n, dt)`, `FlowSolver.step(n, dt)` | `set_dt(dt)` + `step(n)`; `step` raises if no dt was set | **removed 1.0.0** |
+| `sphere_centres=`; `centres=` (`redistribute_pore_mesh`, `sphere_union_scene`) | `sphere_centers=`; `centers=` | **removed 1.0.0** |
+| `Tessellation.volumes()` / `neighbor_counts()` / `wall_counts()`; `Simulation.get_num_neighbors()`; `FlowSolver.get_cell_volume()` / `get_velocity()` | `get_volumes()` / `get_neighbor_counts()` / `get_wall_counts()`; `get_neighbor_counts()`; `get_volumes()` / `get_velocities()` — array copies carry `get_` (§1.2) | **removed 1.0.0** |
+| `Simulation.get_kinetic_energy()` / `get_internal_energy()` / `get_time()`; `FlowSolver.num_cells()` / `num_faces()` / `num_wall_faces()` / `layout()` / `pressure_iterations()` | `kinetic_energy()` / `internal_energy()` / `time`; the five as read-only properties | **removed 1.0.0** |
 | `num_cells`, `num_faces`, `num_particles`, `num_wall_faces` | — | **canon** |
 
 ### peclet.pnm
 
-| current | canonical | status |
+| former | canonical | status |
 |---|---|---|
 | `origin_zyx`, `spacing_zyx`, `global_shape_zyx`, `grad_p_zyx` | — | **canon, as the documented exception of §1.7** |
-| `shape` (kwarg of `segment_volume`) | `cells` | **deferred to a major** — see §0.1 |
+| `extract_topology_gpu(segmentation, shape)` | `extract_topology(segmentation, shape_zyx)` | **removed 1.0.0** |
 
 pnm is the one module whose Python arrays are C-contiguous `(nz, ny, nx)` rather than
 Fortran-order `(nx, ny, nz)` — `SDFReader.read_vti` returns exactly that, because that is the
 layout a VTI hands over — and its origin/spacing triples are stated in the SAME order as the array
-they describe. The `_zyx` suffix is therefore load-bearing: it is what tells a reader that
-`spacing[0]` is dz and not dx, and dropping it for a bare `spacing` would put an unmarked
-order-reversal in front of every caller. **Keep the suffix wherever the triple is in array order**,
-and never add a bare `origin`/`spacing` beside it in the other order — one module having two
-silently transposed spellings of the same quantity is worse than one module spelling it long.
-(An earlier draft of this file listed these as an open correctness item. That was wrong: they are
-consistent with the array they accompany, which is what CONVENTIONS §6 asks for.)
+they describe. The `_zyx` suffix is therefore load-bearing. **Keep the suffix wherever the triple is
+in array order**, and never add a bare `origin`/`spacing` beside it in the other order.
 
 ### peclet.core (`peclet.core.amr`, `peclet.core.mpi`)
 
-| current | canonical | status |
+| former | canonical | status |
 |---|---|---|
-| `Octree(cells, extent=, origin=, periodic=)` | — | **canon** (Phase 3) |
-| `spacing`, `spacings_from_extent` | — | **canon** (per axis) |
-| `spacing_from_extent` (scalar) | — | **canon as a helper**; it keeps a cubic contract and says so |
-| `root_cells` (kwarg of `spacings_from_extent`) | — | **canon** — an octree's ROOT cell count is a different quantity from `Octree(cells=...)`'s leaf grid, and the longer name is what says so |
-| `num_leaves`, `num_levels` | — | **canon** |
-| `centers` | — | **canon** |
+| `Octree(brick, lmax, origin=, h0=, extent=)`; `DistributedOctree(global_root_size=, …)` | `Octree(cells, *, lmax=0, origin=, spacing=None, extent=None)` — `cells` is the FINEST grid (= brick·2^lmax, must divide); keyword-only after `cells` | **removed 1.0.0** |
+| `.h0` | `.spacing` | **removed 1.0.0** |
+| `spacing_from_extent` (scalar) / `spacings_from_extent(root_cells=)` | — | **canon** (a cubic helper that says so; `root_cells` is a different quantity from `cells`) |
+| `mpi.Migrator`, `mpi.Halo`; ctor `(origin, size, gsize, periodic)` | `ParticleMigrator`, `ParticleHalo`; `(origin, extent, cells, periodic)` | **removed 1.0.0** |
+| `ParticleHalo.num_ghost()` / `num_owned()` | read-only properties | **removed 1.0.0** |
+| `num_leaves`, `num_levels`, `centers` | — | **canon** |
 
 ### peclet.coupling
 
-| current | canonical | status |
+| former | canonical | status |
 |---|---|---|
-| `CfdDem(..., smooth_width=)` (cells) | `smooth_length=` (a physical length) | **aliased** (both ship; `smooth_length` is canonical) |
+| `CfdDem(smooth_width=)` (cells); `CfdDem(h=)` | `smooth_length=` (a physical length); the spacing comes from the flow solver | **removed 1.0.0** |
+| `ResolvedCfdDem(rho_f=, periodic=<bool>, move=)` | `rho=`, `periodic=(bx, by, bz)`, `move_particles=` — the same words as `CfdDem` | **removed 1.0.0** |
+| `drag="bvk"`, `"bvk2"` | `"beetstra"`, `"tang"` (the literature names) | **removed 1.0.0** |
 | `CfdDem(..., periodic=)` | — | **canon** |
-| `h=` | — | derived from the flow solver by default; an explicit `h` is a test hook |
 
 ## 3. What this file does NOT rename
 
@@ -208,7 +212,10 @@ consistent with the array they accompany, which is what CONVENTIONS §6 asks for
 
 - 2026-09-07 — file created. Canon fixed; `smooth_length` (coupling) is the first entry landed under
   it, together with flow's already-shipped `spacing`/`cells`/`extent`/`origin` quartet.
-- 2026-09-08 — first alias pass. voro `set_domain`/`extent`/`set_dt`/`dt` (`Tessellation`,
+- 2026-09-08 (later) — **1.0.0 clean break** (QUALITY_PLAN D1): every *aliased* row above became
+  *removed 1.0.0* in flow `b891b8e`, dem `4aff4db`, voro `9e7b1b0`, pnm `b2d4fce`, core `8d9f3c2`
+  and the coupling/sweep commits of the same day; the alias ladder is binding from 1.0.0 on.
+- 2026-09-08 — first alias pass (superseded the same day by the clean break). voro `set_domain`/`extent`/`set_dt`/`dt` (`Tessellation`,
   `Simulation`, `FlowSolver`); dem `set_domain(extent=, origin=, periodic=)`, `set_periodic`,
   `origin`/`extent`/`periodic`; flow `num_scene_instances`, `vof_block_color`, and the
   canonical-partner note on `get_spacing`/`cell_centres`. Every old spelling still works and every
