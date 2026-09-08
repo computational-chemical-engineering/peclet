@@ -160,6 +160,11 @@ pnm/dem/voro/coupling `PecletDeps.cmake` are byte-identical and flow's differs o
 
 ### D. CI that is honest (M, not breaking)
 
+**pnm DONE 2026-09-08** (`ec646c8`…`72cf6f4`): 0 → 9 registered ctests (single-rank contract with
+hand-derived counts, determinism, Python smoke, the 7199-pore gate that SKIPS without the data file,
+MPI np=1,2,4), CI runs them all (39 s + 74 s with the Kokkos cache), blocking clang-format after one
+reformat commit. flow/dem/voro/core in progress.
+
 1. core: 50 of 80 test binaries `return 0` with "skipping" when morton is absent, and CI never
    provides morton → every AMR/octree test is green-by-no-op. Add morton (tag) + a Kokkos-OpenMP
    job; convert the skips to `SKIP_RETURN_CODE`; add an `ENABLE_MPI=OFF` job; wire
@@ -224,10 +229,12 @@ stops returning energy through `maxVolErr`.
    + `amr_bindings.cpp` `Flow`/`Poisson` + ~30 tests move; `greedyColoring` (voro's only reason to
    include `amr/momentum.hpp`) → `solver/coloring.hpp`; `barnes_hut.hpp` out of `amr/`. `AmrFlow`'s
    23 setters → a config struct; `fprintf(stderr)` ×13 → a logger hook.
-3. **pnm:** `pore_extraction_mpi.hpp` (1836 lines) re-inlines every kernel of
-   `pore_extraction.hpp` (1029) — 28 vs 45 `parallel_for`s, zero shared kernel calls. Factor one
-   templated kernel set; the MPI file keeps only halo/merge orchestration. The bit-exact np=1
-   ctests are the safety net.
+3. **pnm — DONE 2026-09-08** (pnm `5ad3898`, `0e0c2cd`): `src/pore_kernels.hpp` holds every stage kernel
+   once, templated on a geometry policy (`GridGeo` single-rank, `BlockGeo` MPI); the two pipeline
+   files keep orchestration only (2873 → 2458 lines, `parallel_for` 66 → 37, no stage body twice).
+   Gates: 9/9 ctests host and CUDA, packing_ring 7199/53020 unchanged, and a 54-file byte comparison
+   of pores/segmentation/connections/network-flow (single-rank staged+fused, np=2 per rank, open and
+   cut-cell) against the pre-refactor build: 0 differ.
 4. **dem:** `sim.hpp` (1876) → step drivers / `Simulation` facade / shape registry; the world-radius
    fill written inline 3× beside `fillWorldRadiiKokkos`; the gid-keyed ledger carry written twice
    (`solve_driver_force.hpp:72-90`, `contact_preprocessing.hpp:119-170`).
