@@ -194,7 +194,24 @@ singletons (ParaView's `mpiexec` cached — the CLAUDE.md trap; now pinned by
 `cmake/PecletCorePinMpiexec.cmake` and the scripts fail when `comm.size != PECLET_CORE_TEST_NP`); a
 rank exiting 77 before `MPI_Init` aborts prterun (Open MPI 5) → `tests/test_skip_mpi.hpp` inits
 first; the old CI matrix had no gcc job (`include:` overwrote the axis). `PECLET_CORE_BUILD_TESTS`
-stays default ON (the wheel builds from `python/`, not the root). flow/voro in progress.
+stays default ON (the wheel builds from `python/`, not the root).
+
+**voro DONE 2026-09-08** (`1cbf005`, `a487777`): one tree (`-DPECLET_VORO_BUILD_TESTS=ON`, default OFF)
+registers 24 + 18 MPI = 42 (`tests/kokkos_mpi` folded in, standalone form kept); the 10 `bench_*`
+binaries + the Voro++ fetch opt-in under `PECLET_VORO_BUILD_BENCHMARKS` (Voro++ pinned to commit
+`b0dac575` — its only tag, v0.4.6 of 2013, predates its CMake); warnings 622 → 145 (all 51 in
+`include/` fixed; the 120 left are morton's `__int128` `-Wpedantic`, 25 in `tests/`); CI runs all
+single-rank tests (`-LE bench`, 2 threads) + a new `mpi` job np=1,2,4 (3 m 55 s) + a configure
+against the pinned sibling tags (`PECLET_VENDOR_SIBLINGS=ON`) + `quality.yml` with blocking
+clang-format after one 20-file reformat. **Silent-green trap closed:** `find_package(MPI)` took
+ParaView's MPICH `mpiexec` while linking OpenMPI, so every np=N test ran N singletons and "agreed"
+with single-rank trivially (same trap as core's Python tree); the launcher now comes from beside
+`MPI_CXX_COMPILER` and the binaries fail when the communicator size ≠ `PECLET_VORO_EXPECT_NP`.
+**Honestly red:** `test_sdf_curved` (never in the old 7-test regex) fails in CI — cavity N=12000
+sagitta 2.311e-4 vs the 2e-4 gate — and the concave-SDF cavity build is thread-count dependent with
+a wall-facet count that varies run to run at fixed threads (20845 vs 19983). That is the
+"nondeterministic miss" of the Voronoi-methods plan: an engine defect in the concave `sdfCutPlane`
+re-clip path, left red and un-disabled; **1.0.0 blocker, under G.7.** flow in progress.
 
 1. core: 50 of 80 test binaries `return 0` with "skipping" when morton is absent, and CI never
    provides morton → every AMR/octree test is green-by-no-op. Add morton (tag) + a Kokkos-OpenMP
@@ -358,4 +375,6 @@ lands; F and G.2 follow in the same repo.*
 - **2026-09-08, package D** — pnm `ec646c8`…`72cf6f4` (0→9 ctests, CI 39 s + 74 s) and G.3
   `5ad3898`/`0e0c2cd` (one kernel set, 2873→2458 lines, 54-file output byte-identical, 9/9 host +
   CUDA); dem `5bb9bfd`…`8124d57` (47 ctests in one tree, scripts sorted, CI 2 m 47 s + 3 m 17 s).
-  Details under §3.D / §3.G.3. core `69d6b0f`…`6bd091d` (109/164/7 ctests, six CI jobs, longest 17 min).
+  Details under §3.D / §3.G.3. core `69d6b0f`…`6bd091d` (109/164/7 ctests, six CI jobs, longest 17 min); voro `1cbf005`/`a487777`
+  (42 ctests one tree, MPI launcher trap closed, 622 → 145 warnings; `test_sdf_curved` honestly RED =
+  1.0.0 blocker under G.7).
