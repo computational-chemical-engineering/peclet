@@ -163,7 +163,24 @@ pnm/dem/voro/coupling `PecletDeps.cmake` are byte-identical and flow's differs o
 **pnm DONE 2026-09-08** (`ec646c8`…`72cf6f4`): 0 → 9 registered ctests (single-rank contract with
 hand-derived counts, determinism, Python smoke, the 7199-pore gate that SKIPS without the data file,
 MPI np=1,2,4), CI runs them all (39 s + 74 s with the Kokkos cache), blocking clang-format after one
-reformat commit. flow/dem/voro/core in progress.
+reformat commit.
+
+**dem DONE 2026-09-08** (`5bb9bfd`, `edf07dc`, `8124d57`): three standalone test trees (8 + 2 + 24)
+and unregistered Python scripts → one tree: `-DPECLET_DEM_BUILD_TESTS=ON` registers 11 (kokkos +
+arborx + pytest), `+ -DPECLET_DEM_MPI=ON` 47 (+24 kokkos_mpi, +12 Python MPI at np=1,2,4); every test
+`SKIP_RETURN_CODE 77`, MPI ones labelled `mpi` with `PROCESSORS`. The 34 root-level scripts sorted:
+13 → `tests/python/test_*.py`, 4 → `tests/python/mpi/`, 17 → `examples/` (all smoke-run); the statics
+battery cut 96k→1.7k grains, the drum ω 2→0.5 (ω=2 was centrifuging). CI: `single-rank` 2 m 47 s
+(also configures against the default `PECLET_CORE_TAG` as the stale-pin check) + `mpi` 3 m 17 s
+(np=1,2,4 oversubscribed) + Quality 9 s; clang-format blocking after one reformat (375 violations,
+20 files); `.clang-tidy` = voro's; artifact actions v7/v8. Findings: `tests/arborx` had bit-rotted
+(fixed); the MPI scripts were dead against the current API (ported); three legacy scripts "passed"
+while printing FAILURE (velocity solve is off by default, no default gravity, the `(N,4)` w column is
+the inverse mass — recorded in dem's CLAUDE.md); `docs/mpi.md`'s "np=2/4 differ by float noise" is
+false on the stiff random IC (per-particle max 0.11, even np=1 at 2 threads gives 0.08 — asserted as
+measured). **Open numerics finding (not D):** single-rank periodic wrap contacts whose far partner
+sits more than one radius beyond the face are resolved one-sidedly (`sim.hpp` `ghostBand = maxRad`);
+the MPI step is symmetric. Fix under G.4. flow/voro/core in progress.
 
 1. core: 50 of 80 test binaries `return 0` with "skipping" when morton is absent, and CI never
    provides morton → every AMR/octree test is green-by-no-op. Add morton (tag) + a Kokkos-OpenMP
@@ -317,3 +334,7 @@ stops returning energy through `maxVolErr`.
   "preconditioner produced non-finite z" on it (flow-side, check under D/G.6); voro's GitHub repo has
   a PR-required branch rule that direct pushes bypass; the `pre-legacy-removal` tag keeps morton's
   history reachable.
+- **2026-09-08, package D** — pnm `ec646c8`…`72cf6f4` (0→9 ctests, CI 39 s + 74 s) and G.3
+  `5ad3898`/`0e0c2cd` (one kernel set, 2873→2458 lines, 54-file output byte-identical, 9/9 host +
+  CUDA); dem `5bb9bfd`…`8124d57` (47 ctests in one tree, scripts sorted, CI 2 m 47 s + 3 m 17 s).
+  Details under §3.D / §3.G.3.
