@@ -427,3 +427,14 @@ lands; F and G.2 follow in the same repo.*
   (42 ctests one tree, MPI launcher trap closed, 622 → 145 warnings; `test_sdf_curved` honestly RED,
   then root-caused the same day: order-dependent silent overflow caps, `9ce81c8`/`ce698c1`); morton
   `5f35316` (headers `-Wpedantic`-clean, voro's 120 remaining warnings gone).
+- **2026-09-08, packages E/F/H and the voro engine fix** — E: dem `c7a89ec`/`54ca44c` (bit-exact),
+  core's folded into G.2. F: dem `2213849` (public + `sim.diagnostics`), callers followed in coupling
+  `f98e6d6` and the gallery (local `6a749f8`, not pushed — the site is re-rendered only on 1.0.0
+  wheels). H: pnm `329eae2`, core `c52989f`, voro `23c088f`. voro `9ce81c8`/`ce698c1` closed the
+  `test_sdf_curved` blocker; morton `5f35316` made its headers `-Wpedantic`-clean for consumers.
+  **Package D is now done in all six repos with tests.**
+  **Interrupted, resume here:** voro's package F was cut off mid-flight and left UNCOMMITTED edits in
+  the voro working tree (`src/voro_bindings.cpp`, `include/peclet/voro/mesh_optimizer.hpp`,
+  `packaging/voro_init.py`, `tests/kokkos/test_mesh_optimizer.cpp`) — inspect with `git -C voro diff`
+  before starting anything there; dem's G.4 (sim.hpp split + the periodic-wrap one-sidedness) never
+  started.
