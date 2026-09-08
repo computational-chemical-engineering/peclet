@@ -58,11 +58,15 @@ nav:
   - Design:
       - Architecture: ARCHITECTURE.md
       - Conventions: CONVENTIONS.md
+      - Naming canon: NAMING.md
       - Interfaces: INTERFACES.md
       - Style: STYLE.md
       - Portability: PORTABILITY.md
       - Roadmap: ROADMAP.md
       - Quality plan (1.0.0): QUALITY_PLAN.md
+      - Decomposition and multigrid: DECOMPOSITION_AND_MULTIGRID.md
+      - Scaling issues: SCALING_ISSUES.md
+      - Physical units (phases 3-4 open): PHYSICAL_UNITS_PLAN.md
   - Releasing:
       - Release workflow: RELEASE.md
       - Release preparation (current): RELEASE_PREP.md
