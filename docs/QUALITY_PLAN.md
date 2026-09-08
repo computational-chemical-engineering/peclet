@@ -125,7 +125,7 @@ maintainer's own files, listed not moved) and the worktree prune; the dem script
 | morton | `legacy/` (no target, not included; needs C++20 in a C++17 library), `third_party/libmorton_morton.h` (byte-identical duplicate) | history lives in git |
 | core | `python/build_td_*.log`; decide `docs/data/*.log` (31 campaign logs, cited by the AMR notes → move with them to `docs/archive/data/`) | |
 | coupling | `build_td_*.log` ×4; add `*.log` to `.gitignore` | |
-| umbrella | `full.log`; `.gitignore` the `flow-*`/`tel/` worktrees and `*.log`; **move out** `69503dc29254db50bfdf4f41/` (a paper's LaTeX repo), `sphere-cfd-validation/` (525 MB → peclet-examples), `proposal/` (88 MB), `.sdf-campaign-probes/` (→ `flow/tests/study/`); prune the 13 merged flow worktrees (~12 GB) once their sessions close | |
+| umbrella | `full.log`; `.gitignore` the `flow-*`/`tel/` worktrees and `*.log`; **move out** `69503dc29254db50bfdf4f41/` (a paper's LaTeX repo), `.sdf-campaign-probes/` (→ `flow/tests/study/`); prune the 13 merged flow worktrees (~12 GB) once their sessions close. **DONE 2026-09-08:** `sphere-cfd-validation/` (its own git repo) and `proposal/` moved to `~/Codes/`; voro's PR-required branch protection removed so all eight repos have the same (none); `morton/octree/` removed, its 151-line std::map octree kept as core's test-local oracle (`core/tests/oracle/`) | |
 
 Also in B: dem's remaining root scripts are *sorted*, not deleted — assert-bearing ones
 (`test_hertz.py`, `test_hertz_shapes.py`, `test_pair_materials.py`, `test_cone_friction.py`,
