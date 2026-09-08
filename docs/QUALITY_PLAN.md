@@ -407,9 +407,13 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
    no `cout`/`cerr`/`fprintf` left in `src/`, every failure path throws (the MPI ones after a collective
    `MPI_Allreduce` of the condition so no rank hangs); `docs/Doxyfile` was the last self-as-flow line.
    Left for G: global-namespace `SDFData` in `sdf_reader.h`.
-7. morton: README H1 `morton-arithmetic`, `pyproject` comment (`mortonarith`), "python 3.8+" badge
-   vs `>=3.9`, `docs/ROADMAP.md` "v0.3"; ship `bindings/morton_c.h` so the 26 C exports are a
-   documented ABI; decide `octree/` (split out or delete — "being split out" since July).
+7. morton — **DONE 2026-09-08** (verified against the tree, not just the plan): the README H1 is
+   `peclet-morton`, no `mortonarith` or "python 3.8+" claim survives (`requires-python = ">=3.9"`),
+   `docs/ROADMAP.md` carries no "v0.3", `bindings/morton_c.h` is installed beside the headers so the
+   C ABI is documented, and `octree/` is gone (item 5; the std::map octree lives on as core's test
+   oracle). Package C and item 5 had already done the work the plan still listed as open.
+
+**Package H is complete in all eight repositories.**
 
 ## 4. Order and gates
 
