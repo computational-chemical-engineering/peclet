@@ -4,8 +4,8 @@
 > `flow`, `dem` and `voro`, good enough to carry (a) high-accuracy IBM geometry in the CFD, (b)
 > non-spherical DEM particles as analytic shapes, (c) static and moving objects (stirrers, drums,
 > impellers), and (d) resolved CFD-DEM where a particle *is* an analytic SDF — on multithreaded CPU,
-> GPU, and under MPI. Companion to [ARCHITECTURE](ARCHITECTURE.md), [CONVENTIONS](CONVENTIONS.md),
-> [INTERFACES](INTERFACES.md), [MULTIPHYSICS_PLAN](MULTIPHYSICS_PLAN.md).
+> GPU, and under MPI. Companion to [ARCHITECTURE](../ARCHITECTURE.md), [CONVENTIONS](../CONVENTIONS.md),
+> [INTERFACES](../INTERFACES.md), [MULTIPHYSICS_PLAN](MULTIPHYSICS_PLAN.md).
 >
 > **Design decisions 1 and 4 RESOLVED 2026-08-26** (§8): two-layer dispatch (compile-time leaves +
 > runtime node/scene), and core-defined types with per-code ownership via a non-owning `SceneView`.

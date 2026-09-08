@@ -77,5 +77,20 @@ nav:
       - peclet-pnm: https://computational-chemical-engineering.github.io/peclet-pnm/
       - peclet-dem: https://computational-chemical-engineering.github.io/peclet-dem/
       - peclet-voro: https://computational-chemical-engineering.github.io/peclet-voro/
+  - Archive (historical design notes):
+      - About the archive: archive/README.md
+      - AMR octree (design & status): archive/AMR.md
+      - AMR geometry setup requirements: archive/AMR_GEOMETRY_SETUP_REQUIREMENTS.md
+      - Analytic SDF geometry: archive/ANALYTIC_SDF_GEOMETRY.md
+      - Communication scaling: archive/COMMUNICATION_SCALING.md
+      - Defect correction (plan): archive/DEFECT_CORRECTION_PLAN.md
+      - Defect correction (session prompt): archive/DEFECT_CORRECTION_PROMPT.md
+      - Device residency: archive/DEVICE_RESIDENCY_PLAN.md
+      - Multigrid telescoping: archive/MG_TELESCOPING_PLAN.md
+      - Multiphysics framework: archive/MULTIPHYSICS_PLAN.md
+      - VoF plan: archive/VOF_PLAN.md
+      - VoF handoff note: archive/VOF_NEXT_SESSION.md
+      - Voronoi methods plan: archive/VORONOI_METHODS_PLAN.md
+      - peclet-cuda wheel prototype: archive/peclet_cuda_wheel_prototype.md
   - Privacy: privacy.md
 

@@ -248,12 +248,16 @@ stops returning energy through `maxVolErr`.
    operator storage); :92's self-contradicting array-shape sentence fixed; :79's `tpx/` path.
    STYLE.md §Naming (`tpx`, `pbs::`, `cfd::`, "global namespace") and §CI (clang-tidy "in CI")
    rewritten to reality. INTERFACES.md per D7. ROADMAP :77-84 names four files that do not exist.
-   ARCHITECTURE :26/:63 `block_decomposer`. `docs/archive/` for the 13 plan notes
-   (AMR, AMR_GEOMETRY_SETUP_REQUIREMENTS, ANALYTIC_SDF_GEOMETRY, COMMUNICATION_SCALING,
-   DEFECT_CORRECTION_PLAN+PROMPT, DEVICE_RESIDENCY_PLAN, MG_TELESCOPING_PLAN, MULTIPHYSICS_PLAN,
-   VOF_PLAN, VOF_NEXT_SESSION, VORONOI_METHODS_PLAN, peclet_cuda_wheel_prototype) with
-   `mkdocs.yml` nav/`not_in_nav` updated (it references a `DOC_CI_WORK_NOTES.md` that does not exist).
-   RELEASE_PREP is re-cut for 1.0.0.
+   ARCHITECTURE :26/:63 `block_decomposer`. **DONE 2026-09-08:** the 13 plan notes are in
+   `docs/archive/` (AMR, AMR_GEOMETRY_SETUP_REQUIREMENTS, ANALYTIC_SDF_GEOMETRY,
+   COMMUNICATION_SCALING, DEFECT_CORRECTION_PLAN+PROMPT, DEVICE_RESIDENCY_PLAN,
+   MG_TELESCOPING_PLAN, MULTIPHYSICS_PLAN, VOF_PLAN, VOF_NEXT_SESSION, VORONOI_METHODS_PLAN,
+   peclet_cuda_wheel_prototype) behind an `archive/README.md` index and a collapsed `mkdocs.yml`
+   "Archive" nav section (`mkdocs build --strict` clean; the audit's `DOC_CI_WORK_NOTES.md` claim
+   was wrong — `mkdocs.yml` never referenced it), PHYSICAL_UNITS_PLAN stays (Phases 3–4 open),
+   ARCHITECTURE :63 and the ROADMAP status line are fixed. Still open here: CONVENTIONS §4/:92/:79,
+   STYLE §Naming + §CI, INTERFACES per D7, ROADMAP :77-84's four non-existent files, and
+   RELEASE_PREP re-cut for 1.0.0.
 2. flow: `CLAUDE.md` (174 KB, 2062 lines) → a < 20 KB reference; campaign history to
    `doc/history/`; `doc/` (31 files, five `vof_workorders*.md` = 853 KB) split reference/history;
    README `-DCFD_BUILD_MPI` → `PECLET_FLOW_MPI`, `SolverColocated` default "ghost"; `pyproject`

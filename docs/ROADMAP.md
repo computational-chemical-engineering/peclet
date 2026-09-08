@@ -1,6 +1,11 @@
 # Suite Roadmap
 
-> Status: living tracker. Long-term plan to give the suite a shared MPI block decomposition with
+> Status: **historical plan record.** Phases 1–7 (decomposition, async halo engine, GPU support,
+> Python bindings, dynamic load balancing) are **done**; what remains here is at-scale multi-GPU
+> tuning. The *active* work list for the next release is
+> [QUALITY_PLAN.md](QUALITY_PLAN.md) — start there, not here.
+>
+> Long-term plan to give the suite a shared MPI block decomposition with
 > efficient asynchronous ghost-layer exchange, common SDF/IBM, GPU support, and Python bindings — while
 > keeping each method its own code. See [ARCHITECTURE](ARCHITECTURE.md) for the layering.
 >
@@ -13,7 +18,7 @@
 - **C++20 host & Kokkos device; `morton` pins C++17** (see [STYLE](STYLE.md)).
 - **Keep computation on the device; minimize host↔device movement** — the cross-cutting plan for
   migrating remaining host-only compute to Kokkos and removing avoidable data movement is in
-  [DEVICE_RESIDENCY_PLAN](DEVICE_RESIDENCY_PLAN.md).
+  [DEVICE_RESIDENCY_PLAN](archive/DEVICE_RESIDENCY_PLAN.md).
 - One `HaloExchange` interface, two engines (NBX for dynamic, persistent-neighbor for static),
   GPU-aware. CPU-correct first, then GPU.
 - First solver wired in: **flow** (most grid-native). `morton` is a core dependency.
@@ -124,7 +129,7 @@ flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The
       correctly — `VoronoiHalo` / the distributed moving tessellation on the core particle halo
       (`PECLET_VORO_MPI`), validated against the single-rank tessellation; device-packed ghost exchange.
 - [x] `FlowSolver`: covolume / collocated Navier–Stokes on the Voronoi mesh (2026-09; see
-      [VORONOI_METHODS_PLAN](VORONOI_METHODS_PLAN.md) for the open method items).
+      [VORONOI_METHODS_PLAN](archive/VORONOI_METHODS_PLAN.md) for the open method items).
 
 ## Phase 6 — Consolidation
 
@@ -135,14 +140,14 @@ flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The
       `ci.yml` / `docs.yml` / `release.yml`, GHCR containers — see [RELEASE](RELEASE.md).
 - [x] **CFD-DEM coupling** as its own package (`peclet-coupling`): unresolved volume-averaged
       (`CfdDem`) and resolved cut-cell (`ResolvedCfdDem`) drivers over `flow` + `dem`, distributed
-      when both are (see [MULTIPHYSICS_PLAN](MULTIPHYSICS_PLAN.md)).
+      when both are (see [MULTIPHYSICS_PLAN](archive/MULTIPHYSICS_PLAN.md)).
 - [ ] Reconcile remaining divergences (namespaces, C++ standard, dep management).
 
 ## Phase 7 — Dynamic load balancing (cross-cutting infra) — DONE
 
 Both consumers create *non-uniform* work that the equal-cell-count ORB does not balance:
 **AMR** dynamically refines (a feature refined into one block leaves that rank heavier — see
-`docs/AMR.md`, `distributedAdapt`), and **dem** packs particles densely (particle counts per block
+`docs/archive/AMR.md`, `distributedAdapt`), and **dem** packs particles densely (particle counts per block
 drift far apart). The fix is the same primitive for both, so it lives in `core`.
 
 - [x] **Weighted ORB** — `peclet::core::decomp::BlockDecomposer::init(numBlocks, globalSize, weights)`. The split
@@ -175,7 +180,7 @@ The "remaining work is at-scale tuning" phase now has measured campaigns behind 
       [DECOMPOSITION_AND_MULTIGRID](DECOMPOSITION_AND_MULTIGRID.md) §2.7).
 - [x] **Porous-bed weak-scaling + permeability study** — cut-cell iterations flat to 537 M cells;
       refine ladder: cut-cell/ghost k∞ agree to 0.1 %; study page live in peclet-examples.
-- [x] **Communication scaling** ([COMMUNICATION_SCALING](COMMUNICATION_SCALING.md)): the porous
+- [x] **Communication scaling** ([COMMUNICATION_SCALING](archive/COMMUNICATION_SCALING.md)): the porous
       35 % weak-efficiency toll diagnosed as latency-bound halo events; halo–compute overlap in
       every distributed RB-GS sweep + communication-avoiding smoothing (2-deep ghosts, one
       exchange per RB pair, `PECLET_FLOW_CA`) shipped bit-exact — np=32 cut-cell 1323→759 ms/step,

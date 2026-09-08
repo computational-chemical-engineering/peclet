@@ -72,7 +72,7 @@ db7b1ba`; `set_pressure_telescope(True)` / `PECLET_FLOW_TELESCOPE=1`, off by def
 byte-identical off). The predictor shows 384³/1536 going from a 24×48×24 coarsest grid on 1536
 ranks to 3³ on one (5 → 8 levels); the ctest gate shows a starved partition reproducing the
 single-rank hierarchy to 2.5e-14. Full treatment: **`DECOMPOSITION_AND_MULTIGRID.md` §2.8 and
-open problem 1**; design, implementation and status: **[`MG_TELESCOPING_PLAN.md`](MG_TELESCOPING_PLAN.md)**.
+open problem 1**; design, implementation and status: **[`MG_TELESCOPING_PLAN.md`](archive/MG_TELESCOPING_PLAN.md)**.
 
 **Measured at scale (2026-09-02, fp64 build, wall-confined bed with FoxBerry's inlet/outlet).**
 Pressure iterations per step, telescoped: **43.1 / 42.9 / 41.7 / 39.8 / 39.8 / 39.8 / 39.8** at

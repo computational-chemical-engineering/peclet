@@ -2,7 +2,7 @@
 
 *Evidence from the porous-scaling campaign (Snellius gpu_h100, 2026-08; peclet-examples
 `benchmarks/porous-scaling`) and the plan to close the gap. Companion to
-[DECOMPOSITION_AND_MULTIGRID.md](DECOMPOSITION_AND_MULTIGRID.md), which governs *iteration
+[DECOMPOSITION_AND_MULTIGRID.md](../DECOMPOSITION_AND_MULTIGRID.md), which governs *iteration
 counts*; this note is about the **cost per iteration** under MPI.*
 
 ## 1. The observation

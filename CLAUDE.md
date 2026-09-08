@@ -55,6 +55,9 @@ The design contract lives in `docs/`:
   Snellius/LUMI site packages, Zenodo, gallery re-check) with the current cycle's state and decisions in
   [docs/RELEASE_PREP.md](docs/RELEASE_PREP.md); pre-flight + audits in `tools/release/`, site scripts in
   `tools/hpc/`. **Read before bumping a version or tagging anything.**
+- [docs/archive/](docs/archive/README.md) — dated design notes and campaign records (AMR, analytic SDF,
+  VoF, Voronoi methods, multiphysics, defect correction, MG telescoping, device residency, the CUDA
+  wheel prototype). Superseded by the code and the reference docs above — history, not contract.
 - [docs/SNELLIUS.md](docs/SNELLIUS.md) — running on the Snellius cluster: the 2024a toolchain, building (and the CMake/venv traps), the sbatch conventions every benchmark script shares, and pre-flight checks. **Read before queueing anything there.**
 
 ## The projects

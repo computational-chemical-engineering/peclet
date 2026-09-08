@@ -1,8 +1,8 @@
 # Device-Residency & Data-Movement Plan
 
 > Status: plan (living). Goal: keep computation on the GPU device and stop moving data across the
-> host↔device boundary. Companion to [ROADMAP](ROADMAP.md), [ARCHITECTURE](ARCHITECTURE.md),
-> [PORTABILITY](PORTABILITY.md). Derived from a suite-wide audit (2026-06-28); `file:line`
+> host↔device boundary. Companion to [ROADMAP](../ROADMAP.md), [ARCHITECTURE](../ARCHITECTURE.md),
+> [PORTABILITY](../PORTABILITY.md). Derived from a suite-wide audit (2026-06-28); `file:line`
 > references are snapshots — re-grep before acting.
 
 ## Goal & principles

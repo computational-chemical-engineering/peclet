@@ -316,7 +316,7 @@ Roughly in order of expected value.
    - Textbook treatment of processor agglomeration and idle processors on coarse grids:
      Trottenberg, Oosterlee & Schüller, *Multigrid*, ch. 6.
 
-   **Designed 2026-09-01 — see [`MG_TELESCOPING_PLAN.md`](MG_TELESCOPING_PLAN.md).** The route is
+   **Designed 2026-09-01 — see [`MG_TELESCOPING_PLAN.md`](archive/MG_TELESCOPING_PLAN.md).** The route is
    geometric telescoping on the ORB tree: `BlockDecomposer` already stores the bisection tree, every
    internal node is exactly the union of its subtree's leaf boxes, so *merging sibling blocks is a
    tree truncation* — nested by construction, no partitioner, no graph. That makes this cheaper here

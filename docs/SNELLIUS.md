@@ -173,6 +173,6 @@ rank's block is even on it, so achievable depth is set by the per-rank block, no
 - `docs/DECOMPOSITION_AND_MULTIGRID.md` — the per-axis coarsening rule, aligned vs coarse-first
   partitions, and why grid dimensions' factors of two decide solver cost. Read before choosing a
   benchmark grid.
-- `docs/COMMUNICATION_SCALING.md` — the halo/smoother communication design the scaling studies test.
+- `docs/archive/COMMUNICATION_SCALING.md` — the halo/smoother communication design the scaling studies test.
 - `peclet-examples/benchmarks/porous-scaling/README.md` — the most complete worked runbook
   (two ladders, ablations, and a forensic history of a real GPU-only corruption bug).

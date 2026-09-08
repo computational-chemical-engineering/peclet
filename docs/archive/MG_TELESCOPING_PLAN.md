@@ -1,8 +1,8 @@
 # Coarse-level telescoping for the pressure multigrid — design + implementation plan
 
 Written 2026-09-01, answering open problem 1 of
-[`DECOMPOSITION_AND_MULTIGRID.md`](DECOMPOSITION_AND_MULTIGRID.md) and issue 2 of
-[`SCALING_ISSUES.md`](SCALING_ISSUES.md): the multigrid hierarchy stops coarsening when a per-rank
+[`DECOMPOSITION_AND_MULTIGRID.md`](../DECOMPOSITION_AND_MULTIGRID.md) and issue 2 of
+[`SCALING_ISSUES.md`](../SCALING_ISSUES.md): the multigrid hierarchy stops coarsening when a per-rank
 block hits an odd extent, which costs a third of the strong-scaling efficiency at 1536 ranks and,
 on a dense bed, costs convergence outright.
 
