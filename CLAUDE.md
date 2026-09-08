@@ -145,8 +145,7 @@ Since 2026-09-08 (QUALITY_PLAN D) there is ONE tree: `tests/kokkos_mpi` is folde
 `mpiexec` on PATH used to launch N singletons that "agreed" trivially), the `bench_*` binaries and
 the Voro++ fetch are opt-in under `PECLET_VORO_BUILD_BENCHMARKS`, and clang-format is **blocking**
 (the tree was reformatted once in `a487777`). `tools/clang_format_check.sh` walks `include/`, `src/`
-and `tests/` itself — don't hand-roll globs. Known: `test_sdf_curved` is red until the concave-SDF
-re-clip path is made thread-count independent (QUALITY_PLAN §3.D voro, G.7).
+and `tests/` itself — don't hand-roll globs.
 The legacy half-edge `voronoi.hpp` CPU oracle is **gone** — retired in voro `0d4f3b8`
 ("retire the legacy half-edge engine + rewrite the docs (device-only)"); `include/` now holds only
 `peclet/voro/`. Voro++ survives solely as a benchmark throughput reference for `bench_convexcell`.

@@ -207,11 +207,17 @@ clang-format after one 20-file reformat. **Silent-green trap closed:** `find_pac
 ParaView's MPICH `mpiexec` while linking OpenMPI, so every np=N test ran N singletons and "agreed"
 with single-rank trivially (same trap as core's Python tree); the launcher now comes from beside
 `MPI_CXX_COMPILER` and the binaries fail when the communicator size ≠ `PECLET_VORO_EXPECT_NP`.
-**Honestly red:** `test_sdf_curved` (never in the old 7-test regex) fails in CI — cavity N=12000
-sagitta 2.311e-4 vs the 2e-4 gate — and the concave-SDF cavity build is thread-count dependent with
-a wall-facet count that varies run to run at fixed threads (20845 vs 19983). That is the
-"nondeterministic miss" of the Voronoi-methods plan: an engine defect in the concave `sdfCutPlane`
-re-clip path, left red and un-disabled; **1.0.0 blocker, under G.7.** flow in progress.
+**Honestly red, then fixed the same day** (`9ce81c8`, `ce698c1`): `test_sdf_curved` (never in the old
+7-test regex) failed in CI with cavity sagitta 2.311e-4 vs the 2e-4 gate, and the wall-facet count
+varied run to run at fixed threads. Root cause = two silent caps in the cold build whose victims are
+chosen by the OpenMP order of the atomic scatter slot: `ConvexCell::clip` counted every committed
+plane (including ones later made redundant) against `MAXP` and published a zero-volume cell at the
+cap (one 29-face cavity cell = the whole missing volume), and the facet over-buffer sized at the
+Poisson–Voronoi mean silently published `facetCount = 0` for the 400–600 cells that finished last.
+Fix: compact the plane set at the cap, overflow only on live planes; exact-demand reserve with one
+re-run at the measured size. Sagitta 4.3e-7 with identical facet counts at 1/2/4/8 threads (3 runs
+each), 42/42, gate unchanged. `test_sdf_dynamic`'s tol1e-4 flake is probably the same class.
+flow in progress.
 
 1. core: 50 of 80 test binaries `return 0` with "skipping" when morton is absent, and CI never
    provides morton → every AMR/octree test is green-by-no-op. Add morton (tag) + a Kokkos-OpenMP
@@ -394,5 +400,6 @@ lands; F and G.2 follow in the same repo.*
   `5ad3898`/`0e0c2cd` (one kernel set, 2873→2458 lines, 54-file output byte-identical, 9/9 host +
   CUDA); dem `5bb9bfd`…`8124d57` (47 ctests in one tree, scripts sorted, CI 2 m 47 s + 3 m 17 s).
   Details under §3.D / §3.G.3. core `69d6b0f`…`6bd091d` (109/164/7 ctests, six CI jobs, longest 17 min); voro `1cbf005`/`a487777`
-  (42 ctests one tree, MPI launcher trap closed, 622 → 145 warnings; `test_sdf_curved` honestly RED =
-  1.0.0 blocker under G.7).
+  (42 ctests one tree, MPI launcher trap closed, 622 → 145 warnings; `test_sdf_curved` honestly RED,
+  then root-caused the same day: order-dependent silent overflow caps, `9ce81c8`/`ce698c1`); morton
+  `5f35316` (headers `-Wpedantic`-clean, voro's 120 remaining warnings gone).
