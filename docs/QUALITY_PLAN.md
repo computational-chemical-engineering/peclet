@@ -265,6 +265,23 @@ constructor and `solve_driver*.hpp` (`_REST_MODEL`, `_SLEEP*`, `_VERLET_SKIN`, `
 folded into G.2 — the AMR relocation — rather than touching `amr/` twice). Each becomes a setter with a documented default, or is deleted with
 the ablation it served. Keep `*_DEBUG`, `*_VERBOSE`, `*_PROFILE*`, `*_TIMEOUT`, `GPU_AWARE_MPI`.
 
+**flow DONE 2026-09-08** (`ad917b1`): 31 reads / 25 distinct variables, not the 12 the plan named
+(it missed `MG_ASPECT`, `MG_RESFILL`, `MG_DIAGRESUM`, `AGGLOM_EXTENT`, `DECOMP_MAX_IMBALANCE`,
+`TELESCOPE_MIN_EXTENT`, `EXACT_RESIDUAL`, `VOF_WISP_EPS`, `VMG_AUTO_CELLS`/`_MIN_GLOBAL`,
+`HOST_SERIAL_CELLS`, `PRESSURE_STRICT` and the unprefixed `PECLET_PC_DEPOSIT_FALLBACK`); `src/` is
+down to five reads, all `*_DEBUG`, and a `no_env_knobs` ctest fails if another appears.
+`CutcellMG::setDecompositionLevels` and every other numerics-affecting function static are gone —
+`decomposition()` takes `levels`/`maxImbalance`, `IbmSolver` holds them per solver, `flow.mpi_block()`
+takes them as keywords; only a host launch-size cutoff stays process-wide, as a `constexpr`.
+`PECLET_FLOW_CA`'s four states became `set_comm_avoiding('both'|'off'|'momentum'|'pressure')`.
+**The finding, and the reason D3 exists:** the exact-residual flag was process-wide, so an earlier
+gate's `enableVof()` silently changed a LATER single-phase solver's pressure solve
+(`test_vof_bc.cpp` `composedGate`, `max|div|` 2e-15 → 9e-11 once the leak was closed; the gate now
+asks for it explicitly and its printed output is byte-identical to the old binary). Gate: SHA-256 of
+`u,v,w,p[,C]` identical before/after on lid cavity, cut-cell sphere, VoF bubble and outflow duct at 1
+and 4 threads; four setter-vs-env variants bit-identical to the old env runs; 154/154; CI green.
+Also fixed: CLAUDE.md documented `PECLET_FLOW_BFS_RE800`, which never existed.
+
 **dem DONE 2026-09-08** (`c7a89ec`, `54ca44c`): the reads were in four files, not two (`sim.hpp`,
 `solve_driver.hpp`, `solver_fused.hpp`, `solve_driver_force.hpp`); 11 vars → setters (six of them into
 one `set_sleeping(...)`), four deleted with their code paths (`_FUSED_GRID`, `_ML_GATES`,
@@ -446,3 +463,8 @@ lands; F and G.2 follow in the same repo.*
   `docs/python/dem.md` was regenerated from the tiered module; `tools/gen_python_api.py` now emits
   `Diagnostics` beside `Simulation`, so the developer tier is documented rather than hidden behind a
   property. The other generated pages are untouched (their modules did not change).
+- **2026-09-08, package E complete** — flow `ad917b1` (25 variables, the process-global statics, and a
+  real cross-solver leak closed), dem `54ca44c`, core's folded into G.2. Nine gallery files and one
+  Snellius batch script still name retired `PECLET_FLOW_*` variables (list in §3.E); `coupling` has
+  none. flow `486cdb3` finished H.1's citation follow-up, hand-wrapped because `flow_bindings.cpp`
+  sits on quality.yml's temporary vof-w4 exclude list and must not meet clang-format until W4 merges.

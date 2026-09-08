@@ -56,6 +56,14 @@ releases before removal, and a break costs a major. The full old→new table is 
 **Environment variables removed** (QUALITY_PLAN D3: no env var may change numerics; every knob is a
 setter with a documented default, defaults bit-exact to the old unset behaviour):
 
+- **peclet.flow**: all 25 `PECLET_FLOW_*` (and `PECLET_PC_DEPOSIT_FALLBACK`) reads that changed a
+  result are gone. The process-global `CutcellMG::setDecompositionLevels` static and its siblings
+  become per-solver state: `decomposition(levels=, max_imbalance=)`, `set_decomposition(...)`,
+  `mpi_block(..., levels=, max_imbalance=)`; `PECLET_FLOW_CA`'s four states become
+  `set_comm_avoiding('both'|'off'|'momentum'|'pressure')`; the rest became individual setters whose
+  defaults reproduce the old unset behaviour bit-exactly. This closes a cross-solver leak: the
+  exact-residual flag was process-wide, so enabling VoF on one solver silently changed a later
+  single-phase solver's pressure solve. Only `*_DEBUG` variables remain, and a test enforces it.
 - **peclet.dem**: `PECLET_DEM_REST_MODEL`→`set_restitution_model('newton'|'poisson')`;
   `PECLET_DEM_SLEEP`/`_SLEEP_SCALE`/`_SLEEP_K`/`_WAKE_SCALE`/`_SLEEP_WAKELOST`/`_SLEEP_INVMASS_FRAC`→
   `set_sleeping(enabled=True, threshold_scale=2.0, consecutive=64, wake_scale=40.0,
