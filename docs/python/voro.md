@@ -9,8 +9,8 @@ Moving-cell Voronoi tessellation, moving-cell dynamics, the unstructured-mesh ge
 
 peclet.voro — dynamic 3D Voronoi tessellation of moving particles.
 
-A device-native (Kokkos) moving-cell Voronoi engine: periodic & Lees–Edwards boxes, incremental cell
-repair, and compressible Euler / Navier–Stokes / multiphase dynamics on the moving cells. Also serves as
+A device-native (Kokkos) moving-cell Voronoi engine: periodic boxes, incremental cell repair, and
+compressible Euler / Navier–Stokes / multiphase dynamics on the moving cells. Also serves as
 an unstructured-mesh generator that can feed an Eulerian solve in :mod:`peclet.flow`. The compiled
 backend (Serial / OpenMP / CUDA / HIP) is chosen at build time — ``peclet.voro.execution_space`` reports
 which one this build has.
@@ -35,10 +35,13 @@ slower than a cold build. Periodic cubic box. Single domain (one process).
 | `build_report` | build_report(self) -> dict  Validity counts of the last build: {'buried', 'reach_exceeded', 'empty', 'overflow', 'incomplete'} — all zero for a guaranteed-exact partition. |
 | `clear_geometry` | clear_geometry(self) -> None  Drop the SDF geometry (takes effect at the next `build`). |
 | `clear_weights` | clear_weights(self) -> None  Back to the unweighted Voronoi diagram (next `build`). |
-| `energy_forces` | energy_forces(self, types: ndarray[dtype=int32, order='C'], tension: ndarray[dtype=float64, order='C'], sigma_wall: ndarray[dtype=float64, order='C'] | None = None, dEdV: ndarray[dtype=float64, order='C'] | None = None, lloyd: float = 0.0, facet_tension: float = 0.0) -> dict  Energies and their exact gradients on the RESIDENT cells (after build/step), no rebuild:   interfacial  E = Σ σ(t_i,t_j) A_ij over facets between different `types` (N,) int32,                with the symmetric `tension` table (nTypes, nTypes) float64;   wetting      E = Σ σ_wall(t_i) A_wall,i over SDF wall facets, if `sigma_wall` (nTypes,)                is given (a uniform wall tension is a constant — only the species                difference does work, which is what sets the contact angle);   volume       Σ e_i(V_i) for a caller-supplied e'(V_i) = `dEdV` (N,) (e.g.   centroidal   `lloyd` · Σ ∫_cell |y − x_i|² (Lloyd/CVT; gradient 2V(x−c) drives seeds to                their centroids — the skewness the grid solver's two-point operators need gone);   roundness    `facet_tension` · Σ A_f over all interior faces. 2(V/Vref−1)/Vref). Returns {'interface_energy', 'wall_energy', 'force' (N,3) = dE/dx, 'force_w' (N,) = dE/dw when weights are set}. Descend along −force to minimise. |
-| `neighbor_counts` | neighbor_counts(self) -> numpy.ndarray[dtype=int32]  Per-particle Voronoi neighbour count (N,) int32 — the number of faces of each cell (wall facets included). |
+| `energy_forces` | energy_forces(self, types: ndarray[dtype=int32, order='C'], tension: ndarray[dtype=float64, order='C'], sigma_wall: ndarray[dtype=float64, order='C'] | None = None, dEdV: ndarray[dtype=float64, order='C'] | None = None, lloyd: float = 0.0, facet_tension: float = 0.0) -> dict  Energies and their exact gradients on the RESIDENT cells (after build/step), no rebuild:   interfacial  E = Σ σ(t_i,t_j) A_ij over facets between different `types` (N,) int32,                with the symmetric `tension` table (nTypes, nTypes) float64;   wetting      E = Σ σ_wall(t_i) A_wall,i over SDF wall facets, if `sigma_wall` (nTypes,)                is given (a uniform wall tension is a constant — only the species                difference does work, which is what sets the contact angle);   volume       Σ e_i(V_i) for a caller-supplied e'(V_i) = `dEdV` (N,) (e.g. 2(V/Vref−1)/Vref);   centroidal   `lloyd` · Σ ∫_cell |y − x_i|² (Lloyd/CVT; gradient 2V(x−c) drives seeds to                their centroids — the skewness the grid solver's two-point operators need gone);   roundness    `facet_tension` · Σ A_f over all interior faces. Returns {'interface_energy', 'wall_energy', 'force' (N,3) = dE/dx, 'force_w' (N,) = dE/dw when weights are set}. Descend along −force to minimise. |
+| `extent` | The box size (Lx, Ly, Lz) — read-only; set it with `set_domain`. |
+| `get_neighbor_counts` | get_neighbor_counts(self) -> numpy.ndarray[dtype=int32]  Per-particle Voronoi neighbour count (N,) int32 (a copy) — the number of faces of each cell (wall facets included). |
+| `get_volumes` | get_volumes(self) -> numpy.ndarray[dtype=float64]  Per-particle Voronoi cell volume (N,) float64 (a copy). Sums to the box volume (space-filling). |
+| `get_wall_counts` | get_wall_counts(self) -> numpy.ndarray[dtype=int32]  Per-particle number of resident SDF wall planes (N,) int32 (a copy); all zero without geometry. |
 | `num_particles` | Particle count N set by the last `build`. |
-| `set_box` | set_box(self, L: collections.abc.Sequence[float]) -> None  Set the periodic box edge lengths (Lx, Ly, Lz). Call before `build`. |
+| `set_domain` | set_domain(self, extent: collections.abc.Sequence[float], origin: collections.abc.Sequence[float] = [0.0, 0.0, 0.0], periodic: collections.abc.Sequence[bool] = [True, True, True]) -> None  Set the periodic box before `build`: `extent` is the box SIZE (Lx, Ly, Lz). The suite-wide spelling (suite/docs/NAMING.md 1.1), the same call `dem.Simulation.set_domain` takes. `origin` must be (0, 0, 0) and `periodic` (True, True, True) — this engine's box is anchored at the origin and periodic on every axis; both are checked rather than ignored, so a caller who writes the suite-wide form gets an error naming the limitation. |
 | `set_gate` | set_gate(self, on: bool = True) -> None  Enable the adaptive gate (default True) that routes high-churn steps straight to a full rebuild — the 'never much slower than a cold build' guard. |
 | `set_geometry` | set_geometry(self, node_ints: ndarray[dtype=int32, order='C'], node_reals: ndarray[dtype=float64, order='C'], root: int = 0, grad_h: float = 1e-05) -> None  Clip the cells by an SDF solid given as a core shape scene in the flat node encoding (node_ints int32 (3 per node), node_reals float64 (16 per node)) — exactly what peclet.core.geom.Scene.encode() returns and dem.add_analytic_wall takes; `root` is the tree root to evaluate. Suite sign convention: sdf < 0 inside the solid. Seeds inside the solid get no cell (volume 0); cells reaching into it gain wall facets. Applies to the next `build` and is carried through every `step` (wall planes are resident; a boundary watch re-clips cells at the wall). `grad_h` is the central-difference step for the SDF gradient. Analytic vocabulary only (no sampled grids through this path yet). |
 | `set_local_certificate` | set_local_certificate(self, on: bool = True) -> None  Use the cheap O(nt) Lawson local certificate (default True) instead of the brute O(nt*np) form for detecting which cells changed. Both are complete; local is faster. |
@@ -46,8 +49,6 @@ slower than a cold build. Periodic cubic box. Single domain (one process).
 | `set_wall_mode` | set_wall_mode(self, exact: bool = True, skin_frac: float = 0.0) -> None  Wall re-gather policy for `step` (default exact=True): re-clip every wall-clipped cell that moved, so the incremental result equals a cold rebuild. exact=False keeps a cell's stale tangent planes until it moved more than skin_frac × mean spacing (cheaper, not exact by construction). |
 | `set_weights` | set_weights(self, weights: ndarray[dtype=float64, order='C']) -> None  Per-seed POWER (Laguerre) weights (N,) float64: the cells become the power diagram (radical planes) instead of the Voronoi diagram. Takes effect at the next `build`; call again before a `step` to update the weights alongside the positions. Exact in the small-weight regime (see the docs). |
 | `step` | step(self, positions: ndarray[dtype=float64, order='C']) -> dict  Incrementally repair the resident tessellation to new `positions` (N,3, same N as `build`). Returns a dict of per-step work stats: 'flagged' (cells the certificate flagged), 'pass1' and 'pass2' (cells re-gathered in each pass), 'extra' (cells gathered across verify extra-passes), 'surgical' (Pass-1 cells repaired surgically), 'verify_passes' (verify iterations run), 'rebuilt' (True if the gate routed this step to a full rebuild), 'fell_back' (True if the verify failed and a cold rebuild was forced). |
-| `volumes` | volumes(self) -> numpy.ndarray[dtype=float64]  Per-particle Voronoi cell volume (N,) float64. Sums to the box volume (space-filling). |
-| `wall_counts` | wall_counts(self) -> numpy.ndarray[dtype=int32]  Per-particle number of resident SDF wall planes (N,) int32; all zero without geometry. |
 
 ### `Simulation`
 Device-native compressible-Euler / Navier-Stokes Voronoi fluid simulation.
@@ -59,18 +60,20 @@ repaired each step on the device. Set the particle state, `init`, then `step`.
 | Method / property | Description |
 |---|---|
 | `clear_geometry` | clear_geometry(self) -> None  Drop the SDF geometry (before init()). |
+| `dt` | The stored time step (0 until `set_dt`). |
+| `extent` | The box size (Lx, Ly, Lz) — read-only; set it with `set_domain`. |
 | `get_forces` | get_forces(self) -> numpy.ndarray[dtype=float64]  Current per-particle force (N,3) float64 — the pressure (EOS) force plus the optional viscous Navier-Stokes term, as used by the last velocity-Verlet kick. Useful for force-field analysis, equilibrium/convergence checks, and coupling. |
-| `get_internal_energy` | get_internal_energy(self) -> float  Total internal (EOS) energy (scalar). |
-| `get_kinetic_energy` | get_kinetic_energy(self) -> float  Total kinetic energy (scalar). |
-| `get_num_neighbors` | get_num_neighbors(self) -> numpy.ndarray[dtype=int32]  Per-particle Voronoi neighbour (facet) count (N,) int32. |
+| `get_neighbor_counts` | get_neighbor_counts(self) -> numpy.ndarray[dtype=int32]  Per-particle Voronoi neighbour (facet) count (N,) int32 (a copy). |
 | `get_positions` | get_positions(self) -> numpy.ndarray[dtype=float64]  Current particle positions (N,3) float64. |
-| `get_time` | get_time(self) -> float  Current simulation time (scalar). |
 | `get_velocities` | get_velocities(self) -> numpy.ndarray[dtype=float64]  Current particle velocities (N,3) float64. |
-| `get_volumes` | get_volumes(self) -> numpy.ndarray[dtype=float64]  Per-particle Voronoi cell volume (N,) float64. |
+| `get_volumes` | get_volumes(self) -> numpy.ndarray[dtype=float64]  Per-particle Voronoi cell volume (N,) float64 (a copy). |
 | `init` | init(self) -> None  Build the first tessellation and forces from the particle state set above. |
+| `internal_energy` | internal_energy(self) -> float  Total internal (EOS) energy (scalar). |
+| `kinetic_energy` | kinetic_energy(self) -> float  Total kinetic energy ½ Σ m_i |v_i|² (a device reduction). |
 | `num_particles` | Particle count N. |
-| `set_box` | set_box(self, L: collections.abc.Sequence[float]) -> None  Set the periodic box edge lengths (Lx, Ly, Lz). |
 | `set_bulk_viscosities` | set_bulk_viscosities(self, viscosities: ndarray[dtype=float64, order='C']) -> None  Per-particle bulk viscosity (N,) float64 (defaults to zero if unset). |
+| `set_domain` | set_domain(self, extent: collections.abc.Sequence[float], origin: collections.abc.Sequence[float] = [0.0, 0.0, 0.0], periodic: collections.abc.Sequence[bool] = [True, True, True]) -> None  Set the periodic box before `init`: `extent` is the box SIZE (Lx, Ly, Lz). The suite-wide spelling (suite/docs/NAMING.md 1.1), the same call `dem.Simulation.set_domain` takes. `origin` must be (0, 0, 0) and `periodic` (True, True, True) — this engine's box is anchored at the origin and periodic on every axis; both are checked rather than ignored, so a caller who writes the suite-wide form gets an error naming the limitation. |
+| `set_dt` | set_dt(self, dt: float) -> None  Set the time step. The suite-wide way to configure a stepper (suite/docs/NAMING.md 1.5) — `flow.Solver`, `dem.Simulation` and `tpx_amr.Flow` all take `set_dt`. |
 | `set_geometry` | set_geometry(self, node_ints: ndarray[dtype=int32, order='C'], node_reals: ndarray[dtype=float64, order='C'], root: int = 0, grad_h: float = 1e-05) -> None  SDF solid walls for the fluid (same flat node encoding as Tessellation.set_geometry). The cells are clipped by the solid; the EOS pressure acts on the wall facets (the wall pushes back). Call before init(). |
 | `set_masses` | set_masses(self, masses: ndarray[dtype=float64, order='C']) -> None  Particle masses (N,) float64. |
 | `set_positions` | set_positions(self, positions: ndarray[dtype=float64, order='C']) -> None  Initial particle positions (N,3) float64. |
@@ -78,32 +81,35 @@ repaired each step on the device. Set the particle state, `init`, then `step`.
 | `set_repair` | set_repair(self, on: bool = True) -> None  Opt-in (default off): use the incremental moving-point repair + reeval-published force geometry each step instead of a full rebuild. Call before init(). |
 | `set_velocities` | set_velocities(self, velocities: ndarray[dtype=float64, order='C']) -> None  Initial particle velocities (N,3) float64. |
 | `set_viscosities` | set_viscosities(self, viscosities: ndarray[dtype=float64, order='C']) -> None  Per-particle shear viscosity (N,) — enables the viscous Navier-Stokes term. |
-| `step` | step(self, num_steps: int, dt: float) -> None  Advance the velocity-Verlet dynamics by `num_steps` steps of size `dt`. |
+| `step` | step(self, num_steps: int) -> None  Advance the velocity-Verlet dynamics by `num_steps` steps of the stored time step (`set_dt`); raises if none was set. |
+| `time` | Current simulation time. |
 
 ### `FlowSolver`
 Static Navier–Stokes solver on the face mesh of a resident Tessellation (Voronoi methods plan, track C). layout='collocated' (default): peclet.flow's approximate projection with the skew-corrected adjoint constraint pair — second order on unstructured Voronoi meshes; layout='covolume': the staggered covolume scheme (exact energy conservation, first order on unstructured meshes). Walls come from the tessellation's SDF geometry (no-slip unless set_wall_velocity). SSP-RK3 with a projection per stage; GraphAMG-PCG pressure solve.
 
 | Method / property | Description |
 |---|---|
-| `get_cell_volume` | get_cell_volume(self) -> numpy.ndarray[dtype=float64] |
-| `get_pressure` | get_pressure(self) -> numpy.ndarray[dtype=float64] |
-| `get_velocity` | get_velocity(self) -> numpy.ndarray[dtype=float64]  Cell velocity (num_cells, 3). |
-| `kinetic_energy` | kinetic_energy(self) -> float |
-| `layout` | layout(self) -> str |
-| `max_divergence` | max_divergence(self) -> float |
-| `num_cells` | num_cells(self) -> int |
-| `num_faces` | num_faces(self) -> int |
-| `num_wall_faces` | num_wall_faces(self) -> int |
-| `pressure_iterations` | pressure_iterations(self) -> int |
-| `set_body_force` | set_body_force(self, fx: float, fy: float, fz: float) -> None |
+| `dt` | The stored time step (0 until `set_dt`). |
+| `get_pressure` | get_pressure(self) -> numpy.ndarray[dtype=float64]  Cell pressure (num_cells,) float64 (a copy). |
+| `get_velocities` | get_velocities(self) -> numpy.ndarray[dtype=float64]  Cell velocity (num_cells, 3) float64 (a copy; the covolume layout reconstructs it from the face fluxes). |
+| `get_volumes` | get_volumes(self) -> numpy.ndarray[dtype=float64]  Cell volume (num_cells,) float64 (a copy) — the face mesh's, i.e. the tessellation's. |
+| `kinetic_energy` | kinetic_energy(self) -> float  Total kinetic energy ½ Σ V_i |U_i|² over the cells (a device reduction). |
+| `layout` | The solver layout this instance was built with: 'collocated' or 'covolume'. |
+| `max_divergence` | max_divergence(self) -> float  Max over the cells of the discrete divergence of the transporting face flux — round-off after a projection. |
+| `num_cells` | Number of cells of the face mesh (= the tessellation's particle count). |
+| `num_faces` | Number of faces of the face mesh: interior faces first, then the wall faces. |
+| `num_wall_faces` | Number of SDF wall faces (the trailing block of the faces); 0 without geometry. |
+| `pressure_iterations` | PCG iteration count of the last pressure solve. |
+| `set_body_force` | set_body_force(self, fx: float, fy: float, fz: float) -> None  Uniform body force per unit mass (fx, fy, fz) applied to every cell (a pressure gradient drive, gravity). |
+| `set_dt` | set_dt(self, dt: float) -> None  Set the time step (suite/docs/NAMING.md 1.5); `step` uses it. |
 | `set_implicit_diffusion` | set_implicit_diffusion(self, on: bool) -> None  Collocated: flow's semi-implicit step (explicit convection, backward-Euler viscous solve, approximate projection) — no diffusive dt limit, first order in time. |
-| `set_pressure_tolerance` | set_pressure_tolerance(self, tol: float) -> None |
+| `set_pressure_tolerance` | set_pressure_tolerance(self, tol: float) -> None  Relative residual at which the pressure PCG stops (default set by the solver). |
 | `set_skew_corrected` | set_skew_corrected(self, on: bool) -> None  Collocated only: the centroid-consistent constraint pair (default on). |
 | `set_stokes` | set_stokes(self, on: bool) -> None  Drop the convective term (creeping flow). |
 | `set_velocity` | set_velocity(self, U: ndarray[dtype=float64, order='C']) -> None  Initial cell velocity (num_cells, 3); projected once. |
 | `set_wall_gradient_quadratic` | set_wall_gradient_quadratic(self, on: bool) -> None  Wall viscous flux from the wall-anchored least-squares quadratic (default on; exact for Poiseuille) instead of the two-point (U_i - U_wall)/h_A. |
 | `set_wall_velocity` | set_wall_velocity(self, U: ndarray[dtype=float64, order='C']) -> None  Prescribed velocity on the wall faces, (num_wall_faces, 3). |
-| `step` | step(self, num_steps: int, dt: float) -> None |
+| `step` | step(self, num_steps: int) -> None  Advance `num_steps` steps of the stored time step (`set_dt`); raises if none was set. |
 
 ### `VoronoiHalo`
 Distributed (MPI) ghost-gather for the multi-rank Voronoi tessellation.
@@ -150,10 +156,10 @@ the updated 'positions', final 'energy', 'energy_ratio' (final/initial), and ite
 
 ### `optimize_pore_mesh`
 ```
-optimize_pore_mesh(positions: ndarray[dtype=float64, order='C'], vref: ndarray[dtype=float64, order='C'], sphere_centres: ndarray[dtype=float64, order='C'], sphere_radii: ndarray[dtype=float64, order='C'], L: float, sw: int = 6, max_iter: int = 80, tol: float = 1e-09, cg_iters: int = 400, method: str = 'graphamg', mu_barrier: float = 0.0, free_energy: bool = False) -> dict
+optimize_pore_mesh(positions: ndarray[dtype=float64, order='C'], vref: ndarray[dtype=float64, order='C'], sphere_centers: ndarray[dtype=float64, order='C'], sphere_radii: ndarray[dtype=float64, order='C'], L: float, sw: int = 6, max_iter: int = 80, tol: float = 1e-09, cg_iters: int = 400, method: str = 'graphamg', mu_barrier: float = 0.0, free_energy: bool = False) -> dict
 
 Relax interstitial seeds (N,3) so their SDF-clipped Voronoi cell volumes approach the per-cell
-targets vref (N,), with the sphere packing (sphere_centres (M,3), sphere_radii (M,)) as periodic
+targets vref (N,), with the sphere packing (sphere_centers (M,3), sphere_radii (M,)) as periodic
 walls. method: 'graphamg'|'jacobi'|'colored_gs' (Gauss-Newton CG) or 'steepest' (descent).
 free_energy=True uses E=-Σ V_ref·log V (pressure V_ref/V, resists collapse); mu_barrier>0 adds a
 log-barrier. EXPERIMENTAL (pore-space meshing; see the pore-mesh-voronoi example).
@@ -189,12 +195,12 @@ position-only optimiser (:func:`optimize_pore_mesh`, GraphAMG Gauss–Newton) fi
 now-feasible start. Returns a dict: positions, volumes, vref, max_rel, rms_rel, rounds,
 n_added, n_removed, n_dead, history (per-round (N, max_rel, rms_rel, n_dead)).
 
-The sphere packing is the periodic wall geometry (centres (M,3), radii (M,), box L).
+The sphere packing is the periodic wall geometry (centers (M,3), radii (M,), box L).
 ```
 
 ### `sdf_voronoi_cells`
 ```
-sdf_voronoi_cells(positions: ndarray[dtype=float64, order='C'], sphere_centres: ndarray[dtype=float64, order='C'], sphere_radii: ndarray[dtype=float64, order='C'], L: float) -> dict
+sdf_voronoi_cells(positions: ndarray[dtype=float64, order='C'], sphere_centers: ndarray[dtype=float64, order='C'], sphere_radii: ndarray[dtype=float64, order='C'], L: float) -> dict
 
 Reconstruct the SDF-clipped interstitial Voronoi cells and return their polyhedra as flat
 arrays (VTK_POLYHEDRON layout): 'points' (Np,3), 'faces' + 'face_offsets' (per-cell face lists,
@@ -203,7 +209,7 @@ global point ids), 'volume' (Nc,), 'boundary' (Nc, 1 where the cell touches a sp
 
 ### `sdf_voronoi_section`
 ```
-sdf_voronoi_section(positions: ndarray[dtype=float64, order='C'], sphere_centres: ndarray[dtype=float64, order='C'], sphere_radii: ndarray[dtype=float64, order='C'], L: float, origin: collections.abc.Sequence[float], normal: collections.abc.Sequence[float]) -> dict
+sdf_voronoi_section(positions: ndarray[dtype=float64, order='C'], sphere_centers: ndarray[dtype=float64, order='C'], sphere_radii: ndarray[dtype=float64, order='C'], L: float, origin: collections.abc.Sequence[float], normal: collections.abc.Sequence[float]) -> dict
 
 Cross-section of the SDF-clipped interstitial Voronoi mesh by the plane through `origin` with
 `normal`: cut every cell directly (ConvexCell::sectionPolygon, robust — works from the dual

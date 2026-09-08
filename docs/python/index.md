@@ -40,7 +40,7 @@ carries it (the PyPI wheels do not):
 | `peclet.dem` | `Simulation.init_mpi(...)`, `enable_mpi_step(...)`, `step_mpi(nsteps)`, `step_hertz_mpi(nsteps)`, `rebalance()`, `rank()`, `num_ghost()` |
 | `peclet.voro` | `VoronoiHalo(origin, size, gsize, periodic)` with `owned_mask`, `gather(...) → (pos, gid, weight, n_owned)`, `refresh_positions`, `rank()/size()` |
 | `peclet.coupling` | the drivers run distributed when their `flow` and `dem` are (the deposition uses `exchange_field_add`) |
-| `peclet.core` | `peclet.core.mpi.Migrator` / `Halo` (the shared particle halo the above build on); `peclet.core.amr.DistributedOctree` |
+| `peclet.core` | `peclet.core.mpi.ParticleMigrator` / `ParticleHalo` (the shared particle halo the above build on); `peclet.core.amr.DistributedOctree` |
 
 A distributed driver `import mpi4py` (which calls `MPI_Init`), then decomposes and steps. See the
 worked example [`benchmarks/profile_mpi_flow.py`](https://github.com/computational-chemical-engineering/peclet/tree/main/benchmarks),

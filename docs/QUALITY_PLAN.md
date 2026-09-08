@@ -90,6 +90,9 @@ Effort: S < 1 day · M 1–3 days · L > 3 days. "Breaking" = Python API changes
 
 ### A. One spelling per concept (S–M per repo, breaking) — **the 1.0.0 gate**
 
+**DONE 2026-09-08** in all seven repos (A.1–A.4; NAMING.md §2 = the record); the gallery sources are
+rewritten (peclet-examples 948173d, 2f75f39, 282534b — not pushed, not re-rendered: that needs the 1.0.0 wheels).
+
 1. Apply §2 in `flow/src/flow_bindings.cpp`, `dem/src/dem_bindings.cpp`, `voro/src/voro_bindings.cpp`,
    `pnm/src/pnm_bindings.cpp`, `coupling/python/peclet_coupling/{driver,resolved}.py`,
    `core/python/{amr,mpi}_bindings.cpp`; update every in-suite caller (scripts, tests, README,
@@ -105,6 +108,10 @@ Effort: S < 1 day · M 1–3 days · L > 3 days. "Breaking" = Python API changes
    tracked `sdflow.pyi` (pybind11-era, 37 of 266 members) is deleted and replaced the same way.
 
 ### B. Dead code and artefacts out (S per repo, not breaking)
+
+**DONE 2026-09-08** for every row of the table below except the umbrella "move out" items (the
+maintainer's own files, listed not moved) and the worktree prune; the dem script *sort* and flow's
+`tests/study` move are still open (the dem agent's move-where list is in commit `b9a9b17`'s report).
 
 | repo | delete / untrack | why |
 |---|---|---|
@@ -129,6 +136,12 @@ Also in B: dem's remaining root scripts are *sorted*, not deleted — assert-bea
 absolute `/home/frankp/...` paths) moves to `studies/` or peclet-examples.
 
 ### C. One version source, old identifiers gone (S, CMake-breaking only)
+
+**DONE 2026-09-08**: C.1 (CMake reads pyproject in all seven; the pre-flight flags a drifting literal and
+morton's vcpkg manifest), C.2 (`peclet_core`/`peclet::core`, `PECLET_CORE_TAG`/`PECLET_CORE_DIR`/
+`PECLET_CORE_INCLUDE`, `peclet_flow`, vorflow/mortonarith gone; `.gitmodules` names still `transport-core`/
+`sdflow`/`vorflow` — cosmetic, open), C.4, C.5. **Open:** C.3 (one shared cmake module; today the
+pnm/dem/voro/coupling `PecletDeps.cmake` are byte-identical and flow's differs only by its sibling-override block).
 
 1. CMake reads the version from `pyproject.toml` (`file(STRINGS … REGEX "^version")`) in every
    repo; fixes morton (`VERSION 0.1.0` vs pyproject 0.2.1; conan/vcpkg 0.1.0 too) and voro
@@ -271,6 +284,23 @@ stops returning energy through `maxVolErr`.
 
 ## 5. Log
 
-- **2026-09-08** — audit; this file; decisions D1–D8 taken (maintainer: "quality is the prime
-  objective … be API breaking if needed"). Executed the same day: see the per-repo commits
-  referenced in [NAMING.md](NAMING.md) §4 and the umbrella log.
+- **2026-09-08** — audit; this file; decisions D1–D9 taken (maintainer: "quality is the prime
+  objective … be API breaking if needed"; "if the version should be major, do so"; "AMR is being
+  developed, do not throw it away"). **Executed the same day, all pushed:** packages A, B, C and the
+  per-repo stale-line fixes of H — flow `14f3388`→`64adc17`, dem `ae88d3e`→`885f85f`, voro
+  `9e7b1b0`→`ef99da9`, pnm `978f340`→`6167f23`, core `8d9f3c2`→`6604ed0`, morton `8614353`/`b502598`,
+  coupling `8603faa`→`34ad637`; umbrella `e263459`…; CHANGELOG `[Unreleased] — 1.0.0`. Batteries on
+  host-openmp after the changes: flow `tests/kokkos` 44/44 + regression PASS + verify Poiseuille (vof
+  subset re-run 16/16 after the second flow pass), dem `tests/kokkos` 8/8 + verify_packing + three
+  test scripts, voro 24/24, pnm 6/6 MPI + 7199 pores, core 104/104 + 158/158 + Python np=1,2,4,
+  morton all four configurations + pytest 9 + wheel, coupling pytest 4 passed / 1 skipped. **Not
+  re-run:** the CUDA and MPI matrices of flow/dem/voro (RELEASE.md §3 on the day).
+  Corrections the execution surfaced: flow `get_ox/oy/oz` are openness fields (table fixed); flow has
+  44 kernel tests and core 158 Kokkos ctests (docs fixed); dem's `set_positions` must precede
+  `set_shape_ids` (docstring fixed); voro's `volumes()` was not the getter model (§1.2 restated);
+  morton's PDEP/PEXT grep test did not exist (now does); pnm's `release.yml` was already consistent.
+  New observations for the open packages: voro's blanket `-Wno-*` removal exposes 622 warnings (fix
+  under G.7); coupling's `test_fixed_bed_ergun_porous` passes but flow's `CutcellMG::solvePCG` prints
+  "preconditioner produced non-finite z" on it (flow-side, check under D/G.6); voro's GitHub repo has
+  a PR-required branch rule that direct pushes bypass; the `pre-legacy-removal` tag keeps morton's
+  history reachable.

@@ -37,9 +37,7 @@ compiled kernels of its own.
 
 | Method / property | Description |
 |---|---|
-| `forces` | &nbsp; |
 | `step` | &nbsp; |
-| `torques` | &nbsp; |
 
 ### Module attributes
 

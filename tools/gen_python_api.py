@@ -39,7 +39,7 @@ PAGES = [
      "The Lagrangian particle halo (`peclet.core.mpi`), the Kokkos AMR octree (`peclet.core.amr`, "
      "present when built with a Kokkos backend + morton) and the analytic-SDF scene authoring + "
      "rigid-body mass properties (`peclet.core.geom`).",
-     [("peclet.core.mpi", ["Migrator", "Halo"]),
+     [("peclet.core.mpi", ["ParticleMigrator", "ParticleHalo"]),
       ("peclet.core.amr", ["Octree", "Poisson", "Flow", "DistributedOctree"]),
       ("peclet.core.geom", ["SceneBuilder"])]),
 ]

@@ -9,7 +9,8 @@ Vectorised Morton (Z-order) codes with O(1) arithmetic directly in Morton space.
 
 peclet.morton - fast Morton (Z-order) codes with arithmetic, for NumPy.
 
-This is a thin ``ctypes`` wrapper over the C++ ``morton`` library. Every
+This is a thin ``ctypes`` wrapper over the C ABI of the C++ ``morton`` library
+(``bindings/morton_c.h``, shared library ``libpeclet_morton_c``). Every
 operation is vectorised: it runs over whole NumPy arrays in compiled code, so
 there is no per-element Python overhead.
 
