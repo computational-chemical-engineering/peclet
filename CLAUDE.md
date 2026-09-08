@@ -16,7 +16,7 @@ decomposition** with efficient **asynchronous ghost-layer exchange**, common **S
 `block_decomposer` (now **retired/archived**) were extracted into the shared **`core/`**
 library (header-only C++20, its own git repo + `CLAUDE.md`) that every method depends on.
 
-**`core/` status:** complete and tested (104 plain / 157 Kokkos ctests, `mpirun -np 1..8`). Provides ORB block
+**`core/` status:** complete and tested (109 plain / 164 Kokkos / 7 Python ctests, `mpirun -np 1..8`; morton-guarded tests SKIP with exit 77, never pass silently). Provides ORB block
 decomposition; the async grid ghost-layer exchange (`peclet::core::halo::GridHalo` — topology/exchange split,
 field-agnostic, NBX + persistent neighborhood-collective engines, overlap-capable, plus a GPU-resident
 host-staged variant); the Lagrangian halo (`peclet::core::halo::ParticleMigrator` — particle migration +
@@ -64,7 +64,7 @@ The design contract lives in `docs/`:
 
 | Directory | Language / stack | What it does | Has own CLAUDE.md |
 |-----------|------------------|--------------|-------------------|
-| `core/` | Header-only C++20 + MPI | **Shared infrastructure**: ORB block decomposition + asynchronous ghost-layer exchange (NBX + persistent engines) + particle migration + SDF geometry + dynamic load balancing + AMR octree. The layer every method code depends on. Tested (104 plain / 157 Kokkos ctests, np 1–8). | **Yes — read it** |
+| `core/` | Header-only C++20 + MPI | **Shared infrastructure**: ORB block decomposition + asynchronous ghost-layer exchange (NBX + persistent engines) + particle migration + SDF geometry + dynamic load balancing + AMR octree. The layer every method code depends on. Tested (109 plain / 164 Kokkos / 7 Python ctests, np 1–8). | **Yes — read it** |
 | `morton/` | Header-only C++17 (+ **Kokkos**, Python `peclet.morton`) | Morton/Z-order codes with **arithmetic in Morton space** (neighbour-find, axis add, Z-order step without decode→re-encode). BMI2/AVX-512 + runtime dispatch; the foundational spatial-index library. Portable **Kokkos** GPU backend (`include/morton/kokkos.hpp`, CUDA/HIP/OpenMP) — raw CUDA retired. | **Yes — read it** |
 | `flow/` | **Kokkos** + C++20 + nanobind (`flow`) | Incompressible Navier–Stokes solver for porous media: staggered MAC grid, Immersed Boundary Method over SDF geometry, pressure projection. **CUDA retired** (Kokkos: CUDA/HIP/OpenMP). | **Yes — read it** |
 | `pnm/` | **Kokkos** + C++20 + nanobind (`peclet.pnm`) | Pore-network extraction from SDF geometry: pore detection, marker-controlled watershed segmentation, throat topology (`SDFReader`, `extract_pores`, `segment_volume`, `extract_topology_gpu`, fused `extract_pore_network`). **Distributed MPI extraction** on the core ORB (`extract_pore_network_mpi`, gated `PECLET_PNM_MPI`) — bit-exact to single-rank, `tests/kokkos_mpi` ctests np=1,2,4 host+CUDA. Split out of `flow` (2026-07) with its git history. | Yes (brief) |
@@ -119,9 +119,15 @@ cd dem && source ../.venv/bin/activate        # the suite venv already has nanob
 cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"
 cmake --build build -j$(nproc)                  # -> build/peclet/dem/_dem.*.so (import peclet.dem; -DPECLET_DEM_MPI=ON for the MPI step)
 export PYTHONPATH=$PYTHONPATH:$(pwd)/build
-python verify_packing_spheres.py                # verify_*.py are the test/demo entry points
+python examples/verify_packing_spheres.py       # examples/ = demos; tests/python/ = pytest
+# Registered tests: -DPECLET_DEM_BUILD_TESTS=ON → 11 ctests (kokkos + arborx + pytest),
+# + -DPECLET_DEM_MPI=ON → 47 (kokkos_mpi + Python MPI at np=1,2,4); every test SKIPs with exit 77.
 ```
-The root-level `verify_*.py` / `test_*.py` files are demo and validation entry points (not a packaged test suite); the one-off investigation scripts were removed 2026-09-08 (QUALITY_PLAN B) and the remaining ones are to be sorted into `tests/python/` (pytest) and `examples/`.
+Since 2026-09-08 (QUALITY_PLAN D) there are no root-level scripts: `tests/python/test_*.py` are pytest
+functions run by ctest, `tests/python/mpi/` the MPI ones, `examples/` the demos (`pack.py`,
+`verify_*.py`, `generate_*.py`, `bench_step.py`). Three legacy gotchas are recorded in `dem/CLAUDE.md`
+(the velocity solve is off by default, there is no default gravity, the `(N,4)` w column is the
+inverse mass).
 
 ### voro
 ```bash
