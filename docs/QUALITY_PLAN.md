@@ -468,3 +468,9 @@ lands; F and G.2 follow in the same repo.*
   Snellius batch script still name retired `PECLET_FLOW_*` variables (list in §3.E); `coupling` has
   none. flow `486cdb3` finished H.1's citation follow-up, hand-wrapped because `flow_bindings.cpp`
   sits on quality.yml's temporary vof-w4 exclude list and must not meet clang-format until W4 merges.
+- **2026-09-08, gallery callers** — `peclet-examples` `6a749f8` (dem's 1.0.0 API across 50 files; int
+  shape codes were 1/2/3, not 0-based, and three latent bugs surfaced: an `(N,4)` `set_velocities`
+  call that dem used to mis-index, a six-scalar `add_plane`, and a C-order `get_sdf_grid` read) and
+  `ff21290` (flow's retired `PECLET_FLOW_*`). Local commits, NOT pushed, NOT re-rendered — that waits
+  on the 1.0.0 wheels. Dated records in `ISSUES.md`/`PROGRESS.md` keep their historical commands with
+  a bracketed note naming the replacement setter.
