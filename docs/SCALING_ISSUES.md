@@ -41,7 +41,7 @@ reflects `PMAXIT` rather than convergence.
 vs a 200 cap) and lands two orders lower in divergence. On dense beds fp64 is the *performance*
 choice, not a +12 % correctness tax. Recommended production fix remains the **double-diagonal**
 (faces float, diagonal resummed in double), already proven at the agglomerated bottom and awaiting
-generalisation — see `flow/doc/vof_workorders_v34.md` (WO-M).
+generalisation — see `flow/doc/history/vof_workorders_v34.md` (WO-M).
 
 *Actions:* generalise the double-diagonal; failing that, make a capped pressure solve **loud** (a
 one-line warning naming `PMAXIT` costs nothing and converts a silent invalid into a visible one);

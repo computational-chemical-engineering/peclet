@@ -80,7 +80,7 @@ handoff; their state now:
 
 Written 2026-08-31 at the end of the session that built V0–V4. **Read this first**, then
 `VOF_PLAN.md` (the campaign plan, now carrying measured results), then the findings logs in
-`flow/doc/vof_workorders*.md`. Everything below is *decided and unstarted* — the user
+`flow/doc/history/vof_workorders*.md`. Everything below is *decided and unstarted* — the user
 authorized these four items and deferred them to a later session because budget was low.
 
 ## Where the campaign stands

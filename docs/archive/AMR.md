@@ -238,7 +238,7 @@ Jacobi/BiCGStab (~1e-11); the immersed sphere at finite Re reaches the host `Amr
   **The collocated projection is the ABC method by design — do NOT replace it with Rhie–Chow.** The
   small residual cell divergence is intrinsic to cell-centered velocity placement (the *face* field
   is exactly divergence-free; the *cell* field only approximately), not a defect to engineer away;
-  see `flow/doc/sdflow_colocated_plan.md` and the `amr-octree-status` memory note.
+  see `flow/doc/flow_colocated_plan.md` and the `amr-octree-status` memory note.
 - **Phase 6b — DONE (momentum advection: SOU + implicit-FOU deferred correction).**
   `AmrFlow::setAdvection(true)` adds conservative `∇·(u u)` momentum advection. The high-order flux
   is **second-order upwind (SOU)** by default (`setAdvectionScheme(1)` ⇒ Koren TVD); the advecting

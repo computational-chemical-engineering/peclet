@@ -156,7 +156,7 @@ iteration counts)**; MPI np 1/2/4 bit-exact vs single-rank; device≡host-oracle
 CUDA). Measured: forward vs an independent inclusion-exclusion oracle 1.2e-15; **10⁵-sample
 round-trip 6.7e-15**; `faceFluxVolume(f=1)` bitwise equal to `plicVolume`; MYC on exact
 planes max 1.02° / mean 0.10° (Youngs 3.67° / 1.21°); sphere reconstruction order **1.98**.
-Two findings, both in `flow/doc/vof_workorders.md`:
+Two findings, both in `flow/doc/history/vof_workorders.md`:
 - **A boundary defect in Lehmann & Gekle's published Listing 1, found and fixed.** Their
   hoisted case-(5) guard `min(n1+n2,n3) <= d <= n3` fires at the single point `d == n3`
   when `n3 < n1+n2`, where case (3) is correct — `plicVolume(⅓,⅓,⅓, ⅓)` returned 0 instead
@@ -185,7 +185,7 @@ Own g=3 halo, 6-permutation sweep cycling, `parallel_scan` worklist (bitwise neu
 LeVeque T=3 reversal L1(vol) 7.75e-3 / 2.68e-3 / **5.98e-4** at 32/64/128³, order 1.53 then
 **2.16** — the published PLIC behaviour; volume drift ≤ 5.7e-14 against a measured discrete
 face divergence ≤ 1.2e-15. Clipping OFF; wisp census recorded. Three things to carry
-(details in `flow/doc/vof_workorders.md`):
+(details in `flow/doc/history/vof_workorders.md`):
 - **The trap is now a number, not folklore**: `debugRecomputeDilation` ships default-off and
   gate G measures it — frozen flag **2.3e-15** vs recomputed per sweep **1.5e-2**.
 - **§6's "hard CFL < 0.5" is the *2D* bound.** Weymouth's own thesis (Appendix A, eq. A.33 —
@@ -199,7 +199,7 @@ face divergence ≤ 1.2e-15. Clipping OFF; wisp census recorded. Three things to
   vector potential. For V2 the relevant number is the projection's own divergence residual.
 
 **V2 — Two-phase NS, no surface tension (staggered).** Split into **V2a** (wiring, WO-J) and
-**V2b** (momentum-consistent transport, WO-K) — `flow/doc/vof_workorders_v2.md`.
+**V2b** (momentum-consistent transport, WO-K) — `flow/doc/history/vof_workorders_v2.md`.
 
 **V2a — C → closures → varRho projection. ✅ DONE 2026-08-31** (flow `45c3bd5`;
 `src/vof/colour_field.hpp` + the VoF section of `flow_ibm.hpp` + harmonic-ρ_f siblings in
@@ -284,7 +284,7 @@ all gated so the mean-curvature factor is measured. **No new halo** — the whol
 exactly ±3, which is what the colour field's g = 3 already gives, and it contains no reduction at
 all, hence the bitwise MPI. Measured: exact-fraction sphere 16³→32³→64³ **order 2.26 (L1) / 1.86
 (max)**; the PV branch alone 1.96–1.99; plane 1.5e-14. Findings in
-`flow/doc/vof_workorders_v34.md` (WO-O):
+`flow/doc/history/vof_workorders_v34.md` (WO-O):
 - **the fallback rate is ~19 % at D/Δ = 48, not Han's 2-D 0.9 %, and that is geometry.** In 3D the
   corner column of a 3×3 patch must span √2·s where the preferred-direction slope reaches √2 on the
   octant diagonal — 2.5 cells, exactly a 7-column's capacity — so the failing fraction is
@@ -307,7 +307,7 @@ all, hence the bitwise MPI. Measured: exact-fraction sphere 16³→32³→64³ *
 **V4 — Balanced-force CSF + capillary time step. ✅ DONE 2026-08-31** (flow `cd507ba` /
 `f2fea3f`; `src/vof/surface_tension.hpp` + `Solver::addCsfRhs`, ctest `vof_surface_tension`,
 `vof_surface_tension_mpi_np{1,2,4}`, `tests/study/vof_surface_tension.py`; WO-P in
-`flow/doc/vof_workorders_v34.md`). The face force is `σ·κ_f·(C(i) − C(i−s_c))/h` with the
+`flow/doc/history/vof_workorders_v34.md`). The face force is `σ·κ_f·(C(i) − C(i−s_c))/h` with the
 **projection's own difference operator** — deliberately NOT through the per-cell force field,
 whose face rule is an arithmetic interpolation (right for `ρg`, wrong for `σκ∇C`); the
 interpolated variant ships as the ablation `set_csf_mode(1)`.
@@ -434,7 +434,7 @@ load at extreme scale.
   rung gated on measurement (first-principles directive):
   - ~~**S0 — measure before investing**~~ — **DONE 2026-08-30 (WO-B)**, and it **refutes the
     diagnosis this ladder was built on**. `flow/tests/study/vardensity_solver_probe.py`, 406
-    configurations × 20 steps, CUDA + host; full numbers in `flow/doc/vof_workorders.md`
+    configurations × 20 steps, CUDA + host; full numbers in `flow/doc/history/vof_workorders.md`
     (WO-B findings) and the superseding note in `flow/doc/variable_density_projection.md` §2.
     (a) `set_pressure_pcg(True, …)` **ignores its flag** — it never clears `useChebyshev_` — so
     §2's "PCG" control, and every later varRho PCG measurement, actually ran Chebyshev.
@@ -459,7 +459,7 @@ load at extreme scale.
   - ~~**S1 — flexible CG (FCG/IPCG)**~~ — **DONE 2026-08-30 (WO-C)**, and it **settles the
     diagnosis**. `set_pressure_fcg` / `CutcellMG::solveFCG` (Polak–Ribière β, +1 vector,
     +1 dot/iteration, 2 % projection-time overhead, default off, single-phase regression
-    +0.00 %). Full numbers: `flow/doc/vof_workorders.md`, WO-C findings; reproduce with
+    +0.00 %). Full numbers: `flow/doc/history/vof_workorders.md`, WO-C findings; reproduce with
     `vardensity_solver_probe.py --drivers pcg,fcg`.
     (a) **The V-cycle preconditioner is NOT symmetric w.r.t. the fine operator, and the
     asymmetry comes from the domain BCs at the FIRST coarse level.** FCG converges on **93
@@ -873,7 +873,7 @@ Part III's block container stays in flow regardless.
 
 **Ownership model** (the AMR-campaign pattern: Opus executes rungs specified as
 work orders with deterministic gates; Fable does design-heavy derivation and writes the
-work orders). Detailed phase-0 work orders: `flow/doc/vof_workorders.md`.
+work orders). Detailed phase-0 work orders: `flow/doc/history/vof_workorders.md`.
 
 | rung | owner | notes |
 |---|---|---|
@@ -940,7 +940,7 @@ Welch & Wilson JCP 2000 · Scriven CES 1959 · Berenson 1961 / Klimenko 1981.
 ## 12. The finishing campaign (2026-09-02) — review verdict, new rungs, order
 
 Written by Fable at the start of the session that finishes Part I and ships the example gallery.
-Companion work orders: `flow/doc/vof_workorders_v5.md` (WO-Q … WO-U).
+Companion work orders: `flow/doc/history/vof_workorders_v5.md` (WO-Q … WO-U).
 
 ### 12.1 What the 2026-09-01 solver work changed under V0–V4 (review verdict)
 
@@ -1049,7 +1049,7 @@ pattern — the ABC counterpart of the V4 rule).
 Review of §§4, 9, 10 against the state after today's landings. Nothing in the method verdict
 (§0), the architecture (§3) or the three-layer/AMR structure (§11) needs changing; what changes
 is *status*, *sequencing* and the grain at which the remaining rungs are specified. Work orders
-for everything below: `flow/doc/vof_workorders_v6.md` (Part I remainder, Part II start, Part III
+for everything below: `flow/doc/history/vof_workorders_v6.md` (Part I remainder, Part II start, Part III
 start). Ownership stays as §11: Fable writes the derivations into the WO, Opus executes against
 gates, twice-failed gates escalate.
 
@@ -1168,7 +1168,7 @@ gates, twice-failed gates escalate.
    conserved ṁ is a cell-FACE flux where the physics wants the flux at the interface (fix: give
    the interfacial cell its own Robin row instead of a Dirichlet identity row), the P2 order
    ladder with the new row, and the Ja 2 verdict at a second resolution → **P3h** — the full
-   dossier (what is proven, what remains R1–R6, acceptance) is `flow/doc/vof_workorders_v6.md`
+   dossier (what is proven, what remains R1–R6, acceptance) is `flow/doc/history/vof_workorders_v6.md`
    § WO-P3h.
 9. **[FIXED 09-04, ISSUES sweep]** `step()` is now atomic across the two explicit two-phase stability throws (the checks run before the predictor; state bitwise unchanged after a throw); `step_adaptive()` re-picks dt from the current state every call (bitwise equal to the gallery drivers' loops); `set_contact_angle` binds to domain-BC walls (within the SDF wall's own error); `vof_geometry()` on all-fluid solvers; collocated `set_state` seeds the face field; a preconditioner breakdown is visible (`pressure_solve_failed()`, the cap; `PECLET_FLOW_PRESSURE_STRICT=1` raises). The free-slip domain BC (type 4) lands with another session's `rel-issues` branch (`35d951c`).
    **(previous)** `step()` is not atomic across the Weymouth–Yue boundedness throw (E6 finding): the colour

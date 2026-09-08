@@ -829,7 +829,7 @@ already holds exactly what `buildCutcellOp` consumed, and the exact apply reads 
    `CMakePresets.json` or `cmake/`, because it is a *compile define*, not a CMake option. The
    first "double" ladder column here came back byte-identical to the float one because of it —
    a null result that reads like a finding. The working form is
-   `-DCMAKE_CXX_FLAGS=-DPECLET_FLOW_MREAL_DOUBLE` (`flow/doc/vof_workorders_v34.md:256` has it
+   `-DCMAKE_CXX_FLAGS=-DPECLET_FLOW_MREAL_DOUBLE` (`flow/doc/history/vof_workorders_v34.md:256` has it
    right, and is how WO-M actually built its control). Corrected at §5 below. **Attribution: the
    bad recipe was only ever in this file (§5:707)** — `suite/CLAUDE.md` never mentioned
    `MREAL_DOUBLE` at all and `flow/CLAUDE.md` mentions it only in prose, so there is nothing to

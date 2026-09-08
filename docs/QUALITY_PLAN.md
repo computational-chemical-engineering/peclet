@@ -378,10 +378,17 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
    `AMR_GEOMETRY_SETUP_REQUIREMENTS.md`) now name the `archive/` paths; the two in
    `flow/src/flow_bindings.cpp` (`DEFECT_CORRECTION_PLAN.md`, `MG_TELESCOPING_PLAN.md`) wait for the
    package-E agent to finish in that file.
-2. flow: `CLAUDE.md` (174 KB, 2062 lines) → a < 20 KB reference; campaign history to
-   `doc/history/`; `doc/` (31 files, five `vof_workorders*.md` = 853 KB) split reference/history;
-   README `-DCFD_BUILD_MPI` → `PECLET_FLOW_MPI`, `SolverColocated` default "ghost"; `pyproject`
-   "single-rank"; `ci.yml` "pybind11"; `AGENTS.md`/`GEMINI.md` either made true or deleted.
+2. flow — **DONE 2026-09-08** (`628d3da` doc content, `ef25feb`, `013d3b3`): CLAUDE.md 178 KB / 2110
+   lines → 20 KB / 292 lines, the old file archived verbatim as `doc/history/claude_md_2026-09-08.md`;
+   `doc/` split into reference (17 live design docs) and `doc/history/` (the five `vof_workorders*`,
+   eight collocated campaign notes, `colocated_study/`, ghost-hardening, advective cut-wall, the two
+   packing reports) behind two dated indexes; 79 relative links checked, 0 broken; ctest counts
+   corrected to 156 registered / 154 with `-LE bench`; `AGENTS.md` reduced to a true pointer and
+   `GEMINI.md` deleted (it held another tool's generic workflow memory, nothing about this repo).
+   **The plan's item 3 was wrong on all four counts** — `CFD_BUILD_MPI`, the `SolverColocated`
+   "ghost" default, `pyproject`'s "single-rank" and the pybind11 mention were already fixed by A/B/C
+   and D. Left for later, as core did: ~10 `doc/…` citations inside `src/` and `tests/*.cpp` gain the
+   `history/` prefix when those files are next edited.
 3. dem — **DONE 2026-09-08** (`f680c3d`, `acb0fd5`): README quick-start written and RUN against the
    1.0.0 API, folder listing and venv paragraph corrected, `docs/solver_details.md` rewritten for the
    Kokkos stack (it narrated the retired `src/cuda/*.cu`), CLAUDE.md carries the E/F traps and the
@@ -486,3 +493,10 @@ lands; F and G.2 follow in the same repo.*
   (`decomposition_levels=`, `max_imbalance=`). On 160^3/np=6 and 144^3/np=12 the prediction now differs
   from the default, as it must; 48/48 non-MPI green. **Lesson for F and G: when a process-global goes
   away, every pure/preflight function that used to read it needs the value passed in.**
+- **2026-09-08, H.2 and its fallout** — flow's doc diet also flagged that
+  `scripts/check_decomposition.py --predict` printed IDENTICAL hierarchies for `--mode 0,4` under
+  headings naming different depths, and silently overwrote `--decomp-levels`; fixed in `013d3b3`
+  (aligned 80x48x160 vs coarse-first(4) 80x52x160 on 160^3/np=6). Umbrella links re-pointed at
+  `flow/doc/history/…` in eight files, `docs/archive/AMR.md` cited `flow/doc/sdflow_colocated_plan.md`
+  which never existed (it is `flow_colocated_plan.md`), and `docs/python/flow.md` was regenerated from
+  the MPI build so it no longer documents the retired `PECLET_FLOW_MG_ASPECT`.

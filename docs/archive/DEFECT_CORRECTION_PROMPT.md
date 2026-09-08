@@ -12,7 +12,7 @@ Read, in this order, before doing anything else:
    ownership and handoff protocol (§3), and **§4, the status log, which tells you where the
    previous session stopped**. Then §5, the working practices — they are not optional.
 2. `docs/VOF_NEXT_SESSION.md` Item 1 (the evaluation that produced this plan) and
-   `flow/doc/vof_workorders_v34.md` §4-5 (WO-M: the measured float-vs-double record, the
+   `flow/doc/history/vof_workorders_v34.md` §4-5 (WO-M: the measured float-vs-double record, the
    `PECLET_FLOW_MG_DIAGRESUM` control, and the harness `flow/tests/study/precision_ab.py`).
 3. `suite/CLAUDE.md`, then `flow/CLAUDE.md` and `core/CLAUDE.md` for build/test recipes.
 

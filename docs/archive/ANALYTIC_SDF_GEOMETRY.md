@@ -1241,7 +1241,7 @@ option was taken in each case and is stated; none of them is settled.
    motion is quantitatively trustworthy only in the creeping regime.
 
    *Second addendum (2026-08-31, rung A0 EXECUTED — flow `fb1a1a7`, `469ab7f`; full gate battery
-   in `flow/doc/advective_cutwall_flux_plan.md`).* The wall velocity is now fed into the momentum
+   in `flow/doc/history/advective_cutwall_flux_plan.md`).* The wall velocity is now fed into the momentum
    advection's inputs: `buildAdvInputs` fills scratch copies of `C[c].u` whose solid-masked rows
    carry `uBc_` (the rigid-body wall velocity the rung-2 machinery already evaluates), and the
    three explicit RHS builders, both implicit-FOU stencil builders and the velocity-MG restriction

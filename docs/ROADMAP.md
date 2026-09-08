@@ -196,7 +196,7 @@ The "remaining work is at-scale tuning" phase now has measured campaigns behind 
       [SCALING_ISSUES](SCALING_ISSUES.md) — the top two are correctness, not performance.
 - [ ] **Open**: fat-block ablation rung (512³ cells/GPU, script ready); ghost-projection march
       instability at large elongated rungs + ghost hardening phases B/C
-      (`flow/doc/ghost_hardening_plan.md` — active); warmstart divergence on steady marches;
+      (`flow/doc/history/ghost_hardening_plan.md` — active); warmstart divergence on steady marches;
       anchored-path (outflow) agglomerated-bottom floor (open problem 3); dem main build has no
       ctests — a memcheck'd periodic-packing smoke test is the suggested CI gate.
 
