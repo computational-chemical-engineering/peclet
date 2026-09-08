@@ -246,6 +246,20 @@ constructor and `solve_driver*.hpp` (`_REST_MODEL`, `_SLEEP*`, `_VERLET_SKIN`, `
 folded into G.2 — the AMR relocation — rather than touching `amr/` twice). Each becomes a setter with a documented default, or is deleted with
 the ablation it served. Keep `*_DEBUG`, `*_VERBOSE`, `*_PROFILE*`, `*_TIMEOUT`, `GPU_AWARE_MPI`.
 
+**dem DONE 2026-09-08** (`c7a89ec`, `54ca44c`): the reads were in four files, not two (`sim.hpp`,
+`solve_driver.hpp`, `solver_fused.hpp`, `solve_driver_force.hpp`); 11 vars → setters (six of them into
+one `set_sleeping(...)`), four deleted with their code paths (`_FUSED_GRID`, `_ML_GATES`,
+`_REST_NEWTON_OFF`, `_REST_ONESIDED` — the two Poisson ablations took five dead `PGSManifoldSweep`
+members with them), `_HERTZ_PROFILE` + the compile-time macros kept; `getenv` in `src/` is one call
+and `tests/python/test_no_env_knobs.py` greps for a return. Gate: SHA-256 of final positions identical
+before/after on XPBD (sleeping on/off), Hertz, `step_mpi` np=1,2 at one thread; eight setter-vs-env
+variants each distinct and setter == env; 47/47; CUDA build smoke-run (graph/fused paths are
+CUDA-only). Findings: `PECLET_DEM_SYMMETRIC_PGS` and `_STAB_MODE` never existed in code — the gallery's
+Dosta production scripts set the former (no-op; `set_stabilization_mode('off')` was meant);
+`benchmarks/porous-scaling/snellius/probe_dem6.sh` sets the four GPU-submission vars → setters;
+the XPBD path is not run-to-run deterministic at 4 threads (record for G.4). F should tier
+`set_cuda_graphs`/`set_fused_sweeps` (pure performance) into `diagnostics`.
+
 ### F. API tiering (M per repo, breaking) — D2
 
 flow: ~180 of 266 members move to `diagnostics` (the `*_diagnostics/_stats/_census/_budget/
@@ -287,7 +301,7 @@ stops returning energy through `maxVolErr`.
 4. **dem:** `sim.hpp` (1876) → step drivers / `Simulation` facade / shape registry; the world-radius
    fill written inline 3× beside `fillWorldRadiiKokkos`; the gid-keyed ledger carry written twice
    (`solve_driver_force.hpp:72-90`, `contact_preprocessing.hpp:119-170`).
-5. **core Python:** `Octree` and `DistributedOctree` share 14 verbatim members with no base.
+5. **core Python:** `Octree` and `DistributedOctree` share 14 verbatim members with no base. Folded into G.2 (same file, `python/amr_bindings.cpp`, restructured once).
 6. **Precision as a typed policy:** flow's `MReal = float` unless a raw `-DPECLET_FLOW_MREAL_DOUBLE`
    (no CMake option; three "hard `(float)` casts that survived the templating") is
    SCALING_ISSUES #1; make it `option(PECLET_FLOW_OPERATOR_DOUBLE)`, grep-test that no `(float)`

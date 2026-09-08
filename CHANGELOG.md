@@ -39,6 +39,21 @@ releases before removal, and a break costs a major. The full old→new table is 
 - **peclet.morton**: C library `libmortonarith_c`→`libpeclet_morton_c` with a shipped `morton_c.h`;
   the `legacy/` tree removed (tag `pre-legacy-removal`).
 
+**Environment variables removed** (QUALITY_PLAN D3: no env var may change numerics; every knob is a
+setter with a documented default, defaults bit-exact to the old unset behaviour):
+
+- **peclet.dem**: `PECLET_DEM_REST_MODEL`→`set_restitution_model('newton'|'poisson')`;
+  `PECLET_DEM_SLEEP`/`_SLEEP_SCALE`/`_SLEEP_K`/`_WAKE_SCALE`/`_SLEEP_WAKELOST`/`_SLEEP_INVMASS_FRAC`→
+  `set_sleeping(enabled=True, threshold_scale=2.0, consecutive=64, wake_scale=40.0,
+  wake_on_lost_contact=False, immovable_frac=0.01)`; `PECLET_DEM_VERLET_SKIN`→`set_verlet_skin(0.0)`;
+  `PECLET_DEM_NO_GRAPH`→`set_cuda_graphs(True)`; `PECLET_DEM_FUSED`/`_NO_FUSED`→
+  `set_fused_sweeps('auto'|'on'|'off')`; `PECLET_DEM_NO_INCR_COLOR`→`set_incremental_coloring(True)`;
+  deleted with their code paths: `PECLET_DEM_FUSED_GRID` (tuning cap), `PECLET_DEM_ML_GATES`,
+  `PECLET_DEM_REST_NEWTON_OFF`, `PECLET_DEM_REST_ONESIDED` (ablations). Read-only properties
+  `sleeping`, `verlet_skin`, `cuda_graphs`, `fused_sweeps`, `incremental_coloring`; a test greps
+  `src/` for `getenv`. Kept: `PECLET_DEM_HERTZ_PROFILE`. (`PECLET_DEM_SYMMETRIC_PGS`, used by the
+  gallery's production scripts, was never read by any version — those runs were no-ops on it.)
+
 Also: every repo's CMake `project(VERSION)` now reads `pyproject.toml`; the `transport_core`/`tpx_*`
 CMake names became `peclet_core`/`peclet::core`, `PECLET_TPX_TAG`→`PECLET_CORE_TAG`, flow's target
 `sdflow`→`peclet_flow`, voro's `vorflow` remnants gone; tracked artefacts removed (a third-party PDF,
