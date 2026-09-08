@@ -309,9 +309,14 @@ stops returning energy through `maxVolErr`.
 |---|---|---|
 | 1 | A + B + C + H1 (umbrella docs) | every repo's existing battery green on host-openmp; `check_release_state.sh` clean; gallery pages grep clean of removed names |
 | 2 | D | a red test in CI is a real failure; MPI suites run in CI |
-| 3 | **tag 1.0.0** ("physical domains", the clean-break release) | RELEASE.md phases A–I |
-| 4 | E + F | 1.x: env vars retired, diagnostics tier (additive where possible; breaking → 2.0) |
-| 5 | G + H2–7 | `flow_ibm.hpp` split, AMR flow relocated (D6), pnm dedupe |
+| 3 | E + F + G.2 (the breaking parts) | env vars retired; diagnostics tier; AMR flow out of `peclet.core` (D6) — every removal in the CHANGELOG |
+| 4 | **tag 1.0.0** ("physical domains", the clean-break release) | RELEASE.md phases A–I; CUDA + MPI matrices |
+| 5 | G (rest) + H2–7 | `flow_ibm.hpp` split, dem `sim.hpp` split, precision policy, doc diets — 1.x, non-breaking |
+
+*Order corrected 2026-09-08 (was: tag after D, E + F in 1.x "breaking → 2.0"): F is breaking by
+definition (D2) and G.2 moves public Python names out of `peclet.core`; under D9 (strict semver from
+1.0.0) they belong BEFORE the tag, not in a 2.0 weeks later. E is launched per repo as its D pass
+lands; F and G.2 follow in the same repo.*
 
 ## 5. Log
 
