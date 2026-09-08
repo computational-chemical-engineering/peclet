@@ -295,9 +295,10 @@ stops returning energy through `maxVolErr`.
    17 campaign notes to `docs/history/`.
 5. core: `README`/`CLAUDE.md`/`pyproject` still say `tpx_amr`/`tpx_mpi`, "26 ctests" (157);
    `docs/` split reference (4) / campaigns (7); `amr_advection_session_prompt.md` deleted.
-6. pnm: `pore_extraction.hpp` header guard `PECLET_FLOW_…` and `@brief flow —`; `sdf_reader.cpp:126`
-   unconditional `std::cout`; `cerr` warnings and the four `fprintf(stderr)` non-convergence paths
-   in the MPI file become exceptions.
+6. pnm — **DONE 2026-09-08** (already in `978f340`; re-swept in `329eae2`): guard + `@brief` say pnm,
+   no `cout`/`cerr`/`fprintf` left in `src/`, every failure path throws (the MPI ones after a collective
+   `MPI_Allreduce` of the condition so no rank hangs); `docs/Doxyfile` was the last self-as-flow line.
+   Left for G: global-namespace `SDFData` in `sdf_reader.h`.
 7. morton: README H1 `morton-arithmetic`, `pyproject` comment (`mortonarith`), "python 3.8+" badge
    vs `>=3.9`, `docs/ROADMAP.md` "v0.3"; ship `bindings/morton_c.h` so the 26 C exports are a
    documented ABI; decide `octree/` (split out or delete — "being split out" since July).
