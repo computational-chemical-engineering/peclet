@@ -21,6 +21,20 @@ releases before removal, and a break costs a major. The full old→new table is 
   `set_domain(lx,ly,lz,px,py,pz)`→`set_domain(extent=, origin=, periodic=)`, `get_num_contacts()`/
   `get_num_manifolds()`/`get_max_overlap()`→`num_contacts()`/`num_manifolds()`/`max_overlap()`,
   `add_plane(6 scalars)`→`add_plane(point, normal)`, `export_lammps(pbc_enabled=)`→`periodic=`.
+  **API tiering (F):** `step(dt)`→`set_dt(dt)`+`step(n)` (a stepper before `set_dt` raises; the silent
+  `dt = 1e-3` default is gone), `step(0.0)`→`relax(n)`, `step_hertz(dt, …)`→`step_hertz(substeps,
+  skin_frac)`, `step_mpi(nsteps=)`→`step_mpi(n=)`; shape codes→`'sphere'|'hollow_cylinder'|'box'`,
+  `set_sphere_shape(r)`→`initialize_shape('sphere', r)`; `set_gravity(gx,gy,gz)`→one triple + `gravity`;
+  SDF grids→one 3-D array; `set_stabilization(bool)`+`set_stabilization_mode`→`set_stabilization(str)`;
+  counts (`num_particles`, `num_contacts`, `num_manifolds`, `max_overlap`, `num_asleep`, `rank`,
+  `num_ghost`, …), `growth_factor`, `growth_rate`→properties; `init_mpi(size=, gsize=)`→`(origin, extent,
+  cells, periodic)`; developer members→`sim.diagnostics` (`set_velocity_solver`, `set_cuda_graphs`,
+  `set_fused_sweeps`, `coloring_conflicts`, `rest_orphan_stats`, `rest_bank_stats`, `wall_sdf_at`,
+  `profiling_info`, `mpi_rebuilds`, `mpi_gathers`, the `'escalate'`/`'ordered'` stabilization modes).
+  New checks raise where the old code was silent: `set_positions` beyond `capacity`, per-particle
+  setters with a wrong row count (`set_velocities` used to mis-index `(N,4)` input), `set_dt(≤0)`, bad
+  mode/shape names. `get_sdf_grid` now returns a Fortran-ordered `(rx,ry,rz)` array (it returned
+  x-fastest data with C strides, transposed on non-cubic grids).
 - **peclet.voro**: `set_box(L)`→`set_domain(extent=)`, `step(n, dt)`→`set_dt(dt)`+`step(n)`,
   `sphere_centres=`/`centres=`→`sphere_centers=`/`centers=`; getters made uniform — arrays copied out
   carry `get_` (`get_volumes()`, `get_neighbor_counts()`, `get_wall_counts()`, `get_velocities()`),

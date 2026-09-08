@@ -148,7 +148,13 @@ Status: **removed 1.0.0** = the non-canonical spelling was deleted in the clean-
 | `set_domain(min, max)` | — | **canon** (a corner overload, correctly named) |
 | `get_domain_min()` / `get_domain_max()` | `origin` / `origin + extent` | **removed 1.0.0** |
 | `enable_periodicity(x, y, z)`; `export_lammps(pbc_enabled=)` | `set_periodic(x, y, z)` + `periodic`; `export_lammps(periodic=)` | **removed 1.0.0** |
-| `get_num_contacts()` / `get_num_manifolds()` / `get_max_overlap()` | `num_contacts()` / `num_manifolds()` / `max_overlap()` (methods, like `num_particles()`) | **removed 1.0.0** |
+| `get_num_contacts()` / `get_num_manifolds()` / `get_max_overlap()`; `num_particles()`, `num_shapes()`, `num_asleep()`, `rank()`, `num_ghost()` | `num_contacts`, `num_manifolds`, `max_overlap`, `num_particles`, … — **properties** (§1.2: stored scalars) | **removed 1.0.0** |
+| `step(dt)`; `step(0.0)`; `step_hertz(dt, …)` / `step_hertz_mpi(dt, …)`; `step_mpi(nsteps=)` | `set_dt(dt)` + `step(n=1)`; `relax(n=1)`; `step_hertz(substeps, skin_frac)`; `step_mpi(n=)` — a stepper before `set_dt` raises | **removed 1.0.0** |
+| `initialize_shape(shape_type: int)`, `add_shape(int)`; `set_sphere_shape(r)` | `'sphere'` / `'hollow_cylinder'` / `'box'`; `initialize_shape('sphere', r)` | **removed 1.0.0** |
+| `set_gravity(gx, gy, gz)`; `set_sdf_shape`/`add_sdf_shape`/`add_sdf_wall(grid, nx, ny, nz, …)` | `set_gravity((gx, gy, gz))` + `gravity`; one 3-D `grid[nx, ny, nz]` array | **removed 1.0.0** |
+| `set_stabilization(bool)` + `set_stabilization_mode(str)` | `set_stabilization('off' \| 'onesided' \| 'multilevel')` + `stabilization`; `'escalate'`/`'ordered'` under `diagnostics` | **removed 1.0.0** |
+| `set_velocity_use_gs`, `set_cuda_graphs`, `set_fused_sweeps`, `debug_coloring_conflicts`, `get_rest_*_stats`, `wall_sdf_at`, `get_profiling_info`, `mpi_rebuilds`, `mpi_gathers` | `sim.diagnostics.set_velocity_solver('gauss_seidel' \| 'jacobi')`, `.set_cuda_graphs`, `.set_fused_sweeps`, `.coloring_conflicts()`, `.rest_orphan_stats()`, `.rest_bank_stats()`, `.wall_sdf_at`, `.profiling_info()`, `.mpi_rebuilds`, `.mpi_gathers` | **moved 1.0.0** (D2 tier) |
+| `get_growth_factor()` / `get_growth_rate()`; `init_mpi(size=, gsize=)` | `growth_factor` / `growth_rate`; `init_mpi(origin, extent, cells, periodic)` | **removed 1.0.0** |
 | `add_plane(px, py, pz, nx, ny, nz)` | `add_plane(point, normal)` | **removed 1.0.0** |
 | `num_particles`, `num_shapes`, … ; `get_positions()`, `get_velocities()`, … | — | **canon** |
 

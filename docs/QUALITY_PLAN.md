@@ -286,6 +286,17 @@ grids passed as a 3-D array, not `(grid, nx, ny, nz, …)`; `set_positions` boun
 `DistributedMovingTessellation` or document `VoronoiHalo` as the whole MPI story; `minimize_interface`
 stops returning energy through `maxVolErr`.
 
+**dem DONE 2026-09-08** (`2213849`): public surface ≈ 90 members in eight groups (shapes, domain,
+physics, walls, state, stepping, read-out, policy, MPI); `sim.diagnostics` holds 13 developer members;
+deletions: `set_sphere_shape` (alias), `set_stabilization(bool)`, the flat `[3N]` `set_positions`
+fallback — no kernel was an unreached ablation. Gate: 47/47 before and after, SHA-256 of final
+positions identical on XPBD / Hertz / `step_mpi` np=1,2. Findings: `get_sdf_grid` returned x-fastest
+data with C strides (transposed on non-cubic grids — fixed, Fortran order); `set_velocities` read
+`(N,4)` input as `(N,3)` and mis-indexed (three dem tests did exactly that); `step()` had a silent
+`dt = 1e-3` default and `step()` with no argument was a dt=0 relaxation (now `relax(n)`); NAMING §2's
+dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: coupling (`resolved.py`,
+`driver.py`, six tests, `examples/fluidized_bed.py`) and 52 gallery files (both in flight).
+
 ### G. Structure (L, mostly not breaking)
 
 1. **`flow/src/flow_ibm.hpp` (11 802 lines, one class, 483 member functions, 221 data members)**
