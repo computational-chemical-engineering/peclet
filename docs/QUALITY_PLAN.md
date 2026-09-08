@@ -326,8 +326,11 @@ stops returning energy through `maxVolErr`.
    vs `docs/archive/` rule); Lees–Edwards and the half-edge oracle dropped from README/CITATION.cff
    (zero occurrences in `include/`); 23 campaign notes (not 17) → `docs/archive/` with an index;
    `docs/` keeps `architecture.dox`, `distributed_voronoi.md`, `performance_report.md`.
-5. core: `README`/`CLAUDE.md`/`pyproject` still say `tpx_amr`/`tpx_mpi`, "26 ctests" (157);
-   `docs/` split reference (4) / campaigns (7); `amr_advection_session_prompt.md` deleted.
+5. core — **DONE 2026-09-08** (`c52989f`): last `tpx`/`transport_core`/`block_decomposer` prose gone;
+   `-LE bench` counts corrected to 104/158 (totals 109/164/7 include the `bench` label); six campaign
+   notes → `docs/archive/` with an index, four AMR reference docs stay (nothing deleted);
+   `amr_advection_session_prompt.md` was already gone. CLAUDE.md 18.7 KB. Left: ~25 code comments cite
+   the old `docs/<name>.md` paths (prefix `archive/` when those files are next edited).
 6. pnm — **DONE 2026-09-08** (already in `978f340`; re-swept in `329eae2`): guard + `@brief` say pnm,
    no `cout`/`cerr`/`fprintf` left in `src/`, every failure path throws (the MPI ones after a collective
    `MPI_Allreduce` of the condition so no rank hangs); `docs/Doxyfile` was the last self-as-flow line.

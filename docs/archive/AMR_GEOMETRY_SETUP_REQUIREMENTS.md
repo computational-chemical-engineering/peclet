@@ -68,7 +68,7 @@ Two caveats that matter for planning:
   finding F1 in `core/docs/amr_setup_parallel_plan.md`.
 - **The remaining serial phases are now the largest single items** (velocity MG build 0.3,
   `findPocketCells` 0.2), i.e. the next lever is no longer loop parallelism either — it is
-  device-resident assembly (`core/docs/amr_device_assembly_plan.md`).
+  device-resident assembly (`core/docs/archive/amr_device_assembly_plan.md`).
 
 ## 2. The inversion (user brainstorm, endorsed): geometry drives, not cells
 

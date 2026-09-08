@@ -430,7 +430,7 @@ load at extreme scale.
   rediscretization is fine for openness, unproven for 10³ coefficient jumps); (b)
   **Chebyshev is not a stopgap** — it is the only driver with zero global reductions per
   iteration, i.e. exactly the all-reduce-free pressure driver the comm-scaling campaign
-  wants (`core/docs/comm_avoiding_pressure_driver.md`). The ladder, cheap → deep, each
+  wants (`core/docs/archive/comm_avoiding_pressure_driver.md`). The ladder, cheap → deep, each
   rung gated on measurement (first-principles directive):
   - ~~**S0 — measure before investing**~~ — **DONE 2026-08-30 (WO-B)**, and it **refutes the
     diagnosis this ladder was built on**. `flow/tests/study/vardensity_solver_probe.py`, 406

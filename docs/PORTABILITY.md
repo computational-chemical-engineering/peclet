@@ -88,7 +88,7 @@ the device, only the compact halo buffers cross to the host for MPI) and **GPU-a
 (`Kokkos::View::data()` passed straight to `MPI_Isend/Irecv`, opt-in via
 `PECLET_CORE_GPU_AWARE_MPI`). GPU-aware transport is available on Snellius (OpenMPI+UCX, the
 `UCX-CUDA` module) and LUMI (Cray-MPICH, `MPICH_GPU_SUPPORT_ENABLED=1`); the host-staged path works
-on every stack. See `core/docs/cuda-aware-mpi.md`.
+on every stack. See `core/docs/archive/cuda-aware-mpi.md`.
 
 ## Notes / gotchas
 
