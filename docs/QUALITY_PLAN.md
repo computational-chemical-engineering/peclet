@@ -356,10 +356,11 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
    `archive/README.md` index and a collapsed "Archive" nav section, 24 links re-based, `mkdocs build
    --strict` clean (umbrella `afda9d4`); PHYSICAL_UNITS_PLAN stays until Phases 3–4 land. **Open:** the
    D7 decision on INTERFACES.md (implement `concepts.hpp` + `static_assert`s, or rewrite as the written
-   contract), and the RELEASE_PREP re-cut for 1.0.0 on release day. Small follow-up in the submodules:
-   docstrings in `flow/src/flow_bindings.cpp` (×2) and `coupling/python/peclet_coupling/resolved.py`
-   cite `docs/DEFECT_CORRECTION_PLAN.md`, `docs/MG_TELESCOPING_PLAN.md`, `docs/ANALYTIC_SDF_GEOMETRY.md`
-   as plain text — add the `archive/` prefix when those files are next touched.
+   contract), and the RELEASE_PREP re-cut for 1.0.0 on release day. The submodule follow-up is
+   done except flow: coupling (`2672318`) and core (`b39ffe4`, which also cited
+   `AMR_GEOMETRY_SETUP_REQUIREMENTS.md`) now name the `archive/` paths; the two in
+   `flow/src/flow_bindings.cpp` (`DEFECT_CORRECTION_PLAN.md`, `MG_TELESCOPING_PLAN.md`) wait for the
+   package-E agent to finish in that file.
 2. flow: `CLAUDE.md` (174 KB, 2062 lines) → a < 20 KB reference; campaign history to
    `doc/history/`; `doc/` (31 files, five `vof_workorders*.md` = 853 KB) split reference/history;
    README `-DCFD_BUILD_MPI` → `PECLET_FLOW_MPI`, `SolverColocated` default "ghost"; `pyproject`
