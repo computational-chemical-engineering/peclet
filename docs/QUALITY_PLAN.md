@@ -217,6 +217,19 @@ Poisson–Voronoi mean silently published `facetCount = 0` for the 400–600 cel
 Fix: compact the plane set at the cap, overflow only on live planes; exact-demand reserve with one
 re-run at the measured size. Sagitta 4.3e-7 with identical facet counts at 1/2/4/8 threads (3 runs
 each), 42/42, gate unchanged. `test_sdf_dynamic`'s tol1e-4 flake is probably the same class.
+
+**flow DONE 2026-09-08** (`5b2b73b`, `92c99d5`, `ee7ac7f`): `option(PECLET_FLOW_BUILD_TESTS OFF)` folds
+`tests/kokkos` (44) and, with `PECLET_FLOW_MPI`, `tests/kokkos_mpi` (106 at np=1,2,4[,8]) into the
+module's own tree — ~110 `build_*` directories collapse to one per backend, both test directories
+still configure standalone; the regression suite and three verify scripts are ctests with
+`SKIP_RETURN_CODE 77`; `vof_timing` + `bench_rbgs` labelled `bench`. `ctest -N` = 155. CI: `build-test`
+at `OMP_NUM_THREADS=2` with `-j1 --timeout 1200 -LE bench` (the unbounded pool is what starved the
+4-core runner in run 34173816982), then the Python gates, then a **configure-only** pass at the
+default `PECLET_CORE_TAG`; a new `mpi` job runs np=1,2 always and np=4/8 oversubscribed when np=2
+stayed under 20 min; nanobind pinned; clang-format blocking after one reformat (`92c99d5`), the six
+files the `vof-w4` worktree edits excluded with the reason in the workflow. **Release pre-flight
+item (D4):** the tag pass is configure-only because `PECLET_CORE_TAG` v0.6.1 predates `VofMetric`/
+`vofPhysNormal` — re-pin the tag at release and make it a compile.
 flow in progress.
 
 1. core: 50 of 80 test binaries `return 0` with "skipping" when morton is absent, and CI never
