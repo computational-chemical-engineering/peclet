@@ -322,9 +322,10 @@ stops returning energy through `maxVolErr`.
    "single-rank"; `ci.yml` "pybind11"; `AGENTS.md`/`GEMINI.md` either made true or deleted.
 3. dem: write `dem/CLAUDE.md` (build matrix, three test projects, hidden call orders); README
    folder listing (12 of 22 headers), venv paragraph, `docs/solver_details.md` still narrating `src/cuda/*.cu`.
-4. voro: write `voro/CLAUDE.md`; README drops Lees–Edwards (zero occurrences in `include/`),
-   `PECLET_VORO_BUILD_BENCHMARKS` (does not exist), `mainpage.dox`, "two surfaces"; lists `fv/`;
-   17 campaign notes to `docs/history/`.
+4. voro — **DONE 2026-09-08** (`23c088f`): CLAUDE.md written by D + H (5 KB, one-tree recipe, `docs/`
+   vs `docs/archive/` rule); Lees–Edwards and the half-edge oracle dropped from README/CITATION.cff
+   (zero occurrences in `include/`); 23 campaign notes (not 17) → `docs/archive/` with an index;
+   `docs/` keeps `architecture.dox`, `distributed_voronoi.md`, `performance_report.md`.
 5. core: `README`/`CLAUDE.md`/`pyproject` still say `tpx_amr`/`tpx_mpi`, "26 ctests" (157);
    `docs/` split reference (4) / campaigns (7); `amr_advection_session_prompt.md` deleted.
 6. pnm — **DONE 2026-09-08** (already in `978f340`; re-swept in `329eae2`): guard + `@brief` say pnm,

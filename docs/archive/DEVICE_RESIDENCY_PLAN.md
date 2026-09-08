@@ -102,7 +102,7 @@ neighbour topology on the CPU **every distributed substep**.
 The stepper does a **full `buildTessellation` + `buildAuxMaps` rebuild every step**; the incremental
 machinery (`reevalGeometry`, `isSelfConsistent`, `TopologyStore`, skin/candidate emission, `nbrlist`)
 is device-resident code that already exists but is only wired into benches/tests. This is the Phase-2/3
-program in `voro/docs/dynamic_update_decision_and_plan.md`.
+program in `voro/docs/archive/dynamic_update_decision_and_plan.md`.
 
 | Item | What | Where | Effort |
 |------|------|-------|--------|
