@@ -132,23 +132,24 @@ inverse mass).
 ### voro
 ```bash
 cd voro && source ../.venv/bin/activate
-# The tests live in tests/kokkos and are registered ONLY by the Kokkos build — a plain
+# Tests are registered ONLY with -DPECLET_VORO_BUILD_TESTS=ON (default OFF): a plain
 # `cmake -B build` configures zero tests ("No tests were found!!!"), which is not a failure signal.
-cmake -B build_dev -DPECLET_VORO_KOKKOS=ON -DPECLET_VORO_BUILD_PYTHON=ON \
-  -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"   # add -DPECLET_VORO_MPI=ON for the distributed path
-cmake --build build_dev --parallel        # -> build_dev/peclet/voro/_voro.*.so (import peclet.voro)
-OMP_PROC_BIND=false ctest --test-dir build_dev --output-on-failure    # ~24 tests (21 test_* + gates + python)
-CLANG_FORMAT_BIN=clang-format-18 bash tools/clang_format_check.sh     # what CI runs (see below)
+cmake -B build_dev -DPECLET_VORO_KOKKOS=ON -DPECLET_VORO_BUILD_PYTHON=ON -DPECLET_VORO_MPI=ON \
+  -DPECLET_VORO_BUILD_TESTS=ON -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"
+cmake --build build_dev --parallel 8      # -> build_dev/peclet/voro/_voro.*.so (import peclet.voro)
+OMP_NUM_THREADS=4 OMP_PROC_BIND=false ctest --test-dir build_dev --output-on-failure   # 42 = 24 + 18 `mpi`
+bash tools/clang_format_check.sh          # what the blocking Quality job runs (clang-format 18.1.8)
 ```
-`tools/clang_format_check.sh` is the canonical format command — it walks `include/` and `tests/`
-itself, so don't hand-roll globs (the older `include/voro/**` path has not existed since the
-`vorflow` → `voro` rename). Google style, but **informational, not enforced**: the CI job is named
-"clang-format (informational)" and the tree currently carries ~570 pre-existing violations
-(`repair.hpp`, `sdf.hpp`, `tessellator.hpp` + test files), mostly unicode-in-comment lines. Keep
-*new* code clean; a repo-wide reformat is a separate deliberate change.
+Since 2026-09-08 (QUALITY_PLAN D) there is ONE tree: `tests/kokkos_mpi` is folded in under the
+`mpi` label (np=1,2,4; the launcher is taken from beside `MPI_CXX_COMPILER` — ParaView's MPICH
+`mpiexec` on PATH used to launch N singletons that "agreed" trivially), the `bench_*` binaries and
+the Voro++ fetch are opt-in under `PECLET_VORO_BUILD_BENCHMARKS`, and clang-format is **blocking**
+(the tree was reformatted once in `a487777`). `tools/clang_format_check.sh` walks `include/`, `src/`
+and `tests/` itself — don't hand-roll globs. Known: `test_sdf_curved` is red until the concave-SDF
+re-clip path is made thread-count independent (QUALITY_PLAN §3.D voro, G.7).
 The legacy half-edge `voronoi.hpp` CPU oracle is **gone** — retired in voro `0d4f3b8`
 ("retire the legacy half-edge engine + rewrite the docs (device-only)"); `include/` now holds only
-`peclet/voro/`. Voro++ survives solely as a FetchContent throughput reference for `bench_convexcell`.
+`peclet/voro/`. Voro++ survives solely as a benchmark throughput reference for `bench_convexcell`.
 The production device tessellator stores each Voronoi cell as a compact **dual-triangle ConvexCell**
 (a vertex is a triple of plane indices) plus a `facetGeometry` CSR — not the old half-edge mesh
 (see README).
