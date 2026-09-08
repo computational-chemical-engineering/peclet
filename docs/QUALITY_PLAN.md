@@ -474,3 +474,15 @@ lands; F and G.2 follow in the same repo.*
   `ff21290` (flow's retired `PECLET_FLOW_*`). Local commits, NOT pushed, NOT re-rendered — that waits
   on the 1.0.0 wheels. Dated records in `ISSUES.md`/`PROGRESS.md` keep their historical commands with
   a bracketed note naming the replacement setter.
+- **2026-09-08, a coordination lesson worth keeping** — flow `628d3da` carries BOTH a `predict_hierarchy`
+  fix and the H.2 doc-diet agent's in-progress files: two agents were committing in the same checkout
+  and a bare `git commit` takes the whole shared index, not just the paths you staged. With concurrent
+  agents in one repo, always commit with a pathspec (`git commit <paths> -m ...`). The agent preambles
+  now say so.
+- **2026-09-08, a package-E regression caught by the gallery pass** — removing the process-global
+  decomposition state left `CutcellMG::predict` calling `decomposition()` with the defaults, so
+  `flow.predict_hierarchy` silently predicted the ALIGNED hierarchy for a coarse-first job while its
+  docstring claimed otherwise. Fixed in `628d3da`: the depth and imbalance tolerance are parameters
+  (`decomposition_levels=`, `max_imbalance=`). On 160^3/np=6 and 144^3/np=12 the prediction now differs
+  from the default, as it must; 48/48 non-MPI green. **Lesson for F and G: when a process-global goes
+  away, every pure/preflight function that used to read it needs the value passed in.**
