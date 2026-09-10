@@ -43,14 +43,14 @@ before tagging; ship E–H (the structural refactors) across 1.x under the alias
 - **D5 — CI tests what it claims.** A test that cannot run in a configuration is *skipped* by
   ctest (`SKIP_RETURN_CODE`), never silently green. The MPI suites (flow 103, dem 24, voro 18, pnm 6
   ctests) run at np=1,2,4 somewhere in CI. coupling gets a CI.
-- **D6 — core is infrastructure; AMR is preserved.** AMR is under active development and
-  nothing of it is deleted. The AMR Navier–Stokes solver (`core/include/peclet/core/amr/flow.hpp`
-  and its 10 k lines of siblings, bindings and tests) is *relocated* with its history — either
-  into `flow` as its octree backend, or onto a `dev/amr-flow` branch of core until it is ready
-  to ship as a method — so that the released core is mesh infrastructure only (`BlockOctree`,
-  `DistributedOctree`, leaf halo, CSR, refine/adapt, VTU I/O stay). The AMR plan notes and
-  campaign logs move to `archive/`, not the bin. (Maintainer, 2026-09-08: "AMR is being
-  developed. So, do not throw it away. You might move things to a development branch.")
+- **D6 — core is infrastructure; AMR is preserved, as its own package.** AMR is under active
+  development and nothing of it is deleted. The whole `core/include/peclet/core/amr/` tree — the
+  Navier–Stokes solver AND the octree infrastructure under it — is *relocated with its history*
+  into a new eighth package, **`peclet-amr`** (`peclet.amr`), which depends on `peclet-core` and on
+  nothing else in the suite. The released core is then decomposition, halo, geometry and load
+  balancing: the layer the method codes actually use. (Maintainer, 2026-09-08: "AMR is being
+  developed. So, do not throw it away. You might move things to a development branch."; decision
+  refined 2026-09-10 after the dependency audit in G.2.)
 - **D7 — Docs describe the code that exists.** Campaign notes move to `archive/`; INTERFACES.md's
   six unrealised concepts are either implemented as `concepts.hpp` with `static_assert`s or the
   file is rewritten as the duck-typed contract; STYLE.md's namespace and CI sections are corrected.
@@ -334,11 +334,60 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
    porous + closures / MPI state, as CRTP or mixin headers; `project()` (522 lines) and
    `setSolidDevice` (540) cut below ~150; the nine self-labelled "sibling" functions
    (`buildRhs`×5, `hydroForceTorque`×2, `addCsfRhs`×2, `fillVelGhostsTo`×2) merged behind parameters.
-2. **core → flow (D6):** `amr/{flow,flow_oracle,poisson,momentum*,multigrid,pcg,velocity_mg,
-   ghost_projection*,cut_cell,cf_scheme,scalar_transport,distributed_flow_mg,distributed_poisson}.hpp`
-   + `amr_bindings.cpp` `Flow`/`Poisson` + ~30 tests move; `greedyColoring` (voro's only reason to
-   include `amr/momentum.hpp`) → `solver/coloring.hpp`; `barnes_hut.hpp` out of `amr/`. `AmrFlow`'s
-   23 setters → a config struct; `fprintf(stderr)` ×13 → a logger hook.
+2. **`core/amr/` → a new `peclet-amr` package (D6).** *Decided 2026-09-10; supersedes the earlier
+   "move the solver into flow". The audit behind it is below — re-read it before deviating.*
+
+   **The move.** The whole `amr/` tree goes, solver and octree together, with its git history, into
+   a new repo `peclet-amr` → Python `peclet.amr`, a submodule like every other package (own CMake,
+   CI, CLAUDE.md, wheel, Doxygen, Zenodo DOI). It depends on `peclet-core` (`find_package(peclet-core
+   CONFIG)`) and on nothing else in the suite. `core/python/amr_bindings.cpp` goes with it, so
+   `peclet.core.amr.{Octree,DistributedOctree,Poisson,Flow}` becomes `peclet.amr.*` — breaking,
+   hence before the 1.0.0 tag. `barnes_hut.hpp` is not AMR: it moves elsewhere in core or goes.
+
+   **Why the whole tree, not just the solver.** Nothing outside `amr/` consumes it. `flow` includes
+   no AMR header at all; `dem`, `pnm` and `coupling` none; the only includer of `block_octree.hpp` /
+   `distributed_octree.hpp` outside `amr/` is core's own `amr_bindings.cpp`; and the Lagrangian
+   rebalance path lives in `halo/particle_rebalance.hpp`, not in the octree. `voro` reaches into
+   `amr/momentum.hpp` for exactly one function, `greedyColoring` → move it to `core/solver/coloring.hpp`
+   (otherwise voro would acquire a dependency on the AMR package). Folding 10.6 k lines of a second,
+   unrelated solver stack into `flow` — whose own `flow_ibm.hpp` is being split under G.1 *because*
+   it is too big — trades one oversized package for another.
+
+   | part of `amr/` | lines |
+   |---|---|
+   | solver (flow, oracle, Poisson, momentum, MG, PCG, cut cell, ghost projection, coarse-fine, scalar transport, distributed variants) | 10595 |
+   | infrastructure (block/distributed octree, adapt, refine, indicators, leaf field + halo, distributed view/fv, VTU I/O, CSR) | 4167 |
+
+   **Why `peclet-amr` does NOT depend on `peclet-flow`.** The two solvers have different data models,
+   so the discretization does not transfer as code: flow computes with fixed-offset stencils on
+   structured `(x,y,z)` Kokkos views, while the AMR path assembles a per-cell diagonal plus a general
+   face CSR and applies it with weighted Jacobi + BiCGStab because the operator is non-symmetric.
+   Hanging nodes are why `cf_scheme.hpp` exists and has no flow counterpart. Packaging says the same:
+   `core` installs an exported CMake package, `flow` installs only its Python extension, so a C++
+   dependency on flow would first require making flow a consumable header package, then pinning three
+   repos together — a heavy price for a few hundred lines of scalar mathematics.
+
+   **What IS shared, and where it goes.** The cut-cell closure polynomials are duplicated today,
+   written independently in `flow/src/cut_cell_ibm.hpp` (`float`, `KOKKOS_INLINE_FUNCTION`) and
+   `amr/cut_cell.hpp` (`double`, `MORTON_HD`), and the AMR ghost projection cites flow's campaign
+   notes as its authority for the method it implements. That layer is pure functions of local
+   geometry with no data layout in them: lift `poly_D` / `poly_Nc` / `poly_N_nb` and their siblings
+   into **core**, templated on the scalar type (which also serves G.6), and have both packages call
+   the one copy. Python-level composition stays available and costs nothing: `peclet.amr` may import
+   `peclet.flow` for a uniform-grid reference solution or shared I/O without any C++ coupling.
+
+   **Prerequisites and traps.** Three infrastructure headers reach back into solver headers and must
+   be cut first: `distributed_view.hpp` → `multigrid.hpp`, `distributed_poisson.hpp`, and
+   `distributed_fv.hpp` → `distributed_poisson.hpp`. `core/python/build*/` hold stale artefacts naming
+   the retired `tpx_amr` target — do not carry them across. Move the ~30 AMR ctests and the AMR docs
+   with the code; core's `tests/oracle/morton_octree.hpp` stays in core (it is BlockOctree's test
+   oracle). Update the umbrella `CLAUDE.md` table, `ARCHITECTURE.md`, `mkdocs.yml`, `docs/python/`,
+   `tools/release/`, `RELEASE.md`'s package list and `PecletDeps.cmake` for an eighth package.
+
+   **Not in scope, and not implied.** If the long-term goal is one solver serving both uniform and
+   adaptive meshes, the mechanism is templating the discretization on a mesh policy — the pattern
+   G.3 proved in pnm (`GridGeo` / `BlockGeo`) — not a package dependency. That is a deliberate
+   project to decide on its own merits, never a side effect of this split.
 3. **pnm — DONE 2026-09-08** (pnm `5ad3898`, `0e0c2cd`): `src/pore_kernels.hpp` holds every stage kernel
    once, templated on a geometry policy (`GridGeo` single-rank, `BlockGeo` MPI); the two pipeline
    files keep orchestration only (2873 → 2458 lines, `parallel_for` 66 → 37, no stage body twice).
@@ -421,7 +470,7 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
 |---|---|---|
 | 1 | A + B + C + H1 (umbrella docs) | every repo's existing battery green on host-openmp; `check_release_state.sh` clean; gallery pages grep clean of removed names |
 | 2 | D | a red test in CI is a real failure; MPI suites run in CI |
-| 3 | E + F + G.2 (the breaking parts) | env vars retired; diagnostics tier; AMR flow out of `peclet.core` (D6) — every removal in the CHANGELOG |
+| 3 | E + F + G.2 (the breaking parts) | env vars retired; diagnostics tier; `core/amr` out of `peclet.core` into `peclet-amr` (D6) — every removal in the CHANGELOG |
 | 4 | **tag 1.0.0** ("physical domains", the clean-break release) | RELEASE.md phases A–I; CUDA + MPI matrices |
 | 5 | G (rest) + H2–7 | `flow_ibm.hpp` split, dem `sim.hpp` split, precision policy, doc diets — 1.x, non-breaking |
 
@@ -536,8 +585,10 @@ not breaking and could follow it, but doing it first keeps one release instead o
   deleted with their kernels). Do it before G.1, so the split moves a smaller surface.
 - **pnm F / core F** are small. core's F is entangled with G.2 and G.5 — all three touch
   `python/amr_bindings.cpp`, so do them as one pass, not three.
-- **G.2** moves the AMR flow solver out of core into flow (D6: RELOCATED, never deleted; AMR is under
-  active development). G.5 (`Octree`/`DistributedOctree` sharing 14 verbatim members) is the same file.
+- **G.2** moves the WHOLE `core/amr/` tree into a new eighth package `peclet-amr` depending on core
+  alone (D6, decided 2026-09-10 — read G.2 in full, it carries the dependency audit; relocated with
+  its history, never deleted, AMR is under active development). G.5 (`Octree`/`DistributedOctree`
+  sharing 14 verbatim members) is the same file and rides along, as does core's F.
 - **G.4** (dem `sim.hpp` split) carries a real numerics fix: single-rank periodic wrap contacts whose
   far partner sits more than one radius beyond the face are resolved ONE-SIDEDLY (`ghostBand = maxRad`);
   the MPI step is symmetric. Keep the structural commits bit-exact and isolate the fix in its own
