@@ -11,7 +11,7 @@ PAGES = [
      "collocated `SolverColocated`), with geometric VoF two-phase flow, analytic moving geometry (scenes) "
      "and the distributed (MPI) solve. `execution_space` reports the compiled-in Kokkos backend; "
      "`has_mpi` whether this build carries the multi-rank API. Regenerate from an MPI-enabled build.",
-     [("peclet.flow", ["Solver", "SolverColocated"])]),
+     [("peclet.flow", ["Solver", "SolverColocated", "SolverDiagnostics", "SolverColocatedDiagnostics"])]),
     ("pnm.md", "peclet.pnm — pore-network extraction",
      "Pore-network extraction from SDF geometry (pores, watershed segmentation, throat topology), "
      "pore-network FLOW data (per-throat flow rates + pore pressures) from a peclet.flow DNS, and the "
@@ -26,8 +26,15 @@ PAGES = [
     ("voro.md", "peclet.voro — dynamic Voronoi tessellation + Voronoi-mesh flow",
      "Moving-cell Voronoi tessellation, moving-cell dynamics, the unstructured-mesh generator that "
      "feeds `peclet.flow`, the covolume / collocated Navier–Stokes solver on a Voronoi mesh "
-     "(`FlowSolver`) and the distributed tessellation (`VoronoiHalo`).",
-     [("peclet.voro", ["Tessellation", "Simulation", "FlowSolver", "VoronoiHalo"])]),
+     "(`FlowSolver`) and the distributed moving tessellation (`DistributedTessellation`, over the "
+     "`VoronoiHalo` primitive). Developer instruments live on each object's `diagnostics`; the pore-mesh "
+     "algorithms are `peclet.voro.pore_mesh`, the scene helpers `peclet.voro.scenes`.",
+     [("peclet.voro", ["Tessellation", "Simulation", "FlowSolver", "VoronoiHalo", "DistributedTessellation",
+                       "OptimizeResult", "InterfaceResult"]),
+      ("peclet.voro._voro", ["TessellationDiagnostics", "SimulationDiagnostics", "FlowSolverDiagnostics",
+                             "DistributedTessellationDiagnostics"]),
+      ("peclet.voro.pore_mesh", ["RedistributeResult"]),
+      ("peclet.voro.scenes", [])]),
     ("coupling.md", "peclet.coupling — CFD-DEM coupling",
      "Two-way coupling of `peclet.flow` and `peclet.dem`: the unresolved point-particle driver "
      "`CfdDem` (void fraction, drag laws, semi-implicit feedback) and the resolved cut-cell driver "
