@@ -506,10 +506,25 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
    SCALING_ISSUES #1; make it `option(PECLET_FLOW_OPERATOR_DOUBLE)`, grep-test that no `(float)`
    touches an operator view, and document core's float closure storage
    (`ghost_projection.hpp:71-76`, `scheme/ghost_closure.hpp`) in CONVENTIONS §3 as the same exposure.
-7. voro: named defaults (`TessellationParams`) for the literals scattered through the bindings
-   (`MAXP/MAXT` 64/112 vs 64/96 vs 128/256, `0.25*spacing`, `0.7`); library `printf`s behind a
-   verbosity flag; the serial host loops in `sdf_voronoi_cells`/`_section` on the resident device
-   tessellation (device-first directive).
+7. **voro — DONE 2026-09-10** (`5ffb0ea`, `76eed19`, `2407c58`, `d58373b`, `aee039b`, `c3d3416`,
+   `4653c0b`, `4ab848e`; CI green). `include/peclet/voro/params.hpp` is the one home of the engine
+   defaults (every template default, default argument and bench fixture names them; the bindings'
+   `defaults` re-exports them) — the only capacity that changed is `ConvexCell`'s template default
+   64/96 → 64/112, used by one unit test. `PECLET_VORO_PROFILE` (the library's last `getenv`) is gone:
+   `diagnostics.set_profile(on)` on `Tessellation`/`Simulation`/`DistributedTessellation`, and the
+   silent over-buffer rebuild is counted (`build_report()['over_buffer_rebuilds']`). The pore-space
+   export runs on the device (`pore_cells.hpp`: the tessellator's own gather, count → scan → fill in
+   seed order, no atomics), gated by `test_pore_cells` (invariants + device vs a certified host
+   oracle: 805/805 cells, volumes 1e-12, vertex sets 1e-9 L; CUDA RTX 5080 6e-11, run-to-run
+   identical). THE GATE FOUND: the old host reconstruction's fixed 80-nearest gather missed planes on
+   8/805 cells (volumes off by up to 2.5e-3) — so the two pore hashes changed because the VALUES
+   were wrong before (`edbc5056…` → `ca5485fc…`, `f498cf1b…` → `aac38ed6…`; the other 16 identical);
+   `buildTessellation` judged `kIncomplete` against a window the grid clamps (fixed `c3d3416`). OPEN
+   CUDA DEFECT: at 128/256 the device SDF clip is wrong on CUDA (every wall cell off up to 22 %,
+   deterministic; 64/112 correct; 128/256 exact on OpenMP) — the device pore path runs at 64/112 with
+   overflow counted; investigate `clipCellAgainstSdf` at 128/256 under nvcc. Warnings 25 → 0 (all
+   in `tests/`). `aee039b` switched `mesh_optimizer.hpp`/`ot_optimizer.hpp`/`bench_mesh_optimizer.cpp`
+   to `peclet::core::solver` (G.2's B4).
 
 ### H. Docs describe the code (S–M, not breaking) — D7
 

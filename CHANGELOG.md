@@ -50,6 +50,13 @@ releases before removal, and a break costs a major. The full old→new table is 
   plain-CG ablation) is gone; `VoronoiHalo(cells, *, extent, origin, periodic)` with `rank`/`num_ranks`
   properties; **new** `DistributedTessellation` binds the distributed moving tessellation (global
   skin-trip reduction included) so the MPI story no longer needs hand-driven halo gathers.
+  **Structure (G.7):** `pore_mesh.sdf_voronoi_cells` / `sdf_voronoi_section` run on the device
+  (`search_window=` keyword, `num_overflow`/`num_incomplete` in the result) — and their VALUES changed:
+  the old host reconstruction's fixed 80-nearest gather missed planes on ~1 % of cells (volumes off by
+  up to 2.5e-3); the new path is gated against a certified shell-walk oracle. `PECLET_VORO_PROFILE` is
+  gone → `<object>.diagnostics.set_profile(on)`, and `build_report()` reports `over_buffer_rebuilds`.
+  Engine defaults have one home, `include/peclet/voro/params.hpp` (`ConvexCell`'s template default
+  is 64/112 like every consumer; it was 64/96).
 - **peclet.pnm**: `extract_topology_gpu(shape=)`→`extract_topology(shape_zyx=)`; **API tiering (F):**
   the segmentation, the connections and the network-flow arrays are ndarrays in and out
   (`segment_volume` → `int32 (Nz,Ny,Nx)`, `extract_topology`/`connections`/`throats` → `(M,2) int32`,
