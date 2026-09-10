@@ -40,9 +40,42 @@ releases before removal, and a break costs a major. The full old→new table is 
   carry `get_` (`get_volumes()`, `get_neighbor_counts()`, `get_wall_counts()`, `get_velocities()`),
   stored scalars are properties (`time`, `num_cells`, `num_faces`, `num_wall_faces`, `layout`,
   `pressure_iterations`), computed scalars are bare methods (`kinetic_energy()`, `internal_energy()`).
-- **peclet.pnm**: `extract_topology_gpu(shape=)`→`extract_topology(shape_zyx=)`; `Pore` gained
+  **API tiering (F):** developer members move to `<object>.diagnostics` (`build_report`,
+  `set_local_certificate`, `set_gate`, `set_skew_corrected`, `set_wall_gradient_quadratic`, `set_repair`);
+  `set_wall_mode('exact'|'skin')`; `set_body_force((fx, fy, fz))`; the mesh optimizers take `extent`
+  and keyword-only options and return `OptimizeResult` / `InterfaceResult` / `RedistributeResult`
+  objects instead of dicts (`minimize_interface` no longer reports its energy through `maxVolErr`);
+  the pore-mesh algorithms live in `peclet.voro.pore_mesh` and the scene helpers in
+  `peclet.voro.scenes` (`_union_sdf` → `scenes.sphere_union_sdf`); `FlowSolver(amg=)` (an unreached
+  plain-CG ablation) is gone; `VoronoiHalo(cells, *, extent, origin, periodic)` with `rank`/`num_ranks`
+  properties; **new** `DistributedTessellation` binds the distributed moving tessellation (global
+  skin-trip reduction included) so the MPI story no longer needs hand-driven halo gathers.
+- **peclet.pnm**: `extract_topology_gpu(shape=)`→`extract_topology(shape_zyx=)`; **API tiering (F):**
+  the segmentation, the connections and the network-flow arrays are ndarrays in and out
+  (`segment_volume` → `int32 (Nz,Ny,Nx)`, `extract_topology`/`connections`/`throats` → `(M,2) int32`,
+  the five network-flow scalars → float64; they were Python lists of boxed ints/floats/tuples — same
+  values, same order), `extract_topology` reads the 3-D array in place, `mpi_block` returns
+  `(offset_zyx, shape_zyx)` (the integer voxel offset was spelled `origin_zyx`, colliding with the
+  physical origin every other call takes), `mpi_rank()`/`mpi_size()` are gone (mpi4py has them);
+  `Pore` gained
   constructors and `__repr__`; malformed VTI files and non-convergence now raise instead of printing.
-- **peclet.core**: `mpi.Migrator`/`Halo`→`ParticleMigrator`/`ParticleHalo` with `(origin, extent,
+- **peclet.amr — NEW eighth package (G.2, D6):** the whole `core/amr/` tree — the block-octree AMR
+  infrastructure AND the collocated cut-cell Navier–Stokes solver on it — is relocated with its git
+  history into `peclet-amr` (`import peclet.amr`; `peclet.core.amr.{Octree, DistributedOctree, Poisson,
+  Flow}` → `peclet.amr.{…}`; C++ `peclet::core::amr` → `peclet::amr`, `peclet/core/amr/` → `peclet/amr/`,
+  `PECLET_CORE_AMR_*` → `PECLET_AMR_*`). It depends on peclet-core and peclet-morton only, requires MPI and a
+  Kokkos backend, and is sdist-only (`pip install peclet[amr]`). The face-CSR operator, the BiCGStab
+  solver, the greedy graph colouring and the vector primitives it shared with voro were lifted into
+  `peclet::core::solver` (`core/include/peclet/core/solver/{face_csr,csr_operator,csr_bicgstab,coloring,
+  vector_ops}.hpp`, bodies verbatim; voro includes those now). **API tiering (F):** `Flow.diagnostics`
+  holds the instruments (`last_mom_iters`, `last_pres_iters`, `last_outer_iters`, `divergence_norm_face`,
+  `set_momentum_mg`, `set_momentum_gs`, `set_velocity_mg_staircase`, `set_momentum_mg_solver`,
+  `set_ghost_gradient`, `set_aperture_order`). **Environment variables removed (E):** `PECLET_CORE_GPS_RHO` /
+  `PECLET_CORE_GPS_MAXN` → `Flow.set_ghost_sampled(on, rho=2.2, max_samples=0)` (defaults bit-exact);
+  `PECLET_CORE_PROFILE_*` (prints) → `PECLET_AMR_PROFILE_*`. `Octree` and `DistributedOctree` bind their 16
+  shared members once (G.5). Byte gate across the relocation: `python/state_hash.py` in both repos.
+- **peclet.core**: the AMR tree is gone (above); core is decomposition, halo, geometry, load balancing,
+  the VoF kernel layer and the shared `solver/` layer. `mpi.Migrator`/`Halo`→`ParticleMigrator`/`ParticleHalo` with `(origin, extent,
   cells, periodic)`; `num_ghost`/`num_owned` are properties; `amr.Octree(brick, lmax, …)`→
   `Octree(cells, *, lmax=0, origin=, spacing=None, extent=None)` (`cells` is the finest grid),
   `.h0`→`.spacing`; `.pyi` stubs for `amr`/`mpi`/`geom` ship in the wheel; `find_package(peclet-core
@@ -52,6 +85,14 @@ releases before removal, and a break costs a major. The full old→new table is 
   drag names `bvk`/`bvk2`→`beetstra`/`tang`; one `eps_min` default.
 - **peclet.morton**: C library `libmortonarith_c`→`libpeclet_morton_c` with a shipped `morton_c.h`;
   the `legacy/` tree removed (tag `pre-legacy-removal`).
+
+- **peclet.dem — numerics fix (G.4, `93eec07`):** single-rank periodic wrap contacts are now resolved
+  symmetrically. A wrap pair whose farther partner sat more than one maximum radius beyond the periodic
+  face had no image on that side, so only the un-imaged partner moved, and by half the de-penetration;
+  the ghost band is now `2·maxRad + margin` (ghost capacity follows). Results change only for periodic
+  single-rank runs with such pairs; the MPI step was already symmetric and is unchanged. Structural:
+  `src/sim.hpp` split into `step_solve.hpp` / `step_solve_mpi.hpp` / `shape_registry.hpp` (bit-exact,
+  gated by the committed `tests/regression/state_hash.py`).
 
 **Environment variables removed** (QUALITY_PLAN D3: no env var may change numerics; every knob is a
 setter with a documented default, defaults bit-exact to the old unset behaviour):

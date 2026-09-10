@@ -1,7 +1,7 @@
 # Suite naming — one spelling per concept
 
 `peclet` is seven repos and seven shipped Python packages (`peclet.flow`, `peclet.pnm`, `peclet.dem`,
-`peclet.voro`, `peclet.coupling`, `peclet.morton`, and `peclet.core`'s `mpi`/`amr`/`geom` modules). They grew separately,
+`peclet.voro`, `peclet.coupling`, `peclet.morton`, `peclet.amr`, and `peclet.core`'s `mpi`/`geom` modules). They grew separately,
 so the same idea acquired different spellings — `set_domain` in dem against `set_box` in voro,
 `cell_centers` beside `cell_centres` in flow, `num_particles` against `scene_instance_count`. A user
 who moves between two of them pays for that every time.
@@ -168,6 +168,16 @@ Status: **removed 1.0.0** = the non-canonical spelling was deleted in the clean-
 | `Tessellation.volumes()` / `neighbor_counts()` / `wall_counts()`; `Simulation.get_num_neighbors()`; `FlowSolver.get_cell_volume()` / `get_velocity()` | `get_volumes()` / `get_neighbor_counts()` / `get_wall_counts()`; `get_neighbor_counts()`; `get_volumes()` / `get_velocities()` — array copies carry `get_` (§1.2) | **removed 1.0.0** |
 | `Simulation.get_kinetic_energy()` / `get_internal_energy()` / `get_time()`; `FlowSolver.num_cells()` / `num_faces()` / `num_wall_faces()` / `layout()` / `pressure_iterations()` | `kinetic_energy()` / `internal_energy()` / `time`; the five as read-only properties | **removed 1.0.0** |
 | `num_cells`, `num_faces`, `num_particles`, `num_wall_faces` | — | **canon** |
+| `Tessellation.build_report()` / `set_local_certificate()` / `set_gate()`; `FlowSolver.set_skew_corrected()` / `set_wall_gradient_quadratic()`; `Simulation.set_repair()` | `<object>.diagnostics.<same>` (F, D2) | **removed 1.0.0** (F, 2026-09-10) |
+| `Tessellation.set_wall_mode(exact: bool, skin_frac)` | `set_wall_mode(mode='exact'\|'skin', skin_frac)` | **removed 1.0.0** (F) |
+| `FlowSolver(..., amg=True)` | — (the plain-CG ablation, unreached) | **removed 1.0.0** (F) |
+| `FlowSolver.set_body_force(fx, fy, fz)` | `set_body_force((fx, fy, fz))` | **removed 1.0.0** (F) |
+| `optimize_volume_mesh(positions, vset, L, sw, max_newton, …, colored_gs)` → dict | `optimize_volume_mesh(positions, target_volumes, extent, *, search_window, max_iter, tol, cg_iters, use_weights, method=)` → `OptimizeResult` (`n_empty` → `num_empty`) | **removed 1.0.0** (F) |
+| `minimize_interface(positions, types, sigma, L, sw, max_iter, tol)` → dict (energy in `maxVolErr`) | `minimize_interface(positions, types, extent, *, sigma, search_window, max_iter, tol)` → `InterfaceResult{iters, energy, energy_ratio, converged}` | **removed 1.0.0** (F) |
+| `optimize_pore_mesh(positions, vref, c, r, L, sw, …)`, `sdf_voronoi_cells(…, L)`, `sdf_voronoi_section(…, L, origin, normal)`, `redistribute_pore_mesh(…, L, …)` at the package root | `peclet.voro.pore_mesh.<same>(…, target_volumes, sphere_centers, sphere_radii, extent, *, search_window, …)`, `(…, extent)`, `(…, extent, point, normal)`, `→ RedistributeResult` (`n_added/n_removed/n_dead` → `num_*`) | **removed 1.0.0** (F) |
+| `sphere_union_scene(…)`, `_union_sdf(pts, c, r, L)` at the package root | `peclet.voro.scenes.sphere_union_scene`, `scenes.sphere_union_sdf(points, centers, radii, extent)` | **removed 1.0.0** (F) |
+| `VoronoiHalo(origin, size, gsize, periodic)`, `.rank()`, `.size()`, `owner_of(x, y, z)`, `gather(owned_pos, owned_gid, owned_weight, rcut)` | `VoronoiHalo(cells, *, extent, origin, periodic)`, `rank` / `num_ranks` properties, `owner_of(point)`, `gather(positions, gids, rcut, weights=None)` | **removed 1.0.0** (F) |
+| — | `DistributedTessellation(cells, *, extent, origin, periodic, rcut, skin, tolerance)` — the distributed moving tessellation (`establish`, `step`, `num_owned`, `num_combined`, `get_combined_gids`); `VoronoiHalo` stays as the primitive | **new 1.0.0** (F) |
 
 ### peclet.pnm
 
@@ -175,6 +185,10 @@ Status: **removed 1.0.0** = the non-canonical spelling was deleted in the clean-
 |---|---|---|
 | `origin_zyx`, `spacing_zyx`, `global_shape_zyx`, `grad_p_zyx` | — | **canon, as the documented exception of §1.7** |
 | `extract_topology_gpu(segmentation, shape)` | `extract_topology(segmentation, shape_zyx)` | **removed 1.0.0** |
+| `segment_volume()` → `list[int]`, `extract_topology()` → `list[tuple]`, `extract_network_flow()['throats'` / `'pore_pressure'` / …`]` → lists | `int32 (Nz,Ny,Nx)` ndarray, `(M,2) int32` ndarray, float64 ndarrays (same values, same order) | **removed 1.0.0** (F, 2026-09-10) |
+| `mpi_block()` → `(origin_zyx, shape_zyx)` — an INTEGER voxel offset spelled like the physical origin | `(offset_zyx, shape_zyx)` | **removed 1.0.0** (F) |
+| `mpi_rank()`, `mpi_size()` | — (mpi4py; zero callers) | **removed 1.0.0** (F) |
+| `Pore.x`, `.y`, `.z` | — | **canon** — three self-named scalars carry no axis-order ambiguity, so they take no `_zyx` (the documented exception to §1.7 for this module) |
 
 pnm is the one module whose Python arrays are C-contiguous `(nz, ny, nx)` rather than
 Fortran-order `(nx, ny, nz)` — `SDFReader.read_vti` returns exactly that, because that is the
@@ -182,7 +196,7 @@ layout a VTI hands over — and its origin/spacing triples are stated in the SAM
 they describe. The `_zyx` suffix is therefore load-bearing. **Keep the suffix wherever the triple is
 in array order**, and never add a bare `origin`/`spacing` beside it in the other order.
 
-### peclet.core (`peclet.core.amr`, `peclet.core.mpi`)
+### peclet.core (`peclet.core.mpi`, `peclet.core.geom`) and peclet.amr (`peclet.core.amr` until 2026-09-10)
 
 | former | canonical | status |
 |---|---|---|
@@ -192,6 +206,9 @@ in array order**, and never add a bare `origin`/`spacing` beside it in the other
 | `mpi.Migrator`, `mpi.Halo`; ctor `(origin, size, gsize, periodic)` | `ParticleMigrator`, `ParticleHalo`; `(origin, extent, cells, periodic)` | **removed 1.0.0** |
 | `ParticleHalo.num_ghost()` / `num_owned()` | read-only properties | **removed 1.0.0** |
 | `num_leaves`, `num_levels`, `centers` | — | **canon** |
+| `peclet.core.amr.{Octree, DistributedOctree, Poisson, Flow}` | `peclet.amr.{…}` — the whole AMR tree is the eighth package `peclet-amr` (QUALITY_PLAN G.2, D6) | **removed 1.0.0** (G.2, 2026-09-10) |
+| `Flow.last_mom_iters` / `last_pres_iters` / `last_outer_iters` / `divergence_norm_face` / `set_momentum_mg` / `set_momentum_gs` / `set_velocity_mg_staircase` / `set_momentum_mg_solver` / `set_ghost_gradient` / `set_aperture_order` | `Flow.diagnostics.<same>` | **removed 1.0.0** (F, 2026-09-10) |
+| env `PECLET_CORE_GPS_RHO` / `PECLET_CORE_GPS_MAXN` | `Flow.set_ghost_sampled(on, rho=2.2, max_samples=0)` | **removed 1.0.0** (E for amr) |
 
 ### peclet.coupling
 

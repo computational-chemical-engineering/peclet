@@ -54,6 +54,7 @@ nav:
       - peclet.pnm: python/pnm.md
       - peclet.coupling: python/coupling.md
       - peclet.core: python/core.md
+      - peclet.amr: python/amr.md
       - peclet.morton: python/morton.md
   - Design:
       - Architecture: ARCHITECTURE.md
@@ -76,6 +77,7 @@ nav:
       - Voronoi update throughput (voro): studies/voro_update_throughput.md
   - C++ API (Doxygen):
       - peclet-core: https://computational-chemical-engineering.github.io/peclet-core/
+      - peclet-amr: https://computational-chemical-engineering.github.io/peclet-amr/
       - peclet-morton: https://computational-chemical-engineering.github.io/peclet-morton/
       - peclet-flow: https://computational-chemical-engineering.github.io/peclet-flow/
       - peclet-pnm: https://computational-chemical-engineering.github.io/peclet-pnm/

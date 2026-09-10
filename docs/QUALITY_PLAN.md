@@ -316,6 +316,63 @@ grids passed as a 3-D array, not `(grid, nx, ny, nz, …)`; `set_positions` boun
 `DistributedMovingTessellation` or document `VoronoiHalo` as the whole MPI story; `minimize_interface`
 stops returning energy through `maxVolErr`.
 
+**Review 2026-09-10 (before executing F in the remaining repos) — decisions taken against the code:**
+*Enum convention*: "integer/bool modes → enums" means VALIDATED STRINGS with the accepted set in the error
+message (`set_pressure_bottom`, dem's shapes and modes); no C++ enums cross the Python boundary.
+*voro*: the parked `wip/package-f-tiering` (e3e5ebb) fast-forwards onto main and its design stands
+(four `diagnostics` views over an owner pointer, `InterfaceResult{iters, energy, energyRatio,
+converged}` — the `maxVolErr` item is done there, `OptimizeResult` objects, `parseWallMode`/`parseMethod`,
+and a `DistributedTessellation` binding over `DistributedMovingTessellation` — DECIDED: bind it, keep
+`VoronoiHalo` as the primitive; the halo-only story hands the user the global skin-trip reduction that
+already deadlocked at np≥4). But it is import-broken: the lazily imported `peclet.voro.pore_mesh` and
+`.scenes` were never written/committed and CMake stages only `voro_init.py`; it also deleted
+`FlowSolver(amg=)` silently and dropped `set_tolerance`'s default — both reversed (evidence or a
+diagnostics setter; a numeric default is not a mode). `_union_sdf` (used by the gallery) becomes
+`scenes.sphere_union_sdf`.
+*flow*: 278 unique members, not 266. The plan's "3–7 are ablations" is contradicted by
+`flow_ibm.hpp:855-860`: 5/6/7 are the Basilisk embed port and must stay reachable. DECIDED: one public
+`set_collocated_scheme('ghost'|'gauge-exact'|'plain'|'embed')` (embed = mode 7); the intermediate rungs
+only as `diagnostics.set_face_interp(5|6)`; modes 1, 2, 3, 4, 10, 11, 12, 13, `gauge-2a` and
+`set_fv_relax` deleted with the kernels only they reach (most of `mac_approx_projection.hpp`; no
+registered ctest calls `set_face_interp`). Faces become strings too (`'-x'…'+z'`), types
+`'periodic'|'wall'|'inflow'|'outflow'|'slip'`. Eleven "call BEFORE" docstrings have ZERO state checks;
+each becomes a check only where the late call is silently wrong (verified in the C++), else the
+docstring is corrected. Pressure-driver selection, `set_decomposition`, `set_backflow_stabilization`,
+the VoF block container, `hydro_force_torque(_reaction)`, the copying field registry and
+`unit_scales` stay public (coupling and the documented usage need them); `field_view`,
+`exchange_field*`, `rebalance_by_weights`, `bcast_from_root` are diagnostics — coupling follows.
+*pnm*: no `diagnostics` object (nothing to put in it); `mpi_rank`/`mpi_size` deleted (zero callers);
+`mpi_block`'s integer voxel offset renamed `origin_zyx` → `offset_zyx` (it collided with the physical
+`origin_zyx` every other call takes); and the defect the plan missed — `segment_volume` /
+`extract_pore_network` returned the segmentation as a Python `list[int]` (millions of boxed ints on
+packing_ring) and `extract_topology` converted it back element-wise → ndarrays in and out
+(`int32 (Nz,Ny,Nx)`, connections `(M,2)`), byte-identical values. `Pore.x/y/z` stay (self-named
+scalars carry no axis-order ambiguity; NAMING §1.7 records the exception).
+*core*: mpi/geom have nothing diagnostic; `peclet.amr.Flow` gets a `diagnostics` for its iteration
+counters. Every hash-gate script is COMMITTED under `tests/` this time (dem's SHA gate and pnm's
+54-file comparison were ad hoc and are lost).
+
+**core DONE 2026-09-10 — as `peclet.amr` F** (amr `eeeac1e`): `Flow.diagnostics` (ten instruments, listed in
+NAMING §2); mpi/geom had nothing to tier. Executed inside G.2 (§3.G.2).
+
+**voro DONE 2026-09-10** (`16363b5`, `9e87eee` on top of the parked `e3e5ebb`, fast-forwarded; the wip
+branch deleted): four `diagnostics` views; `pore_mesh` and `scenes` written as lazily imported
+submodules and staged/installed by CMake (the parked branch had neither file); `OptimizeResult` /
+`InterfaceResult` / `RedistributeResult`; `FlowSolver(amg=)` deleted with evidence (zero callers);
+`set_tolerance` default restored; `DistributedTessellation` bound (np=2 vs a single-rank cold rebuild:
+max |dV|/V̄ = 8.8e-14). Gate: 24/24 + 18/18 mpi before and after; `python/state_hash.py` COMMITTED
+(17 paths identical + the new distributed path); Quality/Doxygen/MPI green. Gallery hits (five pages +
+`src/peclet_examples/pore_mesh.py`) and voro's CLAUDE.md (the brief wrongly said none exists) in the
+agent's report; coupling: none.
+
+**pnm DONE 2026-09-10** (`6ee6399`, `b07ad75`): public surface 12 names, no `diagnostics` object; ndarray
+returns (`segment_volume` int32 `(Nz,Ny,Nx)`, connections/throats `(M,2) int32`, network-flow scalars
+float64 — the whole dict, not only `connections`), `extract_topology` reads the 3-D array in place,
+`mpi_block` → `(offset_zyx, shape_zyx)`, `mpi_rank`/`mpi_size` deleted (zero callers). Gate: 9/9 before
+and after; `tests/regression/state_hash.py` COMMITTED (61 hashes: lattice + packing_ring, staged +
+fused, network flow ± openness, np=2) — all identical to the pristine build; CI green. Gallery:
+`pore-network-extraction/index.qmd:94` keeps a now-redundant `reshape` (valid); coupling: no callers.
+
 **dem DONE 2026-09-08** (`2213849`): public surface ≈ 90 members in eight groups (shapes, domain,
 physics, walls, state, stepping, read-out, policy, MPI); `sim.diagnostics` holds 13 developer members;
 deletions: `set_sphere_shape` (alias), `set_stabilization(bool)`, the flat `[3N]` `set_positions`
@@ -384,6 +441,41 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
    oracle). Update the umbrella `CLAUDE.md` table, `ARCHITECTURE.md`, `mkdocs.yml`, `docs/python/`,
    `tools/release/`, `RELEASE.md`'s package list and `PecletDeps.cmake` for an eighth package.
 
+   **Corrections from the 2026-09-10 re-audit (verified against the tree; they supersede the text
+   above where they differ).** (1) voro uses MORE than `greedyColoring`: `ot_optimizer.hpp:95,228` uses
+   `MomentumSolver<21>` / `MomentumOp` (the Jacobi-preconditioned BiCGStab over a face CSR), so the
+   lift into `core/solver/` is the colouring AND the CSR operator + BiCGStab solver (verbatim; the AMR
+   package keeps `using` aliases; `MomentumMG` stays in amr). (2) `barnes_hut.hpp` includes
+   `block_octree.hpp` + `leaf_field.hpp` and is already inside the 4167-line infrastructure count: it
+   is an octree consumer and moves with the tree. (3) Four AMR headers include `morton/morton.hpp`:
+   `peclet-amr` depends on core AND morton — nothing else in the suite. (4) `tests/oracle/
+   morton_octree.hpp` has one includer, `test_block_octree.cpp` (AMR): it moves. (5) The movable
+   ctest set is 47 (plain) / 52 (host+MPI) / 92 (Kokkos) per core tree plus `python_amr{,_np2}`, not
+   ~30. (6) No consumer uses `find_package(peclet-core CONFIG)`; every package vendors core through
+   its own `cmake/PecletDeps.cmake` sibling include with a `PECLET_CORE_TAG` pin, and there is no
+   umbrella `PecletDeps.cmake` — `peclet-amr` uses the same mechanism. (7) The back-edges
+   (`distributed_view.hpp`/`distributed_fv.hpp` → solver headers) are genuine symbol uses but do not
+   block the split, since nothing that stays in core depends on `amr/`; they are internal hygiene for
+   the new package. (8) E for amr: `PECLET_CORE_GPS_RHO/MAXN` change numerics → `Flow.set_ghost_sampled(
+   rho=, max_samples=)` setters, defaults inert; `PECLET_CORE_PROFILE_*` are prints (renamed
+   `PECLET_AMR_*`); core's `grid_halo.hpp` variables are transport/logging and stay. (9) core's
+   CLAUDE.md advertises 104/158 ctests; no current tree reproduces those counts — fixed with the strip.
+
+   **DONE 2026-09-10.** core `d93c323` (B: the face-CSR operator layer lifted to `core/solver/` —
+   `face_csr.hpp`, `csr_operator.hpp` (`MomentumOp`), `csr_bicgstab.hpp` (`MomentumSolver`, vestigial
+   `Bits` dropped), `coloring.hpp`, `vector_ops.hpp`; new ctest `csr_solver`), `ae1affe` (D: the strip),
+   `5810ab5` (toolchain-aware byte gate). New repo `peclet-amr` = 174 filtered commits (`include/peclet/
+   core/amr/` and its `tpx/amr/` ancestry → `include/peclet/amr/`, the 51 AMR test sources, the study
+   drivers, `bench_amr_flow`, the AMR docs and archive notes, `tests/oracle/morton_octree.hpp`) + scaffold
+   `2533f16`, E `0c1de95`, F `eeeac1e`, G.5 `8e74940`, a format-only `48f1801`, CI `cfe5a50`; submodule
+   `amr` in the umbrella. Counts: core 109/164/7 → 53/68/6 (+`csr_solver`); amr 100 ctests (79 + 16 np8 +
+   5 bench) + 3 Python. Hashes: core mpi/geom 15 keys identical pristine → B → D; amr 13 keys identical
+   across the relocation (same toolchain; the gate records per toolchain and SKIPs elsewhere — `-O0`
+   and `-O3` differ). Findings: core's single-rank halo stub is not Kokkos-clean, so amr REQUIRES MPI;
+   `-mfma` must stay module-only (host-vs-device bit-exact tests drift with it); filter-repo carried
+   core's release tags into the new history — deleted locally, never pushed; `PECLET_CORE_TAG` pins in
+   the consumers lag core `d93c323` (release session).
+
    **Not in scope, and not implied.** If the long-term goal is one solver serving both uniform and
    adaptive meshes, the mechanism is templating the discretization on a mesh policy — the pattern
    G.3 proved in pnm (`GridGeo` / `BlockGeo`) — not a package dependency. That is a deliberate
@@ -394,10 +486,21 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
    Gates: 9/9 ctests host and CUDA, packing_ring 7199/53020 unchanged, and a 54-file byte comparison
    of pores/segmentation/connections/network-flow (single-rank staged+fused, np=2 per rank, open and
    cut-cell) against the pre-refactor build: 0 differ.
-4. **dem:** `sim.hpp` (1876) → step drivers / `Simulation` facade / shape registry; the world-radius
-   fill written inline 3× beside `fillWorldRadiiKokkos`; the gid-keyed ledger carry written twice
-   (`solve_driver_force.hpp:72-90`, `contact_preprocessing.hpp:119-170`).
-5. **core Python:** `Octree` and `DistributedOctree` share 14 verbatim members with no base. Folded into G.2 (same file, `python/amr_bindings.cpp`, restructured once).
+4. **dem — DONE 2026-09-10** (`ee34cfe` gate, `4839ccf` split, `9dad55d`, `9fa890c` dedups, `93eec07`
+   fix; CI green). `sim.hpp` 1917 → 1047: free drivers → `src/step_solve.hpp` + `step_solve_mpi.hpp`,
+   the shape registry → `src/shape_registry.hpp` as a protected base `ShapeRegistry` (bodies verbatim;
+   `addAnalyticWall` stayed with the walls); the world-radius fill was written FOUR times (not three)
+   → one `fillWorldRadiiKokkos`; the gid-keyed search THREE times (not two) → `pairKeyFromGids` +
+   `lowerBoundKey`. Gate: `tests/regression/state_hash.py` (COMMITTED; nine fixed-seed cases at one
+   thread incl. `step_mpi`/`step_hertz_mpi` np=1,2) identical after every structural commit; 47/47.
+   The numerics fix is its own commit: single-rank periodic wrap contacts were one-sided because the
+   partner beyond one `maxRad` of the face had no image (the survey had the sides swapped: the far,
+   un-imaged partner moved, by half the de-penetration); band = `2·maxRad + margin`, ghost capacity
+   follows; `tests/python/test_periodic_wrap_symmetry.py` RED before / GREEN after, and
+   `test_validate_periodic.py`'s straddlers are now asymmetric (np=2 error 0). Hashes changed only
+   for the four single-rank periodic cases; Hertz and every MPI case identical.
+5. **core Python — DONE 2026-09-10 in peclet-amr** (`8e74940`): the shared members (16, not 14) are bound
+   once through `bindOctreeCommon<T>`; attribute sets identical before/after.
 6. **Precision as a typed policy:** flow's `MReal = float` unless a raw `-DPECLET_FLOW_MREAL_DOUBLE`
    (no CMake option; three "hard `(float)` casts that survived the templating") is
    SCALING_ISSUES #1; make it `option(PECLET_FLOW_OPERATOR_DOUBLE)`, grep-test that no `(float)`
@@ -553,6 +656,20 @@ lands; F and G.2 follow in the same repo.*
   `flow/doc/history/…` in eight files, `docs/archive/AMR.md` cited `flow/doc/sdflow_colocated_plan.md`
   which never existed (it is `flow_colocated_plan.md`), and `docs/python/flow.md` was regenerated from
   the MPI build so it no longer documents the retired `PECLET_FLOW_MG_ASPECT`.
+
+- **2026-09-10, F/G review and launch** — the remaining packages were reviewed against the code before
+  cutting (five read-only surveys: voro's parked branch, flow's 278 members, core's AMR dependency
+  graph, pnm's surface, dem's `sim.hpp`). Findings and decisions are recorded in place: §3.F ("Review
+  2026-09-10") and §3.G.2 ("Corrections from the 2026-09-10 re-audit"). Plan errors found: voro's AMR
+  use is the CSR BiCGStab solver, not one function; `barnes_hut.hpp` is an octree consumer; peclet-amr
+  needs morton; flow's face-interp 5/6/7 are the embed port, not ablations; pnm returned the
+  segmentation as a list of boxed ints; dem's ledger carry is written three times, not two; the G.3 and
+  dem SHA gates were never committed. `.gitmodules` still names `transport-core`/`sdflow`/`vorflow` (a
+  D8 leftover, renamed when the eighth submodule is added). `preamble_G.md` written (byte-comparison
+  gate mandatory, hash scripts committed). The empty repo `peclet-amr` was created. Execution order:
+  wave 1 in parallel — voro F, flow F, pnm F, dem G.4 — plus core F + G.2 + G.5 as one pass; then the
+  voro include switch, the shared `poly_*` lift, G.1, G.6, G.7; then callers, CHANGELOG/NAMING, this
+  file, pointers. No version bump, no tag.
 
 ## 6. Handoff — starting packages F and G
 

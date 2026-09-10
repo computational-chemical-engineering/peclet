@@ -36,13 +36,17 @@ PAGES = [
     ("morton.md", "peclet.morton — Morton/Z-order arithmetic",
      "Vectorised Morton (Z-order) codes with O(1) arithmetic directly in Morton space.",
      [("peclet.morton", [])]),
-    ("core.md", "peclet.core — shared infrastructure (MPI halo, AMR, geometry)",
-     "The Lagrangian particle halo (`peclet.core.mpi`), the Kokkos AMR octree (`peclet.core.amr`, "
-     "present when built with a Kokkos backend + morton) and the analytic-SDF scene authoring + "
-     "rigid-body mass properties (`peclet.core.geom`).",
+    ("core.md", "peclet.core — shared infrastructure (MPI halo, geometry)",
+     "The Lagrangian particle halo (`peclet.core.mpi`) and the analytic-SDF scene authoring + "
+     "rigid-body mass properties (`peclet.core.geom`). The AMR octree and its solver are the separate "
+     "`peclet.amr` package since 2026-09-10 (QUALITY_PLAN G.2).",
      [("peclet.core.mpi", ["ParticleMigrator", "ParticleHalo"]),
-      ("peclet.core.amr", ["Octree", "Poisson", "Flow", "DistributedOctree"]),
       ("peclet.core.geom", ["SceneBuilder"])]),
+    ("amr.md", "peclet.amr — block-octree AMR and its collocated cut-cell Navier–Stokes solver",
+     "The block-local-Morton AMR octree (`Octree`, distributed `DistributedOctree`), the AMR Poisson "
+     "solve and the collocated cut-cell Navier–Stokes solver on it (`Flow`; developer instruments on "
+     "`Flow.diagnostics`). Depends on peclet-core and peclet-morton; requires a Kokkos backend and MPI.",
+     [("peclet.amr", ["Octree", "DistributedOctree", "Poisson", "Flow", "FlowDiagnostics"])]),
 ]
 
 

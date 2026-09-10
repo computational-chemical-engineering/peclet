@@ -16,7 +16,7 @@ those releases, the workflows in each repo, and the traps they hit.
 
 | Artifact | Where | Produced by | Status of the mechanism |
 |---|---|---|---|
-| **CPU wheels + sdists**: `peclet-core` (sdist only), `peclet-morton`, `peclet-flow`, `peclet-pnm`, `peclet-dem`, `peclet-voro`, `peclet-coupling` (sdist only) | PyPI | each submodule's `.github/workflows/release.yml` on a `v*` tag (cibuildwheel, manylinux_2_28, cp310–cp313, `PECLET_VENDOR_DEPS=ON`; Trusted Publishing) | works (used for every release) |
+| **CPU wheels + sdists**: `peclet-core` (sdist only), `peclet-amr` (sdist only), `peclet-morton`, `peclet-flow`, `peclet-pnm`, `peclet-dem`, `peclet-voro`, `peclet-coupling` (sdist only) | PyPI | each submodule's `.github/workflows/release.yml` on a `v*` tag (cibuildwheel, manylinux_2_28, cp310–cp313, `PECLET_VENDOR_DEPS=ON`; Trusted Publishing) | works (used for every release) |
 | **`peclet` metapackage** (== pins on the CPU family; extras `[mpi]`, `[cfd-dem]`) | PyPI | umbrella `.github/workflows/release.yml` on a `v*` tag | works |
 | **CUDA wheels** `peclet-flow-cu13` (and, once added, `peclet-dem-cu13`, `peclet-pnm-cu13`, `peclet-voro-cu13`) | PyPI | `cuda-wheel` job in the same `release.yml` (manylinux container + CUDA 13 toolkit, Kokkos-CUDA static, `nvidia-cuda-runtime` dependency wheel, rpath) | works for flow; the other three do not exist yet (§5.3) |
 | **Containers** `peclet-cpu`, `peclet-cuda:*-sm80/-sm90`, `peclet-hip:*-gfx90a` | GHCR (`oras://ghcr.io/computational-chemical-engineering/...`) | umbrella `.github/workflows/containers.yml` on a `v*` tag or dispatch | cpu + cuda publish; hip builds since 2026-09-04 (failed on every tag 0.3.0–0.6.0, §8) |

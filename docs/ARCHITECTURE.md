@@ -21,6 +21,7 @@ conventions, and the same interfaces.
 | `voro` | **Mixed** | Moving particles + their Voronoi cells (Lagrangian carriers, Eulerian-like fluxes across cell faces); also a mesh generator + Navier–Stokes on the Voronoi mesh | Developed; Kokkos + nanobind Python |
 | `pnm` | Eulerian post-processing | Pore/throat network extracted from an SDF grid (watershed), network flow from a `flow` DNS | Developed; split out of `flow` 2026-07 |
 | `coupling` | **Coupled** | `flow` + `dem` in one process: unresolved (volume-averaged drag, void fraction) and resolved (cut-cell reaction) two-way coupling | Developed; distributed when both are |
+| `amr` | **Eulerian, adaptive** | Block-local-Morton octree (per-block octree, distributed octree with leaf/field rebalance, solution-adaptive refinement) carrying a collocated cut-cell Navier–Stokes solver (ghost projection, mixed-level cut band, AMR multigrid/BiCGStab) | Under development; split out of `core/amr/` with its history 2026-09-10 (QUALITY_PLAN G.2); depends on `core` + `morton` only |
 | `morton` | Primitive | Z-order codes / spatial index | Mature |
 
 (`block_decomposer`, the original source of the shared MPI layer, has been **retired/archived**; its
@@ -34,13 +35,14 @@ decomposition (all use the same block decomposition) nor the geometry (all use t
 
 ```
             ┌──────────────────────────────────────────────────────────┐
- methods    │  flow  pnm  dem  voro  coupling  │   separate repos
+ methods    │  flow  pnm  dem  voro  coupling  amr     │   separate repos
             └──────────────────────────────────────────────────────────┘
                    │             │                │
                    ▼             ▼                ▼
             ┌──────────────────────────────────────────────────────────┐
  core       │                   core                         │   new shared repo
             │  decomposition · halo (async MPI) · geometry/SDF · ibm   │
+            │  solver (face-CSR, BiCGStab, colouring, GraphAMG) · vof  │
             │  common types/conventions · python (nanobind bridge)     │
             └──────────────────────────────────────────────────────────┘
                    │                                        │

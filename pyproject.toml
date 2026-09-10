@@ -37,6 +37,9 @@ dependencies = [
 # peclet-core is sdist-only (MPI particle halo + Kokkos AMR): installing it builds from source and needs
 # an MPI toolchain (+ optional Kokkos prefix for the AMR module).
 mpi = ["peclet-core==0.6.1"]
+# peclet-amr (block-octree AMR + its solver, under development) is sdist-only too: needs MPI, a Kokkos
+# backend and peclet-morton; pinned to the family version at tag time like every member.
+amr = ["peclet-amr==0.1.0"]
 # peclet-coupling is the unresolved point-particle CFD-DEM coupling of peclet.flow + peclet.dem
 # (sdist-only: builds its Kokkos kernels from source against a bootstrapped prefix).
 cfd-dem = ["peclet-coupling==0.4.0"]

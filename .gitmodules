@@ -19,3 +19,6 @@
 [submodule "pnm"]
 	path = pnm
 	url = git@github.com:computational-chemical-engineering/peclet-pnm.git
+[submodule "amr"]
+	path = amr
+	url = git@github.com:computational-chemical-engineering/peclet-amr.git

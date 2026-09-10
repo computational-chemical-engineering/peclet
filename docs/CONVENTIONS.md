@@ -51,8 +51,8 @@ To stop every code inventing its own, the core `common` module defines (host sid
 - `peclet::core::Real` — **`double`**, a fixed alias (`common/types.hpp`), not a build option. Where a code
   stores a *float* for speed it says so per role: flow's multigrid operator storage is `MReal = float` unless
   built with `-DPECLET_FLOW_MREAL_DOUBLE` ([SCALING_ISSUES.md](SCALING_ISSUES.md) #1 — dense beds need the
-  double build), and core's ghost-projection closure weights (`scheme/ghost_closure.hpp`,
-  `amr/ghost_projection.hpp`) are float by design. Turning these into typed CMake options is
+  double build), and core's ghost-projection closure weights (`scheme/ghost_closure.hpp`) and peclet-amr's
+  `ghost_projection.hpp` overlay are float by design. Turning these into typed CMake options is
   [QUALITY_PLAN.md](QUALITY_PLAN.md) G.6.
 - `peclet::core::Index` — signed index type for grids/particles (`std::int64_t`; supersedes block_decomposer's
   `long int IndxT`).
@@ -76,7 +76,7 @@ labels and stay local to voronoi; they are not suite-wide types.
 ## 6. Python binding conventions
 
 - **Mechanism:** **nanobind** for every compiled solver (`peclet.flow`, `peclet.pnm`, `peclet.dem`,
-  `peclet.core.{mpi,amr,geom}`, `peclet.voro`, `peclet.coupling`'s kernels), built through **scikit-build-core**. nanobind is
+  `peclet.core.{mpi,geom}`, `peclet.amr`, `peclet.voro`, `peclet.coupling`'s kernels), built through **scikit-build-core**. nanobind is
   chosen over pybind11 because its `nb::ndarray` carries a DLPack device tag and arbitrary strides,
   which is what makes the zero-copy GPU path below possible. morton's lightweight ctypes/C-ABI shim
   stays as is (dependency-free by design, ships portable PyPI wheels) — the deliberate exception.
@@ -113,7 +113,7 @@ labels and stay local to voronoi; they are not suite-wide types.
   CUDA runtime unloads → `cudaErrorCudartUnloading` at exit). To avoid the opposite abort ("deallocated
   after `Kokkos::finalize`"), the hook first releases any live View-holding objects, then finalizes:
   modules with simulation objects keep a registry and do `releaseAll()` → `finalize()` (dem, voro,
-  `peclet.core.amr`); modules whose objects are short-lived just `finalize()` (flow, pnm) and document that a
+  `peclet.amr`); modules whose objects are short-lived just `finalize()` (flow, pnm) and document that a
   Solver kept alive to interpreter exit must be released first (`del s`). Getters return host
   `vector_to_ndarray` arrays (no device Views), so they never block finalize; a zero-copy *device*
   export (`view_to_ndarray` to CuPy) must be released before exit. Build note: pass `NOMINSIZE` to

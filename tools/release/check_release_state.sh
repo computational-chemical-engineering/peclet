@@ -13,8 +13,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 OFFLINE=0; CI=0
 for a in "$@"; do case "$a" in --offline) OFFLINE=1;; --ci) CI=1;; esac; done
-SUBS="core morton flow pnm dem voro coupling"
-declare -A DIST=([core]=peclet-core [morton]=peclet-morton [flow]=peclet-flow [pnm]=peclet-pnm [dem]=peclet-dem [voro]=peclet-voro [coupling]=peclet-coupling)
+SUBS="core amr morton flow pnm dem voro coupling"
+declare -A DIST=([core]=peclet-core [amr]=peclet-amr [morton]=peclet-morton [flow]=peclet-flow [pnm]=peclet-pnm [dem]=peclet-dem [voro]=peclet-voro [coupling]=peclet-coupling)
 fail=0
 say() { printf '%s\n' "$*"; }
 bad() { say "  !! $*"; fail=1; }
@@ -99,8 +99,8 @@ if [ -f "$f" ]; then
   say "== peclet-cu13 metapackage ($f) version $(grep -m1 -E '^version' "$f" | sed -E 's/.*"([^"]+)".*/\1/')"
   grep -E 'peclet-[a-z0-9-]+==' "$f" | sed -E 's/^\s*/  /'
   [ "$(grep -m1 -E '^version' "$f" | sed -E 's/.*"([^"]+)".*/\1/')" != "$(pyver .)" ] && bad "peclet-cu13 version != peclet $(pyver .)"
-  for d in peclet-morton peclet-flow peclet-pnm peclet-dem peclet-voro peclet-core peclet-coupling; do
-    case $d in peclet-morton|peclet-core|peclet-coupling) dc=$d;; *) dc=$d-cu13;; esac
+  for d in peclet-morton peclet-flow peclet-pnm peclet-dem peclet-voro peclet-core peclet-amr peclet-coupling; do
+    case $d in peclet-morton|peclet-core|peclet-amr|peclet-coupling) dc=$d;; *) dc=$d-cu13;; esac
     cpu=$(grep -oE "$d==[0-9.]+" pyproject.toml | head -1 | cut -d= -f3)
     gpu=$(grep -oE "$dc==[0-9.]+" "$f" | head -1 | cut -d= -f3)
     [ -z "$gpu" ] && { bad "peclet-cu13: no pin for $dc"; continue; }

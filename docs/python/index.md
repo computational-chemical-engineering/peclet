@@ -12,7 +12,8 @@ individual `pip install peclet-<name>`). Worked, runnable examples for every mod
 | [**peclet.dem**](dem.md) | `import peclet.dem` | `Simulation` — Lagrangian DEM (XPBD and Hertz–Mindlin), SDF-shaped particles, analytic walls |
 | [**peclet.voro**](voro.md) | `import peclet.voro` | `Tessellation`, `Simulation`, `FlowSolver` — moving-cell Voronoi, dynamics, Navier–Stokes on a Voronoi mesh |
 | [**peclet.coupling**](coupling.md) | `import peclet.coupling` | `CfdDem` / `ResolvedCfdDem` — two-way CFD-DEM over `flow` + `dem` |
-| [**peclet.core**](core.md) | `from peclet.core import mpi, amr, geom` | particle halo (MPI), Kokkos AMR octree, analytic-SDF scene authoring (`SceneBuilder`) |
+| [**peclet.core**](core.md) | `from peclet.core import mpi, geom` | particle halo (MPI), analytic-SDF scene authoring (`SceneBuilder`) |
+| [**peclet.amr**](amr.md) | `import peclet.amr` | block-octree AMR (`Octree`, `DistributedOctree`) and its collocated cut-cell Navier–Stokes solver (`Flow`) — under development |
 | [**peclet.morton**](morton.md) | `import peclet.morton` | vectorised Morton/Z-order arithmetic |
 
 Every Kokkos-backed module exposes `execution_space` (`OpenMP` / `Cuda` / `HIP` / `Serial`) so you can
@@ -40,7 +41,7 @@ carries it (the PyPI wheels do not):
 | `peclet.dem` | `Simulation.init_mpi(...)`, `enable_mpi_step(...)`, `step_mpi(nsteps)`, `step_hertz_mpi(nsteps)`, `rebalance()`, `rank()`, `num_ghost()` |
 | `peclet.voro` | `VoronoiHalo(origin, size, gsize, periodic)` with `owned_mask`, `gather(...) → (pos, gid, weight, n_owned)`, `refresh_positions`, `rank()/size()` |
 | `peclet.coupling` | the drivers run distributed when their `flow` and `dem` are (the deposition uses `exchange_field_add`) |
-| `peclet.core` | `peclet.core.mpi.ParticleMigrator` / `ParticleHalo` (the shared particle halo the above build on); `peclet.core.amr.DistributedOctree` |
+| `peclet.core` | `peclet.core.mpi.ParticleMigrator` / `ParticleHalo` (the shared particle halo the above build on); `peclet.amr.DistributedOctree` |
 
 A distributed driver `import mpi4py` (which calls `MPI_Init`), then decomposes and steps. See the
 worked example [`benchmarks/profile_mpi_flow.py`](https://github.com/computational-chemical-engineering/peclet/tree/main/benchmarks),
