@@ -15,7 +15,18 @@ releases before removal, and a break costs a major. The full old→new table is 
   `global_cells`, `cell_centres()`→`cell_centers()`, `scene_instance_count()`→`num_scene_instances()`,
   `vof_block_colour`/`vof_filled_colour`/`enable_vof_blocks_from_colours(colours=)`→`…color…`;
   `set_velocity_streams()` (a no-op) and the ignored `set_solid(pressure_coarse=)` keyword are gone.
-  `get_ox/oy/oz` stay (they are the openness fields).
+  `get_ox/oy/oz` stay (they are the openness fields). **API tiering (F, 2026-09-10):** 125 developer
+  members move to `solver.diagnostics` (instruments, timers, census/budget/ledger calls, solver tuning
+  beyond driver selection, ablation switches, the zero-copy `field_view`/`exchange_field*`/
+  `rebalance_by_weights`); ONE collocated scheme setter, `set_collocated_scheme('ghost'|'gauge-exact'|
+  'plain'|'embed')` — `set_face_interp` modes 1, 2, 3, 4, 10, 11, 12, 13, `'gauge-2a'`, `set_fv_relax`
+  and `set_aperture_floor` are deleted with their kernels (the two intermediate embed rungs survive as
+  `diagnostics.set_face_interp(5|6)`); every integer code is a string (`set_domain_bc('-x', 'inflow',
+  …)`, `set_advection_scheme('sou'|'koren')`, `add_scalar(scheme='koren')`, `set_scalar_bc(name, face,
+  'dirichlet', v)`, `set_csf_mode('face'|'cell')`, …); the `_off` pairs and `disable_vof_blocks` collapse
+  into their setters; and the "call BEFORE" docstrings became checks that raise (`set_domain_bc` after
+  geometry, `set_decomposition` after `init_mpi`, …) — a late `set_rho`/`set_mu` used to leave a stale
+  stencil silently and now rebuilds it.
 - **peclet.dem**: `initialize()`→`initialize_shape(shape_type, radius, …)` (radius mandatory),
   `enable_periodicity()`→`set_periodic()`, `get_domain_min/max()`→`origin`/`extent`, positional
   `set_domain(lx,ly,lz,px,py,pz)`→`set_domain(extent=, origin=, periodic=)`, `get_num_contacts()`/

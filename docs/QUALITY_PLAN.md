@@ -355,6 +355,19 @@ counters. Every hash-gate script is COMMITTED under `tests/` this time (dem's SH
 **core DONE 2026-09-10 — as `peclet.amr` F** (amr `eeeac1e`): `Flow.diagnostics` (ten instruments, listed in
 NAMING §2); mpi/geom had nothing to tier. Executed inside G.2 (§3.G.2).
 
+**flow DONE 2026-09-10** (`853816f` tier, `cf7ebf6` scheme collapse + deletions, `85147a6` strings/on-off
++ `tests/regression/state_hash.py`, `66deaa1` state checks, `b927a07` docs; CI green): 278 members →
+142 public + 125 `diagnostics` (the plan's "~180 of 266" was ~125 of 278); one `set_collocated_scheme`
+with `'embed'` = mode 7; modes 1–4/10–13, `gauge-2a`, `set_fv_relax`, `set_aperture_floor` and the
+kernels only they reached deleted (`fvViscousApply`, `centerGradAperture(Scaled)`, `centerGradOpenCapped`,
+`wdef_`); faces and types are strings everywhere; seven setters raise after geometry / `init_mpi`, a
+late `set_rho`/`set_mu` was SILENTLY WRONG (stale stencil) and now rebuilds. Gate: 154/154 before and
+after (48 non-MPI + 106 MPI), regression suite PASS without `--update`, 11 fixed-seed paths bit-identical
+at every milestone. Finding: the porous path's default MG-PCG reports a non-finite preconditioner on 2
+of 5 steps (deterministic; the same signal §5 recorded for coupling's Ergun test — G.6/SCALING #1 territory).
+Callers: coupling (`driver.py` field_view/exchange_field*/rebalance_by_weights → `diagnostics`,
+`examples/fluidized_bed.py` int BCs) and 76 gallery files / 273 hits — both handled in this session.
+
 **voro DONE 2026-09-10** (`16363b5`, `9e87eee` on top of the parked `e3e5ebb`, fast-forwarded; the wip
 branch deleted): four `diagnostics` views; `pore_mesh` and `scenes` written as lazily imported
 submodules and staged/installed by CMake (the parked branch had neither file); `OptimizeResult` /
