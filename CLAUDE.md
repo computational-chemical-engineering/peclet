@@ -44,6 +44,7 @@ The design contract lives in `docs/`:
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — layering, dependency graph, Lagrangian/Eulerian/mixed taxonomy, how each code maps onto the core.
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — SDF sign, x-fastest indexing, types, precision policy, periodic/Lees–Edwards, Python array shapes.
+- [docs/DECISIONS.md](docs/DECISIONS.md) — the **decision register**: what the project chose, what it rejected, and why, for all 512 decisions (460 in force, 52 superseded), with verbatim quotes and provenance in [docs/decisions/](docs/decisions/). It exists because settled decisions were being silently reversed — a later session picking the textbook alternative because nothing in front of it said the project had already rejected that alternative on purpose. Each submodule's `CLAUDE.md` inlines its own highest-risk prohibitions. **Read the entry for anything you are about to change; reversing one takes a new recorded decision, not a judgement call in the moment.**
 - [docs/NAMING.md](docs/NAMING.md) — the **naming canon**: one spelling per concept across all five Python APIs (the `origin`/`extent`/`cells`/`spacing` domain quartet, `num_*` counts, `periodic=`, `set_dt`, American spelling, `get_` only for a transfer), the table of every current divergence and its status, and the additive-alias rule for changing a shipped name. **Read before adding a public name.**
 - [docs/STYLE.md](docs/STYLE.md) — C++20 host & Kokkos device (morton pins C++17), clang-format/tidy (from voronoi), namespaces, CMake/CI.
 - [docs/INTERFACES.md](docs/INTERFACES.md) — shared C++20 concepts: `Domain`, `Decomposition`, `Field`, `HaloExchange`, `SdfGeometry`, `ImmersedBoundary`, `Stepper`.
@@ -59,6 +60,40 @@ The design contract lives in `docs/`:
   VoF, Voronoi methods, multiphysics, defect correction, MG telescoping, device residency, the CUDA
   wheel prototype). Superseded by the code and the reference docs above — history, not contract.
 - [docs/SNELLIUS.md](docs/SNELLIUS.md) — running on the Snellius cluster: the 2024a toolchain, building (and the CMake/venv traps), the sbatch conventions every benchmark script shares, and pre-flight checks. **Read before queueing anything there.**
+
+## Settled decisions that cross the whole suite
+
+Full register in [docs/DECISIONS.md](docs/DECISIONS.md). These are the cross-cutting ones; each
+submodule's `CLAUDE.md` carries its own.
+
+- **The collocated pressure coupling is the Almgren–Bell–Colella approximate projection — NEVER
+  Rhie–Chow.** Held independently by `flow`, `amr` and `voro`, and re-proposed by mistake in all
+  three. The residual cell divergence is *intrinsic* to cell-centred velocity placement; Rhie–Chow
+  is not an "upgrade".
+- **Every numerical method runs fully on-device and must be MPI-distributable.** Host serial paths
+  are permitted only as oracles and unit tests, never as the production path.
+- **Never change numerics while porting.** A backend change is a faithful port, proved bit-identical.
+- **Identifiers name what a thing is, never where it runs.** No `Device*` / `*Kokkos` class names;
+  device-resident duals take the data-structure suffix `View`. Transfer verbs and prose are the
+  kept exceptions.
+- **Kokkos device sources are `.cpp`, never `.cu`**; provisioning is a shared install prefix plus
+  `find_package`, never `FetchContent`.
+- **All coupled methods share one `BlockDecomposer`** — static-only co-decomposition is rejected.
+- **USER DIRECTIVE — `peclet.flow` is the reference** for shared-method design elsewhere in the
+  suite; study it before designing the same method in another code.
+- **USER DIRECTIVE — match or exceed SOTA massively-parallel performance in every component**,
+  setup included.
+- **USER DIRECTIVE — solvers take a physical domain and physical properties.** Spatial discretization
+  is derived, never user-supplied; **never add cell-unit API surface** — new setters take physical
+  inputs.
+- **USER DIRECTIVE — CFD-DEM defaults to `porous=True`** (volume-averaged NS, ε in the fluid
+  equations and not merely in the drag). `porous=False` is a cheap approximation only, never for
+  published benchmark comparison.
+- **USER DIRECTIVE — never `git add -A` / `git add .` / `git commit -a`.** Stage named paths only;
+  on a shared checkout, verify the index before committing — concurrent agents share these trees.
+- **USER DIRECTIVE — push directly to main across the suite, no PR flow.** The umbrella is pushed
+  **last**, so submodule pointers never dangle; `core` is tagged and published before any consumer.
+- **USER DIRECTIVE — quality is the prime objective**; the next release is the clean-break 1.0.0.
 
 ## The projects
 
