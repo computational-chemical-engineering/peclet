@@ -579,6 +579,40 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
    in `tests/`). `aee039b` switched `mesh_optimizer.hpp`/`ot_optimizer.hpp`/`bench_mesh_optimizer.cpp`
    to `peclet::core::solver` (G.2's B4).
 
+8. **flow build time — explicit instantiation of the solver (S–M, not breaking, opened 2026-09-11).**
+   *Measured (host, single thread, `-O3`):* a kernel unit test compiles in 4.5 s (0.3 MB object), one MPI
+   solver test in **56 s** (5.6 MB), `flow_bindings.cpp` in **1 m 41 s** (12.3 MB) — because
+   `Solver<Grid>` is a ~12 k-line header-only class template (517 members, 98 Kokkos device lambdas) that
+   every one of the **45** test executables naming it re-instantiates from scratch, and the bindings do
+   it for both grids: ~45–50 CPU-minutes per full rebuild, 20–30 min wall at the `-j8` four agents
+   shared; an edit to any of the 12 domain headers invalidates all 45. Flags are `-O3 -DNDEBUG
+   -std=gnu++20 -fopenmp` — no LTO, no `-march` — so there is NO cross-TU optimization to lose:
+   the kernels are compiled once per instantiating TU with identical flags and identical code today.
+   *Design:* one instantiation TU per grid (`src/flow_solver_staggered.cpp`, `src/flow_solver_collocated.cpp`:
+   `template class peclet::flow::Solver<Staggered>;` …) in an OBJECT/STATIC target the module and every
+   test link; `extern template class Solver<…>;` at the bottom of `flow_ibm.hpp`, skipped in the
+   instantiation TUs (a `PECLET_FLOW_INSTANTIATING` define). Member templates and the free kernel
+   headers (`mac_*.hpp`, used by the kernel unit tests) are untouched. The `PECLET_FLOW_MPI` definition
+   must match between the instantiation TUs and their consumers (one tree = one configuration, as now).
+   CUDA: the instantiation TUs are compiled by the Kokkos launch compiler like any other — verify on the
+   `nvidia-cuda` prefix (extended lambdas are defined only there; consumers never instantiate device
+   code). Then `ccache` as an opt-in launcher (`CMAKE_CXX_COMPILER_LAUNCHER`, documented in CLAUDE.md
+   and `CMakePresets.json`, never forced) and, if the residual per-test time warrants it, a PCH of
+   `flow_ibm.hpp` (`target_precompile_headers`). One test runner instead of 45 executables is the
+   further step — only if cheap.
+   *Gates:* 155/155; `tests/regression/sdflow_regression.py` PASS with its **perf baseline** (step time
+   within noise — report the before/after numbers; the maintainer's condition is no performance loss);
+   `tests/regression/state_hash.py` identical (if a hash moves, it is FMA-contraction from changed
+   inlining — report it, never `--update` silently); the measured full clean rebuild and the
+   single-domain-header-edit rebuild times before/after (`time cmake --build … -j8`); CUDA tree builds
+   and its kernel battery passes; CI green (and shorter — report the job times). Python import smoke
+   on the wheel path (`pip install .`) — the instantiation objects must ship inside `_flow.so`.
+   *Traps:* nanobind's `BoundSolver final : Solver<Grid>` inherits the ctor — an `extern template`
+   class must still be complete for that (it is: only instantiation is suppressed, not the definition);
+   `static` locals in members become one per program instead of one per TU (they were already one per
+   shared object; check `flow_ibm.hpp`'s two `static const char*` name tables); `-fvisibility` —
+   the tests link the same objects the module links, so symbols must not be hidden from them.
+
 ### H. Docs describe the code (S–M, not breaking) — D7
 
 1. Umbrella — **DONE 2026-09-08** except the two items at the end: CONVENTIONS.md §4 states the
@@ -782,6 +816,11 @@ the wheels exist). Before tagging: bump the `PECLET_CORE_TAG`/`PECLET_MORTON_TAG
 `cmake/PecletDeps.cmake` (they lag core `d93c323`; amr's CI uses core `main`), and regenerate `docs/python/*`
 from MPI builds one last time (a regeneration from the venv's OLD wheels silently regresses the pages —
 always set `PYTHONPATH` to the build trees).
+
+**Queued before or after the tag (not breaking): G.8** — flow's explicit solver instantiation + `ccache`
+(§3.G.8; measured facts, design, gates and traps are there; maintainer's condition: no performance loss,
+judged by the regression perf baseline). Run it in a fresh session with the preamble_G contract, in a
+worktree if anything else is touching `flow` at the time.
 
 **Open items recorded in place, none blocking the tag:** §3.G.7's CUDA `clipCellAgainstSdf` defect at
 128/256; §3.G.6's two float-tuned gates in flow's double build (no CI job until they get tolerances) and

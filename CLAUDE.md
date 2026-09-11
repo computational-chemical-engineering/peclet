@@ -222,6 +222,15 @@ location that the wheel install maps into place.
 
 ## Conventions across the suite
 
+- **Concurrent agents in ONE repo use worktrees, never one shared checkout.** A bare `git commit` takes the
+  whole shared index (flow `628d3da` swept another agent's staged docs, 2026-09-08), and a half-edited
+  header breaks the other agent's build. `git -C <repo> worktree add ../<repo>-<task> -b agent/<task>`
+  beside the packages (so `../core`, `../morton`, `../extern/install` still resolve), own `build_*` tree
+  inside it, the coordinator `--ff-only` merges into `main`, re-gates once, pushes and removes the
+  worktree. Agents in *different* repos keep the plain checkouts, and everyone commits with a pathspec
+  (`git commit <paths> -m …`). Full rebuilds of flow cost ~50 CPU-minutes (QUALITY_PLAN G.8) — a worktree
+  is for real work, not a five-minute fix; `ccache` makes the second one cheap.
+
 - **The `nvidia-cuda` prefix carries an OpenMP HOST backend since 2026-08-30**
   (`OPENMP;SERIAL;CUDA`; `core/docs/amr_setup_parallel_plan.md` D1′): host-side Kokkos
   `parallel_for`/`parallel_scan` (the AMR setup builders) run multithreaded. Consequences:
