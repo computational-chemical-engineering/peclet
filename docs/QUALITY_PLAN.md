@@ -579,39 +579,68 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
    in `tests/`). `aee039b` switched `mesh_optimizer.hpp`/`ot_optimizer.hpp`/`bench_mesh_optimizer.cpp`
    to `peclet::core::solver` (G.2's B4).
 
-8. **flow build time — explicit instantiation of the solver (S–M, not breaking, opened 2026-09-11).**
-   *Measured (host, single thread, `-O3`):* a kernel unit test compiles in 4.5 s (0.3 MB object), one MPI
-   solver test in **56 s** (5.6 MB), `flow_bindings.cpp` in **1 m 41 s** (12.3 MB) — because
-   `Solver<Grid>` is a ~12 k-line header-only class template (517 members, 98 Kokkos device lambdas) that
-   every one of the **45** test executables naming it re-instantiates from scratch, and the bindings do
-   it for both grids: ~45–50 CPU-minutes per full rebuild, 20–30 min wall at the `-j8` four agents
-   shared; an edit to any of the 12 domain headers invalidates all 45. Flags are `-O3 -DNDEBUG
-   -std=gnu++20 -fopenmp` — no LTO, no `-march` — so there is NO cross-TU optimization to lose:
-   the kernels are compiled once per instantiating TU with identical flags and identical code today.
-   *Design:* one instantiation TU per grid (`src/flow_solver_staggered.cpp`, `src/flow_solver_collocated.cpp`:
-   `template class peclet::flow::Solver<Staggered>;` …) in an OBJECT/STATIC target the module and every
-   test link; `extern template class Solver<…>;` at the bottom of `flow_ibm.hpp`, skipped in the
-   instantiation TUs (a `PECLET_FLOW_INSTANTIATING` define). Member templates and the free kernel
-   headers (`mac_*.hpp`, used by the kernel unit tests) are untouched. The `PECLET_FLOW_MPI` definition
-   must match between the instantiation TUs and their consumers (one tree = one configuration, as now).
-   CUDA: the instantiation TUs are compiled by the Kokkos launch compiler like any other — verify on the
-   `nvidia-cuda` prefix (extended lambdas are defined only there; consumers never instantiate device
-   code). Then `ccache` as an opt-in launcher (`CMAKE_CXX_COMPILER_LAUNCHER`, documented in CLAUDE.md
-   and `CMakePresets.json`, never forced) and, if the residual per-test time warrants it, a PCH of
-   `flow_ibm.hpp` (`target_precompile_headers`). One test runner instead of 45 executables is the
-   further step — only if cheap.
-   *Gates:* 155/155; `tests/regression/sdflow_regression.py` PASS with its **perf baseline** (step time
-   within noise — report the before/after numbers; the maintainer's condition is no performance loss);
-   `tests/regression/state_hash.py` identical (if a hash moves, it is FMA-contraction from changed
-   inlining — report it, never `--update` silently); the measured full clean rebuild and the
-   single-domain-header-edit rebuild times before/after (`time cmake --build … -j8`); CUDA tree builds
-   and its kernel battery passes; CI green (and shorter — report the job times). Python import smoke
-   on the wheel path (`pip install .`) — the instantiation objects must ship inside `_flow.so`.
-   *Traps:* nanobind's `BoundSolver final : Solver<Grid>` inherits the ctor — an `extern template`
-   class must still be complete for that (it is: only instantiation is suppressed, not the definition);
-   `static` locals in members become one per program instead of one per TU (they were already one per
-   shared object; check `flow_ibm.hpp`'s two `static const char*` name tables); `-fvisibility` —
-   the tests link the same objects the module links, so symbols must not be hidden from them.
+8. **flow build time — explicit instantiation of the solver (S–M, not breaking). DONE 2026-09-12,
+   flow `61e9f58` + `8f79c3b`.** *The problem:* `Solver<Grid>` is a ~12 k-line class template (517
+   out-of-line members across the twelve domain headers G.1 split it into, 98 Kokkos device lambdas)
+   and every one of the **45** test executables naming it re-instantiated all of it at `-O3`, as did
+   the bindings for both grids — measured: a kernel unit test 4.5 s (0.3 MB object), one MPI solver
+   test **56 s** (5.6 MB), `flow_bindings.cpp` **1 m 41 s** (12.3 MB). Flags are `-O3 -DNDEBUG
+   -std=gnu++20 -fopenmp`, no LTO and no `-march`, so there was NO cross-TU optimization to lose.
+   *What shipped:* `src/flow_solver_staggered.cpp` and `src/flow_solver_colocated.cpp` hold the two
+   explicit instantiations; `cmake/PecletFlowSolver.cmake` builds them into a STATIC library the
+   module and every test link; `flow_ibm.hpp` ends with the matching `extern template` declarations,
+   skipped in those TUs by `PECLET_FLOW_INSTANTIATING`. The second commit guards the twelve domain
+   `#include`s with the same macro, so a consumer sees **declarations only**. No function body was
+   touched; member templates and the `mac_*.hpp` kernel headers are untouched.
+   *Measured (host-openmp, `-j8`, 48-core host; CPU time is the load-independent number):*
+
+   | | before | after |
+   |---|---|---|
+   | full clean rebuild | 6 m 46 s wall / **44 m 29 s CPU** | 2 m 17 s / **12 m 07 s** |
+   | one domain header touched | 6 m 19 s / **41 m 10 s**, 45 TUs | 1 m 12 s / **4 m 35 s**, **4 TUs** |
+   | one consumer TU (`test_sdflow_mpi.cpp`) | 59.6 s, 5.5 MB object | 5.3 s, 59 KB |
+   | full clean rebuild, `nvidia-cuda` | 13 m 51 s / **90 m 08 s** | 8 m 11 s / **49 m 36 s** |
+
+   `_flow.so` grows 6.49 → 6.97 MB: an explicit instantiation emits all 517 members where implicit
+   instantiation emitted only what each TU used. The CUDA gain is smaller because nvcc's fixed
+   per-TU front-end cost dominates a thin consumer.
+   *Gates, all met at the float-operator default in force when G.8 was written:* 155/155 on
+   host-openmp before and after (49 single-rank + 106 MPI); CUDA single-rank 49/49 before and after;
+   `sdflow_regression.py` PASS both sides with every metric at +0.00 % and every iteration count
+   identical; `state_hash.py` **identical** on all ten single-rank entry paths and at np = 2, checked
+   separately after each of the two commits; step time within run-to-run noise on a back-to-back A/B
+   of the two modules (64³ and 48³ staggered beds and the 48³ collocated `ghost` bed, min of 3 × 20
+   steps, ≤ 1.3 % either way); wheel path `pip install .` into a scratch venv imports and runs, and
+   `_flow.so` carries no undefined `Solver<...>` symbol, so the instantiation objects ship inside it.
+   *Decisions taken in the pass:* STATIC not OBJECT (the link is inert for the 27 targets that never
+   name `Solver`, so `tests/kokkos` links it from every target in the directory and a new test needs
+   no edit); `PECLET_FLOW_MPI` became a PUBLIC property of the MPI library variant and the 31
+   per-test `target_compile_definitions` were deleted, which makes an ODR mismatch between
+   instantiation and consumer inexpressible rather than merely unlikely; PIC + hidden visibility on
+   the library mirror what `nanobind_add_module` sets on `peclet_flow`, so the module's code
+   generation is unchanged, which is what the no-performance-loss condition is judged on; **no PCH**
+   (the residual per-consumer time is 5.3 s, so `target_precompile_headers` is not warranted) and
+   **no single test runner** (the cost now lives in four TUs, not forty-five).
+   *The one rule the second commit imposes*, stated at the guard in `flow_ibm.hpp`: a member
+   TEMPLATE of `Solver` that a test or the bindings calls must be defined in `flow_ibm.hpp` itself —
+   an explicit instantiation of the class does not cover member templates, so a definition left in a
+   domain header would not link. The class has exactly one member template today and it is used only
+   from inside the class.
+   *CI (`ubuntu-latest`, 4 cores, `-j4`), G.6 `73cc63c` -> G.8 `8f79c3b`:* the **build step** of the
+   `mpi` job 24 m 17 s -> **5 m 03 s** and of the `single-rank` job 9 m 51 s -> **3 m 11 s**; whole
+   jobs 53 m 54 s -> **28 m 36 s** and 41 m 36 s -> 38 m 57 s. The single-rank job barely moves
+   because it is test-bound, not build-bound — the regression suite and the verify scripts run at two
+   threads on a four-core runner and now dominate it completely.
+   *`ccache`, the second half of G.8:* wired as an opt-in launcher
+   (`-DCMAKE_CXX_COMPILER_LAUNCHER=ccache`, never forced) and verified on the host prefix — the
+   solver library cold 69 s, warm 0.3 s, 100 % direct hits. **It cannot work on a CUDA/HIP prefix**,
+   and the reason is structural, not a flag: Kokkos routes device compilation by putting
+   `kokkos_launch_compiler <nvcc_wrapper> <c++>` in the global `RULE_LAUNCH_COMPILE`, and that script
+   redirects only when the executable immediately following it is the compiler it was handed. A
+   compiler launcher expands exactly there, so the script sees `ccache`, declines to redirect, and
+   plain `c++` is given nvcc's flags (`unrecognized command-line option '-arch=sm_120'`) at the end
+   of a long build. flow's CMake now **rejects that combination at configure time with the reason**,
+   and `CMakePresets.json` carries `host-openmp-ccache` and deliberately no CUDA counterpart.
 
 ### H. Docs describe the code (S–M, not breaking) — D7
 
@@ -795,6 +824,21 @@ lands; F and G.2 follow in the same repo.*
   handoff: **an agent that ends its turn to "wait for a monitor" never wakes** — every executor stalled
   at least once until told to block in the foreground (`timeout … tail --pid=<pid> -f /dev/null`).
 
+- **2026-09-12** — **G.8 executed and pushed** (flow `61e9f58`, `8f79c3b`; umbrella record this
+  commit). `Solver<Grid>` is now compiled once per grid instead of once per consumer, and consumers
+  see declarations only. Full clean rebuild 44 m 29 s -> 12 m 07 s of CPU on host-openmp and
+  90 m 08 s -> 49 m 36 s on nvidia-cuda; a one-domain-header edit went from 45 objects and 41 m 10 s
+  to **4 objects and 4 m 35 s**; CI's build step 24 m 17 s -> 5 m 03 s (mpi job) and 9 m 51 s ->
+  3 m 11 s (single-rank). Gated as §3.G.8 records: 155/155 host and 49/49 CUDA single-rank before and
+  after, regression PASS with every metric at +0.00 %, `state_hash.py` identical after each of the two
+  commits, step time within noise on a back-to-back module A/B, and the wheel path verified into a
+  scratch venv. `ccache` is opt-in and host-only, and the CMake now refuses it on a device prefix with
+  the reason (Kokkos owns the compile rule's launcher). **Two things this pass found that the plan had
+  wrong:** G.8 predicted a PCH might still be needed and offered one test runner instead of 45 — both
+  are now pointless, because the residual per-consumer compile is 5.3 s and the cost lives in four TUs;
+  and G.8 assumed `ccache` "works through the Kokkos launch compiler", which is false by construction.
+  Also corrected: the spelling is `flow_solver_colocated.cpp`, matching the `Colocated` policy tag.
+
 ## 6. Handoff — starting packages F and G
 
 Written 2026-09-08 at the end of the day A–E+H were executed, for whoever picks up F and G. Read
@@ -817,10 +861,10 @@ the wheels exist). Before tagging: bump the `PECLET_CORE_TAG`/`PECLET_MORTON_TAG
 from MPI builds one last time (a regeneration from the venv's OLD wheels silently regresses the pages —
 always set `PYTHONPATH` to the build trees).
 
-**Queued before or after the tag (not breaking): G.8** — flow's explicit solver instantiation + `ccache`
-(§3.G.8; measured facts, design, gates and traps are there; maintainer's condition: no performance loss,
-judged by the regression perf baseline). Run it in a fresh session with the preamble_G contract, in a
-worktree if anything else is touching `flow` at the time.
+**G.8 is DONE** (2026-09-12, flow `61e9f58` + `8f79c3b`) — flow's explicit solver instantiation and
+`ccache`. Numbers, decisions and the one new rule it imposes are in §3.G.8; the short version is that a
+full flow rebuild costs a quarter of the CPU it did and a one-header edit a tenth, bit-exact, with no
+step-time change. Nothing in the release depends on it.
 
 **Open items recorded in place, none blocking the tag:** §3.G.7's CUDA `clipCellAgainstSdf` defect at
 128/256; §3.G.6's two float-tuned gates in flow's double build (no CI job until they get tolerances) and

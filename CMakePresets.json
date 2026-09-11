@@ -48,12 +48,20 @@
         "CMAKE_CXX_COMPILER": "hipcc",
         "CMAKE_PREFIX_PATH": "${sourceDir}/extern/install/lumi-hip"
       }
+    },
+    {
+      "name": "host-openmp-ccache",
+      "displayName": "Host (Kokkos OpenMP backend) + ccache",
+      "description": "As `host-openmp`, with ccache as the compiler launcher (docs/QUALITY_PLAN.md §3.G.8). Opt-in, and never implied by the plain preset: a cold cache costs a few percent, a warm one turns a full rebuild into a link. ccache must be on PATH. HOST BACKENDS ONLY -- on a CUDA/HIP prefix Kokkos already owns the compile rule's launcher with kokkos_launch_compiler and a second launcher breaks its redirect; there is no nvidia-cuda-ccache preset for that reason, and flow's CMake rejects the combination with the explanation.",
+      "inherits": "host-openmp",
+      "cacheVariables": { "CMAKE_CXX_COMPILER_LAUNCHER": "ccache" }
     }
   ],
   "buildPresets": [
     { "name": "host-openmp", "configurePreset": "host-openmp" },
     { "name": "host-serial", "configurePreset": "host-serial" },
     { "name": "nvidia-cuda", "configurePreset": "nvidia-cuda" },
-    { "name": "lumi-hip",    "configurePreset": "lumi-hip" }
+    { "name": "lumi-hip",    "configurePreset": "lumi-hip" },
+    { "name": "host-openmp-ccache", "configurePreset": "host-openmp-ccache" }
   ]
 }
