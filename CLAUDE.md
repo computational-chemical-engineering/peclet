@@ -61,6 +61,53 @@ The design contract lives in `docs/`:
   wheel prototype). Superseded by the code and the reference docs above — history, not contract.
 - [docs/SNELLIUS.md](docs/SNELLIUS.md) — running on the Snellius cluster: the 2024a toolchain, building (and the CMake/venv traps), the sbatch conventions every benchmark script shares, and pre-flight checks. **Read before queueing anything there.**
 
+## Worktrees: the default when another session shares a checkout
+
+**These checkouts are shared.** A dozen-plus Claude sessions run against this suite at once; on
+2026-09-11 two separate edits of `flow/CLAUDE.md` were swept into another session's commits within
+the hour. Staging named paths (the standing directive) stops *you* taking *their* files; it does not
+stop *them* taking yours. A worktree is the other half.
+
+**Work in one whenever another session is or may be in that submodule**, whenever the task spans more
+than a commit or two, and always when touching a file everyone touches (`CLAUDE.md`, `CHANGELOG.md`,
+`cmake/PecletDeps.cmake`). A read-only look or one quick commit does not need one.
+
+Historically the cost was the rebuild, which is why the shared tree kept winning. QUALITY_PLAN G.8
+(compile `Solver<Grid>` once, not once per consumer) cut that materially for `flow`, so the honest
+answer has changed: **isolate by default, share only for something trivial.**
+
+### The convention (already in use — `flow` has 15)
+
+A worktree is a **sibling of the submodule**, named `<repo>-<topic>`:
+
+```bash
+cd flow && git worktree add ../flow-<topic> -b <topic>     # -> suite/flow-<topic>
+cd ../flow-<topic> && source ../.venv/bin/activate
+cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"
+```
+
+**The sibling position is load-bearing, not cosmetic.** Everything in this suite is reached by `../`
+from inside a submodule: the one venv (`../.venv`), the Kokkos/ArborX prefixes
+(`../extern/install/<backend>`), and the sibling headers `PecletDeps.cmake` prefers over a
+FetchContent. Put the worktree anywhere else — nested under a subdirectory, or outside `suite/` — and
+those resolve to nothing: the venv silently falls through to the system Python (see "One venv"), and
+CMake silently fetches pinned tags instead of using your siblings. `suite/tel/flow` is an existing
+worktree that does *not* satisfy this; do not copy it.
+
+Each worktree carries **its own `build*/` directories** — never share a build tree between worktrees,
+and never point one at another's. The `extern/install/<backend>` prefixes are read-only and shared by
+design.
+
+### Housekeeping
+
+- Branch per topic, not per agent. `git worktree list` inside the submodule before adding another —
+  there are already abandoned ones (`.claude/worktrees/agent-*` at the umbrella, from 2026-09-02).
+- `git worktree remove ../flow-<topic>` when the branch lands; `git worktree prune` for stale entries.
+- The submodule is the unit. A worktree of the **umbrella** does not give you worktrees of the
+  submodules — it gives you the same submodule checkouts, shared with everyone. Isolate the submodule
+  you are changing.
+- Umbrella pointer bumps still happen in the real `suite/` checkout, after the submodule is pushed.
+
 ## Settled decisions that cross the whole suite
 
 Full register in [docs/DECISIONS.md](docs/DECISIONS.md). These are the cross-cutting ones; each
