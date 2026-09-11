@@ -151,6 +151,63 @@ CMake names became `peclet_core`/`peclet::core`, `PECLET_TPX_TAG`→`PECLET_CORE
 logs, PNGs, dem's 2.5 MB run log, voro's retired-engine zip); dead test harnesses deleted; new
 `dem/CLAUDE.md`, `voro/CLAUDE.md`; pnm and coupling gained CI/quality workflows.
 
+**One deliberate numerics change — flow's operator storage is now DOUBLE by default.**
+`PECLET_FLOW_OPERATOR_DOUBLE` flips from OFF to ON (`SCALING_ISSUES.md` #1). Float storage of the
+pressure hierarchy, the momentum stencil and the cut-cell overlay breaks the singular row-sum
+identity `A·1 = 0` at high multigrid contrast, and it breaks it *silently*: on a dense bed the
+residual floors and then rebounds, so the run is invalid rather than merely less accurate, and
+nothing says so. The measured cost of being wrong (RCP bed, rtol 1e-8): float 24/33/CAPPED
+iterations at `max|div|` 4.51e-06 against 14/14/28 and 9.51e-12 in double. A float build is still one
+flag away and now emits a CMake warning naming what it costs. Documenting the limitation instead was
+rejected, because documentation protects only a reader who already knows to look. The
+double-*diagonal* fallback is a different mechanism and stays retired.
+**What this means for your numbers:** results from the default build change in the last digits
+wherever the operator is involved — nine of the ten fixed-seed entry paths in
+`flow/tests/regression/state_hash.py` move, and the tenth (pure scalar transport, no cut cells and
+no multigrid contrast) is byte-identical. The accuracy and efficiency baselines do **not** move:
+`sdflow_regression.py` passes against its existing baseline with every gated metric at +0.00 % and
+every pressure-iteration count identical, while `max|div|` improves by about two orders of
+magnitude. Any dense-bed permeability produced by a float build should be re-checked.
+
+**Build (no API or numerical effect).** `flow` compiles `Solver<Grid>` **once per grid** instead of
+once per consumer: two explicit-instantiation translation units in a static library that the module
+and all 45 test executables link, with `extern template` declarations in `flow_ibm.hpp` and the
+twelve definition headers included only in those two units. A full flow rebuild fell from 44 to 12
+CPU-minutes on the host backend and from 90 to 50 on CUDA; editing one of the twelve domain headers
+now rebuilds **4** objects instead of 45, 41 CPU-minutes to 4. Proved bit-exact by the committed
+state-hash gate, with step time unchanged. `ccache` is supported as an opt-in compiler launcher on
+the host backends (`-DCMAKE_CXX_COMPILER_LAUNCHER=ccache`); it cannot work on a CUDA or HIP prefix,
+where Kokkos already owns the compile rule's launcher, and the CMake now says so at configure time
+instead of failing incomprehensibly ten minutes later. `peclet-coupling` gains the `CITATION.cff` it
+was the only package to lack.
+
+### Known limitations in 1.0.0
+
+- **An immersed solid cutting an inflow or outflow face breaks the pressure solve** (iteration cap,
+  `max|div|` ~4e-3). A bed clear of the open faces is fine. `flow/doc/cutcell_openbc_convergence.md`.
+- **Multigrid depth is capped by the factors of two in the grid.** An axis coarsens only while it
+  stays even, so an odd dimension never coarsens at all, and under MPI only if every rank's block is
+  even on it. Telescoping ships and is the default; the underlying requirement that intermediate
+  levels coarsen in place is routed around, not solved, and it is the top open item at scale.
+- **Collocated solver:** the `(matrix_order=1, rhs_order=2)` ghost mode is march-unstable above about
+  2000 spheres and is documented do-not-use. Collocated MPI is validated at np = 1, 2, 4; np >= 16 is
+  unresolved.
+- **VoF:** the staggered grid is the reference. The collocated path is all-fluid and rated to density
+  ratio about 100 with motion; the per-bubble block container is all-fluid and staggered-only for its
+  surface tension. **Colliding markers are outside the rating** — a contacting pair drives through the
+  two-cell film at roughly 1.5 eddy turnovers, independent of the timestep.
+- **voro on CUDA:** `clipCellAgainstSdf` is wrong by up to 22 % on device at 128 and 256 grids, while
+  correct on the OpenMP backend.
+- **peclet-amr's octree V-cycle is a preconditioner, not a solver, on anisotropic (box) cells** — it
+  diverges at aspect ratio 2 and 4 even though the operators themselves are exact. See
+  `amr/docs/amr_anisotropic.md`.
+- **morton's AVX-512 batch kernels were not re-validated for this release.** They need Intel SDE or
+  AVX-512 hardware, and the release host has neither. Every other morton configuration, including the
+  contractual PDEP/PEXT-free non-BMI2 build, passed.
+- **Unresolved and recorded:** whether the reported permeability `K` is interstitial or superficial.
+  `DECISIONS.md` carries the contradiction; it decides a (1−φ) factor. **No permeability number is
+  published in these release notes for that reason.**
+
 ## [0.7.2] — 2026-09-06
 
 CUDA wheels only. `peclet-flow-cu13` 0.5.1, `peclet-pnm-cu13` 0.1.2, `peclet-dem-cu13` 0.5.1,
