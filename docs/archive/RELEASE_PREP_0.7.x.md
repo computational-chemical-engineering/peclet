@@ -2,12 +2,12 @@
 
 > **2026-09-08 update.** 0.7.0, 0.7.1 and 0.7.2 shipped (2026-09-05/06); §0–§7 below are that cycle's
 > record. The NEXT release is **1.0.0**, not 0.8.0: it carries the physical-domains feature of §8 *and*
-> the API clean break of [QUALITY_PLAN.md](QUALITY_PLAN.md) (decisions D1/D9 — every non-canonical
+> the API clean break of [QUALITY_PLAN.md](../QUALITY_PLAN.md) (decisions D1/D9 — every non-canonical
 > name removed, no aliases, every package to 1.0.0). Gate before tagging: QUALITY_PLAN work packages
 > A–D green in every repo, the CHANGELOG's removal list complete, the gallery pages grep-clean of the
 > removed names. Re-run the three tools on the day and re-cut this file for 1.0.0.
 
-The one-off companion of [RELEASE.md](RELEASE.md) (the durable workflow). Everything here was
+The one-off companion of [RELEASE.md](../RELEASE.md) (the durable workflow). Everything here was
 measured on 2026-09-04 with `tools/release/check_release_state.sh`, `tools/release/audit_docstrings.py`,
 `tools/release/audit_examples.py` and two read-only audits of the docs and the gallery. It is a
 checklist to tick when the release window opens; development continues meanwhile, so re-run the
@@ -74,7 +74,7 @@ Other facts of the snapshot:
    | flow (kokkos / kmpi / regression / verify_*) | 36/36 | 36/36, regression PASS, verify 5/5 | 103/103 np=1,2,4 | 2026-09-04, main at the rel-issues merge; OMP_NUM_THREADS=4. Host module rebuilt 2026-09-05 at 2a89c67 for the coupling tests |
    | pnm | module builds · `test_extraction.py packing_ring.vti` = **7199 pores** | module builds (`PECLET_PNM_MPI=ON`), 7199 pores; `tests/kokkos_mpi` **6/6** (np 1,2,4) | `tests/kokkos_mpi` 6/6 (np 1,2,4) | |
    | dem (kokkos / kmpi / verify_packing) | `tests/kokkos` 8/8 · `verify_packing_spheres.py` runs to completion (final overlap 0.000) | `tests/kokkos` **8/8** · `tests/kokkos_mpi` **24/24** · `verify_packing_spheres.py` to completion | `tests/kokkos_mpi` 24/24 (host) | module built with `PECLET_DEM_MPI=ON` |
-   | voro | in-tree Kokkos+Python+MPI build **24/24** (352 s); `tests/kokkos_mpi` 18/18 re-run at 29dcaaf (np=1 gate 0.000e+00) | in-tree **24/24** · `tests/kokkos_mpi` **18/18** at 29dcaaf — was 15/18: the three `flow_mpi_*_np1` gates demanded bit-exactness, which a device backend cannot give (round-off, run-to-run nondeterministic via the tessellator's atomics); the gate is now 1e-13 / 1e-14 on a device backend, 0.0 on host (voro 29dcaaf) | `tests/kokkos_mpi` 18/18 (np 1,2,4; `OMP_NUM_THREADS=1`) | H100 np=4 gates all OK on Snellius 2026-09-05 (job 26366044, [VORONOI_METHODS_PLAN C5](archive/VORONOI_METHODS_PLAN.md)) |
+   | voro | in-tree Kokkos+Python+MPI build **24/24** (352 s); `tests/kokkos_mpi` 18/18 re-run at 29dcaaf (np=1 gate 0.000e+00) | in-tree **24/24** · `tests/kokkos_mpi` **18/18** at 29dcaaf — was 15/18: the three `flow_mpi_*_np1` gates demanded bit-exactness, which a device backend cannot give (round-off, run-to-run nondeterministic via the tessellator's atomics); the gate is now 1e-13 / 1e-14 on a device backend, 0.0 on host (voro 29dcaaf) | `tests/kokkos_mpi` 18/18 (np 1,2,4; `OMP_NUM_THREADS=1`) | H100 np=4 gates all OK on Snellius 2026-09-05 (job 26366044, [VORONOI_METHODS_PLAN C5](VORONOI_METHODS_PLAN.md)) |
    | coupling | `terminal_velocity`, `fixed_bed_ergun` **2/2** (flow + dem host modules on PYTHONPATH) | **2/2** (flow 8767878 + dem CUDA modules on PYTHONPATH) | – | |
    | whole family | import smoke: flow/dem/voro/pnm/core.amr report `OpenMP`; core.mpi, core.geom, morton, coupling import | flow/dem/voro/pnm/core.amr report `Cuda`; core.mpi, core.geom, morton, coupling import | – | `PYTHONPATH` over the seven `build_rel*` trees |
 
@@ -422,7 +422,7 @@ Original questions, for the record:
 
 ## 8. Physical domains — the 0.8.0 headline feature (Phase 1 landed 2026-09-06, Phase 2 2026-09-07)
 
-[PHYSICAL_UNITS_PLAN.md](PHYSICAL_UNITS_PLAN.md) Phase 1 is on main in core, flow, pnm and coupling:
+[PHYSICAL_UNITS_PLAN.md](../PHYSICAL_UNITS_PLAN.md) Phase 1 is on main in core, flow, pnm and coupling:
 every solver takes a physical domain (cells, extent, origin) and derives its own cell size, and the
 user never writes `h`. `extent=None` keeps the historical cell units and is bit-identical, so this is
 a **minor** bump for all four (new API, old form kept), and the plan's D5 says they ship together —
