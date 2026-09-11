@@ -16,7 +16,7 @@ compute kernels (particle<->grid deposition, drag laws, momentum feedback) live 
 extension, running in place on the arrays the two solvers expose (zero-copy grid fields; particle
 forces round-tripped through the dem host API).
 
-ResolvedCfdDem is the RESOLVED driver (Layer 4 of suite/docs/ANALYTIC_SDF_GEOMETRY.md): each grain
+ResolvedCfdDem is the RESOLVED driver (Layer 4 of suite/docs/archive/ANALYTIC_SDF_GEOMETRY.md): each grain
 IS an analytic SDF instance in the flow solver's scene, the fluid resolves its surface, and the
 coupling is a surface-traction exchange with no drag correlation in it. Pure Python -- it needs no
 compiled kernels of its own.
@@ -28,7 +28,7 @@ compiled kernels of its own.
 | `compute_forces` | &nbsp; |
 | `last_drag` | &nbsp; |
 | `last_slip` | &nbsp; |
-| `rebalance` | Dynamic co-rebalancing (multi-rank only). Build ONE weight field over the global grid -- fluid work (1 per cell) + gamma * particle count -- and redistribute BOTH codes onto the same weighted ORB from it: the flow state via rebalance_by_weights (bit-exact migration + rebuild), the particles via migrate_to_weights. Because both build the SAME deterministic partition from the same array, they stay co-located. Call at a step boundary. No-op single-rank. |
+| `rebalance` | Dynamic co-rebalancing (multi-rank only). Build ONE weight field over the global grid -- fluid work (1 per cell) + gamma * particle count -- and redistribute BOTH codes onto the same weighted ORB from it: the flow state via diagnostics.rebalance_by_weights (bit-exact migration + rebuild), the particles via migrate_to_weights. Because both build the SAME deterministic partition from the same array, they stay co-located. Call at a step boundary. No-op single-rank. |
 | `slip` | Interpolated fluid velocity minus particle velocity (N,3) — what the drag law sees. `vel` may be host or device; returns a host NumPy array for convenient inspection. |
 | `step` | &nbsp; |
 | `update_void_fraction` | &nbsp; |

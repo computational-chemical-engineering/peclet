@@ -41,19 +41,26 @@ Precision is chosen per role, not globally — but stated explicitly so codes ma
   (dem.)
 - **Header-only / CPU generic code:** template on `real_t` with a sensible default; pick `double` for
   accuracy-sensitive tests. (voronoi.)
-- **The shared core is precision-agnostic:** decomposition/halo/geometry are templated on the payload
-  type and never hard-code float vs double.
+- **The shared core's DATA layer is precision-agnostic:** decomposition/halo/geometry are templated on
+  the payload type and never hard-code float vs double. Its **closure layer is not**, and says so:
+  `scheme/ghost_closure.hpp` (the ghost-projection closure polynomials and weights) is float
+  throughout, and peclet-amr's `ghost_projection.hpp` `GhostOverlay` stores its matrix weights
+  (`wm_n1`/`wm_n2`, `w_bc`, `w_n1`/`w_n2`, `th`, `rescale`) as float — genuine operator coefficients in
+  single precision, the same exposure as flow's `MReal` (below). The cut-cell closure polynomials are
+  templated on the scalar (`scheme/cut_cell_closure.hpp`, one copy serving flow in float and amr in
+  double) — corrected 2026-09-10 (QUALITY_PLAN G.6); the earlier "never hard-codes float" claim was false.
 
 ## 4. Type aliases
 
 To stop every code inventing its own, the core `common` module defines (host side):
 
 - `peclet::core::Real` — **`double`**, a fixed alias (`common/types.hpp`), not a build option. Where a code
-  stores a *float* for speed it says so per role: flow's multigrid operator storage is `MReal = float` unless
-  built with `-DPECLET_FLOW_MREAL_DOUBLE` ([SCALING_ISSUES.md](SCALING_ISSUES.md) #1 — dense beds need the
-  double build), and core's ghost-projection closure weights (`scheme/ghost_closure.hpp`) and peclet-amr's
-  `ghost_projection.hpp` overlay are float by design. Turning these into typed CMake options is
-  [QUALITY_PLAN.md](QUALITY_PLAN.md) G.6.
+  stores a *float* for speed it says so per role: flow's operator storage — the pressure hierarchy, the
+  momentum stencil AND the cut-cell IBM overlay — is `MReal = float` unless built with the CMake option
+  `PECLET_FLOW_OPERATOR_DOUBLE=ON` ([SCALING_ISSUES.md](SCALING_ISSUES.md) #1 — dense beds need the double
+  build; a ctest greps `src/` so no `(float)` cast can touch an operator view without a
+  `// PRECISION-EXEMPT:` line), and core's ghost-projection closure weights (`scheme/ghost_closure.hpp`)
+  and peclet-amr's `ghost_projection.hpp` overlay are float by design (QUALITY_PLAN G.6, 2026-09-10).
 - `peclet::core::Index` — signed index type for grids/particles (`std::int64_t`; supersedes block_decomposer's
   `long int IndxT`).
 - `peclet::core::Vec<Dim>` = `std::array<Real, Dim>`; `peclet::core::IVec<Dim>` = `std::array<Index, Dim>`.
