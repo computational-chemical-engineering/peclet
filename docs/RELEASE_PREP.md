@@ -84,20 +84,43 @@ the limitation was rejected because the failure is *silent* — documentation pr
 already knows. The double-*diagonal* fallback stays retired (65x worse on divergence). Recorded in
 [decisions/flow.md](decisions/flow.md) and [SCALING_ISSUES.md](SCALING_ISSUES.md) §1.
 
-**What this leaves to do in the release window [R]:**
+**What this leaves to do in the release window [R]** — measured 2026-09-12, outcomes inline:
 
-1. **Re-bless the regression baselines.** This changes numerics in the default build, so
-   `tests/regression/sdflow_regression.py` state hashes and `perf_baseline.json` move. Re-baseline
-   with `--update` and record the before/after in the CHANGELOG; a changed digit here is expected
-   *this once* and must not be waved through again afterwards.
-2. **Re-measure the ~12%.** The figure is inherited from the G.6 note, not measured after G.8's
-   explicit-instantiation refactor. Confirm against the perf baseline on the packed case.
-3. **Check the CUDA build**, not just host — the macro is directory-scoped and reaches
-   `peclet_flow_solver` (G.8's new TU), verified 2026-09-11 on the host-openmp prefix; confirm the
-   same on `nvidia-cuda` before tagging. A TU compiled at a different precision than the headers it
-   shares would be an ODR violation, and a silent one.
+1. ~~**Re-bless the regression baselines.**~~ **NOT NEEDED — the baselines do not move.**
+   `sdflow_regression.py` against the *existing* `perf_baseline.json`, run on a double-default build
+   (`flow/build_rel_omp`, host-openmp): **PASS**, with every gated metric at **+0.00 %** — `K_inf`
+   7.447, `k*_inf` 0.0062362 and 0.017183 (was 0.017184, +0.00 %), convergence orders 2.29 / 2.19 /
+   1.38 unchanged, and **every pressure-iteration count identical** (368/560/525/976/1607,
+   635/573/439/717, 746/667/1308/2250). What moved is `max|div|`, by about two orders of magnitude
+   *in the right direction* — e.g. the N=64 ring bed 1.4e-10 → 1.0e-11, the Z&H sphere 4.5e-11 →
+   2.1e-12 — and the gate on divergence is an upper bound, so an improvement passes. **Do NOT run
+   `--update`**: it would overwrite a baseline that still holds and discard the historical reference.
+   The three regression beds are simply not the high-contrast dense beds where float storage breaks.
+   *What does move is `state_hash.py`*: nine of the ten single-rank entry paths and the np=2 case
+   change, which is expected and is the deliberate numerics change. `scalar` is byte-IDENTICAL
+   (`711f587dab95ca…`) because that case carries no cut-cell operator and no multigrid contrast, so
+   the storage type never reaches it — a useful sanity check that the flip did only what it claims.
+   New hashes: staggered_bed `e933ca12437925a8`, colocated_ghost `b5208af291d680c0`,
+   colocated_gauge_exact `43fe1408541bbe83`, colocated_plain `0fa88904b2ea78b6`, colocated_embed
+   `22a77cf1104be469`, channel `9d1daa0e9928ec50`, vof_droplet `929eb7c21c99250f`, porous
+   `44d3ffd55797efcb`, scene_moving `6d8df1d3917f7b62`, mpi_np2 `6b300a8da0c97703`.
+   **And the defect the flip exists to fix is gone**: the float build printed
+   `CutcellMG::solvePCG: preconditioner produced non-finite z … (reported as 500/500 iterations,
+   i.e. a CAPPED solve)` twice on the porous case; the double build prints it zero times.
+2. **Re-measure the ~12%** — STILL OPEN. A first attempt on 2026-09-12 was contaminated: four
+   builds were running concurrently and the float arm measured 358 ms/step against a quiet-machine
+   value of 311 ms/step for the same binary, i.e. the load term was larger than the effect. Redo it
+   on a quiet host as a back-to-back A/B of the two modules (`build_g8h2` float vs `build_rel_omp`
+   double), min of three runs of twenty steps. The regression's own wall-clock column suggests
+   **+2 % to +10 %** depending on the case rather than a uniform 12 %, but that column is a
+   single-shot number and is not evidence.
+3. ~~**Check the CUDA build.**~~ **Host half DONE, CUDA half open.** On host-openmp the macro reaches
+   every target: `PECLET_FLOW_OPERATOR_DOUBLE=1` is present in `flags.make` for `peclet_flow_solver`,
+   `peclet_flow_solver_mpi` (G.8's two instantiation libraries), `peclet_flow` and the consumer tests
+   — so there is no TU at a different precision from the headers it shares, and no silent ODR
+   violation. Repeat the same `flags.make` check on an `nvidia-cuda` tree before tagging.
 4. **Re-check any published dense-bed number** produced by a float build — the porous-scaling study
-   and RingBed in particular.
+   and RingBed in particular. STILL OPEN.
 
 ### 1.3 The verification scripts silently bind to a stale build [B]
 
@@ -252,3 +275,59 @@ Note for readers of the submodule docs: `flow/doc/anisotropic_vof.md` and
 `set_periodic`/`relax`. That is expected: the gallery is already written against the unreleased 1.0.0
 dem API, and the flag clears when dem is tagged. Re-run after the release and re-check the pages the
 QUALITY_PLAN rename table touches.
+
+## 9. Execution log — the 1.0.0 release run (started 2026-09-12)
+
+Appended as the release is executed. Newest entries at the bottom. Anything here that contradicts
+§§1-8 supersedes them; §§1-8 were written before the work was done.
+
+**2026-09-12, Phase A + blockers.**
+
+- **G.8 landed first** (flow `61e9f58` + `8f79c3b`, umbrella `02b389b`), since it changes build time
+  and nothing else: `Solver<Grid>` is compiled once per grid rather than once per consumer, and
+  consumers see declarations only. Bit-exact, no step-time change, CI green. Full numbers in
+  QUALITY_PLAN §3.G.8. A flow rebuild is now 12 CPU-minutes instead of 45, which is what makes
+  re-running the release matrix on this host affordable at all.
+- **§1.1 core-pin staleness, confirmed as sequencing, not a defect.** voro's CI is RED on main and the
+  cause is exactly the predicted one: run `34645794829`, job `kokkos-openmp`, step "Build against the
+  pinned core / morton tags", failing with `peclet/core/solver/coloring.hpp: No such file or
+  directory`. It turned red only now because voro's own `8cdac25` made that guard *compile* rather
+  than merely configure. It clears when core is tagged and voro repins. **voro cannot be green on
+  main before core is tagged**, so RELEASE.md §1.4's "CI green on every repo" is not satisfiable for
+  voro until step one of Phase E is done. Expect it; do not treat it as a new blocker.
+- **The umbrella Site workflow was red and is now green** (`f6392ba`). `mkdocs build --strict` aborted
+  on four broken links in `docs/archive/RELEASE_PREP_0.7.x.md`: archiving the 0.7.x prep file moved it
+  into `docs/archive/` without repointing its relative links, so `QUALITY_PLAN.md`, `RELEASE.md` and
+  `PHYSICAL_UNITS_PLAN.md` still resolved against `docs/`, and `archive/VORONOI_METHODS_PLAN.md` kept a
+  now-doubled `archive/` prefix. Worth remembering as a class: **archiving a document breaks every
+  relative link inside it**, and strict mode turns that into a red release gate.
+- **§1.2 measured — the regression baselines do NOT move.** See §1.2 above, rewritten with the
+  numbers. `--update` must not be run.
+
+**Phase B, as it completes** (host prefix `extern/install/host-openmp`, CUDA prefix
+`extern/install/nvidia-cuda`, `OMP_NUM_THREADS=4 OMP_PROC_BIND=false`, trees named `build_rel*`):
+
+| package | result | counts |
+|---|---|---|
+| core | **PASS** | 53 plain / 68 Kokkos / 6 Python, host *and* CUDA, np 1-8, **0 skips** |
+| morton | **PASS** | default 1/1, non-BMI2 2/2 including the PDEP/PEXT-free contract, Kokkos-OpenMP 2/2, Kokkos-CUDA 2/2, pytest 9/9, 0 skips |
+| flow | **PASS** at the float default | 155/155 host (49 single-rank + 106 MPI) and 49/49 CUDA single-rank, before *and* after G.8; regression PASS; re-run at the double default pending §1.3's landing |
+| dem | pending | |
+| voro | pending | |
+| pnm | pending | |
+| amr | pending | |
+| coupling | pending | |
+
+Corrections Phase B has produced so far:
+
+- **`core/CLAUDE.md`'s ctest counts are stale**: it says 52 plain / 67 Kokkos; the measured numbers are
+  **53 plain / 68 Kokkos** (54/69 counting the `bench` label), identically on host and CUDA. The
+  umbrella `CLAUDE.md`'s "109 plain / 164 Kokkos / 7 Python" for core is wrong by a wider margin and
+  looks like a pre-AMR-split figure. Fix both before tagging; they are quoted in release notes.
+- **morton's AVX-512 batch kernels are UNVALIDATED for this HEAD.** This host is a Threadripper PRO
+  5965WX with no AVX-512F, and Intel SDE is not installed and could not be obtained. The path was not
+  silently skipped — it was not exercised. Either confirm it was validated elsewhere for this HEAD or
+  state it as an untested path in the release notes. Do not claim it passed.
+- **morton's nearest tag by ancestry is `pre-legacy-removal`, not `v0.2.1`** — `git describe` picks the
+  marker tag, which is why the pre-flight prints an odd "since" count. The changelog writer should
+  diff against `v0.2.1`.
