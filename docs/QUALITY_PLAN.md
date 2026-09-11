@@ -399,7 +399,18 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
 
 ### G. Structure (L, mostly not breaking)
 
-1. **`flow/src/flow_ibm.hpp` (11 802 lines, one class, 483 member functions, 221 data members)**
+1. **IN PROGRESS 2026-09-11.** DECIDED mechanism (survey 2026-09-10): NOT CRTP/mixins — every domain
+   touches the shared state (`e_/u_/C[]/sdf_/cField_/vofAdv_/mg_/distributed_`) and nvcc's extended-lambda
+   rule keeps the kernels in one `public:` region, so a dependent base would force `this->` on thousands
+   of lines and nothing stays byte-identical. Instead: declarations + state stay in `flow_ibm.hpp`,
+   definitions move verbatim as out-of-class `Solver<Grid>::` members into domain headers included at
+   its bottom. Landed (flow `eac5b07`, `a0a8c27`, `9f27439`, bit-exact on the committed hash gate +
+   regression + 155/155): `fillVelGhostsKeepOutflow` merged into `fillVelGhostsTo(…, doOutflow)` — the
+   ONE sibling merge that is bit-exact; `project()` (523 lines) → 5 stage members and `setSolidDevice`
+   (540) → 9; the `buildRhs`×5 / `addCsfRhs`×3 families are different arithmetic (different terms and
+   operand order) and are NOT merged; `hydroForceTorque`/`Reaction` compute different quantities and
+   stay. The header split itself is running (agent launched 2026-09-11).
+   *Original item:* **`flow/src/flow_ibm.hpp` (11 802 lines, one class, 483 member functions, 221 data members)**
    split by physics domain: single-phase core / scene + moving geometry / VoF / phase change /
    porous + closures / MPI state, as CRTP or mixin headers; `project()` (522 lines) and
    `setSolidDevice` (540) cut below ~150; the nine self-labelled "sibling" functions
@@ -514,7 +525,20 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
    for the four single-rank periodic cases; Hertz and every MPI case identical.
 5. **core Python — DONE 2026-09-10 in peclet-amr** (`8e74940`): the shared members (16, not 14) are bound
    once through `bindOctreeCommon<T>`; attribute sets identical before/after.
-6. **Precision as a typed policy:** flow's `MReal = float` unless a raw `-DPECLET_FLOW_MREAL_DOUBLE`
+6. **DONE 2026-09-11 (one gap deferred)** — flow `a0a8c27`: `option(PECLET_FLOW_OPERATOR_DOUBLE)` (the macro
+   renamed everywhere, pass-through for `pip install . -C cmake.define…`); the "three hard casts" of
+   SCALING_ISSUES #1 were ALREADY `MReal` — the live exposure was the cut-cell IBM overlay (`mac_ibm.hpp`
+   `mreal = float`, `FV32`), now templated on `MReal` (default float build byte-identical); ctest
+   `no_float_operator_casts` greps `src/` with a `// PRECISION-EXEMPT:` allowlist; the double build
+   compiles and runs 153/155 (two float-tuned gates: lid-cavity rms 0.0247 vs the 0.02 Ghia threshold at
+   400 steps, `vardensity_mpi_np4` Chebyshev count off by one) — no CI job until those get their own
+   tolerances. `ghost_projection.hpp`'s `GpOverlay` (the AUTO-default `'ghost'` scheme) is still float
+   (marked exempt) — being templated by the running G.1 agent. The shared closure polynomials: core
+   `b4596aa`/`5c79205` `scheme/cut_cell_closure.hpp` (templated, tested at float and double against the
+   literal formulas), amr `902ee6c` and flow `a0a8c27` call it — the two copies were byte-identical
+   formulas. CONVENTIONS §3 corrected (core's `ghost_closure.hpp` and amr's `GhostOverlay` matrix weights
+   are float by design; "core never hard-codes float" was false).
+   *Original item:* **Precision as a typed policy:** flow's `MReal = float` unless a raw `-DPECLET_FLOW_MREAL_DOUBLE`
    (no CMake option; three "hard `(float)` casts that survived the templating") is
    SCALING_ISSUES #1; make it `option(PECLET_FLOW_OPERATOR_DOUBLE)`, grep-test that no `(float)`
    touches an operator view, and document core's float closure storage

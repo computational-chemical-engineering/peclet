@@ -26,7 +26,16 @@ releases before removal, and a break costs a major. The full old→new table is 
   'dirichlet', v)`, `set_csf_mode('face'|'cell')`, …); the `_off` pairs and `disable_vof_blocks` collapse
   into their setters; and the "call BEFORE" docstrings became checks that raise (`set_domain_bc` after
   geometry, `set_decomposition` after `init_mpi`, …) — a late `set_rho`/`set_mu` used to leave a stale
-  stencil silently and now rebuilds it.
+  stencil silently and now rebuilds it; a VALUE update of a domain BC or inflow profile after geometry
+  (a ramped jet or lid) stays allowed and now refreshes the tangential fold it used to leave stale.
+  `set_body_force((fx, fy, fz))` and `set_domain_bc(face, type, velocity=(vx, vy, vz))` take one
+  3-sequence like dem and voro. **Structure (G.1, partial):** `project()` and `setSolidDevice` are
+  stage dispatchers (5 + 9 stage members), `fillVelGhostsKeepOutflow` folded into `fillVelGhostsTo`;
+  the domain-header split of `flow_ibm.hpp` follows. **Precision (G.6):** `option(PECLET_FLOW_OPERATOR_DOUBLE)`
+  replaces the raw `-DPECLET_FLOW_MREAL_DOUBLE` flag and now covers the cut-cell IBM overlay too (it was
+  hard float even in a double build); the ctest `no_float_operator_casts` refuses a bare `(float)` on an
+  operator view; the shared cut-cell closure polynomials live once in core (`scheme/cut_cell_closure.hpp`,
+  templated on the scalar; flow float, amr double — byte-identical formulas).
 - **peclet.dem**: `initialize()`→`initialize_shape(shape_type, radius, …)` (radius mandatory),
   `enable_periodicity()`→`set_periodic()`, `get_domain_min/max()`→`origin`/`extent`, positional
   `set_domain(lx,ly,lz,px,py,pz)`→`set_domain(extent=, origin=, periodic=)`, `get_num_contacts()`/
