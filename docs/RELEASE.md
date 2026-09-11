@@ -107,7 +107,7 @@ configured against a retired venv fails with "Cannot run the interpreter".
 | pnm | extraction + MPI | `pnm/scripts/test_extraction.py ../flow/data/packing_ring.vti`; `tests/kokkos_mpi` np 1,2,4 | 7199 pores; bit-exact |
 | dem | kernel + MPI | `dem/tests/kokkos` (8), `dem/tests/kokkos_mpi` (24, host + CUDA); `python dem/verify_packing_spheres.py` | all pass |
 | voro | Kokkos + MPI | `cmake -B voro/build_rel -DPECLET_VORO_KOKKOS=ON -DPECLET_VORO_BUILD_PYTHON=ON [-DPECLET_VORO_MPI=ON]`; `OMP_PROC_BIND=false ctest` | all pass (a plain build registers zero tests — not a pass) |
-| coupling | Python integration tests | `cmake -S coupling -B coupling/build_rel -DPECLET_COUPLING_TESTS=ON ...; ctest` (needs flow + dem host builds on `PYTHONPATH`) | all pass |
+| coupling | Python integration tests | `cmake -S coupling -B coupling/build_rel -DPECLET_COUPLING_TESTS=ON -DPECLET_FLOW_BUILD=<flow tree> -DPECLET_DEM_BUILD=<dem tree> ...; ctest` — **both `_BUILD` variables are required**, see below | all pass |
 | whole family | import smoke | `PYTHONPATH=<all build dirs> python -c "import peclet.flow, peclet.dem, peclet.voro, peclet.pnm, peclet.core.mpi, peclet.morton, peclet.coupling"` | every `execution_space` reports the intended backend |
 
 Record the counts in `RELEASE_PREP.md` (they become the "tested" line of the release notes).
@@ -116,6 +116,21 @@ Anything red is a release blocker unless it is documented as a known limitation.
 **Free MPI ctests in CI**: only the OpenMP single-rank builds run on GitHub (no GPU, no MPI
 runners). The MPI and CUDA columns of this matrix are a *local* obligation — the release checklist
 is the only place they are enforced.
+
+**coupling's two `_BUILD` variables are load-bearing, and omitting them fails SILENTLY.**
+`coupling/tests/CMakeLists.txt` builds the ctest `PYTHONPATH` as
+`"${CMAKE_BINARY_DIR}:${PECLET_FLOW_BUILD}:${PECLET_DEM_BUILD}"`. Leave them unset and those two
+entries are empty, so the test subprocess falls through to whatever `peclet-flow` / `peclet-dem` are
+installed in the venv — which on this machine are **0.4.0 wheels from July**. Measured 2026-09-12:
+the bare configure line makes 2 of 3 coupling tests abort with `TypeError: initialize_shape(): ...
+shape_type: int` and a matching `set_body_force()` error, i.e. the July signatures, not the current
+ones. That is the lucky outcome. The dangerous one is the same fall-through when the old signature
+still happens to match: the tests pass, against a module nobody intended.
+This is the same failure class as RELEASE_PREP §1.3's `SDFLOW_BUILD` trap, and it is worth stating
+the general rule: **`.venv` carries stale installed peclet wheels (`peclet` 0.6.0, `peclet-flow`
+0.4.0, `peclet-dem` 0.4.0, `peclet-voro` 0.4.0, `peclet-pnm` 0.1.0). Anything in this checklist that
+imports `peclet.*` must set `PYTHONPATH` to the build trees explicitly, or it is not testing what you
+think it is.** That includes `tools/gen_python_api.py` and `tools/release/audit_docstrings.py`.
 
 ---
 
