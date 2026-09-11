@@ -16,7 +16,7 @@ decomposition** with efficient **asynchronous ghost-layer exchange**, common **S
 `block_decomposer` (now **retired/archived**) were extracted into the shared **`core/`**
 library (header-only C++20, its own git repo + `CLAUDE.md`) that every method depends on.
 
-**`core/` status:** complete and tested (109 plain / 164 Kokkos / 7 Python ctests, `mpirun -np 1..8`; morton-guarded tests SKIP with exit 77, never pass silently). Provides ORB block
+**`core/` status:** complete and tested (53 plain / 68 Kokkos / 6 Python ctests, `mpirun -np 1..8`; morton-guarded tests SKIP with exit 77, never pass silently). Provides ORB block
 decomposition; the async grid ghost-layer exchange (`peclet::core::halo::GridHalo` — topology/exchange split,
 field-agnostic, NBX + persistent neighborhood-collective engines, overlap-capable, plus a GPU-resident
 host-staged variant); the Lagrangian halo (`peclet::core::halo::ParticleMigrator` — particle migration +
