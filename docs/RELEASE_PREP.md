@@ -394,3 +394,45 @@ float-tuned gates". Two of those four (`vof_bc_mpi_np2`, `vof_bc_mpi_np4`) do no
 **The lesson for the rest of this release:** the stale-build trap (§1.3, fixed in flow `41c8356`) was
 hiding both of these. The first honest local run of the verify battery is the run that found them. Any
 "it passed before" from before that commit is not evidence.
+
+**2026-09-12, Phase B results and two more traps.**
+
+| package | result | counts |
+|---|---|---|
+| core | **PASS** | 53 plain / 68 Kokkos / 6 Python, host *and* CUDA, np 1-8, 0 skips |
+| morton | **PASS** | default 1/1, non-BMI2 2/2 incl. the PDEP/PEXT-free contract, Kokkos-OpenMP 2/2, Kokkos-CUDA 2/2, pytest 9/9, 0 skips. AVX-512 NOT re-validated (no AVX-512F on this host, no Intel SDE) |
+| pnm | **PASS** | 9/9 host and CUDA, 0 skips; np = 1/2/4 bit-exactness genuinely ASSERTED against a single-rank oracle, not assumed; 7199 pores / 7499 labels / 53020 connections on `packing_ring.vti`, identical on both backends |
+| flow | **PASS** at the DOUBLE default | 49/49 single-rank; MPI block re-running after the two gate fixes. 49/49 CUDA single-rank. Regression PASS |
+| amr | **PASS**, shippable as 0.1.0 | 100/100 host; CUDA 99/100 + 1 skip |
+| coupling | **PASS** | 3/3, 0 skips; docstring audit 12/12 documented |
+| dem | running | |
+| voro | running | |
+
+**Docstring audit, finally run against a CLEAN family build** (§2.1's blocked item): **955 callables,
+15 undocumented, 0 stale** — not the "894 / 36" that §2.1 correctly refused to trust, because every
+tree that earlier run imported predated the renames. All nine modules import from build trees in one
+interpreter, none from site-packages, verified before the audit ran. The 15 are being written: flow 6
+(`has_scene`, `pressure_telescope`, `velocity_multigrid_active`, each on both grids), pnm 1
+(`SDFReader`), voro 2 (the two `__init__`s), core 6 (`SceneBuilder` and five of its members).
+
+**amr's one CUDA skip is self-diagnosing and correct.** `python_state_hash` exits 77 because
+`peclet.amr.build_toolchain` reports `'GNU14.2.0Releasex86_64Kokkos5.1.1'` on the CUDA build against
+the committed reference's spaced `'GNU 14.2.0 Release x86_64 Kokkos 5.1.1'`: the
+`target_compile_definitions(amr PRIVATE "PECLET_AMR_BUILD_TOOLCHAIN=\"…\"")` string loses its
+embedded spaces when the TU is routed through the Kokkos launch compiler. Same compiler, same
+everything — a quoting defect in the *label*, not in the build. The gate did exactly what it is for:
+skipped rather than compare across toolchains, and it cannot produce a false pass. **[A]** fix the
+quoting after the release.
+
+**Worktrees and unmerged branches — RELEASE.md §1.1, resolved by PARKING, not merging.** flow carries
+14 worktrees and the suite has 7 unmerged flow branches (`analysis/high-re-stability`, `vof-issues`,
+`vof-v6`, `vof-w0`, `vof-w12`, `vof-w4`, `vof-wor2`), plus `dev/aperture-compat-rhs` and
+`drag-study-harness` in core/amr and `feature/flexible-cell-storage` in voro. Every one of the flow
+branches is between 72 and 629 commits BEHIND main, and their content has been integrated by other
+routes — `vof-issues`, the only one ahead by a substantial 10 commits, carries the free-slip domain
+BC, `step_adaptive`, the visible preconditioner-breakdown flag and the contact-angle wall binding,
+and **main already has all four** (`kBcTypes` includes `"slip"`, `stepAdaptive` is in
+`flow_ibm_vof.hpp`, `pressure_solve_failed` is bound, and `test_wall_slip_mpi.cpp` supersedes the
+branch's `test_freeslip_bc_mpi.cpp`). **Decision: all are explicitly PARKED and their work is NOT in
+1.0.0.** The worktrees are NOT removed — removal would destroy other sessions' build trees for no
+release benefit, and §1.1 is satisfied by explicit parking. Reversible: run the removals later.
