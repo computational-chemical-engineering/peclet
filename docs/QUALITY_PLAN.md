@@ -399,7 +399,7 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
 
 ### G. Structure (L, mostly not breaking)
 
-1. **IN PROGRESS 2026-09-11.** DECIDED mechanism (survey 2026-09-10): NOT CRTP/mixins — every domain
+1. **DONE 2026-09-11** (flow `834ae22`, `e0525f6`, `fd9e407`, `470b6b4`, `73cc63c`; CI green). DECIDED mechanism (survey 2026-09-10): NOT CRTP/mixins — every domain
    touches the shared state (`e_/u_/C[]/sdf_/cField_/vofAdv_/mg_/distributed_`) and nvcc's extended-lambda
    rule keeps the kernels in one `public:` region, so a dependent base would force `this->` on thousands
    of lines and nothing stays byte-identical. Instead: declarations + state stay in `flow_ibm.hpp`,
@@ -409,7 +409,18 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
    ONE sibling merge that is bit-exact; `project()` (523 lines) → 5 stage members and `setSolidDevice`
    (540) → 9; the `buildRhs`×5 / `addCsfRhs`×3 families are different arithmetic (different terms and
    operand order) and are NOT merged; `hydroForceTorque`/`Reaction` compute different quantities and
-   stay. The header split itself is running (agent launched 2026-09-11).
+   stay. The header split: `flow_ibm.hpp` 11 886 → 4 688 lines (declarations, nested structs, state) and
+   twelve domain headers included at its bottom — `flow_ibm_vof.hpp` 2203, `_phase_change` 1576,
+   `_core` 1743, `_project` 1194, `_scene` 715, `_geometry` 691, `_hydro` 544, `_closures` 389,
+   `_diagnostics` 340, `_mpi` 317, `_scalars` 307, `_bc` 292 — every definition verbatim as an out-of-class
+   `Solver<Grid>::` member (517 functions classified by the state they read, e.g. `setSolidFromScene` →
+   scene, `vofInterfaceArea` → phase change because it reads `pcAreaMode_`); each commit bit-exact on the
+   hash gate + regression + 155/155. The split tooling had three generation bugs (double-nested
+   namespace, a comment leaking into a definition, a tokenizer eating the blank line before
+   declarations — the last invisible under clang-format and caught only because `flow_ibm.hpp` is
+   exempt); all fixed and the headers re-verified byte-identical. `73cc63c` also templates
+   `GpOverlay` on `MReal` (G.6's last flow-side gap; the core-side `scheme/ghost_closure.hpp` closure
+   math stays float — two narrowing casts remain, exempt with that reason).
    *Original item:* **`flow/src/flow_ibm.hpp` (11 802 lines, one class, 483 member functions, 221 data members)**
    split by physics domain: single-phase core / scene + moving geometry / VoF / phase change /
    porous + closures / MPI state, as CRTP or mixin headers; `project()` (522 lines) and
@@ -533,7 +544,7 @@ dem row said counts stay methods — §1.2 wins, row fixed. Callers to update: c
    compiles and runs 153/155 (two float-tuned gates: lid-cavity rms 0.0247 vs the 0.02 Ghia threshold at
    400 steps, `vardensity_mpi_np4` Chebyshev count off by one) — no CI job until those get their own
    tolerances. `ghost_projection.hpp`'s `GpOverlay` (the AUTO-default `'ghost'` scheme) is still float
-   (marked exempt) — being templated by the running G.1 agent. The shared closure polynomials: core
+   (marked exempt) — templated in `73cc63c` (G.1's last commit). The shared closure polynomials: core
    `b4596aa`/`5c79205` `scheme/cut_cell_closure.hpp` (templated, tested at float and double against the
    literal formulas), amr `902ee6c` and flow `a0a8c27` call it — the two copies were byte-identical
    formulas. CONVENTIONS §3 corrected (core's `ghost_closure.hpp` and amr's `GhostOverlay` matrix weights
@@ -723,72 +734,80 @@ lands; F and G.2 follow in the same repo.*
   voro include switch, the shared `poly_*` lift, G.1, G.6, G.7; then callers, CHANGELOG/NAMING, this
   file, pointers. No version bump, no tag.
 
+- **2026-09-10/11, packages F and G executed** — all eight repos, every battery green before and after,
+  every structural commit byte-exact on a COMMITTED hash script (flow `tests/regression/state_hash.py`,
+  dem `tests/regression/state_hash.py`, pnm `tests/regression/state_hash.py`, voro `python/state_hash.py`,
+  core + amr `python/state_hash.py`), CI green everywhere. F: pnm `6ee6399`/`b07ad75`, voro `16363b5`/
+  `9e87eee`, flow `853816f`…`b927a07` (+ `a0a8c27` tuples and the BC value-vs-type rule), core-as-amr
+  `eeeac1e`. G.2+G.5: core `d93c323`/`ae1affe`/`5810ab5`, the new `peclet-amr` (submodule `amr`, 174
+  filtered commits + `2533f16`…`cfe5a50`, `902ee6c`). G.4: dem `ee34cfe`…`93eec07` (the wrap fix isolated,
+  RED→GREEN test). G.6: flow `a0a8c27`/`73cc63c`, core `b4596aa`/`5c79205` (`scheme/cut_cell_closure.hpp`).
+  G.7: voro `5ffb0ea`…`4ab848e`. G.1: flow `eac5b07`/`834ae22`…`73cc63c`. Callers: coupling `5b2eb4b`,
+  `16e8b8a`; gallery local `4d6e0cf`, 22 commits to `7be21f7`, `3c9d5e2`, `1b370a0` (NOT pushed, NOT
+  re-rendered). Umbrella `0e8382d`…`296aebe`; `docs/python/*` regenerated from the 1.0.0 build trees.
+  **Defects the gates found** (none would have shown in a green battery): dem's periodic wrap contacts
+  were one-sided on a single rank (the un-imaged far partner moved, by half); voro's host pore-space
+  reconstruction missed planes on 8/805 cells; flow's `set_rho`/`set_mu` after geometry left a stale
+  stencil; flow's cut-cell IBM overlay was hard float in the "double" build; pnm boxed millions of ints;
+  a per-step `set_domain_bc_profile` (a ramped inflow) must stay legal after geometry — the first cut of
+  the state checks forbade it. **Open, recorded in place:** the CUDA `clipCellAgainstSdf` defect at
+  128/256 (§3.G.7); flow's double build has two float-tuned gates (§3.G.6); core's `ghost_closure.hpp`
+  closure math is float; `PECLET_CORE_TAG` pins lag core (release session). Lesson three for the
+  handoff: **an agent that ends its turn to "wait for a monitor" never wakes** — every executor stalled
+  at least once until told to block in the foreground (`timeout … tail --pid=<pid> -f /dev/null`).
+
 ## 6. Handoff — starting packages F and G
 
 Written 2026-09-08 at the end of the day A–E+H were executed, for whoever picks up F and G. Read
 §1 (decisions), §3.F/§3.G, `docs/NAMING.md` §1, and the repo's own `CLAUDE.md` before touching code.
 
-### Where the work stands
+### Where the work stands (rewritten 2026-09-11)
 
-**Done in every repo:** A (one spelling per concept), B (dead code and artefacts out), C (one version
-source, old identifiers gone), D (CI that is honest), E (no env var changes a result), H (docs
-describe the code). Every submodule pointer is bumped and pushed; CI is green in all eight repos;
-`tools/release/check_release_state.sh` flags only the deliberate "bump at tag time" versions.
+**Every package is done in every repo:** A–H, including F in voro/flow/pnm/core(→amr), G.1 (flow_ibm split),
+G.2+G.5 (`peclet-amr`, the eighth package), G.3 (pnm), G.4 (dem split + the wrap fix), G.6 (precision
+option + grep test + the shared closure polynomials in core), G.7 (voro). Every submodule pointer is bumped
+and pushed, CI is green in all nine repos, and `tools/release/check_release_state.sh` flags only the
+deliberate "bump at tag time" versions (plus `peclet-amr` 0.1.0, a new package that gets the family version).
 
-**Done in part:** F in dem only (`2213849`). G.3 in pnm only (`0e0c2cd`).
+**What the next session does: tag 1.0.0.** RELEASE.md phases A–I with EVERY package at 1.0.0 (D9), including
+`peclet-amr`'s first release (sdist only; `peclet[amr]` extra; PyPI project + Trusted Publishing + Zenodo DOI
+still to be created — RELEASE.md's new-package steps), then the CUDA + MPI matrices, then push and re-render
+the gallery (`~/Codes/peclet-examples` holds ~30 local commits against the 1.0.0 API; nothing is pushed until
+the wheels exist). Before tagging: bump the `PECLET_CORE_TAG`/`PECLET_MORTON_TAG` pins in every consumer's
+`cmake/PecletDeps.cmake` (they lag core `d93c323`; amr's CI uses core `main`), and regenerate `docs/python/*`
+from MPI builds one last time (a regeneration from the venv's OLD wheels silently regresses the pages —
+always set `PYTHONPATH` to the build trees).
 
-**Remaining, and the order §4 wants:** F in voro, flow, pnm, core → G.2 (+G.5) → then the rest of G
-(G.1, G.4, G.6, G.7) → tag 1.0.0. F and G.2 are breaking, so they precede the tag; the rest of G is
-not breaking and could follow it, but doing it first keeps one release instead of two.
+**Open items recorded in place, none blocking the tag:** §3.G.7's CUDA `clipCellAgainstSdf` defect at
+128/256; §3.G.6's two float-tuned gates in flow's double build (no CI job until they get tolerances) and
+core's float `scheme/ghost_closure.hpp`; the porous path's "non-finite preconditioner" report (§5,
+2026-09-10 flow F); C.3 (one shared cmake module), D.6 (one composite Kokkos action), the D7 decision on
+INTERFACES.md, the flow `tests/study` move, the RELEASE_PREP re-cut.
 
-### Start here, per repo
-
-- **voro F — half written, parked on a branch.** The agent was cut off before it built anything. Its
-  work is committed on `wip/package-f-tiering` (pushed): public/`diagnostics` split in
-  `src/voro_bindings.cpp`, `pore_mesh` and `scenes` lifted out of `packaging/voro_init.py` into lazily
-  imported submodules, plus touches to `mesh_optimizer.hpp` and `test_mesh_optimizer.cpp`. It is
-  UNBUILT and UNTESTED — read it critically against the current bindings, do not assume it is right.
-  Still open from §3.F: string modes → enums, `minimize_interface` returning energy through
-  `maxVolErr`, and the `DistributedMovingTessellation`-versus-`VoronoiHalo` decision.
-- **flow F** is the big one (~180 of 266 members to `diagnostics`, retired `set_face_interp` modes
-  deleted with their kernels). Do it before G.1, so the split moves a smaller surface.
-- **pnm F / core F** are small. core's F is entangled with G.2 and G.5 — all three touch
-  `python/amr_bindings.cpp`, so do them as one pass, not three.
-- **G.2** moves the WHOLE `core/amr/` tree into a new eighth package `peclet-amr` depending on core
-  alone (D6, decided 2026-09-10 — read G.2 in full, it carries the dependency audit; relocated with
-  its history, never deleted, AMR is under active development). G.5 (`Octree`/`DistributedOctree`
-  sharing 14 verbatim members) is the same file and rides along, as does core's F.
-- **G.4** (dem `sim.hpp` split) carries a real numerics fix: single-rank periodic wrap contacts whose
-  far partner sits more than one radius beyond the face are resolved ONE-SIDEDLY (`ghostBand = maxRad`);
-  the MPI step is symmetric. Keep the structural commits bit-exact and isolate the fix in its own
-  commit with a test. Also unexplained: dem's XPBD path is not run-to-run deterministic at 4 threads.
-
-### Two lessons this work produced — they will bite F and G
+### The three lessons — they will bite the release too
 
 1. **When a process-global disappears, every pure or pre-flight function that read it needs the value
-   passed in.** E removed flow's decomposition statics; `CutcellMG::predict` kept calling
-   `decomposition()` with the defaults, so `flow.predict_hierarchy` silently predicted the *aligned*
-   hierarchy for coarse-first jobs while its docstring claimed otherwise (`628d3da`), and
-   `check_decomposition.py --predict` printed identical ladders under headings naming different depths
-   (`013d3b3`). F moves members and G moves whole files: grep for every reader before you move state.
+   passed in** (`628d3da`, `013d3b3`). F and G moved members and files; nothing regressed because every
+   move was gated by a committed hash script, not by a green battery.
 2. **With concurrent agents in one checkout, commit with a pathspec** — `git commit <paths> -m …`.
-   A bare `git commit` takes the whole shared index: flow `628d3da` swept another agent's staged docs
-   into an unrelated commit.
+3. **A green battery is not a gate; a byte comparison is.** Every defect this pass found (dem wrap
+   asymmetry, voro's inexact host reconstruction, flow's stale stencil and hard-float overlay, pnm's boxed
+   ints, the over-strict BC check) was invisible to a green battery. The hash scripts are now IN the repos;
+   run them before and after anything that claims to be bit-exact.
 
 ### How the packages were run
 
-Agent briefs live in `.claude/preambles/` (gitignored): `preamble.md` is the shared git/build/report
-contract, `preamble_F.md` adds F's tiering rules and gates. There is no `preamble_G.md` — write one
-from §3.G, and require of every structural change what G.3 delivered: **a byte-comparison of the
-outputs against the pre-refactor build**, not just a green battery.
+Agent briefs live in `.claude/preambles/` (gitignored): `preamble.md` (git/build/report contract),
+`preamble_F.md` (tiering rules), `preamble_G.md` (structure: byte-comparison mandatory, hash scripts
+committed). Executors ran one per repo in parallel; the coordinator kept the design decisions, wrote the
+umbrella records after each report, and bumped pointers last. Two practical traps: the scratchpad is shared
+between concurrent agents (use a subdirectory), and an agent that ends its turn "waiting for a monitor" never
+wakes — tell it to block in the foreground.
 
-Gates that caught real defects and should stay: a SHA-256 of the final state from a fixed-seed run per
-public entry path, before and after; the full registered battery on host-openmp (`OMP_NUM_THREADS=4
-OMP_PROC_BIND=false`, MPI at one thread); `gh run watch` green before reporting.
+### Callers
 
-### Callers to update after each breaking pass
-
-`suite/coupling` and the gallery at `~/Codes/peclet-examples`. The gallery has local commits (dem
-`6a749f8`, flow `ff21290`) that are deliberately NOT pushed and NOT re-rendered — that waits for the
-1.0.0 wheels. Dated records there (`ISSUES.md`, `PROGRESS.md`) keep their historical commands with a
-bracketed note naming the replacement; live instructions get updated.
+`suite/coupling` follows every breaking pass in its own commits (`5b2eb4b`, `16e8b8a`). The gallery at
+`~/Codes/peclet-examples` has local, unpushed commits against the whole 1.0.0 API (dem, flow ×2, voro, pnm,
+amr); dated records (`ISSUES.md`, `PROGRESS.md`) keep historical commands with bracketed notes naming the
+replacement; live pages were executed on small grids against the build trees. It is re-rendered and pushed
+only on the 1.0.0 wheels.

@@ -1,7 +1,7 @@
-[submodule "transport-core"]
+[submodule "core"]
 	path = core
 	url = git@github.com:computational-chemical-engineering/peclet-core.git
-[submodule "sdflow"]
+[submodule "flow"]
 	path = flow
 	url = git@github.com:computational-chemical-engineering/peclet-flow.git
 [submodule "dem"]
@@ -10,7 +10,7 @@
 [submodule "morton"]
 	path = morton
 	url = git@github.com:computational-chemical-engineering/peclet-morton.git
-[submodule "vorflow"]
+[submodule "voro"]
 	path = voro
 	url = git@github.com:computational-chemical-engineering/peclet-voro.git
 [submodule "coupling"]
