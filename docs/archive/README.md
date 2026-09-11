@@ -29,3 +29,4 @@ that is still under active development (D6).
 | [VOF_NEXT_SESSION.md](VOF_NEXT_SESSION.md) | 2026-08/09 | Handoff note for the VoF campaign's continuing session: item-by-item state as of 2026-09-02. |
 | [VORONOI_METHODS_PLAN.md](VORONOI_METHODS_PLAN.md) | 2026-09 | The approved Voronoi/convex-cell methods plan — one differentiable cell complex carrying many methods — with the §12 rulings. |
 | [peclet_cuda_wheel_prototype.md](peclet_cuda_wheel_prototype.md) | 2026-07 | Validated proof-of-concept for a pip-installable single-GPU CUDA wheel; the recipe now lives in RELEASE.md and DEPLOYMENT.md. |
+- [RELEASE_PREP_0.7.x.md](RELEASE_PREP_0.7.x.md) — the 0.7.0/0.7.1/0.7.2 release-prep record (measured 2026-09-04). Superseded by the 1.0.0 re-cut in [../RELEASE_PREP.md](../RELEASE_PREP.md); its §8 (physical domains) is carried forward there as §7.

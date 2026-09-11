@@ -71,14 +71,37 @@ for s in $SUBS; do
 done
 say ""
 say "== PecletDeps pins (consumers must pin the NEW core/morton tags before their own release)"
-for s in flow pnm dem voro coupling; do
+for s in flow pnm dem voro coupling amr; do
   f="$s/cmake/PecletDeps.cmake"; [ -f "$f" ] || continue
   printf '  %-9s core=%s morton=%s kokkos=%s arborx=%s\n' "$s" \
-    "$(grep -m1 'set(PECLET_TPX_TAG' "$f" | grep -oE '"[^"]+"' | head -1 | tr -d '"')" \
+    "$(grep -m1 'set(PECLET_CORE_TAG' "$f" | grep -oE '"[^"]+"' | head -1 | tr -d '"')" \
     "$(grep -m1 'set(PECLET_MORTON_TAG' "$f" | grep -oE '"[^"]+"' | head -1 | tr -d '"')" \
     "$(grep -m1 'set(PECLET_KOKKOS_TAG' "$f" | grep -oE '"[^"]+"' | head -1 | tr -d '"')" \
     "$(grep -m1 'set(PECLET_ARBORX_TAG' "$f" | grep -oE '"[^"]+"' | head -1 | tr -d '"')"
 done
+say ""
+
+# A stale core pin only fails at COMPILE time, so a configure-only CI guard stays green and this
+# script used to print nothing (it grepped the retired PECLET_TPX_TAG name). Check it directly:
+# every peclet/core header a consumer includes must exist at the tag that consumer pins.
+say "== consumer includes vs pinned core tag (a stale pin fails only at compile; CI's guard is configure-only)"
+_stale=0
+for s in flow pnm dem voro coupling amr; do
+  f="$s/cmake/PecletDeps.cmake"; [ -f "$f" ] || continue
+  tag="$(grep -m1 'set(PECLET_CORE_TAG' "$f" | grep -oE '"[^"]+"' | head -1 | tr -d '"')"
+  if [ -z "$tag" ]; then say "  $s: NO core pin found in $f"; _stale=1; continue; fi
+  missing=""
+  for h in $(grep -rhoE 'peclet/core/[A-Za-z0-9_/]+\.hpp' "$s/include" "$s/src" 2>/dev/null | sort -u); do
+    git -C core cat-file -e "${tag}:include/${h}" 2>/dev/null || missing="${missing} ${h}"
+  done
+  if [ -n "$missing" ]; then
+    say "  $s: pinned $tag is STALE — headers absent at that tag:${missing}"
+    _stale=1
+  else
+    say "  $s: pinned $tag OK"
+  fi
+done
+[ "$_stale" = 1 ] && say "  -> cut a new core tag and repin before releasing; a wheel build would not compile"
 say ""
 say "== metapackage (umbrella pyproject.toml) version $(pyver .)"
 grep -E 'peclet-[a-z]+==' pyproject.toml | sed -E 's/^\s*/  /'

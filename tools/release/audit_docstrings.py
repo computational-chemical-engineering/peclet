@@ -13,8 +13,11 @@ undocumented count is printed, not enforced — the release checklist decides wh
 """
 import importlib, inspect, json, re, sys
 
+# peclet.amr, not peclet.core.amr: the AMR tree moved out of core into its own package on
+# 2026-09-10 (QUALITY_PLAN G.2/D6). Auditing the old path meant amr's public API was audited by
+# nothing at all -- the import failed, and the eighth package went unchecked.
 MODULES = ["peclet.flow", "peclet.pnm", "peclet.dem", "peclet.voro", "peclet.morton",
-           "peclet.core.mpi", "peclet.core.amr", "peclet.core.geom", "peclet.coupling"]
+           "peclet.core.mpi", "peclet.core.geom", "peclet.amr", "peclet.coupling"]
 STALE = re.compile(r"\b(sdflow|vorflow|tpx_|demgpu|peclet\.flow\.pnm|tests/kokkos_mpi suite|CUDA-API alias|TODO|FIXME)\b", re.I)
 
 

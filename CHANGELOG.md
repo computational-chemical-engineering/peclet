@@ -212,7 +212,7 @@ header repin), peclet-dem 0.5.0, peclet-voro 0.5.0, peclet-coupling 0.4.0, pecle
 - **dem**: `add_scene_shape` sizes the contact buffers and every capacity-sized array follows the
   particle capacity (was a silent contact drop, then heap corruption); root-level scratch scripts are
   excluded from the sdist.
-- (more at release time from the per-package logs — see RELEASE_PREP §1.4 for the gallery-found defects)
+- (more at release time from the per-package logs — see [archive/RELEASE_PREP_0.7.x.md](docs/archive/RELEASE_PREP_0.7.x.md) §1.4 for the gallery-found defects)
 
 ### Known limitations
 - LUMI / HIP: the `peclet-hip` image builds and is published for the first time, but has not run on AMD
