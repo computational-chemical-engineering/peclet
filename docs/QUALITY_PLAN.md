@@ -57,7 +57,12 @@ before tagging; ship E–H (the structural refactors) across 1.x under the alias
 - **D9 — 1.0.0, then semver.** An API-breaking release is a major release: the clean break
   ships as peclet 1.0.0 with every package at 1.0.0 (RELEASE.md's bump table is rewritten
   accordingly at tag time). After 1.0.0 a breaking change needs a major bump, which is what makes
-  the alias ladder worth its cost.
+  the alias ladder worth its cost. **One exception, decided 2026-09-11 (maintainer: "I agree"):
+  `peclet-amr` stays at 0.x** — it is functional and tested (92 C++ + 3 Python ctests, np 1–8) but a
+  research code under active development with no external validation page, unfinished rungs
+  (sub-face closures, pocket exclusion, M2b, D3b) and an API that will churn; pre-1.0 semver lets it
+  break in a minor. It is published with the family (sdist, `peclet[amr]`) and labelled "under
+  development"; it graduates to 1.0.0 on its own merits.
 - **D8 — Old identifiers go.** `transport_core`/`tpx_*`/`PECLET_TPX_TAG`, `sdflow`, `vorflow`,
   `mortonarith`, `DEM_MPI`: renamed in CMake, `.gitmodules`, docs and CI in one pass.
 
@@ -769,8 +774,8 @@ option + grep test + the shared closure polynomials in core), G.7 (voro). Every 
 and pushed, CI is green in all nine repos, and `tools/release/check_release_state.sh` flags only the
 deliberate "bump at tag time" versions (plus `peclet-amr` 0.1.0, a new package that gets the family version).
 
-**What the next session does: tag 1.0.0.** RELEASE.md phases A–I with EVERY package at 1.0.0 (D9), including
-`peclet-amr`'s first release (sdist only; `peclet[amr]` extra; PyPI project + Trusted Publishing + Zenodo DOI
+**What the next session does: tag 1.0.0.** RELEASE.md phases A–I with EVERY package at 1.0.0 (D9) — EXCEPT
+`peclet-amr`, which ships its first release as **0.1.0** and stays 0.x (D9's recorded exception; sdist only; `peclet[amr]` extra; PyPI project + Trusted Publishing + Zenodo DOI
 still to be created — RELEASE.md's new-package steps), then the CUDA + MPI matrices, then push and re-render
 the gallery (`~/Codes/peclet-examples` holds ~30 local commits against the 1.0.0 API; nothing is pushed until
 the wheels exist). Before tagging: bump the `PECLET_CORE_TAG`/`PECLET_MORTON_TAG` pins in every consumer's

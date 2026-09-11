@@ -86,7 +86,8 @@ releases before removal, and a break costs a major. The full old→new table is 
   physical origin every other call takes), `mpi_rank()`/`mpi_size()` are gone (mpi4py has them);
   `Pore` gained
   constructors and `__repr__`; malformed VTI files and non-convergence now raise instead of printing.
-- **peclet.amr — NEW eighth package (G.2, D6):** the whole `core/amr/` tree — the block-octree AMR
+- **peclet.amr — NEW eighth package (G.2, D6), released as 0.1.0 and staying 0.x (under development;
+  its API may break in a minor until it graduates on its own merits — QUALITY_PLAN D9 exception):** the whole `core/amr/` tree — the block-octree AMR
   infrastructure AND the collocated cut-cell Navier–Stokes solver on it — is relocated with its git
   history into `peclet-amr` (`import peclet.amr`; `peclet.core.amr.{Octree, DistributedOctree, Poisson,
   Flow}` → `peclet.amr.{…}`; C++ `peclet::core::amr` → `peclet::amr`, `peclet/core/amr/` → `peclet/amr/`,

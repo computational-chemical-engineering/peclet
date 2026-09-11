@@ -126,7 +126,8 @@ is the only place they are enforced.
 Semantic versioning per package; the family version is the metapackage's. Rules used so far:
 
 - **major** bump when a package removes or renames public Python API. The first one is the family's
-  **1.0.0** ([QUALITY_PLAN.md](QUALITY_PLAN.md) D9): every package ships 1.0.0 together, the umbrella
+  **1.0.0** ([QUALITY_PLAN.md](QUALITY_PLAN.md) D9): every package ships 1.0.0 together — except
+  `peclet-amr`, which ships 0.1.0 and stays 0.x while under development (D9's recorded exception) — the umbrella
   CHANGELOG lists every removed name with its replacement, and from then on the NAMING.md alias ladder
   is binding, so a further break costs a major.
 - **minor** bump when a package gains public Python API or a numerical method (VoF, moving geometry,

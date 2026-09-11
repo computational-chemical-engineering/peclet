@@ -70,7 +70,7 @@ Everything ships under one **`peclet` namespace** — installable parts of one f
 | `peclet-voro` | `peclet.voro` | Dynamic Voronoi tessellation + mesh generator |
 | `peclet-coupling` | `peclet.coupling` | CFD-DEM coupling drivers over flow + dem — sdist only (`peclet[cfd-dem]`) |
 | `peclet-core` | `peclet.core` (`.mpi`, `.geom`) | Shared infra (particle halo, analytic-SDF scenes) — sdist only (`peclet[mpi]`) |
-| `peclet-amr` | `peclet.amr` | Block-octree AMR + collocated cut-cell Navier–Stokes solver on it (under development) — sdist only (`peclet[amr]`) |
+| `peclet-amr` | `peclet.amr` | Block-octree AMR + collocated cut-cell Navier–Stokes solver on it — **0.x, under development** (API may change between minors) — sdist only (`peclet[amr]`) |
 | `peclet` | — | metapackage: `pip install peclet` pulls the CPU family |
 | `peclet-cu13` | — | metapackage: `pip install peclet-cu13` pulls the CUDA family (`peclet-{flow,pnm,dem,voro}-cu13`) |
 
