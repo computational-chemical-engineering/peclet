@@ -24,7 +24,22 @@ is reproducible; the remaining defect is narrower.*
 
 ---
 
-## 1. Float operator storage caps MG-PCG on dense cut-cell beds — HIGH
+## 1. Float operator storage caps MG-PCG on dense cut-cell beds — CLOSED BY DECISION 2026-09-11
+
+> **Resolved by flipping the default, not by a new algorithm.** `PECLET_FLOW_OPERATOR_DOUBLE`
+> defaults to **ON** as of 2026-09-11 (flow `CMakeLists.txt:48-72`); a float build now emits a
+> CMake warning naming this issue. The decision, its rejected alternatives and its consequences
+> are recorded in [decisions/flow.md](decisions/flow.md) — *"Double operator storage is the
+> DEFAULT"*. The reasoning: the failure is **silent**, so documenting it protects nobody who
+> does not already know; ~12% step time is the price of a default that cannot quietly
+> invalidate a dense-bed run. The double-*diagonal* fallback stays retired (65x worse on
+> divergence — it converges to the float-face operator, not the true one).
+>
+> **Consequence still open:** this changes numerics in the default build, so regression state
+> hashes and `perf_baseline.json` must be re-blessed before the 1.0.0 tag.
+>
+> The analysis below stands as the record of why.
+
 
 The documented **WO-M** defect, reproduced independently in the field. Float `MReal` breaks the
 singular row-sum identity `A·1 = 0`, the residual floors at 5e-9…6e-8 and rebounds, and any dense

@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-163 in force, 37 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+164 in force, 37 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -62,6 +62,7 @@ reading until they are settled.
 - **Do not make the preconditioner rho-aware — harmful, and no compatibility floor exists in practice**. **Rejected:** making the preconditioner rho-aware; the H1 hypothesis that GP_THETA_MIN fires and causes the trouble  <sub>ghost-hardening-plan.md:26-37</sub>
 - **Domain-BC all-fluid velocity must use double diffSmoothColor, not float IBM stencil**. **Rejected:** float IBM stencil for domain-BC all-fluid velocity  <sub>cuda-kokkos-migration.md:318-320</sub>
 - **Domain-BC paths stay blocking, following the VelocityMG precedent**. **Rejected:** applying halo-compute overlap to domain-BC paths  <sub>comm-scaling-plan.md:22</sub>
+- **Double operator storage is the DEFAULT (SCALING_ISSUES #1 closed by decision)**. **Rejected:** (a) leaving float as the default and documenting the limitation — rejected because the  <sub>flow/CMakeLists.txt:48-72</sub>
 - **Drag must be included in bcStencilPath() whenever advection is off**.  <sub>porous-cfddem-cuda-two-bugs.md:14</sub>
 - **E2 resolved: the aspect coarsening rule alone fixes MG-PCG stall on stretched grids — no auto-FCG/symmetric-V-cycle decision needed**. **Rejected:** needing a separate symmetric-V-cycle-under-aniso or auto-FCG-on-aniso decision  <sub>physical-units-phase2-aniso.md:28-31</sub>
 - **Earlier "slow convergence / non-converged" worry was a multiplied-dt float-precision artifact, fixed by the divided-dt engine convention**. **Rejected:** the multiplied-dt momentum-operator convention  <sub>ringbed-cfd-surrogate.md:63</sub>

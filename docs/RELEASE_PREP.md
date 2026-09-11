@@ -70,7 +70,7 @@ loudly. voro's `ci.yml` guard now compiles the module the wheel actually builds.
 give `flow`, `dem`, `pnm`, `coupling` and `amr` the same compiling pre-tag guard — today the
 pre-flight is their only net.
 
-### 1.2 SCALING_ISSUES #1 — float operator storage, in the default build [D]
+### 1.2 SCALING_ISSUES #1 — DECIDED 2026-09-11: double operator storage is the default [R]
 
 Not fixed. `PECLET_FLOW_OPERATOR_DOUBLE` is an opt-in compile flag, default **OFF**
 (`flow/CMakeLists.txt:52`); the production double-diagonal storage was deliberately not shipped
@@ -78,10 +78,62 @@ Not fixed. `PECLET_FLOW_OPERATOR_DOUBLE` is an opt-in compile flag, default **OF
 written 2026-09-11: the porous path's default MG-PCG reports a **non-finite preconditioner on 2 of 5
 steps, deterministically**.
 
-A clean-break 1.0.0 should not ship a silent correctness defect in its default configuration. The
-maintainer decides which: ship the double-diagonal; flip the default to double storage and accept the
-cost; or document it as a stated limitation with a loud runtime warning. **Not a decision to defer
-past the tag** — whichever is chosen changes either the numerics, the perf baseline, or the docs.
+**Decision taken 2026-09-11: flip the default.** `PECLET_FLOW_OPERATOR_DOUBLE` is now `ON`
+(flow `CMakeLists.txt:48-72`) and a float build emits a CMake warning naming this issue. Documenting
+the limitation was rejected because the failure is *silent* — documentation protects only a user who
+already knows. The double-*diagonal* fallback stays retired (65x worse on divergence). Recorded in
+[decisions/flow.md](decisions/flow.md) and [SCALING_ISSUES.md](SCALING_ISSUES.md) §1.
+
+**What this leaves to do in the release window [R]:**
+
+1. **Re-bless the regression baselines.** This changes numerics in the default build, so
+   `tests/regression/sdflow_regression.py` state hashes and `perf_baseline.json` move. Re-baseline
+   with `--update` and record the before/after in the CHANGELOG; a changed digit here is expected
+   *this once* and must not be waved through again afterwards.
+2. **Re-measure the ~12%.** The figure is inherited from the G.6 note, not measured after G.8's
+   explicit-instantiation refactor. Confirm against the perf baseline on the packed case.
+3. **Check the CUDA build**, not just host — the macro is directory-scoped and reaches
+   `peclet_flow_solver` (G.8's new TU), verified 2026-09-11 on the host-openmp prefix; confirm the
+   same on `nvidia-cuda` before tagging. A TU compiled at a different precision than the headers it
+   shares would be an ODR violation, and a silent one.
+4. **Re-check any published dense-bed number** produced by a float build — the porous-scaling study
+   and RingBed in particular.
+
+### 1.3 The verification scripts silently bind to a stale build [B]
+
+`flow/scripts/*.py` (38 files) open with
+
+```python
+sys.path.insert(0, .../os.environ.get("SDFLOW_BUILD", "build_mpi"))
+```
+
+which puts `flow/build_mpi` at `sys.path[0]` and **overrides `PYTHONPATH`**. So the workflow
+flow's own `CLAUDE.md` documents —
+
+```
+PYTHONPATH=$PWD/build python scripts/verify_poiseuille_flow.py
+```
+
+— does not test `$PWD/build`. It silently tests `build_mpi`, whose `_flow.so` is currently dated
+**2026-09-01**, ten days and ~45 commits stale. The override variable also still carries the retired
+`SDFLOW_` prefix (QUALITY_PLAN rename table: `sdflow` → `flow`), so it reads as dead configuration
+and nobody sets it.
+
+Found 2026-09-11 while validating the operator-precision flip: the run failed with
+`set_body_force(): incompatible function arguments`, because the Sep-1 module still had the
+three-float signature that the current source replaced with a 3-sequence. **The failure mode that
+matters is the opposite one** — when the stale module's API happens to still match, the script
+prints PASS and nobody learns which binary it validated.
+
+This is the same class as §2.1's stale `build_rel*` trees, and together they mean the suite's two
+validation entry points — the verification scripts and the docstring audit — can both certify a
+build nobody intended.
+
+**Fix before the tag:** have the scripts prefer `PYTHONPATH` when it is set, rename the variable to
+`PECLET_FLOW_BUILD`, and make the default an explicit failure rather than a stale directory. Then
+re-run the verification battery and note which build produced each number. `scripts/` is 38 files
+and was heavily edited on 2026-09-11 by the G.8 work, so this wants one owner doing it in a single
+pass, not a scattered edit.
 
 ## 2. Documentation [R]
 
@@ -148,7 +200,7 @@ fixed and regression-tested.
 
 ## 5. Open technical issues, ranked [R/A]
 
-1. **[B]** SCALING_ISSUES #1 — §1.2 above.
+1. **[R]** SCALING_ISSUES #1 — decided 2026-09-11, default flipped; the re-blessing work is §1.2.
 2. **[R]** SCALING_ISSUES #2, MG depth cap: telescoping ships and is the default, but the underlying
    defect (intermediate levels must coarsen in place) is routed around, not solved. flow's CLAUDE.md
    calls it "the top open item at scale".
@@ -175,8 +227,8 @@ fixed and regression-tested.
 
 ## 6. Decisions needed [D]
 
-1. **SCALING_ISSUES #1** — ship the double-diagonal, flip the default, or document the limitation
-   loudly (§1.2). Blocks the tag.
+1. ~~**SCALING_ISSUES #1**~~ — **decided 2026-09-11**: default flipped to double operator storage
+   (§1.2). What remains is re-blessing, not deciding.
 2. **Drag normalisation** — settle interstitial vs superficial (§5.6) before any permeability number
    is republished under 1.0.0.
 3. **D7 / INTERFACES.md** — realise the concepts or restate the file as a contract.

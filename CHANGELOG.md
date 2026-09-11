@@ -199,6 +199,17 @@ header repin), peclet-dem 0.5.0, peclet-voro 0.5.0, peclet-coupling 0.4.0, pecle
   smoke scripts under `tools/hpc/`; LUMI recipe (`docs/LUMI.md`, untested).
 
 ### Changed / Fixed
+
+- **flow: operator storage is now DOUBLE by default** (`PECLET_FLOW_OPERATOR_DOUBLE=ON`). This is a
+  numerics-affecting default change, taken deliberately: float operator storage silently breaks
+  `A·1 = 0` at high multigrid contrast, and the porous path's default MG-PCG was reporting a
+  non-finite preconditioner on 2 of 5 steps, deterministically. Measured cost of being wrong (P1,
+  RCP bed at rtol 1e-8): float 24/33/CAPPED iterations with `max|div|` 4.51e-06, versus 14/14/28 and
+  9.51e-12 in double. The price is ~12% step time; a float build is still available with
+  `-DPECLET_FLOW_OPERATOR_DOUBLE=OFF` and now emits a CMake warning. Dense-bed results from a float
+  build should be regarded as untrustworthy. Regression state hashes and `perf_baseline.json` must be
+  re-blessed for this change before the tag (RELEASE_PREP §1.2). The double-*diagonal* fallback is a different mechanism and remains
+  retired (it converges to the float-face operator, 65× worse on divergence).
 - **Clean interpreter teardown in every module** (was a `Kokkos::abort`, exit 134, whenever a solver or a
   zero-copy view outlived the atexit finalize — scripts, `python -c`, notebooks): shared
   `kokkos_teardown.hpp` registry, release-then-finalize; explicit `finalize()` per module.

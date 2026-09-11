@@ -2711,3 +2711,26 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - rejected: the e861010 figures (12.2), which predate the stale-ghost V-cycle residual fix
   (flow 5d77deb) that lowered iteration counts and made them decomposition-independent
 - why: the later block was re-measured after the decisive fix and matches the published page
+
+### Double operator storage is the DEFAULT (SCALING_ISSUES #1 closed by decision)
+- area: flow
+- source: flow/CMakeLists.txt:48-72 — maintainer decision 2026-09-11
+- decided: 2026-09-11
+- status: settled
+- quote: |
+    `PECLET_FLOW_OPERATOR_DOUBLE` defaults to ON. Float operator storage silently breaks A*1 = 0 at
+    high multigrid contrast — it fails with no error, and the porous path's default MG-PCG was
+    reporting a non-finite preconditioner on 2 of 5 steps, deterministically (QUALITY_PLAN.md:371).
+    P1 (2026-09-01) measured the cost of being wrong: RCP bed at rtol 1e-8 — float 24/33/CAPPED
+    iterations, div 4.51e-06; double 14/14/28, div 9.51e-12. ~12% step time is the price of a
+    default that cannot silently invalidate a dense-bed run. Opt out with
+    -DPECLET_FLOW_OPERATOR_DOUBLE=OFF, which now emits a CMake WARNING.
+- rejected: (a) leaving float as the default and documenting the limitation — rejected because the
+  failure is SILENT, so documentation does not protect a user who never sees it; (b) the
+  double-DIAGONAL fallback, which remains retired — it converges to the float-face operator rather
+  than the true one and separated 65x on divergence (P1, DIAGRESUM vs exact)
+- why: a clean-break 1.0.0 must not ship a default configuration that can silently produce wrong
+  dense-bed results
+- consequence: this changes numerics in the default build. Regression state hashes and
+  `perf_baseline.json` must be re-blessed, per the standing rule that changing a numerics-affecting
+  default re-blesses bed references and is itself a decision.
