@@ -357,3 +357,40 @@ upload for a name that has no publisher registered. Two halves:
 Also created: `coupling/CITATION.cff` (coupling `fefc2c4`), closing §3.2. It was the only package
 without one, so its GitHub release would have been the family's only archive with no authorship or
 title metadata for Zenodo to read.
+
+**2026-09-12, the double default made two GATES fail, and both were the gates' fault.**
+Running flow's full battery at the new default (`build_rel_omp`, host-openmp) gave **153/155**, with
+exactly two failures. Neither was a solver defect, and neither was tolerance noise to be widened away;
+both were tests measuring the wrong thing, which float storage had been hiding.
+
+1. **`verify_lid_cavity_sdflow`** marched to "steady state" by watching the plane-MEAN of `u` change by
+   less than 1e-5 relative between 50-step samples. In a lid-driven cavity that mean is near zero by
+   symmetry, so it is dominated by round-off in the pressure solve rather than by the flow: the test
+   was watching noise settle, not the field converge. Float's higher noise floor kept the march
+   running by accident. With double storage the mean settled sooner, the march stopped at step **400**
+   instead of 650, and an **unconverged** field was compared to Ghia — centreline min u −0.1934
+   against the tabulated −0.2058, rms 0.0247/0.0256 against a 0.02 gate.
+   Fixed (flow `1ef4330`) to the largest velocity change anywhere on the plane, with the threshold
+   read off a measured trajectory rather than guessed: `maxdu/U` decays 1.5e-1 (step 100) → 1.4e-2
+   (400) → 4.3e-3 (650) → 9.6e-4 (1000) → 2.1e-7 (3000), while the Ghia error reaches a plateau of
+   u_rms 0.0067 / v_rms 0.0053 by about step 1400 and never moves again. **The result that settles
+   the question: with the corrected criterion the float and double builds agree to four digits** —
+   both 1000 steps, u_rms 0.0067, v_rms 0.0037, min centreline u −0.2124, max flux divergence
+   1.1e-16. Operator storage precision does not change the converged cavity answer at all.
+2. **`vardensity_mpi_np4`** required the distributed Chebyshev V-cycle count to equal the single-rank
+   count EXACTLY at every rank count. That is not well posed above np = 1: the stopping test is
+   `maxabs(r) < rtol*r0` and at np > 1 both sides come from a global reduction whose summation order
+   is not the single-rank order, so a step near the threshold can spend one V-cycle more or less. The
+   test's own comment already recorded that the count sequence changes with the **OpenMP thread
+   count** alone at fixed np = 1 — the conclusion was simply never drawn. Every physics gate passed by
+   three orders of magnitude or more while it failed: du 4.4e-17 against 1.0e-15, dp 5.7e-13 against
+   1.2e-08, max|u| 2.8e-17 against 1e-14, dP/dz error 1.1e-15 against 1e-11.
+   Fixed (flow `65b2b6a`): the count gate is exact at np = 1, ±1 above it; the answer tolerances are
+   untouched. A real decomposition defect shows as a large and growing divergence, never as a steady ±1.
+
+flow `228fe02` corrects `flow/CLAUDE.md`, which described the double build as "151/155 with four
+float-tuned gates". Two of those four (`vof_bc_mpi_np2`, `vof_bc_mpi_np4`) do not reproduce at all.
+
+**The lesson for the rest of this release:** the stale-build trap (§1.3, fixed in flow `41c8356`) was
+hiding both of these. The first honest local run of the verify battery is the run that found them. Any
+"it passed before" from before that commit is not evidence.
