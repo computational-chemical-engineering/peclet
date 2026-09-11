@@ -374,25 +374,28 @@ run a different solver than the frozen numbers came from. The obligations are th
 
 ## 11. CI on GitHub — what runs, what must be green, what is missing
 
-| Repo | Workflow | Trigger | Runs |
+| Repo | Workflows | Trigger | Runs |
 |---|---|---|---|
-| core | `ci.yml` (`cpp`), `quality.yml` (ruff, clang-format informational), `docs.yml`, `release.yml` | push/PR; tag | OpenMP build + ctests (serial + MPI via mpirun on the runner) |
+| core | `ci.yml`, `quality.yml`, `docs.yml`, `release.yml` | push/PR; tag | OpenMP build + ctests, serial and MPI via mpirun on the runner |
+| amr | `ci.yml`, `quality.yml`, `docs.yml`, `release.yml` | push/PR; tag | the eighth package (split out 2026-09-10); its `ci.yml` carries an explicit "Honest CI" header and is the best-documented in the suite |
 | morton | `ci.yml` (gcc, clang, AVX-512 under SDE, MSVC, python, docs), `quality.yml`, `docs.yml`, `release.yml` | push/PR; tag | the most complete matrix in the suite |
-| flow | `ci.yml` (`build-test`: OpenMP Kokkos, module import, `tests/kokkos`), `quality.yml`, `docs.yml`, `release.yml` (sdist, wheels, cuda-wheel, publish) | push/PR; tag | single-rank only |
-| pnm | `ci.yml`, `docs.yml`, `release.yml` | push/PR; tag | no `quality.yml` |
-| dem | `ci.yml` (`build-test`), `quality.yml`, `docs.yml`, `release.yml` | push/PR; tag | single-rank only |
-| voro | `ci.yml` (kokkos-openmp, clang-format, documentation), `docs.yml`, `release.yml` | push/PR; tag | |
-| coupling | `release.yml` **only** | tag | **no CI at all** |
+| flow | `ci.yml` (`single-rank` + `mpi`), `quality.yml`, `docs.yml`, `release.yml` (sdist, wheels, cuda-wheel, publish) | push/PR; tag | single-rank AND distributed at np = 1, 2 (4 and 8 when the np=2 pass left time) |
+| pnm | `ci.yml`, `quality.yml`, `docs.yml`, `release.yml` | push/PR; tag | |
+| dem | `ci.yml`, `quality.yml`, `docs.yml`, `release.yml` | push/PR; tag | single-rank only |
+| voro | `ci.yml` (kokkos-openmp, clang-format, documentation), `quality.yml`, `docs.yml`, `release.yml` | push/PR; tag | its pinned-tag guard COMPILES the module since `8cdac25`, which is what makes a stale `PECLET_CORE_TAG` fail here rather than during the release |
+| coupling | `ci.yml`, `quality.yml`, `release.yml` | push/PR; tag | builds flow + dem + coupling and runs the pytest battery |
 | umbrella | `site.yml`, `release.yml`, `containers.yml` | docs push; tag; dispatch | |
 | peclet-examples | `publish.yml` | push to main | Quarto render from freeze (no solver) |
+
+*(Table re-verified 2026-09-12 against `.github/workflows/` in every repo. It previously predated
+`amr`, said coupling had "no CI at all" and pnm "no quality.yml", and described flow's CI as
+single-rank only — all four were false.)*
 
 Must be green before tagging: every `ci.yml` and `quality.yml` python-lint job on `main`. The
 clang-format jobs are informational by design.
 
 Gaps to close (tracked in `RELEASE_PREP.md`; none blocks a release, all reduce risk):
 
-- **coupling has no CI** — add a `ci.yml` that builds flow + dem + coupling against the OpenMP
-  prefix and runs `tests/test_terminal_velocity.py` (fast).
 - **Containers `push` gate** — add a `push` boolean `workflow_dispatch` input to `containers.yml`
   so HIP experiments (§8) can build without publishing an image tagged with a wrong version.
 - **A family "release rehearsal" workflow** in the umbrella (`workflow_dispatch`): checks out all
