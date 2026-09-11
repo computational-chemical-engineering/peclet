@@ -331,3 +331,29 @@ Corrections Phase B has produced so far:
 - **morton's nearest tag by ancestry is `pre-legacy-removal`, not `v0.2.1`** — `git describe` picks the
   marker tag, which is why the pre-flight prints an odd "since" count. The changelog writer should
   diff against `v0.2.1`.
+
+**2026-09-12, the one step that needs the maintainer's hands.** `peclet-amr` is a NEW PyPI project
+(`https://pypi.org/pypi/peclet-amr/json` returns 404), and Trusted Publishing will not accept a first
+upload for a name that has no publisher registered. Two halves:
+
+- **GitHub half: DONE.** `peclet-amr` had no `pypi` deployment environment, which its `release.yml`
+  publish job declares (`environment: pypi`), so the job would have failed after building the sdist.
+  Created to mirror `peclet-pnm`'s (no protection rules, no branch policy).
+- **PyPI half: CANNOT BE DONE HEADLESSLY.** Register a *pending publisher* at
+  <https://pypi.org/manage/account/publishing/> BEFORE the `v0.1.0` tag is pushed, with exactly:
+
+  | field | value |
+  |---|---|
+  | PyPI Project Name | `peclet-amr` |
+  | Owner | `computational-chemical-engineering` |
+  | Repository name | `peclet-amr` |
+  | Workflow name | `release.yml` |
+  | Environment name | `pypi` |
+
+  Every other package already exists on PyPI and needs nothing. If the tag goes first, the build
+  succeeds and only the publish step fails; re-running that job after registering is enough, so this
+  is recoverable rather than fatal — but it burns a release run.
+
+Also created: `coupling/CITATION.cff` (coupling `fefc2c4`), closing §3.2. It was the only package
+without one, so its GitHub release would have been the family's only archive with no authorship or
+title metadata for Zenodo to read.
