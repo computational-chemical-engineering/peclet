@@ -205,11 +205,15 @@ The audit list for the current release is in `RELEASE_PREP.md`.
 
 ### 5.3 CUDA wheel coverage (decision point)
 
-Only `peclet-flow-cu13` exists. A symmetric CUDA family needs a `cuda-wheel` job + a
-`packaging/pyproject-cuda.toml` in **pnm, dem, voro** (copy flow's job; dem additionally builds
-ArborX into the prefix; each module's rpath is `$ORIGIN/../../nvidia/cu13/lib`, one level per
-package depth — pnm was wrong once) and a `peclet-cu13` metapackage (umbrella
-`packaging/pyproject-cu13.toml` published by a second job of the umbrella release workflow).
+**The CUDA family is COMPLETE** (re-verified 2026-09-12; this paragraph used to say only
+`peclet-flow-cu13` existed and list the rest as future work). `flow`, `pnm`, `dem` and `voro` each
+carry a `cuda-wheel` job and a `packaging/pyproject-cuda.toml`, and all four are live on PyPI —
+`peclet-flow-cu13` 0.5.1, `peclet-pnm-cu13` 0.1.2, `peclet-dem-cu13` 0.5.1, `peclet-voro-cu13` 0.5.1
+— beside the `peclet-cu13` metapackage at 0.7.2 (umbrella `packaging/pyproject-cu13.toml`, published
+by a second job of the umbrella release workflow). **The operational consequence: there are FOUR
+CUDA version literals to bump, not one**, and each must match its CPU package's number. dem
+additionally builds ArborX into the prefix, and each module's rpath is
+`$ORIGIN/../../nvidia/cu13/lib`, one level per package depth — pnm's was wrong once.
 Per-package prerequisites: the module must survive interpreter teardown after a solve (dem's
 atexit-finalize pattern; flow had a teardown abort), and the PyPI Trusted Publisher must be
 registered for the new project name *before* tagging (a new name publishes fine with no extra
