@@ -436,3 +436,41 @@ and **main already has all four** (`kBcTypes` includes `"slip"`, `stepAdaptive` 
 branch's `test_freeslip_bc_mpi.cpp`). **Decision: all are explicitly PARKED and their work is NOT in
 1.0.0.** The worktrees are NOT removed — removal would destroy other sessions' build trees for no
 release benefit, and §1.1 is satisfied by explicit parking. Reversible: run the removals later.
+
+**2026-09-12, Phase E — tagging and publishing.** Phase B finished green in all eight packages, so
+the release was cut. Order as §0 requires: core and morton first, then the four method packages that
+vendor their headers, then coupling, then the umbrella.
+
+| package | tag | PyPI |
+|---|---|---|
+| peclet-core | `v1.0.0` | 1.0.0 |
+| peclet-morton | `v1.0.0` | 1.0.0 |
+| peclet-pnm | `v1.0.0` | 1.0.0 (+ `peclet-pnm-cu13` 1.0.0) |
+| peclet-dem | `v1.0.0` | publishing |
+| peclet-voro | `v1.0.0` | publishing |
+| peclet-coupling | `v1.0.0` | 1.0.0 |
+| peclet-amr | `v0.1.0` | 0.1.0 |
+| peclet-flow | pending its CI | |
+
+**§1.1's sequencing premise is CONFIRMED, not merely assumed.** voro's CI had been red on `main`
+since 2026-09-11 because it vendored core at `v0.6.1`, a tag predating the two solver headers it
+includes. The moment core `v1.0.0` existed and voro's `PECLET_CORE_TAG` was repinned to it, that CI
+went green with no other change. amr was in the same state against six core headers. This is worth
+keeping in the durable workflow: **a consumer's pinned-tag CI job cannot be green between the commit
+that adopts new core headers and the release that tags them** — it is a scheduled red, not a defect,
+and RELEASE.md §1.4's "CI green on every repo" has to be read with that exception.
+
+**The amr PyPI worry was half right and the half that mattered was fixable from a shell.** The
+missing piece was not a PyPI pending publisher but the `pypi` DEPLOYMENT ENVIRONMENT in the
+`peclet-amr` GitHub repo, which its `release.yml` publish job declares (`environment: pypi`) and
+which every other package already had. Created to mirror `peclet-pnm`'s, and the first `v0.1.0`
+publish then went through untouched — sdist and publish both green, `peclet-amr` 0.1.0 live. **No
+manual PyPI registration was needed.** Record it that way so the next new package in this family
+checks the GitHub environment first.
+
+**GitHub Releases created** (the Zenodo webhook mints a version DOI from each): `peclet-core`
+`v1.0.0`, `peclet-morton` `v1.0.0`, `peclet-pnm` `v1.0.0`, `peclet-dem` `v1.0.0`,
+`peclet-coupling` `v1.0.0`, `peclet-amr` `v0.1.0`. Each carries a package-specific paragraph plus the
+shared 1.0.0 note; voro, flow and the umbrella follow once their wheels finish. Check the Zenodo
+deposition for each afterwards — a webhook that fires before `CITATION.cff` is in the tag reads no
+metadata, which is why `coupling/CITATION.cff` was created before any tagging (coupling `fefc2c4`).
