@@ -297,11 +297,27 @@ their first run, with no way to know.
 `OMP_PROC_BIND` before peclet is imported; `README.md` and `docs/index.md` carry the warning with
 these numbers.
 
-**Open decision — the library, not the docs, is the right place.** Every containerised user hits
-this, and only the module knows Kokkos is about to initialise: `peclet.flow`'s import could set
-`OMP_NUM_THREADS` from the cgroup budget when the variable is unset. That changes a shipped
-default's behaviour (never its numerics), so it wants a recorded decision rather than a quiet patch
-— DECISIONS.md, with the table above as the evidence.
+**Decided 2026-09-13 (user): fix it in the library.** `core/include/peclet/core/common/cpu_budget.hpp`
+resolves the process's own cgroup from `/proc/self/cgroup` and walks UP, taking the tightest quota on
+the chain (v2 `cpu.max`, v1's cfs pair), capped by the affinity mask; `python::install()` — the one
+Kokkos init shared by flow, dem, voro, pnm, coupling and amr — passes it through
+`InitializationSettings`. Verified against a real cgroup (`systemd-run -p CPUQuota=200%`, 48 CPUs
+visible):
+
+| condition | affinity | usable | threads requested |
+|---|---|---|---|
+| unconstrained | 48 | 48 | **0 — says nothing** |
+| 2 CPUs of quota | 48 | **2** | **2** |
+| 2 CPUs of quota + `OMP_NUM_THREADS=7` | 48 | 2 | **0 — the user's choice stands** |
+
+Inert on a workstation by construction: same thread count, same schedule, same numbers. **Reaching
+users needs a 1.0.1 patch release** of every Kokkos-initialising package — the fix lives inside the
+compiled modules.
+
+A caution the fix itself turned up: reading `/sys/fs/cgroup/cpu.max` directly (the obvious
+one-liner, and what the notebook first shipped) is right only by accident. That path is the cgroup
+ROOT; on a systemd host it reads `max` while the real limit sits on the process's scope below, and
+it appears to work in a container solely because a container has its own cgroup namespace.
 
 
 ## Issues 1 and 2 compound — and that is the most important thing here
