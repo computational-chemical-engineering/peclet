@@ -4,7 +4,7 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 1.0.0, the clean break
+## [1.0.0] — 2026-09-12 — the clean break
 
 **Every package goes to 1.0.0.** This release removes every non-canonical Python name instead of
 aliasing it (the suite had no external users; [docs/QUALITY_PLAN.md](docs/QUALITY_PLAN.md) D1/D9 and
@@ -180,6 +180,28 @@ the host backends (`-DCMAKE_CXX_COMPILER_LAUNCHER=ccache`); it cannot work on a 
 where Kokkos already owns the compile rule's launcher, and the CMake now says so at configure time
 instead of failing incomprehensibly ten minutes later. `peclet-coupling` gains the `CITATION.cff` it
 was the only package to lack.
+
+### Tested
+
+Every package was re-verified on this release's own commits, on the host (Kokkos OpenMP) and, where
+it has a GPU path, on CUDA 13.2 / RTX 5080. Counts are what the batteries actually reported, with
+skips separated from passes.
+
+| package | host | CUDA |
+|---|---|---|
+| core | 53 plain / 68 Kokkos / 6 Python, np 1–8, 0 skips | same, 0 skips |
+| morton | default 1/1, non-BMI2 2/2 (incl. the PDEP/PEXT-free binary check), Kokkos 2/2, pytest 9/9 | Kokkos 2/2, device output bit-identical to the scalar reference on all four layouts |
+| flow | **155/155** (49 single-rank + 106 distributed at np 1, 2, 4) + the accuracy/efficiency regression | 49/49 single-rank |
+| pnm | 9/9, np 1/2/4 bit-exact to a single-rank oracle | 9/9; 7199 pores / 53020 connections on the 256³ ring packing, identical to host |
+| dem | 47/47, np 1/2/4 | 47/47 |
+| voro | 42/42 (24 single-rank + 18 distributed) | 42/42 |
+| amr | 100/100, np 1–8 | 99/100, 1 self-diagnosing skip |
+| coupling | 3/3 | — |
+
+The Python API is fully documented: **955 public callables, 0 undocumented, 0 with a retired name.**
+
+Not exercised: morton's AVX-512 batch kernels (the release host has no AVX-512F and Intel SDE could
+not be obtained), and the LUMI/HIP path (no AMD hardware).
 
 ### Known limitations in 1.0.0
 

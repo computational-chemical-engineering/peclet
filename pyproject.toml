@@ -18,7 +18,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "peclet"
-version = "0.7.2"
+version = "1.0.0"
 description = "GPU-accelerated & parallel simulation of transport phenomena (CFD, DEM, Voronoi) — CPU family metapackage"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,23 +26,23 @@ license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Frank Peters", email = "e.a.j.f.peters@gmail.com" }]
 dependencies = [
-  "peclet-morton==0.2.1",
-  "peclet-flow==0.5.1",
-  "peclet-pnm==0.1.2",
-  "peclet-dem==0.5.1",
-  "peclet-voro==0.5.1",
+  "peclet-morton==1.0.0",
+  "peclet-flow==1.0.0",
+  "peclet-pnm==1.0.0",
+  "peclet-dem==1.0.0",
+  "peclet-voro==1.0.0",
 ]
 
 [project.optional-dependencies]
 # peclet-core is sdist-only (MPI particle halo + Kokkos AMR): installing it builds from source and needs
 # an MPI toolchain (+ optional Kokkos prefix for the AMR module).
-mpi = ["peclet-core==0.6.1"]
+mpi = ["peclet-core==1.0.0"]
 # peclet-amr (block-octree AMR + its solver, under development) is sdist-only too: needs MPI, a Kokkos
 # backend and peclet-morton; pinned to the family version at tag time like every member.
 amr = ["peclet-amr==0.1.0"]
 # peclet-coupling is the unresolved point-particle CFD-DEM coupling of peclet.flow + peclet.dem
 # (sdist-only: builds its Kokkos kernels from source against a bootstrapped prefix).
-cfd-dem = ["peclet-coupling==0.4.0"]
+cfd-dem = ["peclet-coupling==1.0.0"]
 
 [project.urls]
 Homepage = "https://github.com/computational-chemical-engineering/peclet"
