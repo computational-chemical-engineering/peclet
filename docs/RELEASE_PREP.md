@@ -575,8 +575,11 @@ all three pages against `pip install peclet-flow` == 1.0.0 in a fresh venv: `k =
 N = 48, matching the notebook's committed output and its refinement table, so the stored outputs
 did not need regenerating.
 
-**The gate is now `tools/release/check_docs_snippets.py`** (RELEASE.md §5.2). Two lessons in the
-shape of its two passes:
+**The gate is now CI, not a checklist line.** `.github/workflows/quickstart.yml` runs
+`tools/release/check_docs_snippets.py --installed --run` on a docs push or PR, weekly, and as a
+`needs: publish` job of `release.yml` on **every tag** — against the wheels that tag just put on
+PyPI, retrying while the index propagates (RELEASE.md §5.2, §11). A release is not done until that
+job is green. Two lessons in the shape of the tool's two passes:
 
 1. **Nothing was executing the docs.** A page reachable from the front door is a test, and it
    should be run in a venv holding the *published* wheels — the same thing the Colab badge does.

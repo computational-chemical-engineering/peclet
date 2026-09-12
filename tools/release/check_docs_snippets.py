@@ -13,12 +13,15 @@ ran raised `TypeError`. Two checks, because those two breakages need different o
          SIGNATURE change: `set_body_force(fx, fy, fz)` -> `set_body_force(force)` renamed
          nothing, so a name-based audit waves it through.
 
-  NAMES  every other page under `docs/` is prose with illustrative fragments, not a runnable
-         script. Their python blocks are matched by NAME against the binding surface at a git ref,
-         as `audit_examples.py` does for the gallery.
+  NAMES  every other page under `docs/`, and every submodule `README.md` (those are the PyPI
+         project pages), is prose with illustrative fragments rather than a runnable script. Their
+         python blocks are matched by NAME against the peclet surface — either the bindings at a
+         git ref (`--ref`, the way `audit_examples.py` does it, and the only mode that works before
+         a tag is published) or `dir()` of the INSTALLED packages (`--installed`, which needs no
+         submodule checkout and asks the released artifact itself).
 
-    python tools/release/check_docs_snippets.py                       # names only, fast
-    python tools/release/check_docs_snippets.py --run --python .venv-release/bin/python
+    python tools/release/check_docs_snippets.py                       # names at v1.0.0, fast
+    python tools/release/check_docs_snippets.py --installed --run     # what CI runs, on the wheels
 
 Exit status is non-zero if any page fails. `docs/NAMING.md`, `CHANGELOG.md` and `docs/archive/`
 are skipped by design: they RECORD the retired spellings.
@@ -87,12 +90,56 @@ def run_pages(python: str, timeout: int) -> int:
     return bad
 
 
-def check_names(ref: str) -> int:
-    known = set()
-    for sub in BINDINGS:
-        known |= surface(sub, REF_OVERRIDE.get(sub, ref))
-    if not known:
-        sys.exit(f"no binding surface at ref {ref!r} — is the tag fetched in every submodule?")
+# Documented on purpose but NOT in any published wheel: they need a build the wheels do not
+# provide. Exempt in --installed mode only — the --ref pass still requires them to exist in the
+# bindings, so a genuine deletion is still caught. Add to this list only with the reason.
+BUILD_GATED = {
+    "extract_pore_network_mpi",   # pnm: -DPECLET_PNM_MPI=ON; the CPU/CUDA wheels are serial
+}
+
+# Modules of the installed family, and the attribute that leads to each one's classes.
+# NB `pip install peclet` (the metapackage) pulls flow/pnm/dem/voro/morton only — peclet-core and
+# peclet-amr are separate installs, and peclet.coupling ships no wheel. A module that is simply
+# absent is skipped, so CI must install what it wants checked or the pass silently narrows.
+INSTALLED_MODULES = ["peclet.flow", "peclet.dem", "peclet.voro", "peclet.pnm", "peclet.morton",
+                     "peclet.core", "peclet.core.geom", "peclet.core.mpi", "peclet.coupling",
+                     "peclet.amr", "peclet.voro.scenes"]
+
+
+def surface_installed():
+    """Every public name the INSTALLED wheels expose, module attributes and class members alike.
+
+    Asking the artifact beats reading the bindings at a git ref: it needs no submodule checkout (so
+    CI can do it), and it answers for what was actually published rather than what was committed.
+    """
+    import importlib, inspect
+    names, seen = set(), []
+    for modname in INSTALLED_MODULES:
+        try:
+            mod = importlib.import_module(modname)
+        except Exception:
+            continue
+        seen.append(modname)
+        for attr in dir(mod):
+            names.add(attr)
+            obj = getattr(mod, attr, None)
+            if inspect.isclass(obj):
+                names |= set(dir(obj))
+    if not seen:
+        sys.exit("no peclet package is importable — `pip install peclet` first, or use --ref")
+    print(f"NAMES       surface from the installed {', '.join(seen)}")
+    return names
+
+
+def check_names(ref: str, installed: bool) -> int:
+    if installed:
+        known = surface_installed() | BUILD_GATED
+    else:
+        known = set()
+        for sub in BINDINGS:
+            known |= surface(sub, REF_OVERRIDE.get(sub, ref))
+        if not known:
+            sys.exit(f"no binding surface at ref {ref!r} — is the tag fetched in every submodule?")
     # The umbrella docs plus every submodule README — those are the PyPI project pages, as
     # user-facing as the site and equally able to ship a call that no longer exists.
     pages = ([SUITE / "README.md"] + sorted((SUITE / "docs").rglob("*.md"))
@@ -115,7 +162,8 @@ def check_names(ref: str) -> int:
             bad += 1
             print(f"NAMES FAIL  {rel}: {', '.join(gone)}")
     if bad == 0:
-        print(f"NAMES PASS  every doc page's peclet calls exist at {ref}")
+        where = "in the installed packages" if installed else f"at {ref}"
+        print(f"NAMES PASS  every doc page's peclet calls exist {where}")
     return bad
 
 
@@ -125,12 +173,17 @@ def main():
     ap.add_argument("--ref", default="v1.0.0", help="git ref of the submodule bindings to check "
                                                     "the names against (default v1.0.0; amr is "
                                                     "pinned to its own tag, see REF_OVERRIDE)")
+    ap.add_argument("--installed", action="store_true",
+                    help="take the name surface from the INSTALLED peclet packages instead of a "
+                         "git ref — no submodule checkout needed, and it asks the published wheels")
+    ap.add_argument("--no-names", dest="names", action="store_false",
+                    help="skip the static name pass, run only --run")
     ap.add_argument("--run", action="store_true", help="also EXECUTE the runnable pages")
     ap.add_argument("--python", default=sys.executable,
                     help="interpreter for --run; use a fresh venv with the published wheels")
     ap.add_argument("--timeout", type=int, default=900)
     a = ap.parse_args()
-    bad = check_names(a.ref)
+    bad = check_names(a.ref, a.installed) if a.names else 0
     if a.run:
         bad += run_pages(a.python, a.timeout)
     return 1 if bad else 0

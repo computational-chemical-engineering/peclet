@@ -61,3 +61,13 @@ jobs:
         with:
           skip-existing: true   # completing a partial upload (e.g. adding peclet-cu13 after peclet) must
                                 # not fail on the already-published files
+
+  # A release is not done until the front door opens: execute the quick start (README.md,
+  # docs/index.md, the Colab notebook) against the wheels this tag just published. 1.0.0 shipped a
+  # landing page that raised TypeError on its first solver call, and nothing in CI looked.
+  quickstart:
+    needs: publish
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/quickstart.yml
+    with:
+      version: ${{ github.ref_name }}      # e.g. v1.0.0; the leading v is stripped there

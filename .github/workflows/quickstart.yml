@@ -1,0 +1,95 @@
+name: Quick start
+
+# The landing page is a test, and until 1.0.0 nothing ran it. That release shipped a quick start —
+# README.md, docs/index.md and the Colab notebook, the first peclet a new user ever executes — whose
+# twelfth line raised TypeError: the clean break had renamed cell_centres() to cell_centers() and
+# repacked set_body_force(fx, fy, fz) into one 3-sequence. `tools/release/audit_examples.py` covers
+# the sibling gallery only, and the release checklist said to *read* the prose, which catches a
+# stale version number but not a deleted method.
+#
+# So this workflow EXECUTES those three pages against the wheels on PyPI (`--run`), and matches
+# every python block under docs/ and every submodule README against the installed surface
+# (`--installed`). It runs when the docs change, weekly (the docs also break when the API moves
+# under them, with no docs commit to trigger on), and — via workflow_call from Release — on the
+# published wheels of every new version, which is the point: a release is not done until the front
+# door opens.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'README.md'
+      - 'docs/index.md'
+      - 'docs/notebooks/**'
+      - 'tools/release/check_docs_snippets.py'
+      - 'tools/release/audit_examples.py'
+      - '.github/workflows/quickstart.yml'
+  pull_request:
+    paths:
+      - 'README.md'
+      - 'docs/index.md'
+      - 'docs/notebooks/**'
+      - 'tools/release/check_docs_snippets.py'
+      - 'tools/release/audit_examples.py'
+      - '.github/workflows/quickstart.yml'
+  schedule:
+    - cron: '17 5 * * 1'          # Mondays, 05:17 UTC
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "family version to install from PyPI (blank = latest); a leading v is stripped"
+        type: string
+        default: ""
+  workflow_call:
+    inputs:
+      version:
+        description: "family version or tag to install from PyPI (blank = latest)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quickstart-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  quickstart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ inputs.version }}
+      # The runner has two cores; an unbounded Kokkos OpenMP pool is a measured trap (suite CLAUDE.md).
+      OMP_NUM_THREADS: "2"
+      OMP_PROC_BIND: "false"
+    steps:
+      - uses: actions/checkout@v7          # no submodules: --installed asks the wheels, not a git ref
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # Only the metapackage is pinned: `peclet==X` pins flow/pnm/dem/voro/morton itself, while
+      # peclet-core and peclet-amr are separate installs on their own numbering (amr stays 0.x,
+      # the D9 exception). Retry, because a release-triggered run reaches PyPI before the CDN does.
+      - name: Install the published wheels
+        run: |
+          set -u
+          V="${VERSION#v}"
+          if [ -n "$V" ]; then PIN="==$V"; else PIN=""; fi
+          for attempt in $(seq 1 20); do
+            if pip install --upgrade "peclet${PIN}" peclet-core peclet-amr matplotlib; then
+              pip list | grep -i peclet
+              exit 0
+            fi
+            echo "attempt ${attempt}/20: peclet${PIN} not installable yet; waiting 60 s"
+            sleep 60
+          done
+          echo "::error::peclet${PIN} never became installable from PyPI"
+          exit 1
+
+      # NAMES: every doc page's peclet calls exist in what was installed.
+      # RUN:   README.md, docs/index.md and the Colab notebook execute end to end.
+      - name: The docs must run against those wheels
+        run: python tools/release/check_docs_snippets.py --installed --run

@@ -201,12 +201,24 @@ Update, in this order, and read each one end to end (they drift in small factual
   the concept DOI — so nothing on the site goes stale between releases (the "This release (v0.2.0)"
   line survived five releases before this rule). `tools/release/check_release_state.sh` greps for it.
 
-- **The quick start must RUN against the published wheels, not merely parse.**
-  `tools/release/check_docs_snippets.py` is the gate: a NAMES pass matches every python block under
-  `docs/` against the tagged binding surface, and `--run --python <fresh-venv>/bin/python` executes
-  `README.md`, `docs/index.md` and `docs/notebooks/quickstart_sphere.ipynb` end to end — which is
-  what a reader's copy-paste and the Colab badge actually do. Run the `--run` pass in a venv holding
-  the **PyPI** wheels (`pip install peclet`), after publishing and before announcing.
+- **The quick start must RUN against the published wheels, not merely parse — and CI owns this.**
+  `.github/workflows/quickstart.yml` executes `README.md`, `docs/index.md` and
+  `docs/notebooks/quickstart_sphere.ipynb` against the wheels on PyPI, and matches every python
+  block under `docs/` and every submodule `README.md` against the installed surface. It runs on a
+  docs push or PR, weekly (the docs also break when the API moves under them, with no docs commit
+  to trigger on), and — as a `quickstart` job of `release.yml`, `needs: publish` — **on the wheels
+  of every new tag**, retrying while PyPI propagates. A release is not done until that job is green.
+
+  Locally it is the same tool, `tools/release/check_docs_snippets.py`:
+
+  ```bash
+  python tools/release/check_docs_snippets.py                    # names at v1.0.0, from the submodules
+  python tools/release/check_docs_snippets.py --installed --run  # exactly what CI runs, on the wheels
+  ```
+
+  Before a tag exists the `--ref` form is the only one available (`--installed` can only ask for
+  what is already published), so run it against the submodule HEADs while preparing the release and
+  let the tag-triggered job confirm the real artifact.
 
   *Why it exists:* 1.0.0 shipped a landing page whose first 20 lines raised `TypeError`. The clean
   break had renamed `cell_centres()` to `cell_centers()` and repacked `set_body_force(fx, fy, fz)`
@@ -424,7 +436,7 @@ run a different solver than the frozen numbers came from. The obligations are th
 | dem | `ci.yml`, `quality.yml`, `docs.yml`, `release.yml` | push/PR; tag | single-rank only |
 | voro | `ci.yml` (kokkos-openmp, clang-format, documentation), `quality.yml`, `docs.yml`, `release.yml` | push/PR; tag | its pinned-tag guard COMPILES the module since `8cdac25`, which is what makes a stale `PECLET_CORE_TAG` fail here rather than during the release |
 | coupling | `ci.yml`, `quality.yml`, `release.yml` | push/PR; tag | builds flow + dem + coupling and runs the pytest battery |
-| umbrella | `site.yml`, `release.yml`, `containers.yml` | docs push; tag; dispatch | |
+| umbrella | `site.yml`, `release.yml`, `containers.yml`, `quickstart.yml` | docs push; tag; dispatch; weekly | `quickstart.yml` executes the landing page and the Colab notebook against the PyPI wheels, and runs as a `needs: publish` job of `release.yml` on every tag (added 2026-09-12, after 1.0.0 shipped a quick start that raised `TypeError`) |
 | peclet-examples | `publish.yml` | push to main | Quarto render from freeze (no solver) |
 
 *(Table re-verified 2026-09-12 against `.github/workflows/` in every repo. It previously predated
