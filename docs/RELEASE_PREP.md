@@ -593,3 +593,36 @@ commit: `amr`'s bindings moved out of `core` in G.2 and were never re-registered
 `peclet.amr` call in the gallery read as an unknown name), and voro's `packaging/voro_scenes.py` /
 `voro_pore_mesh.py` were missing (`scenes.sphere_union_scene` read as retired). Both were silent
 because `surface()` swallowed a missing path; it now warns.
+
+### Post-release: the film, and the channel goes public (2026-09-12)
+
+The 1.0.0 release film is live — **<https://www.youtube.com/watch?v=L_uAHnL6Gq8>**, 7:30, public,
+and the channel trailer — and every clip on **[@PecletHPC](https://www.youtube.com/@PecletHPC)** is
+now public (trickle flow was the one held back for review). The workflow is written up as
+RELEASE.md §10.1; what this run learned:
+
+1. **The film was cut on two clocks and nobody would have noticed for six minutes.**
+   `assemble.py` gives each beat its narration *plus* a 0.55 s pause, but `narration_full.wav` had
+   been concatenated by hand from the beat wavs with no pauses at all. The picture therefore lagged
+   the voice by 0.55 s per beat — 13.2 s by beat 25 — and `-shortest` cut the tail: the last frame
+   of the published-to-be film was the packed-bed *g(r)* figure while the narrator said "Peclet,
+   version one point zero". Fixed by building the track from `narration.json` and `voice.yaml`'s
+   `pause.beat` inside `assemble.py`, so one constant governs both tracks (the caption clock was
+   counting `beat - sentence`, drifting 0.28 s a beat the other way, and now agrees too). The film
+   was re-muxed from the unchanged picture: 7:17 → 7:30, closing card restored.
+   *A narrated film needs watching to the end before it is published; a duration that looks
+   plausible is not evidence.*
+2. **The four remaining pages with a local mp4 now embed the YouTube copy** (peclet-examples
+   `56d7ed2`), which took the last 11 MB of video out of that repository. Their Quarto freezes were
+   deliberately **not** re-stamped: 45 of the 48 frozen pages are already stale from the 1.0.0
+   migration and are waiting on the §10 re-render, and marking three of them fresh would have
+   published pre-1.0.0 output as current. That also leaves the committed `.ipynb` copies for the
+   same pass (`quarto convert` regenerates them).
+3. **Interlinking, both directions.** Every video description carries its page, the repository and
+   the documentation — `site.docs` in `videos.yaml` had been pointing at the PyPI project page, not
+   the docs site. The docs home page, the gallery landing page and the README carry the film; the
+   gallery navbar and the docs footer carry the channel.
+4. **Captions are not uploaded.** `captions.insert` needs the `youtube.force-ssl` scope, which the
+   stored token does not hold, and widening it means another browser consent round; YouTube's
+   automatic captions cover the narration in the meantime. `films/release-1.0.0/build/captions.srt`
+   is correct on the film's clock if that is ever revisited.

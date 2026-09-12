@@ -25,6 +25,20 @@ theme:
     - content.code.copy
     - toc.integrate
 
+# The icons in the page footer.  The examples gallery and the channel are the two sites a
+# reader is most likely to want next, and neither is in the nav as an icon.
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/computational-chemical-engineering/peclet
+      name: peclet on GitHub
+    - icon: fontawesome/brands/youtube
+      link: https://www.youtube.com/@PecletHPC
+      name: Peclet on YouTube
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/peclet/
+      name: peclet on PyPI
+
 markdown_extensions:
   - admonition
   - tables

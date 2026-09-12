@@ -416,11 +416,50 @@ run a different solver than the frozen numbers came from. The obligations are th
    (`pip install peclet==<family>`; for GPU pages `peclet-flow-cu13`), page by page with
    `render_example.sh <slug>` (clears the page's freeze) — note that editing even a subtitle
    invalidates a freeze, and `quarto` exits 0 on a figure-cell error, so grep `_site` for
-   `cell-output-error` before committing. Commit each page's `_freeze/` (force-add npz/mp4 assets).
+   `cell-output-error` before committing. Commit each page's `_freeze/` (force-add npz assets; a
+   movie does **not** go in the repository — see §10.1).
 3. Pages that need a build the wheels do not provide (MPI, Snellius, `peclet.coupling`,
    `core.geom`) stay frozen and say so in their bootstrap comment; they are re-checked when the
    corresponding site package (§7) is installed.
 4. Close or update the `ISSUES.md` entries the release fixes; open new ones for what the re-run finds.
+
+### 10.1 The films and the channel
+
+Movies live on **[@PecletHPC](https://www.youtube.com/@PecletHPC)**, never in a git repository, and
+`~/Codes/youtube_publishing` (**`ytpub`**) is the whole workflow: `videos.yaml` is the hand-written
+registry, `published.json` the ledger of slug → video id that makes a second run an *update* rather
+than a duplicate upload. Quota is 10 000 units a day — an upload is 1600, a metadata or privacy
+change 50 — so plan a release's uploads, and do not re-run `sync` idly.
+
+```bash
+cd ~/Codes/youtube_publishing
+./ytpub.sh doctor                     # token, ffmpeg, manifest, and which channel it points at
+./ytpub.sh sync --dry-run             # what would happen and what it costs
+./ytpub.sh sync <slug>                # upload or update one
+./ytpub.sh embed --write <slug>       # rewire the example page to the YouTube copy
+./ytpub.sh channel --apply            # description, keywords, banner, trailer
+```
+
+Per release:
+
+1. **Cut the release film** in `films/<version>/` (`tools/narrate.py` then `tools/assemble.py`), and
+   watch it end to end before it goes anywhere. The audio and the picture are cut from one pause
+   constant in `films/voice.yaml`; if they ever drift, the film ends mid-sentence and `-shortest`
+   silently truncates the close.
+2. **Publish it**: an entry in `videos.yaml` with `root: repo`, `encode.passthrough: true` (the film
+   is already 1080p30 and carries its own narration) and `page_url:` pointing at the documentation,
+   then `ytpub sync <slug>`. New clips default to `privacy: unlisted` — watch each one on the
+   channel, then set `privacy: public` and re-run `sync` (50 units, no re-upload).
+3. **Make it the front door**: `channel_trailer:` in `videos.yaml` and `ytpub channel --apply`. The
+   avatar is the one thing with no API — YouTube Studio only.
+4. **Rewire the pages**: `ytpub embed --write <slug>` for any page still carrying a local `<video>`,
+   then `git rm --cached` the mp4. `--freeze` can mirror the swap into Quarto's freeze cache and
+   re-stamp its hash, but only use it on a page whose frozen output is genuinely current — during a
+   re-render pass (§10 step 2) the pages are re-executed anyway and a re-stamp would publish stale
+   output as if it were fresh.
+5. **Interlink both ways**: every video description carries its page, the repository and the docs
+   (`site.docs` in `videos.yaml`); the docs home page, the gallery landing page and the README carry
+   the film and the channel.
 
 ---
 

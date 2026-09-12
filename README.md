@@ -15,6 +15,16 @@ boundary** methodology, **GPU** support, and **Python bindings**.
 The name nods to the [Péclet number](https://en.wikipedia.org/wiki/P%C3%A9clet_number) — the ratio of
 advective to diffusive transport, the dimensionless heart of transport phenomena.
 
+🎬 **The 1.0.0 release film** — seven minutes on what the suite does and the evidence for it:
+
+<a href="https://www.youtube.com/watch?v=L_uAHnL6Gq8">
+  <img src="https://img.youtube.com/vi/L_uAHnL6Gq8/maxresdefault.jpg" width="560"
+       alt="Peclet 1.0.0 — resolve what you can, model what you must (7:30)">
+</a>
+
+More on the channel **[@PecletHPC](https://www.youtube.com/@PecletHPC)**: a short movie for every
+worked example that has one, each linking back to the page with its code and numbers.
+
 📖 **Documentation site:** <https://computational-chemical-engineering.github.io/peclet/> — the suite's front
 door (Python API reference, install/deployment guide, design docs, links to each code's Doxygen API).
 Built from `docs/` via MkDocs ([mkdocs.yml](mkdocs.yml)).

@@ -15,6 +15,24 @@ methodology, **GPU** support (Kokkos: CUDA / HIP / OpenMP), and **Python binding
 The name nods to the [Péclet number](https://en.wikipedia.org/wiki/P%C3%A9clet_number) — the ratio of
 advective to diffusive transport, the dimensionless heart of transport phenomena.
 
+## Watch: the 1.0.0 release film
+
+Seven minutes on what the suite does and, at length, the evidence for it — the exact solutions first,
+then published experiments, then performance measured against another open-source solver on the same
+grid and the same machine. It is also open about how it was built.
+
+<div style="position:relative;padding-top:56.25%;max-width:860px;margin:0 auto;">
+  <iframe src="https://www.youtube.com/embed/L_uAHnL6Gq8?rel=0&amp;modestbranding=1"
+          title="Peclet 1.0.0 — resolve what you can, model what you must"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerpolicy="strict-origin-when-cross-origin" allowfullscreen
+          style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:6px;"></iframe>
+</div>
+
+*[Watch on YouTube](https://www.youtube.com/watch?v=L_uAHnL6Gq8)* · the channel
+**[@PecletHPC](https://www.youtube.com/@PecletHPC)** carries a short movie for every example in the
+gallery, each one linking back to the page that produced it.
+
 ## Quick start (Python)
 
 The codes are driven from **Python** — one `peclet.*` namespace, installable from PyPI. The multicore-CPU
@@ -114,9 +132,15 @@ is the worked-examples site: every page is a notebook executed against the relea
 - **CFD-DEM** — fluidized bed, bubble injection, segregation, homogeneous cooling (MFIX-Exa comparisons).
 - **Benchmarks** — the multi-GPU and CPU scaling studies (Snellius) and a DEM bulk-flow benchmark.
 
+Where a page has a movie, the movie is on **[@PecletHPC](https://www.youtube.com/@PecletHPC)** — a
+bubble squeezing through a packed bed, a million-particle fluidized bed, tumbling cubes in a drum,
+Rayleigh–Bénard convection, trickle flow over a packing, the tennis-racket effect — and each video's
+description links straight back to the page with the code and the numbers.
+
 ## Documentation
 
 - **[Examples gallery](https://computational-chemical-engineering.github.io/peclet-examples/)** — start here if you want to *use* the suite.
+- **[Videos (@PecletHPC)](https://www.youtube.com/@PecletHPC)** — the [1.0.0 release film](https://www.youtube.com/watch?v=L_uAHnL6Gq8) and a movie for every example that has one.
 - **[Python API reference](python/index.md)** — the classes and methods you call from Python (the primary interface).
 - **[Install & run](DEPLOYMENT.md)** — the backend × MPI matrix, `pip install` recipes (CPU wheels, CUDA wheels, source builds) and the HPC routes.
 - **[Containers (HPC)](containers.md)** — pull the pre-built Apptainer images from GHCR (or build your own) and run on a laptop, Snellius, or LUMI.
