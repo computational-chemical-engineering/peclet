@@ -474,3 +474,33 @@ checks the GitHub environment first.
 shared 1.0.0 note; voro, flow and the umbrella follow once their wheels finish. Check the Zenodo
 deposition for each afterwards — a webhook that fires before `CITATION.cff` is in the tag reads no
 metadata, which is why `coupling/CITATION.cff` was created before any tagging (coupling `fefc2c4`).
+
+### What remains, as of 2026-09-12 ~01:50Z
+
+Everything below is mechanical and ordered; the working tree is already prepared for it.
+
+1. **Waiting on**: `peclet-voro` and `peclet-flow` CUDA-wheel jobs (`Release` workflow on their
+   `v1.0.0` tags). Their sdists and CPU wheels are already green; only `cuda wheels` is outstanding.
+   These jobs build Kokkos-CUDA statically with SASS for every supported GPU major, so 40-90 minutes
+   is normal. Nothing needs doing until they finish.
+2. **When they do**: confirm `peclet-voro`, `peclet-voro-cu13`, `peclet-flow`, `peclet-flow-cu13` all
+   read 1.0.0 on the PyPI JSON endpoint (`pip index versions` caches for minutes — use the JSON), then
+   `gh release create v1.0.0` for both, with the same per-package paragraph plus shared body used for
+   the other six.
+3. **Then the umbrella, LAST** — its pins are exact (`==`) and cannot resolve until every member is
+   live. **The commit is already staged in the working tree**: `CHANGELOG.md` (the `[Unreleased]`
+   heading is now `## [1.0.0] — 2026-09-12` and the Tested table is written), `CITATION.cff`,
+   `pyproject.toml`, `packaging/pyproject-cu13.toml`, and all eight submodule pointers, which already
+   equal the tagged commits (verified tag-by-tag). Commit those by NAME, push, then tag `v1.0.0` —
+   that publishes both the `peclet` and `peclet-cu13` metapackages and triggers `Containers`.
+4. **Smoke test** in a fresh venv per RELEASE.md §6: `pip install peclet==1.0.0` then import
+   flow/dem/voro/pnm/morton; repeat with `peclet[mpi,cfd-dem]` (the sdist members, core and coupling —
+   the core sdist was silently unbuildable 0.1.0 through 0.6.0, so this one matters).
+5. **Check a CUDA wheel carries native SASS for every GPU major**, not just PTX:
+   `cuobjdump --list-elf <module>.so`. RELEASE.md records that 0.4.0-0.5.0 shipped sm_75 plus PTX only
+   and failed on every non-Turing GPU with a 13.0/13.1 driver, because a driver older than the toolkit
+   that emitted the PTX cannot JIT it and the launch silently no-ops.
+6. **After the release, not blocking**: the Snellius site package (Phase F), the LUMI one (Phase G,
+   still untested on AMD hardware), Zenodo deposition checks, and the example gallery re-render
+   (Phase I) — `~/Codes/peclet-examples` holds ~30 local commits written against this API and pushes
+   nothing until the wheels exist, which they now do.
