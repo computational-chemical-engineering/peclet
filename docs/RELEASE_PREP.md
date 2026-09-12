@@ -626,3 +626,47 @@ RELEASE.md §10.1; what this run learned:
    stored token does not hold, and widening it means another browser consent round; YouTube's
    automatic captions cover the narration in the meantime. `films/release-1.0.0/build/captions.srt`
    is correct on the film's clock if that is ever revisited.
+
+
+---
+
+## 11. NEXT CYCLE — 1.0.1, the container thread-pool patch (opened 2026-09-13)
+
+**Why a release at all.** The fix lives inside the compiled modules, so no user gets it from a docs
+change: `peclet::core::python::install()` now sizes the host pool by the process's real CPU budget
+(`core/include/peclet/core/common/cpu_budget.hpp`, SCALING_ISSUES issue 7). Without it, a Colab or
+Binder user's FIRST run collapses by ≥35x, silently. That is a patch-worthy regression in practice
+even though no code was wrong at 1.0.0.
+
+**Scope: patch only.** No API change, no numerics change. On an unconstrained machine the new code
+requests nothing and the build is inert — that is the property to state in the notes, and the one
+`core`'s `test_cpu_budget` pins.
+
+**Order** (RELEASE.md §6: core first, umbrella last):
+
+1. `core` → **v1.0.1**. Merge branch `cpu-budget` (worktree `suite/core-cpu-budget`), gate on the
+   full ctest battery, tag, publish.
+2. Repin `PECLET_CORE_TAG "v1.0.0"` → `"v1.0.1"` in `cmake/PecletDeps.cmake` of **flow, dem, voro,
+   pnm, coupling, amr** (`morton` does not use core), rebuild, gate, tag:
+   flow/pnm/dem/voro/coupling → **1.0.1**, amr → **0.1.1** (D9, stays 0.x).
+3. CUDA twins with them: `peclet-flow-cu13`, `peclet-pnm-cu13`, `peclet-dem-cu13`,
+   `peclet-voro-cu13` → 1.0.1 (four literals, §5.3).
+4. Umbrella `peclet` and `peclet-cu13` → **1.0.1**, pins bumped, pushed LAST.
+
+**Gates.** Each repo's own ctest battery, plus:
+
+- `core`: `test_cpu_budget` (fixture cgroup trees) — and the real-cgroup probe, which is the check
+  that actually matters and is not automatable in CI:
+  `systemd-run --user --scope -p CPUQuota=200% <probe>` must report `usable=2` with 48 CPUs visible,
+  `0` threads requested when unconstrained, and `0` when `OMP_NUM_THREADS` is set.
+- **End-to-end, on a rebuilt flow wheel:** the quick start under a 2-CPU quota with all CPUs visible
+  must finish in ~26 s. At 1.0.0 it did not finish in 15 minutes. This is the number the release
+  exists for; do not tag without it.
+- `tools/release/check_docs_snippets.py --installed --run` against the published 1.0.1 wheels — the
+  `quickstart.yml` job does this automatically as a `needs: publish` job of the tag.
+
+**Also in this cycle, if cheap:** `peclet-core` and `peclet-amr` publish an **sdist only**. That is
+why `pip install peclet-core` starts a Kokkos source build, and why the quick-start CI job had to
+stop installing them (it hung for 20 minutes on the first attempt). Either ship wheels or say so in
+their PyPI descriptions; the `BUILD_GATED` list in `check_docs_snippets.py` widens on its own once
+they do.
