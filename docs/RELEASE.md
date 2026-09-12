@@ -249,6 +249,13 @@ Traps recorded from 0.1.0–0.6.0:
 - cibuildwheel 4.x dropped cp38: keep `requires-python >= 3.10` and the build selector in sync.
 - macOS Intel runners queue for 40+ minutes and gate publish — morton dropped `macos-13`; do not add it back.
 - `skip-existing: true` in the flow publish step lets a partial upload be completed (e.g. adding the cu13 wheels after the CPU files); leave it.
+- **A publish failure whose traceback ends in `sigstore/_internal/rekor/client.py` is TRANSIENT
+  INFRASTRUCTURE, not your release.** `pypa/gh-action-pypi-publish` signs an attestation against
+  Sigstore's Rekor transparency log *before* uploading anything, so a `ConnectionError: Connection
+  reset by peer` there means nothing reached PyPI. Hit 2026-09-12 on the umbrella's own publish job
+  with both build jobs already green. `gh run rerun <id> --failed` fixed it on the first retry. Do
+  NOT respond by editing versions or cutting a new tag — `skip-existing: true` makes the retry safe
+  even if part of an upload had landed.
 - A `pypi/pyversions` badge renders "missing" without trove classifiers; the static python badge is deliberate.
 - **CUDA wheels must carry native SASS for every GPU major you support** (sm_75/80/90/100/120 today) —
   PTX does NOT carry a wheel forward: a driver older than the toolkit that emitted the PTX cannot JIT it,
