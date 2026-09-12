@@ -541,6 +541,14 @@ succeeded and **nothing had been uploaded** — the failure is upstream of the u
 editing versions or cutting a new tag; `skip-existing: true` makes the retry safe even if part of an
 upload had landed.
 
+**Containers: ALL FOUR published**, `Containers` workflow green on the `v1.0.0` tag —
+`peclet-cpu`, `peclet-cuda` (`sm80` and `sm90`) and `peclet-hip` (`gfx90a`), each pushed under both
+the versioned and the moving tag (log confirms e.g. `peclet-cuda:1.0.0-sm80` then
+`peclet-cuda:sm80`, both "Upload complete"). **This is the first tag on which `hip-gfx90a` has
+succeeded** — RELEASE.md §0 records it failing on every tag from 0.3.0 through 0.6.0, and §8 that it
+has built since 2026-09-04. The image is published; it remains UNTESTED on AMD hardware, which is a
+different claim and stays a known limitation.
+
 **Remaining, none of it blocking and all of it after-the-release by design:** the Snellius site
 package (RELEASE.md Phase F), the LUMI one (Phase G, still untested on AMD hardware), confirming
 each Zenodo deposition minted a version DOI, and re-rendering the example gallery (Phase I) —
