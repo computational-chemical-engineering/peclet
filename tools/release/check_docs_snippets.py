@@ -95,6 +95,8 @@ def run_pages(python: str, timeout: int) -> int:
 # bindings, so a genuine deletion is still caught. Add to this list only with the reason.
 BUILD_GATED = {
     "extract_pore_network_mpi",   # pnm: -DPECLET_PNM_MPI=ON; the CPU/CUDA wheels are serial
+    "add_leaf",                   # peclet.core.geom.SceneBuilder: peclet-core publishes an SDIST
+                                  # ONLY, so CI cannot install it without a source build
 }
 
 # Modules of the installed family, and the attribute that leads to each one's classes.

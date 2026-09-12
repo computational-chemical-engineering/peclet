@@ -70,24 +70,35 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Only the metapackage is pinned: `peclet==X` pins flow/pnm/dem/voro/morton itself, while
-      # peclet-core and peclet-amr are separate installs on their own numbering (amr stays 0.x,
-      # the D9 exception). Retry, because a release-triggered run reaches PyPI before the CDN does.
+      # `peclet==X` is the only pin needed: the metapackage pins flow/pnm/dem/voro/morton itself.
+      # Retry, because a release-triggered run can reach PyPI before the member wheels of that
+      # version are all up (each submodule repo publishes its own).
       - name: Install the published wheels
         run: |
           set -u
           V="${VERSION#v}"
           if [ -n "$V" ]; then PIN="==$V"; else PIN=""; fi
-          for attempt in $(seq 1 20); do
-            if pip install --upgrade "peclet${PIN}" peclet-core peclet-amr matplotlib; then
+          for attempt in $(seq 1 10); do
+            if pip install --upgrade "peclet${PIN}" matplotlib; then
               pip list | grep -i peclet
               exit 0
             fi
-            echo "attempt ${attempt}/20: peclet${PIN} not installable yet; waiting 60 s"
+            echo "attempt ${attempt}/10: peclet${PIN} not installable yet; waiting 60 s"
             sleep 60
           done
           echo "::error::peclet${PIN} never became installable from PyPI"
           exit 1
+
+      # peclet-core and peclet-amr are outside the metapackage and today publish an SDIST ONLY, so
+      # installing them here would trigger a source build (Kokkos, MPI) and hang the job — that is
+      # exactly what the first version of this workflow did. Take them only if a wheel exists, so
+      # the day they ship one the NAMES pass widens on its own; until then their names sit in
+      # BUILD_GATED. Never fail the job on this.
+      - name: Take peclet-core / peclet-amr only if they ship wheels
+        continue-on-error: true
+        run: |
+          pip install --only-binary=:all: peclet-core peclet-amr \
+            || echo "no wheels for peclet-core/peclet-amr — skipped, see BUILD_GATED"
 
       # NAMES: every doc page's peclet calls exist in what was installed.
       # RUN:   README.md, docs/index.md and the Colab notebook execute end to end.
