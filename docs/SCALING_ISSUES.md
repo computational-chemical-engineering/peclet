@@ -21,6 +21,7 @@ is reproducible; the remaining defect is narrower.*
 | 4 | Intermittent multi-node hang in warmup | **High, silently wrong** (was: Medium) | **Root-caused and fixed 2026-09-02** (core `10294e6`): NBX inter-round tag race |
 | 5 | Momentum solve: cap-bound RB-GS (update criterion) | High (63 % of the packed step) | **Fixed 2026-09-02**: residual stop + velocity MG under MPI (mixed operator); packed step 2.2× faster at 384–1536 ranks |
 | 6 | `check_decomposition.py` unusable above ~100 ranks | Low (tooling) | Open |
+| 7 | Kokkos oversubscribes inside a CPU-quota container (Colab, Binder, Docker, Slurm) | **High, user-visible** | Open — docs fixed 2026-09-12, library default undecided |
 
 ---
 
@@ -266,6 +267,42 @@ whole point — but it takes minutes per rank count above ~100 and several combi
 out or errored during this campaign, so the np=768 and np=1536 partitions could not be checked
 before submitting. Given that issue 3 makes the partition the dominant performance variable, this
 tool should be fast enough to sweep the whole ladder in one call.
+
+## 7. Kokkos oversubscribes inside a CPU-quota container — HIGH, user-visible (added 2026-09-12)
+
+**Reported by the user**: the published quick start "takes forever" on Colab. It is neither the
+solver nor the install — all five wheels together are 5.7 MB.
+
+Kokkos sizes its OpenMP pool from the CPUs it can **see**. A container normally shows the whole
+host while granting a fraction of it through a cgroup *quota*, and a quota is invisible to OpenMP:
+`omp_get_max_threads()` returns the host count, the pool spin-waits at every barrier, and the run
+collapses. Note that an affinity **mask** (`taskset`) does not reproduce this — OpenMP honours a
+mask and sizes itself correctly. The quota is the trap, and it is the shape Colab actually has.
+
+Measured on this workstation, same wheel, same 42-step quick start (N = 48):
+
+| CPUs visible | budget | `OMP_NUM_THREADS` | time |
+|---|---|---|---|
+| 2 (affinity) | 2 | unset | 25.7 s |
+| 2 (affinity) | 2 | 2 | 25.7 s |
+| 48 | **2 (cgroup quota)** | unset | **did not finish in 15 min** |
+| 48 | 2 (cgroup quota) | **2** | **26.0 s** |
+
+So: ≥35x, unbounded, and silent. It is the same failure the suite already records for an unbounded
+pool on a 48-core host (`CLAUDE.md`, "a measured hour-long trap") — but a container user meets it on
+their first run, with no way to know.
+
+**Done:** the Colab notebook's bootstrap cell now reads the real budget out of
+`/sys/fs/cgroup/cpu.max` (v1 fallback, then `sched_getaffinity`) and sets `OMP_NUM_THREADS` and
+`OMP_PROC_BIND` before peclet is imported; `README.md` and `docs/index.md` carry the warning with
+these numbers.
+
+**Open decision — the library, not the docs, is the right place.** Every containerised user hits
+this, and only the module knows Kokkos is about to initialise: `peclet.flow`'s import could set
+`OMP_NUM_THREADS` from the cgroup budget when the variable is unset. That changes a shipped
+default's behaviour (never its numerics), so it wants a recorded decision rather than a quiet patch
+— DECISIONS.md, with the table above as the evidence.
+
 
 ## Issues 1 and 2 compound — and that is the most important thing here
 

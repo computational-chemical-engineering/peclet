@@ -42,7 +42,10 @@ REF_OVERRIDE = {"amr": "v0.1.0"}
 SKIP_NAMES = {"docs/NAMING.md", "CHANGELOG.md", "docs/RELEASE_PREP.md"}
 SKIP_DIRS = {"archive", "decisions", "notebooks"}
 
-FENCE_RE = re.compile(r"```(?:python|py)\n(.*?)```", re.S)
+# Only COLUMN-ZERO fences are the page's runnable script. A fence indented inside an
+# admonition or a list is an aside — and pasting its indented body into the script is an
+# IndentationError, not a finding.
+FENCE_RE = re.compile(r"^```(?:python|py)\n(.*?)^```", re.S | re.M)
 PRELUDE = (
     "import matplotlib\n"
     "matplotlib.use('Agg')\n"

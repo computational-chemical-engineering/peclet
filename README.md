@@ -137,6 +137,22 @@ plt.xlabel("x"); plt.ylabel("y"); plt.tight_layout()
 plt.show()
 ```
 
+> [!WARNING]
+> **Running this in a container? Bound the thread pool first.** Kokkos sizes its OpenMP pool from
+> the CPUs it can *see*. Colab, Binder, Docker and a Slurm cgroup all normally show you the whole
+> host while granting a fraction of it, so the default pool spin-waits itself to a standstill —
+> measured on the wheel above, this 26-second solve did not finish in **15 minutes** on 2 CPUs of
+> quota with 48 visible, and finished in **26.0 s** with the pool bounded. Before importing peclet:
+>
+> ```python
+> import os
+> os.environ.setdefault("OMP_NUM_THREADS", "2")   # or however many CPUs you were actually granted
+> os.environ.setdefault("OMP_PROC_BIND", "false")
+> ```
+>
+> The Colab notebook reads the real budget out of `/sys/fs/cgroup/cpu.max` and does this for you.
+> On a workstation you do not need it: there, visible and granted are the same.
+
 <img src="docs/img/quickstart_sphere.png" width="420" alt="Stokes flow past a sphere: speed and streamlines on the mid-plane">
 
 **Single NVIDIA GPU:** `pip install peclet-cu13` — CUDA wheels of the same family (only the NVIDIA driver is
