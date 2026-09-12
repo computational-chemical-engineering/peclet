@@ -41,6 +41,7 @@ so pore centres and radii are float32 in the input unit system); the network-flo
 (``u``, ``v``, ``w``, ``p``, openness) are float64.
 
 ### `SDFReader`
+VTI (VTK ImageData) reader for a signed-distance-field volume. Stateless: the class exists only to hold read_vti as a static method, not to be instantiated — call SDFReader.read_vti(filename) directly.
 
 | Method / property | Description |
 |---|---|

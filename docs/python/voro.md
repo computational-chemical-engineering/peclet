@@ -50,7 +50,7 @@ DistributedTessellation for the MPI driver. Instruments: `diagnostics`.
 | `build` | build(self, positions: ndarray[dtype=float64, order='C'], strict: bool = False) -> None  Cold-build the (power-)Voronoi tessellation of `positions` (N,3) from scratch and make it resident, clipped by the geometry from `set_geometry` if any. Sets the particle count N for subsequent `step` calls. Warns (raises if strict=True) when the result is not a guaranteed-exact partition: buried power cells (a seed outside its own cell — never for w = r² of non-overlapping spheres), a search reach beyond half the box, or overflowed cells; see `diagnostics.build_report()`. |
 | `clear_geometry` | clear_geometry(self) -> None  Drop the SDF geometry (takes effect at the next `build`). |
 | `clear_weights` | clear_weights(self) -> None  Back to the unweighted Voronoi diagram (next `build`). |
-| `diagnostics` | The diagnostics tier: build_report(), set_local_certificate(), set_gate(). |
+| `diagnostics` | The diagnostics tier: build_report(), set_local_certificate(), set_gate(), set_profile(). |
 | `energy_forces` | energy_forces(self, types: ndarray[dtype=int32, order='C'], tension: ndarray[dtype=float64, order='C'], sigma_wall: ndarray[dtype=float64, order='C'] | None = None, dEdV: ndarray[dtype=float64, order='C'] | None = None, lloyd: float = 0.0, facet_tension: float = 0.0) -> dict  Energies and their exact gradients on the RESIDENT cells (after build/step), no rebuild:   interfacial  E = Σ σ(t_i,t_j) A_ij over facets between different `types` (N,) int32,                with the symmetric `tension` table (nTypes, nTypes) float64;   wetting      E = Σ σ_wall(t_i) A_wall,i over SDF wall facets, if `sigma_wall` (nTypes,)                is given (a uniform wall tension is a constant — only the species                difference does work, which is what sets the contact angle);   volume       Σ e_i(V_i) for a caller-supplied e'(V_i) = `dEdV` (N,) (e.g. 2(V/Vref−1)/Vref);   centroidal   `lloyd` · Σ ∫_cell |y − x_i|² (Lloyd/CVT; gradient 2V(x−c) drives seeds to                their centroids — the skewness the grid solver's two-point operators need gone);   roundness    `facet_tension` · Σ A_f over all interior faces. Returns {'interface_energy', 'wall_energy', 'lloyd_energy', 'tension_energy', 'force' (N,3) = dE/dx, 'force_w' (N,) = dE/dw when weights are set}. Descend along −force to minimise. |
 | `extent` | The box size (Lx, Ly, Lz) — read-only; set it with `set_domain`. |
 | `get_neighbor_counts` | get_neighbor_counts(self) -> numpy.ndarray[dtype=int32]  Per-particle Voronoi neighbour count (N,) int32 (a copy) — the number of faces of each cell (wall facets included). |
@@ -76,7 +76,7 @@ Instruments: `diagnostics`.
 | Method / property | Description |
 |---|---|
 | `clear_geometry` | clear_geometry(self) -> None  Drop the SDF geometry (before init()). |
-| `diagnostics` | The diagnostics tier: set_repair(). |
+| `diagnostics` | The diagnostics tier: set_repair(), set_profile(). |
 | `dt` | The stored time step (0 until `set_dt`). |
 | `extent` | The box size (Lx, Ly, Lz) — read-only; set it with `set_domain`. |
 | `get_forces` | get_forces(self) -> numpy.ndarray[dtype=float64]  Current per-particle force (N,3) float64 — the pressure (EOS) force plus the optional viscous Navier-Stokes term, as used by the last velocity-Verlet kick. Useful for force-field analysis, equilibrium/convergence checks, and coupling. |
@@ -163,7 +163,7 @@ tolerance. rcut, skin and tolerance are fractions of the mean spacing cbrt(V/N_g
 | Method / property | Description |
 |---|---|
 | `clear_geometry` | clear_geometry(self) -> None  Drop the SDF geometry (before establish()). |
-| `diagnostics` | The diagnostics tier: num_regathers. |
+| `diagnostics` | The diagnostics tier: num_regathers, set_profile(). |
 | `establish` | establish(self, positions: ndarray[dtype=float64, order='C'], gids: ndarray[dtype=int64, order='C'], weights: ndarray[dtype=float64, order='C'] | None = None) -> None  Collective: gather the ghosts of this rank's owned seeds (positions (N,3), global ids (N,) int64, optional weights (N,)) and cold-build the combined tessellation. Call once, and again whenever ownership changes. |
 | `get_combined_gids` | get_combined_gids(self) -> numpy.ndarray[dtype=int64]  Global ids (num_combined,) int64 of the owned + ghost seeds after the last gather (owned first, in establish() order). |
 | `get_neighbor_counts` | get_neighbor_counts(self) -> numpy.ndarray[dtype=int32]  Owned-cell neighbour counts (num_owned,) int32 (a copy). |
@@ -259,15 +259,17 @@ Instruments and ablation switches of a Tessellation (reached as `t.diagnostics`)
 
 | Method / property | Description |
 |---|---|
-| `build_report` | build_report(self) -> dict  Validity counts of the last build: {'buried', 'reach_exceeded', 'empty', 'overflow', 'incomplete'} — all zero for a guaranteed-exact partition (build() already warns, or raises with strict=True, when they are not). |
+| `build_report` | build_report(self) -> dict  Validity counts of the last build: {'buried', 'reach_exceeded', 'empty', 'overflow', 'incomplete'} — all zero for a guaranteed-exact partition (build() already warns, or raises with strict=True, when they are not) — and 'over_buffer_rebuilds', the number of times the build's facet/edge over-buffer estimate was exceeded and the build pass re-run at the exact demand (0 normally; each one doubles that build's cost). |
 | `set_gate` | set_gate(self, on: bool) -> None  Ablation: the adaptive gate (default True) that routes high-churn steps straight to a full rebuild — the 'never much slower than a cold build' guard. Takes effect at the next build(). |
 | `set_local_certificate` | set_local_certificate(self, on: bool) -> None  Ablation: the cheap O(nt) Lawson local certificate (default True) vs the brute O(nt*np) form for detecting which cells changed. Both are complete; local is faster. Takes effect at the next build(). |
+| `set_profile` | set_profile(self, on: bool = True) -> None  Print the cold build's timing (grid / build / CSR), the worklist size, the over-buffer rebuilds and the max facets per cell on stderr (default off). Takes effect at the next build(). |
 
 ### `SimulationDiagnostics`
 Performance-path switches of a Simulation (reached as `s.diagnostics`).
 
 | Method / property | Description |
 |---|---|
+| `set_profile` | set_profile(self, on: bool = True) -> None  Print each cold build's timing and over-buffer report on stderr (default off). |
 | `set_repair` | set_repair(self, on: bool = True) -> None  Opt-in (default off): use the incremental moving-point repair + reeval-published force geometry each step instead of a full rebuild. Before init(). |
 
 ### `FlowSolverDiagnostics`
@@ -284,6 +286,7 @@ Instruments of a DistributedTessellation (reached as `d.diagnostics`).
 | Method / property | Description |
 |---|---|
 | `num_regathers` | Number of collective re-gather + cold-rebuild events since construction (establish counts as one). |
+| `set_profile` | set_profile(self, on: bool = True) -> None  Print each rank's cold-build timing and over-buffer report on stderr (default off). |
 
 ### Module attributes
 
@@ -339,24 +342,31 @@ the periodic tessellation's ~1% min-image floor.
 
 ### `sdf_voronoi_cells`
 ```
-sdf_voronoi_cells(positions: ndarray[dtype=float64, order='C'], sphere_centers: ndarray[dtype=float64, order='C'], sphere_radii: ndarray[dtype=float64, order='C'], extent: collections.abc.Sequence[float]) -> dict
+sdf_voronoi_cells(positions: ndarray[dtype=float64, order='C'], sphere_centers: ndarray[dtype=float64, order='C'], sphere_radii: ndarray[dtype=float64, order='C'], extent: collections.abc.Sequence[float], *, search_window: int = 6) -> dict
 
 Reconstruct the SDF-clipped interstitial Voronoi cells (cubic periodic box `extent`, the
-spheres as walls) and return their polyhedra as flat arrays (VTK_POLYHEDRON layout):
-'points' (Np,3), 'faces' + 'face_offsets' (per-cell face lists, global point ids),
-'volume' (Nc,), 'boundary' (Nc, 1 where the cell touches a sphere wall), 'seed' (Nc,).
+spheres as walls) on the device — the tessellator's own gather, one thread per cell — and
+return their polyhedra as flat arrays (VTK_POLYHEDRON layout) in seed order: 'points' (Np,3),
+'faces' + 'face_offsets' (per-cell face lists, global point ids, each face CCW about its
+outward normal), 'volume' (Nc,), 'boundary' (Nc, 1 where the cell touches a sphere wall),
+'seed' (Nc,). Seeds inside a sphere have no cell; 'num_overflow' counts cells skipped for
+exceeding the cell capacity (peclet.voro.defaults max_planes / max_triangles) and 'num_incomplete' the cells whose
+gather window (search_window grid blocks per axis, default 6) did not close — raise
+search_window if it is not 0.
 ```
 
 ### `sdf_voronoi_section`
 ```
-sdf_voronoi_section(positions: ndarray[dtype=float64, order='C'], sphere_centers: ndarray[dtype=float64, order='C'], sphere_radii: ndarray[dtype=float64, order='C'], extent: collections.abc.Sequence[float], point: collections.abc.Sequence[float], normal: collections.abc.Sequence[float]) -> dict
+sdf_voronoi_section(positions: ndarray[dtype=float64, order='C'], sphere_centers: ndarray[dtype=float64, order='C'], sphere_radii: ndarray[dtype=float64, order='C'], extent: collections.abc.Sequence[float], point: collections.abc.Sequence[float], normal: collections.abc.Sequence[float], *, search_window: int = 6) -> dict
 
 Cross-section of the SDF-clipped interstitial Voronoi mesh (cubic periodic box `extent`) by
-the plane through `point` with `normal`: cut every cell directly (ConvexCell::sectionPolygon,
-robust — works from the dual edges, so it tiles the plane exactly where a face-by-face slice
-drops facets). Returns 'verts' (Nv,3, world coords, all on the plane) + 'offsets' (Npoly+1,
-per-polygon vertex ranges) + 'volume' (Npoly, the 3-D cell volume) + 'seed' (Npoly, the seed
-index). For a z=z0 slice pass point=(0,0,z0), normal=(0,0,1) and plot verts[:, :2].
+the plane through `point` with `normal`, on the device: every cell cut directly
+(ConvexCell::sectionPolygon, from the dual edges, so it tiles the plane exactly where a
+face-by-face slice drops facets). Returns 'verts' (Nv,3, world coords, all on the plane, CCW
+about the normal) + 'offsets' (Npoly+1, per-polygon vertex ranges) + 'volume' (Npoly, the 3-D
+cell volume) + 'seed' (Npoly, the seed index), in seed order, plus 'num_overflow' /
+'num_incomplete' as in sdf_voronoi_cells (search_window default 6). For a z=z0 slice pass
+point=(0,0,z0), normal=(0,0,1) and plot verts[:, :2].
 ```
 
 ## `peclet.voro.pore_mesh`
@@ -409,24 +419,31 @@ the cubic box `extent` = (L, L, L).
 
 ### `sdf_voronoi_cells`
 ```
-sdf_voronoi_cells(positions: ndarray[dtype=float64, order='C'], sphere_centers: ndarray[dtype=float64, order='C'], sphere_radii: ndarray[dtype=float64, order='C'], extent: collections.abc.Sequence[float]) -> dict
+sdf_voronoi_cells(positions: ndarray[dtype=float64, order='C'], sphere_centers: ndarray[dtype=float64, order='C'], sphere_radii: ndarray[dtype=float64, order='C'], extent: collections.abc.Sequence[float], *, search_window: int = 6) -> dict
 
 Reconstruct the SDF-clipped interstitial Voronoi cells (cubic periodic box `extent`, the
-spheres as walls) and return their polyhedra as flat arrays (VTK_POLYHEDRON layout):
-'points' (Np,3), 'faces' + 'face_offsets' (per-cell face lists, global point ids),
-'volume' (Nc,), 'boundary' (Nc, 1 where the cell touches a sphere wall), 'seed' (Nc,).
+spheres as walls) on the device — the tessellator's own gather, one thread per cell — and
+return their polyhedra as flat arrays (VTK_POLYHEDRON layout) in seed order: 'points' (Np,3),
+'faces' + 'face_offsets' (per-cell face lists, global point ids, each face CCW about its
+outward normal), 'volume' (Nc,), 'boundary' (Nc, 1 where the cell touches a sphere wall),
+'seed' (Nc,). Seeds inside a sphere have no cell; 'num_overflow' counts cells skipped for
+exceeding the cell capacity (peclet.voro.defaults max_planes / max_triangles) and 'num_incomplete' the cells whose
+gather window (search_window grid blocks per axis, default 6) did not close — raise
+search_window if it is not 0.
 ```
 
 ### `sdf_voronoi_section`
 ```
-sdf_voronoi_section(positions: ndarray[dtype=float64, order='C'], sphere_centers: ndarray[dtype=float64, order='C'], sphere_radii: ndarray[dtype=float64, order='C'], extent: collections.abc.Sequence[float], point: collections.abc.Sequence[float], normal: collections.abc.Sequence[float]) -> dict
+sdf_voronoi_section(positions: ndarray[dtype=float64, order='C'], sphere_centers: ndarray[dtype=float64, order='C'], sphere_radii: ndarray[dtype=float64, order='C'], extent: collections.abc.Sequence[float], point: collections.abc.Sequence[float], normal: collections.abc.Sequence[float], *, search_window: int = 6) -> dict
 
 Cross-section of the SDF-clipped interstitial Voronoi mesh (cubic periodic box `extent`) by
-the plane through `point` with `normal`: cut every cell directly (ConvexCell::sectionPolygon,
-robust — works from the dual edges, so it tiles the plane exactly where a face-by-face slice
-drops facets). Returns 'verts' (Nv,3, world coords, all on the plane) + 'offsets' (Npoly+1,
-per-polygon vertex ranges) + 'volume' (Npoly, the 3-D cell volume) + 'seed' (Npoly, the seed
-index). For a z=z0 slice pass point=(0,0,z0), normal=(0,0,1) and plot verts[:, :2].
+the plane through `point` with `normal`, on the device: every cell cut directly
+(ConvexCell::sectionPolygon, from the dual edges, so it tiles the plane exactly where a
+face-by-face slice drops facets). Returns 'verts' (Nv,3, world coords, all on the plane, CCW
+about the normal) + 'offsets' (Npoly+1, per-polygon vertex ranges) + 'volume' (Npoly, the 3-D
+cell volume) + 'seed' (Npoly, the seed index), in seed order, plus 'num_overflow' /
+'num_incomplete' as in sdf_voronoi_cells (search_window default 6). For a z=z0 slice pass
+point=(0,0,z0), normal=(0,0,1) and plot verts[:, :2].
 ```
 
 ### `sphere_union_scene`
