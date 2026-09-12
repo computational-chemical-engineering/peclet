@@ -44,9 +44,9 @@ N = 48                       # cells per side: change this for a grid-refinement
 
 s = flow.Solver((N, N, N), extent=(L, L, L))                    # a periodic box: a cubic lattice of spheres
 s.set_rho(rho); s.set_mu(mu); s.set_dt(1e3)                    # every input physical; a large dt marches
-s.set_body_force(F, 0.0, 0.0)                                  #   straight to the steady Stokes flow
+s.set_body_force((F, 0.0, 0.0))                                #   straight to the steady Stokes flow
 
-x, y, z = s.cell_centres()                                     # the grid the solver laid inside the box
+x, y, z = s.cell_centers()                                     # the grid the solver laid inside the box
 X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
 sdf = np.sqrt((X - L/2)**2 + (Y - L/2)**2 + (Z - L/2)**2) - R  # signed distance, < 0 inside the sphere
 s.set_solid(sdf, cutcell_pressure=True)                        # no-slip cut-cell immersed boundary

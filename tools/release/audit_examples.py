@@ -21,9 +21,11 @@ SUITE = Path(__file__).resolve().parents[2]
 BINDINGS = {
     "flow": ["src/flow_bindings.cpp", "packaging/flow_init.py"],
     "dem": ["src/dem_bindings.cpp", "packaging/dem_init.py", "packaging/particle_builder.py", "packaging/scene_particle.py"],
-    "voro": ["src/voro_bindings.cpp", "packaging/voro_init.py"],
+    "voro": ["src/voro_bindings.cpp", "packaging/voro_init.py", "packaging/voro_scenes.py",
+             "packaging/voro_pore_mesh.py"],
     "pnm": ["src/pnm_bindings.cpp", "packaging/pnm_init.py"],
-    "core": ["python/mpi_bindings.cpp", "python/amr_bindings.cpp", "python/geom_bindings.cpp"],
+    "core": ["python/mpi_bindings.cpp", "python/geom_bindings.cpp"],
+    "amr": ["python/amr_bindings.cpp", "packaging/amr_init.py"],  # its own repo since G.2
     "coupling": ["src/coupling_bindings.cpp", "python/peclet_coupling/__init__.py",
                   "python/peclet_coupling/driver.py", "python/peclet_coupling/resolved.py"],
     "morton": ["bindings/python/peclet/morton/__init__.py"],
@@ -51,6 +53,10 @@ def surface(sub, ref):
             src = subprocess.run(["git", "-C", str(SUITE / sub), "show", f"{ref}:{rel}"],
                                  capture_output=True, text=True, check=True).stdout
         except subprocess.CalledProcessError:
+            # A path that exists nowhere in BINDINGS' repo is a COVERAGE HOLE, not a no-op: every
+            # call into that module then reads as an unknown name. (amr's bindings moved out of
+            # core in G.2 and nothing noticed, because this used to swallow it silently.)
+            print(f"warning: {sub}: no {rel} at {ref}", file=sys.stderr)
             continue
         for m in DEF_RE.finditer(src):
             names.add(next(g for g in m.groups() if g))

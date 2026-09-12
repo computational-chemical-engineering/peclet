@@ -93,7 +93,7 @@ Python: the constructors take plain keyword arguments, so no package depends on 
 ```python
 s = flow.Solver((nx, ny, nz), extent=(Lx, Ly, Lz), origin=(0, 0, 0))     # spacing = extent / cells
 s.extent, s.origin, s.spacing, s.cells                                       # read-only
-s.cell_centres()  ->  x, y, z 1-D arrays;   s.meshgrid()  ->  X, Y, Z  (for building SDFs and plots)
+s.cell_centers()  ->  x, y, z 1-D arrays;   s.meshgrid()  ->  X, Y, Z  (for building SDFs and plots)
 ```
 
 `extent=None` keeps today's behaviour (`extent = cells`, spacing 1) and is **bit-identical** — every existing
@@ -149,7 +149,7 @@ byte-identical arithmetic.
 | today | after |
 |---|---|
 | `Solver(nx, ny, nz)` | `Solver((nx, ny, nz), extent=(Lx, Ly, Lz), origin=(...))` — old positional form kept |
-| `set_solid(sdf)` in cells | `set_solid(sdf)` — physical signed distances sampled at `cell_centres()` |
+| `set_solid(sdf)` in cells | `set_solid(sdf)` — physical signed distances sampled at `cell_centers()` |
 | `set_scene(...)` cell coordinates | physical coordinates; `dem`/`voro`/`flow` share one scene unchanged |
 | `set_mu`, `set_rho`, `set_dt`, `set_body_force`, BC velocities, `set_surface_tension`, drag, slip length | physical, unchanged names |
 | `get_u/v/w/p`, `vof_geometry()['kappa']` | physical velocity, pressure, curvature in 1/length |
@@ -286,7 +286,7 @@ Gate: a core ctest `domain` (round trips, min-image, anisotropic spacing) — pl
 §3.2 with the reference scales and WRITE THE DERIVATION as a comment block above the helpers; the
 mapping must reduce to the identity for `extent = cells, dt = 1, rho = 1`. Bindings (`flow_bindings.cpp:119`):
 `nb::init` overload with `nb::arg("cells"), nb::arg("extent") = nb::none(), nb::arg("origin") = (0,0,0)`;
-read-only properties `cells, extent, origin, spacing`; `cell_centres()` → three 1-D arrays;
+read-only properties `cells, extent, origin, spacing`; `cell_centers()` → three 1-D arrays;
 `get_spacing()` (:2488) returns the real spacing. Gate: bit-identity with `extent=None`; a new ctest
 `units_identity` constructing with `extent = cells` explicitly and checking every getter.
 
@@ -449,7 +449,7 @@ ones and is where a new converted input belongs. `SceneMap` (same file) is the i
 the geometry kernels take by value. `Solver::spacing()` already reports per-axis `h`, so the data an
 anisotropic operator needs is present; **only the isotropy asserts and the operator coefficients are
 missing.** The Python side exposes `cells`, `global_cells`, `extent`, `origin`, `spacing`,
-`physical_units`, `unit_scales` and `cell_centres()`.
+`physical_units`, `unit_scales` and `cell_centers()`.
 
 **The three isotropy asserts, and who relaxes which.** Do not hunt for them:
 

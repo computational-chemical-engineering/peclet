@@ -560,3 +560,33 @@ still the one unresolved entry in DECISIONS.md, so **no permeability number is p
 1.0.0 notes**; morton's AVX-512 batch kernels were not re-validated for this HEAD and the notes say
 so; and amr's CUDA `python_state_hash` skip is a quoting defect in the build-toolchain LABEL that
 loses its embedded spaces through the Kokkos launch compiler.
+
+### Post-release: the landing page did not run (found by a user, 2026-09-12)
+
+The very first thing 1.0.0 offered a new reader — the quick start on `README.md`, `docs/index.md`
+and the Colab notebook — raised `TypeError` on line 12. The clean break had renamed
+`cell_centres()` to `cell_centers()` and repacked `set_body_force(fx, fy, fz)` into one
+3-sequence, and no check in this document looks at the suite's own docs: `audit_examples.py` scans
+the sibling **gallery** only (`examples/`, `benchmarks/`, `sanity-checks/`), and §5.2's instruction
+is to *read* the prose, which catches a stale version number but not a deleted method.
+
+Fixed on those four pages (`docs/CONVENTIONS.md` carried the old spelling too), verified by running
+all three pages against `pip install peclet-flow` == 1.0.0 in a fresh venv: `k = 1.23512e-01` at
+N = 48, matching the notebook's committed output and its refinement table, so the stored outputs
+did not need regenerating.
+
+**The gate is now `tools/release/check_docs_snippets.py`** (RELEASE.md §5.2). Two lessons in the
+shape of its two passes:
+
+1. **Nothing was executing the docs.** A page reachable from the front door is a test, and it
+   should be run in a venv holding the *published* wheels — the same thing the Colab badge does.
+2. **A static name audit cannot see a signature change.** `cell_centres` → `cell_centers` is a
+   NAMES failure; `set_body_force(fx, fy, fz)` → `set_body_force(force)` renamed nothing and is
+   invisible to every audit in `tools/release/` — only running it finds that class. Any future
+   clean break should assume there are more of these than renames.
+
+Two coverage holes in `audit_examples.py` surfaced while fixing this and are closed in the same
+commit: `amr`'s bindings moved out of `core` in G.2 and were never re-registered (so every
+`peclet.amr` call in the gallery read as an unknown name), and voro's `packaging/voro_scenes.py` /
+`voro_pore_mesh.py` were missing (`scenes.sphere_union_scene` read as retired). Both were silent
+because `surface()` swallowed a missing path; it now warns.

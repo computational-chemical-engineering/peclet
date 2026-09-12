@@ -139,7 +139,7 @@ method's API reference does that job.
 ```python
 s = flow.Solver((nx, ny, nz), extent=(Lx, Ly, Lz), origin=(0, 0, 0))
 s.spacing            # derived: extent / cells — read-only, and the user never needs it
-s.cell_centres()     # the coordinates an SDF or an initial field is sampled at
+s.cell_centers()     # the coordinates an SDF or an initial field is sampled at
 ```
 
 Omitting `extent` selects the historical **cell units** (spacing exactly 1, origin 0, every length in

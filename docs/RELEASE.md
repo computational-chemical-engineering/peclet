@@ -201,6 +201,20 @@ Update, in this order, and read each one end to end (they drift in small factual
   the concept DOI — so nothing on the site goes stale between releases (the "This release (v0.2.0)"
   line survived five releases before this rule). `tools/release/check_release_state.sh` greps for it.
 
+- **The quick start must RUN against the published wheels, not merely parse.**
+  `tools/release/check_docs_snippets.py` is the gate: a NAMES pass matches every python block under
+  `docs/` against the tagged binding surface, and `--run --python <fresh-venv>/bin/python` executes
+  `README.md`, `docs/index.md` and `docs/notebooks/quickstart_sphere.ipynb` end to end — which is
+  what a reader's copy-paste and the Colab badge actually do. Run the `--run` pass in a venv holding
+  the **PyPI** wheels (`pip install peclet`), after publishing and before announcing.
+
+  *Why it exists:* 1.0.0 shipped a landing page whose first 20 lines raised `TypeError`. The clean
+  break had renamed `cell_centres()` to `cell_centers()` and repacked `set_body_force(fx, fy, fz)`
+  into one 3-sequence; `audit_examples.py` covers only the sibling gallery, so nothing looked at the
+  suite's own docs, and nothing at all executed them. Note which check catches which: the rename is
+  a NAMES failure, but the repacked signature renamed nothing and is invisible to any static audit —
+  only running it finds that class.
+
 The audit list for the current release is in `RELEASE_PREP.md`.
 
 ### 5.3 CUDA wheel coverage (decision point)
