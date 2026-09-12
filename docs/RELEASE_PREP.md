@@ -504,3 +504,51 @@ Everything below is mechanical and ordered; the working tree is already prepared
    still untested on AMD hardware), Zenodo deposition checks, and the example gallery re-render
    (Phase I) — `~/Codes/peclet-examples` holds ~30 local commits written against this API and pushes
    nothing until the wheels exist, which they now do.
+
+## 10. RELEASED — peclet 1.0.0, 2026-09-12
+
+All nine repositories are tagged, published and GitHub-released.
+
+| package | tag | PyPI | CUDA twin |
+|---|---|---|---|
+| peclet-core | `v1.0.0` | 1.0.0 (sdist) | — |
+| peclet-morton | `v1.0.0` | 1.0.0 | — |
+| peclet-flow | `v1.0.0` | 1.0.0 | `peclet-flow-cu13` 1.0.0 |
+| peclet-pnm | `v1.0.0` | 1.0.0 | `peclet-pnm-cu13` 1.0.0 |
+| peclet-dem | `v1.0.0` | 1.0.0 | `peclet-dem-cu13` 1.0.0 |
+| peclet-voro | `v1.0.0` | 1.0.0 | `peclet-voro-cu13` 1.0.0 |
+| peclet-coupling | `v1.0.0` | 1.0.0 (sdist) | — |
+| peclet-amr | `v0.1.0` | 0.1.0 (sdist) | — |
+| peclet (metapackage) | `v1.0.0` | 1.0.0 | `peclet-cu13` 1.0.0 |
+
+**Post-publish verification, all done:**
+
+- CPU wheels install and run in a clean interpreter, reporting 1.0.0 and the OpenMP backend.
+- **The core SOURCE distribution builds and imports** — 5 s in a fresh venv. This is the check
+  RELEASE.md flags as having silently failed from 0.1.0 through 0.6.0; it does not recur.
+- **flow's CUDA wheel carries native SASS for sm_75, 80, 90, 100 and 120**, confirmed with
+  `cuobjdump --list-elf` on the downloaded wheel — not PTX alone, which is what made 0.4.0 and 0.5.0
+  abort at import on every non-Turing GPU with a 13.0/13.1 driver.
+- `pip install "peclet[mpi,cfd-dem,amr]==1.0.0"` into a fresh venv resolves all nine packages in
+  70 s, every module imports in one interpreter, and a five-step flow solve runs.
+
+**One operational lesson worth carrying into RELEASE.md.** The umbrella's `publish` job failed the
+first time with `requests.exceptions.ConnectionError: Connection reset by peer` raised inside
+`sigstore` while signing the attestation against the Rekor transparency log. Both build jobs had
+succeeded and **nothing had been uploaded** — the failure is upstream of the upload. `gh run rerun
+<id> --failed` fixed it on the first retry. Treat a publish failure whose traceback ends in
+`sigstore/_internal/rekor/client.py` as transient infrastructure, re-run the job, and do NOT start
+editing versions or cutting a new tag; `skip-existing: true` makes the retry safe even if part of an
+upload had landed.
+
+**Remaining, none of it blocking and all of it after-the-release by design:** the Snellius site
+package (RELEASE.md Phase F), the LUMI one (Phase G, still untested on AMD hardware), confirming
+each Zenodo deposition minted a version DOI, and re-rendering the example gallery (Phase I) —
+`~/Codes/peclet-examples` holds around thirty local commits written against this API and pushes
+nothing until the wheels exist, which they now do.
+
+**Deferred with a reason, not forgotten:** the interstitial-vs-superficial drag normalisation is
+still the one unresolved entry in DECISIONS.md, so **no permeability number is published in the
+1.0.0 notes**; morton's AVX-512 batch kernels were not re-validated for this HEAD and the notes say
+so; and amr's CUDA `python_state_hash` skip is a quoting defect in the build-toolchain LABEL that
+loses its embedded spaces through the Kokkos launch compiler.
