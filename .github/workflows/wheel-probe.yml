@@ -40,7 +40,7 @@ on:
       os_list:
         description: 'JSON array of runners to use'
         type: string
-        default: '["windows-latest", "macos-latest", "macos-13", "ubuntu-24.04-arm"]'
+        default: '["windows-latest", "macos-latest", "ubuntu-24.04-arm"]'
       pkg_list:
         description: 'JSON array of packages to build'
         type: string
@@ -59,10 +59,6 @@ jobs:
       matrix:
         os: ${{ fromJSON(inputs.os_list) }}
         pkg: ${{ fromJSON(inputs.pkg_list) }}
-    env:
-      # C++20 against AppleClang's libc++ wants a recent target; the shipping morton wheel asks for
-      # 10.13, which the Kokkos packages would not survive. A probe value, not a decision.
-      MACOSX_DEPLOYMENT_TARGET: "13.0"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -71,6 +67,33 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+
+      # Homebrew builds for the RUNNER's macOS, and delocate then refuses the wheel: "libomp.dylib
+      # has a minimum target of 26.0" against a wheel tagged 13.0. Take the OLDEST bottle Homebrew
+      # still publishes, and tag the wheel to match — that is the lowest floor actually available.
+      - name: libomp built for an older macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -eu
+          [ "$(uname -m)" = arm64 ] && PREF="arm64_" || PREF=""
+          NAMES="ventura sonoma sequoia tahoe"
+          VERS="13.0 14.0 15.0 26.0"
+          i=1
+          for NAME in $NAMES; do
+            TAG="${PREF}${NAME}"
+            VER=$(echo "$VERS" | cut -d' ' -f$i); i=$((i + 1))
+            if brew fetch --force --bottle-tag="$TAG" libomp >/dev/null 2>&1; then
+              brew install "$(brew --cache --bottle-tag="$TAG" libomp)"
+              echo "OpenMP_ROOT=$(brew --prefix)/opt/libomp" >> "$GITHUB_ENV"
+              echo "MACOSX_DEPLOYMENT_TARGET=$VER" >> "$GITHUB_ENV"
+              echo "libomp from bottle $TAG; wheel floor macOS $VER"
+              exit 0
+            fi
+            echo "no bottle $TAG"
+          done
+          echo "::error::no libomp bottle for any known macOS tag"
+          exit 1
 
       # Everything cibuildwheel needs, assembled in one place: CIBW_ENVIRONMENT *replaces*
       # [tool.cibuildwheel.environment] rather than merging into it, and the _MACOS variant would
@@ -81,7 +104,7 @@ jobs:
           set -eu
           OMP=""
           if [ "$RUNNER_OS" = "macOS" ]; then
-            OMP="OpenMP_ROOT=$(brew --prefix)/opt/libomp"      # /opt/homebrew on arm64, /usr/local on x86-64
+            OMP="OpenMP_ROOT=${OpenMP_ROOT}"                   # set by the libomp step above
           fi
           if [ "${{ matrix.pkg }}" = "morton" ]; then
             echo "CIBW_ENVIRONMENT=$OMP CMAKE_ARGS=\"-DMORTON_ENABLE_BMI2=OFF -DMORTON_ENABLE_RUNTIME_DISPATCH=ON\"" >> "$GITHUB_ENV"
@@ -98,13 +121,6 @@ jobs:
           CIBW_BUILD: "cp312-*"
           CIBW_BUILD_VERBOSITY: "1"
           CIBW_SKIP: "*-win32 *_i686 *-musllinux* pp*"
-          # NOT plain `brew install libomp`: Homebrew builds for the RUNNER's macOS, and delocate
-          # then refuses the wheel -- "libomp.dylib has a minimum target of 26.0" against a wheel
-          # tagged 13.0. Take the Ventura (13.x) bottle explicitly, which is what scikit-learn does.
-          CIBW_BEFORE_ALL_MACOS: >-
-            TAG=$([ "$(uname -m)" = arm64 ] && echo arm64_ventura || echo ventura) &&
-            brew fetch --force --bottle-tag=$TAG libomp &&
-            brew install $(brew --cache --bottle-tag=$TAG libomp)
 
       - name: What came out
         if: always()
