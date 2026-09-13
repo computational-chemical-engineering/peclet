@@ -763,6 +763,26 @@ green for all five packages.
 queues forever), so it could only be cross-compiled and never tested; Intel Macs build from the sdist,
 which the probe showed works. musllinux — never tried. win_arm64 — no runner, nobody asking.
 
+**Full-matrix validation** (run 34771289649, `peclet-flow`, every interpreter on every runner): 20
+wheels, all green, and each one reports the backend this section claims —
+
+| runner | wheels | `peclet.flow.execution_space` |
+|---|---|---|
+| ubuntu-latest | cp310–cp314 `manylinux_2_28_x86_64` | `OpenMP` |
+| ubuntu-24.04-arm | cp310–cp314 `manylinux_2_28_aarch64` | `OpenMP` |
+| windows-latest | cp310–cp314 `win_amd64` | `Serial` |
+| macos-latest | cp310–cp314 `macosx_11_0_arm64` | `Serial` |
+
+Free-threaded CPython built and passed too (`cp314t` on all four) because the probe's selector was
+`cp3*`; the release selector is `cp314-*`, which excludes it. nanobind needs an explicit
+`mod_gil_not_used()` before that is worth shipping — a separate decision, not this cycle's.
+
+**Still unexercised: the release workflow itself.** The matrix above was measured through
+`wheel-probe.yml`, which runs the same cibuildwheel against the same pyproject but not the sdist,
+artifact-collection or publish jobs around it. Dispatch one `release.yml` manually before tagging —
+`workflow_dispatch` builds everything and the publish job is gated on a tag push, so nothing reaches
+PyPI.
+
 **Delete `wheel-probe.yml`** once a real release has gone out on this matrix; it exists only to
 answer a question that is now answered.
 
