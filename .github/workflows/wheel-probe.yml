@@ -1,0 +1,89 @@
+name: Wheel probe
+
+# THROWAWAY. Does the peclet CPU family build outside Linux x86-64?
+#
+# 1.0.0 ships manylinux_2_28 x86-64 only, because that is the only runner the release workflows have
+# ever used — never because anyone tried the others and found they failed. A Windows user's
+# `pip install peclet` therefore falls back to the sdists and dies in CMake (RELEASE_PREP section
+# 11.1). Before committing to a release matrix, find out what actually breaks: cibuildwheel for ONE
+# interpreter (cp312) per package per runner, `fail-fast: false`, so every cell answers for itself.
+#
+# What each cell is asking:
+#   windows-latest    -> MSVC 19.4x: does Kokkos (and ArborX, for dem) compile, and is MSVC's
+#                        OpenMP 2.0 enough for the Kokkos OpenMP backend?
+#   macos-latest      -> arm64 + AppleClang: does it compile, and is there an OpenMP at all
+#                        (AppleClang ships none; the fallback would be a Serial wheel)?
+#   macos-13          -> the same on x86-64. If the label is retired the cell fails instantly,
+#                        which is itself the answer about that target.
+#   ubuntu-24.04-arm  -> manylinux aarch64: Raspberry Pi, Graviton, an ARM Chromebook's Linux
+#                        container. Same toolchain as the shipping wheels, different ISA.
+#
+# `-DPECLET_ALLOW_UNSUPPORTED_PLATFORM=ON` is required: the guard added on 2026-09-13 stops a
+# non-Linux configure on purpose, and this workflow is the one caller that wants past it.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: ${{ matrix.pkg }} · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, macos-13, ubuntu-24.04-arm]
+        pkg: [morton, flow, pnm, voro, dem]
+    env:
+      # C++20 against AppleClang's libc++ wants a recent target; the shipping morton wheel asks for
+      # 10.13, which the Kokkos packages would not survive. A probe value, not a decision.
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true          # the packages are submodules; each is its own repo
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # CIBW_ENVIRONMENT *replaces* [tool.cibuildwheel.environment] rather than merging into it, so
+      # each package's own settings have to be restated here alongside the guard bypass.
+      - name: Environment for this package
+        shell: bash
+        run: |
+          if [ "${{ matrix.pkg }}" = morton ]; then
+            echo 'CIBW_ENVIRONMENT=CMAKE_ARGS="-DMORTON_ENABLE_BMI2=OFF -DMORTON_ENABLE_RUNTIME_DISPATCH=ON"' >> "$GITHUB_ENV"
+          else
+            echo 'CIBW_ENVIRONMENT=PECLET_VENDOR_DEPS=ON CMAKE_ARGS="-DPECLET_ALLOW_UNSUPPORTED_PLATFORM=ON"' >> "$GITHUB_ENV"
+          fi
+
+      - uses: pypa/cibuildwheel@v3.2.1
+        with:
+          package-dir: ${{ matrix.pkg }}
+        env:
+          CIBW_BUILD: "cp312-*"
+          CIBW_BUILD_VERBOSITY: "1"
+
+      - name: What came out
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### ${{ matrix.pkg }} · ${{ matrix.os }}"
+            if ls wheelhouse/*.whl >/dev/null 2>&1; then
+              for w in wheelhouse/*.whl; do echo "- BUILT \`$(basename "$w")\`"; done
+            else
+              echo "- no wheel"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: probe-${{ matrix.pkg }}-${{ matrix.os }}
+          path: wheelhouse/*.whl
+          if-no-files-found: ignore
