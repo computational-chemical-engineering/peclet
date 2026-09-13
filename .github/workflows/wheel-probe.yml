@@ -37,6 +37,14 @@ on:
         description: 'extra -D flags for the vendored Kokkos configure (PECLET_VENDOR_KOKKOS_ARGS)'
         type: string
         default: ''
+      os_list:
+        description: 'JSON array of runners to use'
+        type: string
+        default: '["windows-latest", "macos-latest", "macos-13", "ubuntu-24.04-arm"]'
+      pkg_list:
+        description: 'JSON array of packages to build'
+        type: string
+        default: '["morton", "flow", "pnm", "voro", "dem"]'
 
 permissions:
   contents: read
@@ -49,8 +57,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, macos-13, ubuntu-24.04-arm]
-        pkg: [morton, flow, pnm, voro, dem]
+        os: ${{ fromJSON(inputs.os_list) }}
+        pkg: ${{ fromJSON(inputs.pkg_list) }}
     env:
       # C++20 against AppleClang's libc++ wants a recent target; the shipping morton wheel asks for
       # 10.13, which the Kokkos packages would not survive. A probe value, not a decision.
@@ -79,10 +87,8 @@ jobs:
             echo "CIBW_ENVIRONMENT=$OMP CMAKE_ARGS=\"-DMORTON_ENABLE_BMI2=OFF -DMORTON_ENABLE_RUNTIME_DISPATCH=ON\"" >> "$GITHUB_ENV"
             echo 'CIBW_TEST_COMMAND=python -m pytest {package}/bindings/python/tests -q' >> "$GITHUB_ENV"
           else
-            ARGS="-DPECLET_ALLOW_UNSUPPORTED_PLATFORM=ON"
             KK="${{ inputs.kokkos_args }}"
-            if [ -n "$KK" ]; then ARGS="$ARGS -DPECLET_VENDOR_KOKKOS_ARGS=$KK"; fi
-            echo "CIBW_ENVIRONMENT=PECLET_VENDOR_DEPS=ON $OMP CMAKE_ARGS=\"$ARGS\"" >> "$GITHUB_ENV"
+            echo "CIBW_ENVIRONMENT=PECLET_VENDOR_DEPS=ON $OMP PECLET_VENDOR_KOKKOS_ARGS=\"$KK\" CMAKE_ARGS=\"-DPECLET_ALLOW_UNSUPPORTED_PLATFORM=ON\"" >> "$GITHUB_ENV"
           fi
 
       - uses: pypa/cibuildwheel@v3.2.1
@@ -92,7 +98,13 @@ jobs:
           CIBW_BUILD: "cp312-*"
           CIBW_BUILD_VERBOSITY: "1"
           CIBW_SKIP: "*-win32 *_i686 *-musllinux* pp*"
-          CIBW_BEFORE_ALL_MACOS: "brew install libomp"
+          # NOT plain `brew install libomp`: Homebrew builds for the RUNNER's macOS, and delocate
+          # then refuses the wheel -- "libomp.dylib has a minimum target of 26.0" against a wheel
+          # tagged 13.0. Take the Ventura (13.x) bottle explicitly, which is what scikit-learn does.
+          CIBW_BEFORE_ALL_MACOS: >-
+            TAG=$([ "$(uname -m)" = arm64 ] && echo arm64_ventura || echo ventura) &&
+            brew fetch --force --bottle-tag=$TAG libomp &&
+            brew install $(brew --cache --bottle-tag=$TAG libomp)
 
       - name: What came out
         if: always()
