@@ -45,10 +45,10 @@ pip install peclet-flow     # or any single package
 ```
 
 Wheels cover **Linux** (x86-64 and aarch64), **Windows** x64 and **macOS** on Apple silicon, CPython
-3.10–3.14. Linux runs multi-threaded; Windows and macOS get the single-threaded Serial backend, since
-neither toolchain supplies an OpenMP that Kokkos accepts — use **WSL2** on Windows for the full
-multicore/CUDA build ([DEPLOYMENT.md](DEPLOYMENT.md#operating-systems-and-wheels)). The Colab link
-below needs nothing installed at all.
+3.10–3.14, all multi-threaded — OpenMP on Linux, Kokkos' C++ threads backend on the other two, since
+neither of those toolchains supplies an OpenMP that Kokkos accepts
+([DEPLOYMENT.md](DEPLOYMENT.md#operating-systems-and-wheels)). A GPU on Windows means WSL2. The Colab
+link below needs nothing installed at all.
 
 Stokes flow past a sphere in a box of side `L`, start to finish: **2.5 s on two workstation cores**, around
 half a minute on the two shared vCPUs of a free Colab runtime (it prints its own wall clock). The physical

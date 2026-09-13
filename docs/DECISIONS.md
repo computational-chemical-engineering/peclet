@@ -570,11 +570,13 @@ reading until they are settled.
 
 ## suite-wide — naming, layout, provisioning
 
-27 in force, 1 superseded — full text in [`decisions/suite-wide.md`](decisions/suite-wide.md)
+29 in force, 1 superseded — full text in [`decisions/suite-wide.md`](decisions/suite-wide.md)
 
 ### In force
 
+- **A host backend that does not size itself must be handed the thread budget**. **Rejected:** the "say nothing on an unconstrained machine" policy for every backend (neutral only for OpenMP; on Kokkos::Threads it is a silent 7x cut)  <sub>RELEASE_PREP.md:11.3</sub>
 - **All coupled methods must share one BlockDecomposer; static-only co-decomposition is rejected**. **Rejected:** "Static-only co-decomposition"  <sub>multiphysics-framework-plan.md:410</sub>
+- **Wheels for a toolchain without OpenMP ship Kokkos::Threads, not Serial**. **Rejected:** the Serial backend; clang-cl; faking OpenMP_CXX_SPEC_DATE past Kokkos' 3.0 gate; Homebrew libomp (drags the macOS floor from 11 to 26)  <sub>RELEASE_PREP.md:11.3</sub>
 - **CMake suite_require_nanobind must be a macro, not a function**. **Rejected:** implementing suite_require_nanobind as a CMake function  <sub>nanobind-zero-copy-migration.md:15</sub>
 - **Collocated default is AUTO ghost projection (in both flow and AMR), with documented fallbacks**.  <sub>collocated-attractor-campaign.md:53</sub>
 - **Convention going forward: never add cell-unit API surface; new setters take physical inputs**. **Rejected:** adding new cell-unit-only API surface  <sub>physical-units-plan.md:44</sub>

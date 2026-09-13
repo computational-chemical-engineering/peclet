@@ -88,12 +88,12 @@ Everything ships under one **`peclet` namespace** — installable parts of one f
 (or an individual `pip install peclet-flow`) just works and runs multi-threaded (`OMP_NUM_THREADS`).
 
 **Platforms:** **Linux** (x86-64 and aarch64), **Windows** x64, **macOS** on Apple silicon, CPython
-3.10–3.14. The Linux wheels are multi-threaded (OpenMP); the Windows and macOS wheels are
-single-threaded — MSVC reports OpenMP 2.0 whatever runtime you ask it for, and AppleClang ships none
-at all, so those get the Kokkos **Serial** backend. `flow.execution_space` prints which one you have.
-For multicore or GPU work on a Windows machine, install inside **WSL2** (`wsl --install`, then pip
-install in the Ubuntu shell) and you get the Linux wheel, CUDA included. An Intel Mac, or anything
-else, builds from the sdist — which works, it is just slower to install.
+3.10–3.14. All of them are multi-threaded: Linux through OpenMP, Windows and macOS through Kokkos'
+C++ threads backend, because MSVC reports OpenMP 2.0 whatever runtime you ask it for and AppleClang
+ships none at all. Same numbers either way; `flow.execution_space` prints which you have, and
+`OMP_NUM_THREADS` sets the pool on all of them. A GPU on a Windows machine means **WSL2**
+(`wsl --install`, then pip install in the Ubuntu shell) — that is the Linux wheel, CUDA included.
+An Intel Mac, or anything else, builds from the sdist: slower to install, same result.
 [**docs/DEPLOYMENT.md**](docs/DEPLOYMENT.md) has the table. (1.0.0 shipped Linux x86-64 alone.)
 
 **Quick start** — Stokes flow past a sphere in a box of side `L`, start to finish: **2.5 s on two

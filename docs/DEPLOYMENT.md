@@ -79,35 +79,48 @@ The pinned versions (Kokkos, ArborX) live in `cmake/SuiteKokkos.cmake` / `cmake/
 ## Operating systems and wheels
 
 `pip install peclet` gets a **binary wheel** on every platform below — no compiler, no CMake, no
-Kokkos. Anywhere else pip falls back to the source distribution and builds, which works but takes
-minutes and needs a C++20 toolchain.
+Kokkos — and every one of them is **multi-threaded**. Anywhere else pip falls back to the source
+distribution and builds, which works but takes minutes and needs a C++20 toolchain.
 
 | Platform | Wheel tag | Host backend | Notes |
 |---|---|---|---|
-| **Linux x86-64** | `manylinux_2_28_x86_64` | **OpenMP** (multicore) | the reference platform; also the CUDA wheels (`peclet-cu13`) |
-| **Linux aarch64** | `manylinux_2_28_aarch64` | **OpenMP** (multicore) | Graviton, Raspberry Pi, an ARM Chromebook's Linux container |
-| **Windows x64** | `win_amd64` | **Serial** (one thread) | MSVC defines `_OPENMP` as 200203 whatever runtime you select, and Kokkos requires OpenMP ≥ 3.0 |
-| **macOS arm64** | `macosx_11_0_arm64` | **Serial** (one thread) | AppleClang ships no OpenMP; floor is macOS 11, so every Apple-silicon Mac |
+| **Linux x86-64** | `manylinux_2_28_x86_64` | **OpenMP** | the reference platform; also the CUDA wheels (`peclet-cu13`) |
+| **Linux aarch64** | `manylinux_2_28_aarch64` | **OpenMP** | Graviton, Raspberry Pi, an ARM Chromebook's Linux container |
+| **Windows x64** | `win_amd64` | **Threads** | Kokkos' C++ `std::thread` backend: MSVC defines `_OPENMP` as 200203 whatever runtime you select, and Kokkos requires OpenMP ≥ 3.0 |
+| **macOS arm64** | `macosx_11_0_arm64` | **Threads** | AppleClang ships no OpenMP; floor is macOS 11, so every Apple-silicon Mac |
 | Intel Mac, musl, anything else | — | — | source build from the sdist |
 
 CPython **3.10 – 3.14** (`peclet-morton` from 3.9). Free-threaded builds (`cp313t`, `cp314t`) are not
-built.
+shipped.
 
-**`execution_space` tells you what you got** — `peclet.flow.execution_space`, and the same attribute
-on `dem`, `voro` and `pnm`. The quick start prints it. `Serial` is not a failure; it is one thread.
+**The backend changes nothing numerical.** Same discretization, same solvers, same answers — the
+quick start returns k = 1.2407e-01 in 14 steps on all three backends. What differs is how the host
+loop is parallelized. `peclet.flow.execution_space` (and the same attribute on `dem`, `voro`, `pnm`)
+tells you which one you have; the quick start prints it.
 
-**Want multicore or a GPU on a Windows machine?** Install inside **WSL2** — `wsl --install`, then
+**Setting the thread count.** `OMP_NUM_THREADS` works on every backend — on a Threads or Serial build
+peclet reads it itself, since Kokkos reads only `KOKKOS_NUM_THREADS` and no OpenMP runtime is there to
+pick it up. Either variable will do.
+
+peclet sets the pool size for you on the Threads backend, because Kokkos' own default there is a
+single thread (it wants hwloc, which the wheels do not carry). Measured on 48 cores, the quick start
+runs in 4.42 s on one thread, **0.64 s on 24** and 1.02 s on all 48 — so the backend scales, and
+using every logical core is not the best setting. If you care, measure: `OMP_NUM_THREADS` at about
+your physical core count is a good starting point.
+
+**Want a GPU on a Windows machine?** Install inside **WSL2** — `wsl --install`, then
 `pip install peclet` in the Ubuntu shell. You get the Linux wheel, OpenMP and all, and an NVIDIA GPU
 is reachable through the Windows driver, so `peclet-cu13` works there too.
 
-**Why Serial on Windows and macOS rather than no wheel at all.** Measured, 2026-09-13: peclet's own
-C++ compiles on both (MSVC 19.51 with `/std:c++20`, AppleClang 21 with `-std=gnu++20`), and so does
-Kokkos 5.1.1. Only the *host parallel backend* is unavailable, for toolchain reasons outside this
-project. A single-threaded wheel that installs in seconds beats a multi-threaded one that does not
-exist — and on macOS it also keeps the floor at macOS 11, where a bundled libomp would force macOS 26
-(Homebrew publishes only a Tahoe bottle today). The choice is one line in each package's
-`cmake/PecletDeps.cmake`, which asks `find_package(OpenMP 3.0)` and falls back; a toolchain that
-grows a usable OpenMP picks it up with no change here.
+**Why not OpenMP on Windows and macOS.** Measured, 2026-09-13: peclet's own C++ compiles on both
+(MSVC 19.51 with `/std:c++20`, AppleClang 21 with `-std=gnu++20`), and so does Kokkos 5.1.1. Only the
+OpenMP *runtime* is unavailable — MSVC's `_OPENMP` macro is pinned at 200203 even under
+`/openmp:llvm`, which is a version gate rather than a capability one, and AppleClang has no OpenMP to
+offer. Homebrew's libomp would fix macOS at the cost of dragging the wheel floor from macOS 11 to 26
+(only a Tahoe bottle is published), and `coupling` importing flow + dem would then load two copies of
+it. The C++ threads backend needs none of that. Each package's `cmake/PecletDeps.cmake` asks
+`find_package(OpenMP 3.0)` and falls back on its own, so a toolchain that grows a usable OpenMP is
+picked up with no change here.
 
 ## Installing the Python packages
 

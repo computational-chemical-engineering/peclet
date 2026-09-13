@@ -786,6 +786,65 @@ PyPI.
 **Delete `wheel-probe.yml`** once a real release has gone out on this matrix; it exists only to
 answer a question that is now answered.
 
+### 11.3 Threads, not Serial, where there is no OpenMP (2026-09-13)
+
+§11.2 shipped Serial to Windows and macOS because neither toolchain supplies an OpenMP that Kokkos
+accepts. That was the wrong stopping point: **Kokkos' C++ `std::thread` backend needs no OpenMP
+runtime at all**, and the suite is indifferent to which host backend it gets — exactly one line in
+eight repositories names `Kokkos::OpenMP`, and it is `#ifdef`-guarded (`core/.../grid_halo.hpp`, an
+MPI-only early-out, which now names `Kokkos::Threads` as well).
+
+Measured, quick start at N = 32 on the wheel each runner built (runs 34784791863 / 34784795953).
+**Every run returned 14 steps and k = 1.2407e-01** — the backend changes nothing numerical:
+
+| platform | vCPU | backend | 1 thread | 2 threads | all threads |
+|---|---|---|---|---|---|
+| Linux | 4 | OpenMP | 5.73 s | **2.99 s** | 3.04 s |
+| Windows | 4 | **Threads** | 6.74 s | **3.87 s** | 6.79 s |
+| Windows | 4 | Serial | 6.37 s | 6.37 s | 6.34 s |
+| macOS | 3 | **Threads** | 3.85 s | **3.00 s** | 3.91 s |
+| macOS | 3 | Serial | 5.12 s | 4.99 s | 5.72 s |
+
+**DECISION — Windows and macOS wheels ship `Kokkos::Threads`.** Supersedes the Serial decision in
+§11.2, which stood for about four hours. What changed: Serial was chosen against *OpenMP* and its
+vendored-libomp costs, and the third option was not on the table. Threads is **1.65x faster than
+Serial** on both platforms at the same numbers (3.87 vs 6.37 on Windows, 3.00 vs 4.99 on macOS),
+needs no bundled runtime, asserts no version the build cannot check, and keeps the macOS wheel floor
+at 11. Rejected, unchanged: clang-cl (real OpenMP 5.0, but swaps the compiler and bundles
+`libomp.dll`) and pre-setting `OpenMP_CXX_SPEC_DATE` to walk MSVC's `_OPENMP = 200203` past Kokkos'
+3.0 gate (asserting a version nothing verifies).
+
+**The "all threads" column above is mislabelled, and the reason matters.** Those runs left the thread
+count *unset*, and on both platforms they came back at exactly the one-thread time (6.79 vs 6.74 s;
+3.91 vs 3.85 s). That is not a spin-wait collapse — it is the default. `Kokkos::Threads` asks hwloc
+for the topology and **falls back to one thread when hwloc is absent**
+(`Kokkos_Threads_Instance.cpp:487`), and hwloc is absent in every peclet wheel. On 48 real cores, the
+same wheel:
+
+| threads | 1 | 2 | 4 | 8 | 16 | 24 | 48 | *unset* |
+|---|---|---|---|---|---|---|---|---|
+| best of 3 | 4.420 s | 2.314 | 1.240 | 0.905 | 0.741 | **0.644** | 1.023 | **4.428** |
+
+So the backend scales perfectly well — **6.9x on 24 cores for a 32³ problem** — and ships at 1/7th of
+it unless something supplies a count. OpenMP never had this problem: its default is the whole
+machine.
+
+**Ordering, and what it means for the wheels.** The thread-count fix lives in `peclet-core`, which
+the wheel builds pull by *tag* (`PECLET_CORE_TAG`, FetchContent). So it reaches a Windows or macOS
+wheel only after step 1 of this cycle — core tagged v1.0.1 — and step 2, the repin. Until then a
+Threads wheel built from `main` is single-threaded. Verified locally instead, end to end on a real
+Threads wheel built against the branch: the quick start's default goes **4.428 s → 0.899 s** (4.9x,
+k unchanged at 1.24075e-01), `OMP_NUM_THREADS=4` gives 1.209 s and `KOKKOS_NUM_THREADS=8` gives
+0.890 s — both honoured, as before.
+
+**Consequence, fixed in core `36966ad`:** `defaultHostThreads()` now asks whether the backend sizes
+*itself*. OpenMP does (its runtime reads `OMP_NUM_THREADS`, its default is the machine), so its
+behaviour is unchanged in every case, including the inertness on an unconstrained workstation that
+the whole file exists to preserve. Threads and Serial do neither, so they are handed the budget
+outright. Without that, every Windows and macOS wheel would have shipped single-threaded and said
+nothing about it — the same shape of bug as SCALING_ISSUES issue 7, and this cycle exists for that
+one.
+
 **Also in this cycle, if cheap:** `peclet-core` and `peclet-amr` publish an **sdist only**. That is
 why `pip install peclet-core` starts a Kokkos source build, and why the quick-start CI job had to
 stop installing them (it hung for 20 minutes on the first attempt). Either ship wheels or say so in

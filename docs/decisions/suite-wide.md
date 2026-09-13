@@ -371,3 +371,44 @@ Do not reverse an entry here without recording a new decision that supersedes it
     1. **NOMINSIZE** on EVERY `nanobind_add_module` for Kokkos modules — nanobind's default `-Os` is rejected by nvcc (`nvcc fatal: 's': expected a number`). Without it NO nanobind Kokkos module builds on CUDA.
 - rejected: nanobind's default -Os compile flag for Kokkos CUDA modules
 - why: "nvcc fatal: 's': expected a number" — nvcc rejects -Os
+
+### Wheels for a toolchain without OpenMP ship Kokkos::Threads, not Serial
+- area: suite-wide
+- source: RELEASE_PREP.md:11.3
+- decided: 2026-09-13
+- status: settled
+- quote: |
+    Windows and macOS wheels ship `Kokkos::Threads`. Threads is 1.65x faster than Serial on both
+    platforms at identical numbers (3.87 vs 6.37 s on Windows, 3.00 vs 4.99 s on macOS; k =
+    1.2407e-01 and 14 steps in every run), needs no bundled runtime, asserts no version the build
+    cannot check, and keeps the macOS wheel floor at 11.
+- rejected: the Kokkos Serial backend (single-threaded, and it was chosen only because the third
+    option was not on the table); clang-cl (real OpenMP 5.0, but swaps the compiler for the whole
+    Windows build and bundles libomp.dll); pre-setting OpenMP_CXX_SPEC_DATE to walk MSVC's
+    _OPENMP = 200203 past Kokkos' OpenMP >= 3.0 gate (asserts a version nothing verifies); Homebrew's
+    libomp on macOS (only a tahoe bottle is published, which drags the wheel floor from macOS 11 to
+    26, and `coupling` importing flow + dem would load two copies of it)
+- why: MSVC defines _OPENMP as 200203 whatever runtime is selected -- measured with /openmp:llvm
+    actually reaching the compiler -- and AppleClang ships no OpenMP at all, so the gate is a macro
+    version rather than a capability. Kokkos' C++ std::thread backend needs no OpenMP runtime, and
+    the suite is indifferent to which host space it gets: exactly one line in eight repositories
+    names Kokkos::OpenMP, and it is #ifdef-guarded.
+
+### A host backend that does not size itself must be handed the thread budget
+- area: suite-wide
+- source: RELEASE_PREP.md:11.3
+- decided: 2026-09-13
+- status: settled
+- quote: |
+    `Kokkos::Threads` asks hwloc for the topology and falls back to ONE thread when hwloc is absent
+    (Kokkos_Threads_Instance.cpp:487) -- and it is absent in every peclet wheel. Measured on 48
+    cores: unset, the quick start takes 4.43 s, exactly its one-thread time, against 0.64 s at 24
+    threads. defaultHostThreads() therefore asks whether the backend sizes ITSELF and hands it the
+    budget when it does not.
+- rejected: keeping the "say nothing on an unconstrained machine" policy for every backend (it is
+    neutral only for OpenMP, whose own default is the whole machine; on Threads it is a silent 7x
+    cut); capping the default below the CPU budget on the strength of 3-4 vCPU CI numbers
+- why: OpenMP reads OMP_NUM_THREADS through its runtime and defaults to the machine, so peclet can
+    stay quiet; Kokkos itself reads only KOKKOS_NUM_THREADS, so on Threads and Serial neither the
+    user's variable nor a sensible default reaches anything unless peclet supplies it. Verified end
+    to end on a Threads wheel: default 4.428 s -> 0.899 s, same k, both variables still honoured.
