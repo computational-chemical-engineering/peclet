@@ -97,6 +97,42 @@ jobs:
           CIBW_BUILD_VERBOSITY: "1"
           CIBW_SKIP: "*-win32 *_i686 *-musllinux* pp*"
 
+      # Does the backend this wheel carries actually go faster with more threads? The quick start
+      # from README.md, on the wheel just built, at 1 / 2 / all threads. A Serial wheel will report
+      # the same time three times, which is the point of asking.
+      - name: Time the quick start on the wheel just built
+        if: matrix.pkg == 'flow'
+        shell: bash
+        run: |
+          set -eu
+          python -m pip install --quiet numpy wheelhouse/*.whl
+          cat > qs.py <<'PY'
+          import os, sys, time
+          import numpy as np
+          import peclet.flow as flow
+          L, R, rho, mu, F, N = 1.0, 0.2, 1.0, 0.1, 1.0, 32
+          s = flow.Solver((N, N, N), extent=(L, L, L))
+          x, y, z = s.cell_centers()
+          X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
+          sdf = np.sqrt((X - L/2)**2 + (Y - L/2)**2 + (Z - L/2)**2) - R
+          s.set_rho(rho); s.set_mu(mu); s.set_dt(1e3)
+          s.set_body_force((F, 0.0, 0.0))
+          s.set_solid(sdf, cutcell_pressure=True)
+          t0, u = time.perf_counter(), []
+          for it in range(200):
+              s.step(); u.append(s.get_u().mean())
+              if it >= 3 and abs(u[-1] - u[-4]) < 1e-3 * abs(u[-1]):
+                  break
+          dt = time.perf_counter() - t0
+          k = mu * s.get_u().mean() / F
+          print(f"RESULT {flow.execution_space:8s} threads={os.environ.get('KOKKOS_NUM_THREADS','all'):3s} "
+                f"cpus={os.cpu_count()} steps={it+1} {dt:6.2f}s k={k:.4e}")
+          PY
+          for n in 1 2 ""; do
+            if [ -n "$n" ]; then export KOKKOS_NUM_THREADS="$n"; else unset KOKKOS_NUM_THREADS; fi
+            python qs.py
+          done
+
       - name: What came out
         if: always()
         shell: bash
