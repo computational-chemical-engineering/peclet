@@ -76,6 +76,22 @@ KOKKOS_ARCH=HOPPER90 CUDA_ARCH=90 tools/bootstrap_deps.sh nvidia-cuda   # Snelli
 The pinned versions (Kokkos, ArborX) live in `cmake/SuiteKokkos.cmake` / `cmake/SuiteArborX.cmake` — see
 [Portability](PORTABILITY.md).
 
+## Operating system: Linux x86-64
+
+Everything on this page assumes **Linux on x86-64**, and that is not a soft assumption. The wheels
+are `manylinux_2_28` (the vendored Kokkos build wants GCC 12+ for C++20), the containers are Linux,
+and no member of either family — CPU or CUDA — publishes a Windows or macOS wheel. pip answers a
+missing wheel by falling back to the *source distribution*, so on those systems `pip install peclet`
+quietly turns into a CMake build and dies inside it; from 1.0.1 on it dies with a message naming the
+operating system, instead of CMake's "No CMAKE_CXX_COMPILER could be found".
+
+| Host | What to do |
+|---|---|
+| **Linux x86-64** | `pip install peclet` — the rest of this page |
+| **Windows** | Install inside **WSL2**: `wsl --install`, then `pip install peclet` in the Ubuntu shell. An NVIDIA GPU is reachable from WSL2 through the Windows driver, so `peclet-cu13` works there too. |
+| **macOS** | Run a Linux container (`containers/`, or any Docker/Podman image with Python 3.10+). A native build is untested: Kokkos itself is portable, Apple's clang ships without OpenMP, and nothing in CI exercises it. |
+| **Anything, nothing installed** | The [quick-start notebook in Colab](https://colab.research.google.com/github/computational-chemical-engineering/peclet/blob/main/docs/notebooks/quickstart_sphere.ipynb) |
+
 ## Installing the Python packages
 
 ```bash

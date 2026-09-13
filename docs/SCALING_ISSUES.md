@@ -292,6 +292,14 @@ So: ≥35x, unbounded, and silent. It is the same failure the suite already reco
 pool on a 48-core host (`CLAUDE.md`, "a measured hour-long trap") — but a container user meets it on
 their first run, with no way to know.
 
+Re-measured 2026-09-13 against the **retuned** quick start (N = 32, 14 steps, 2.5 s with the pool
+bounded): unbounded under the same 2-CPU quota it again **did not finish in 15 minutes**, so there
+the collapse is ≥360x. Shrinking the problem does not shrink the trap — it deepens it, because the
+barrier count per unit of work is what the spinning pool taxes. From the same session, the other
+half of the shape: an *affinity* oversubscription of 2 threads on 1 CPU costs 12 % against 1 thread
+on 1 CPU, and 4 threads on 2 CPUs cost 35 %. This is a large-ratio failure, not a cliff you fall off
+at the first thread too many.
+
 **Done:** the Colab notebook's bootstrap cell now reads the real budget out of
 `/sys/fs/cgroup/cpu.max` (v1 fallback, then `sched_getaffinity`) and sets `OMP_NUM_THREADS` and
 `OMP_PROC_BIND` before peclet is imported; `README.md` and `docs/index.md` carry the warning with

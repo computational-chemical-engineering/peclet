@@ -660,10 +660,60 @@ requests nothing and the build is inert — that is the property to state in the
   `systemd-run --user --scope -p CPUQuota=200% <probe>` must report `usable=2` with 48 CPUs visible,
   `0` threads requested when unconstrained, and `0` when `OMP_NUM_THREADS` is set.
 - **End-to-end, on a rebuilt flow wheel:** the quick start under a 2-CPU quota with all CPUs visible
-  must finish in ~26 s. At 1.0.0 it did not finish in 15 minutes. This is the number the release
-  exists for; do not tag without it.
+  must finish in **~2.5 s** — the retuned N = 32 page (§11.1); the N = 48 page it replaces was ~26 s.
+  At 1.0.0, with the pool unbounded, *neither* finishes in 15 minutes (both measured). This is the
+  number the release exists for; do not tag without it.
 - `tools/release/check_docs_snippets.py --installed --run` against the published 1.0.1 wheels — the
   `quickstart.yml` job does this automatically as a `needs: publish` job of the tag.
+
+### 11.1 What the first outside reports turned up (2026-09-13)
+
+A Windows laptop and a Colab runtime, both on the published 1.0.0 wheels. Two separate problems,
+one release.
+
+**Windows: `pip install peclet` ends inside CMake.** There is no Windows wheel and no macOS wheel;
+pip answers a missing wheel by falling back to the *sdist*, and the source build then dies with
+"No CMAKE_CXX_COMPILER could be found" — a message about a compiler, when the answer is "not this
+operating system". Nothing on the PyPI page, in `README.md` or in `DEPLOYMENT.md` had said Linux.
+Fixed: a pre-`project()` guard in flow, dem, pnm, voro, core, amr and coupling (commit *say "Linux
+only" before CMake says "no compiler"*) naming WSL2, a Linux container and Colab, with
+`-DPECLET_ALLOW_UNSUPPORTED_PLATFORM=ON` as the escape hatch; `Operating System :: POSIX :: Linux`
+in every package's classifiers (umbrella metapackages included); an "Operating system: Linux
+x86-64" section in `docs/DEPLOYMENT.md` and a paragraph in `README.md` / `docs/index.md`. **The
+guard ships inside the sdists, so it reaches a Windows user only at 1.0.1** — the docs reach them
+today.
+
+**Colab: the quick start took ~5 minutes, not the promised half-minute.** Not the thread-pool trap
+of issue 7: the bootstrap cell bounded the pool correctly (it printed `OMP_NUM_THREADS = 2`) and
+the run returned the same 42 steps and the same k as CI. The promise was simply written against
+the wrong machine — the N = 48 solve is 25.6 s on two Threadripper 5965WX cores and ~35 s on a
+two-core GitHub runner, and a free Colab runtime's two shared vCPUs are several times slower again.
+So the quick start was retuned (docs-only, live now):
+
+| | 1.0.0 | now |
+|---|---|---|
+| resolution | N = 48 | **N = 32** |
+| stop rule | increment < 1e-5, single step | **three-step window < 1e-3** |
+| steps to steady | 42 | **14** |
+| solve, two cores | 25.6 s | **2.5 s** |
+| permeability k | 1.23512e-01 | **1.2407e-01** |
+
+Both k values sit within 0.2 % of what their own grid gives when iterated to convergence (N = 32 →
+0.123885, N = 48 → 0.123495 at 200 steps), so the cheap run is not the less honest one; `N` is
+still the knob, and the page now says what the finer grids cost. The single-step increment test was
+the worse half of the old bill: at N = 32 it fires at 13 steps for tol 1e-4 **and** for 3e-5, and
+only at 43 for 1e-5, because the increment dips through the tolerance on the way down. The
+three-step window does not have that failure mode at any N tested.
+
+Two measurements from the diagnosis, worth keeping:
+
+- **Mild oversubscription is cheap.** 2 OpenMP threads on 1 CPU (affinity) cost 12 % against 1
+  thread on 1 CPU; 4 threads on 2 CPUs cost 35 %. The >=35x collapse of issue 7 needs a *large*
+  ratio (48 visible, 2 granted) — a slightly-too-big pool is not a cliff.
+- **Per-cell step cost is flat to N = 48 and doubles at N = 64**: 5.6 / 5.6 / 5.5 / 10.4 µs per cell
+  per step at N = 24 / 32 / 48 / 64 on two cores, while the steps to steady go 13 / 14 / 31 / 51.
+  N = 64 therefore costs ~80x N = 32, not the 8x the cell count suggests. Unexplained — a candidate
+  for `SCALING_ISSUES.md` if it reproduces at scale or on a GPU.
 
 **Also in this cycle, if cheap:** `peclet-core` and `peclet-amr` publish an **sdist only**. That is
 why `pip install peclet-core` starts a Kokkos source build, and why the quick-start CI job had to

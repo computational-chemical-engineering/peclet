@@ -44,13 +44,21 @@ pip install peclet-cu13     # the same family as CUDA wheels (NVIDIA driver only
 pip install peclet-flow     # or any single package
 ```
 
-Stokes flow past a sphere in a box of side `L`, start to finish (about half a minute on two cores). The
-physical problem is stated in your own units and `N` sets the resolution, so a grid-refinement study is one
-number away. Run it as is, or open the same steps as a notebook in Colab — the first cell installs the wheels:
+The wheels are manylinux x86-64, CPU and CUDA alike. On **Windows** install inside WSL2, on **macOS**
+use a Linux container — pip otherwise falls back to a source build and stops in CMake
+([DEPLOYMENT.md](DEPLOYMENT.md#operating-system-linux-x86-64)). The Colab link below needs neither.
+
+Stokes flow past a sphere in a box of side `L`, start to finish: **2.5 s on two workstation cores**, around
+half a minute on the two shared vCPUs of a free Colab runtime (it prints its own wall clock). The physical
+problem is stated in your own units and `N` sets the resolution, so a grid-refinement study is one number
+away — at a price: N = 48 is eight times the work of N = 32. Run it as is, or open the same steps as a
+notebook in Colab — the first cell installs the wheels:
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/computational-chemical-engineering/peclet/blob/main/docs/notebooks/quickstart_sphere.ipynb)
 
 ```python
+import time
+
 import numpy as np
 import peclet.flow as flow
 
@@ -58,7 +66,7 @@ import peclet.flow as flow
 L, R = 1.0, 0.2              # side of the periodic box and radius of the sphere at its centre
 rho, mu = 1.0, 0.1           # fluid density and viscosity
 F = 1.0                      # driving pressure gradient along x (force per unit volume)
-N = 48                       # cells per side: change this for a grid-refinement study
+N = 32                       # cells per side: change this for a grid-refinement study
 
 s = flow.Solver((N, N, N), extent=(L, L, L))                    # a periodic box: a cubic lattice of spheres
 s.set_rho(rho); s.set_mu(mu); s.set_dt(1e3)                    # every input physical; a large dt marches
@@ -69,26 +77,27 @@ X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
 sdf = np.sqrt((X - L/2)**2 + (Y - L/2)**2 + (Z - L/2)**2) - R  # signed distance, < 0 inside the sphere
 s.set_solid(sdf, cutcell_pressure=True)                        # no-slip cut-cell immersed boundary
 
-u_prev = 0.0
+t0, u_mean = time.perf_counter(), []
 for it in range(200):
     s.step()
-    u_mean = s.get_u().mean()
-    if it > 5 and abs(u_mean - u_prev) < 1e-5 * abs(u_mean):   # steady: the mean velocity has settled
-        break
-    u_prev = u_mean
+    u_mean.append(s.get_u().mean())
+    if it >= 3 and abs(u_mean[-1] - u_mean[-4]) < 1e-3 * abs(u_mean[-1]):
+        break                                                  # steady: three steps have not moved it
 u, v, w = s.get_u(), s.get_v(), s.get_w()                      # physical velocity, physical pressure
 p = s.get_p()
 k = mu * u.mean() / F                                          # Darcy permeability of the sphere lattice
-print(f"{flow.execution_space}: N = {N}, {it + 1} steps, permeability k = {k:.5e}")
+print(f"{flow.execution_space}: N = {N}, {it + 1} steps, {time.perf_counter() - t0:.1f} s, "
+      f"permeability k = {k:.4e}")
 
 # --- a look at the flow: speed and streamlines on the mid-plane through the sphere ---------------
 import matplotlib.pyplot as plt
 c = N // 2
 speed = np.hypot(u[:, :, c], v[:, :, c])
 plt.figure(figsize=(5, 4.2))
-plt.imshow(np.ma.masked_where(sdf[:, :, c] < 0, speed).T, origin="lower", cmap="viridis",
-           extent=[0, L, 0, L])
+plt.imshow(speed.T, origin="lower", cmap="viridis", extent=[0, L, 0, L])
 plt.streamplot(x, y, u[:, :, c].T, v[:, :, c].T, color="w", density=1.2, linewidth=0.6)
+th = np.linspace(0, 2 * np.pi, 180)                             # the sphere itself, drawn exactly
+plt.fill(L/2 + R*np.cos(th), L/2 + R*np.sin(th), color="w", zorder=3)
 plt.colorbar(label="|u|"); plt.title("Stokes flow past a sphere (periodic box)")
 plt.xlabel("x"); plt.ylabel("y"); plt.tight_layout()
 plt.show()
@@ -98,9 +107,9 @@ plt.show()
 
     Kokkos sizes its OpenMP pool from the CPUs it can **see**. Colab, Binder, Docker and a Slurm
     cgroup all normally show you the whole host while granting a fraction of it, so the default pool
-    spin-waits itself to a standstill — measured on the wheel above, this 26-second solve did not
-    finish in **15 minutes** on 2 CPUs of quota with 48 visible, and finished in **26.0 s** with the
-    pool bounded. Before importing peclet:
+    spin-waits itself to a standstill — measured on the wheel above, this 2.5-second solve did not
+    finish in **15 minutes** on 2 CPUs of quota with 48 visible, and took **2.5 s** with the pool
+    bounded. Before importing peclet:
 
     ```python
     import os
@@ -108,8 +117,9 @@ plt.show()
     os.environ.setdefault("OMP_PROC_BIND", "false")
     ```
 
-    The Colab notebook linked above reads the real budget out of `/sys/fs/cgroup/cpu.max` and does
-    this for you. On a workstation you do not need it: there, visible and granted are the same.
+    The Colab notebook linked above resolves this process's own cgroup and takes the tightest quota
+    on the chain — `/sys/fs/cgroup/cpu.max` is the cgroup *root*, and reads `max` on a host that does
+    limit you. On a workstation you do not need it: there, visible and granted are the same.
 
 <img src="img/quickstart_sphere.png" width="420" alt="Stokes flow past a sphere: speed and streamlines on the mid-plane">
 
