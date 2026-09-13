@@ -83,8 +83,12 @@ jobs:
           for NAME in $NAMES; do
             TAG="${PREF}${NAME}"
             VER=$(echo "$VERS" | cut -d' ' -f$i); i=$((i + 1))
-            if brew fetch --force --bottle-tag="$TAG" libomp >/dev/null 2>&1; then
-              brew install "$(brew --cache --bottle-tag="$TAG" libomp)"
+            # `brew fetch` only WARNS for a tag it cannot serve ("Bottle for tag :arm64_ventura is
+            # unavailable") and still exits 0, so the file is the test, not the exit code.
+            brew fetch --force --bottle-tag="$TAG" libomp >/dev/null 2>&1 || true
+            CACHED=$(brew --cache --bottle-tag="$TAG" libomp 2>/dev/null || true)
+            if [ -n "$CACHED" ] && [ -f "$CACHED" ]; then
+              brew install "$CACHED"
               echo "OpenMP_ROOT=$(brew --prefix)/opt/libomp" >> "$GITHUB_ENV"
               echo "MACOSX_DEPLOYMENT_TARGET=$VER" >> "$GITHUB_ENV"
               echo "libomp from bottle $TAG; wheel floor macOS $VER"
