@@ -45,6 +45,10 @@ on:
         description: 'JSON array of packages to build'
         type: string
         default: '["morton", "flow", "pnm", "voro", "dem"]'
+      cibw_build:
+        description: 'CIBW_BUILD selector (which interpreters)'
+        type: string
+        default: 'cp312-*'
 
 permissions:
   contents: read
@@ -122,7 +126,7 @@ jobs:
         with:
           package-dir: ${{ matrix.pkg }}
         env:
-          CIBW_BUILD: "cp312-*"
+          CIBW_BUILD: ${{ inputs.cibw_build }}
           CIBW_BUILD_VERBOSITY: "1"
           CIBW_SKIP: "*-win32 *_i686 *-musllinux* pp*"
 
