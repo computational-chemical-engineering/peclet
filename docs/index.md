@@ -44,9 +44,11 @@ pip install peclet-cu13     # the same family as CUDA wheels (NVIDIA driver only
 pip install peclet-flow     # or any single package
 ```
 
-The wheels are manylinux x86-64, CPU and CUDA alike. On **Windows** install inside WSL2, on **macOS**
-use a Linux container — pip otherwise falls back to a source build and stops in CMake
-([DEPLOYMENT.md](DEPLOYMENT.md#operating-system-linux-x86-64)). The Colab link below needs neither.
+Wheels cover **Linux** (x86-64 and aarch64), **Windows** x64 and **macOS** on Apple silicon, CPython
+3.10–3.14. Linux runs multi-threaded; Windows and macOS get the single-threaded Serial backend, since
+neither toolchain supplies an OpenMP that Kokkos accepts — use **WSL2** on Windows for the full
+multicore/CUDA build ([DEPLOYMENT.md](DEPLOYMENT.md#operating-systems-and-wheels)). The Colab link
+below needs nothing installed at all.
 
 Stokes flow past a sphere in a box of side `L`, start to finish: **2.5 s on two workstation cores**, around
 half a minute on the two shared vCPUs of a free Colab runtime (it prints its own wall clock). The physical

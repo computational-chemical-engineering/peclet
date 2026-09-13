@@ -715,6 +715,57 @@ Two measurements from the diagnosis, worth keeping:
   N = 64 therefore costs ~80x N = 32, not the 8x the cell count suggests. Unexplained — a candidate
   for `SCALING_ISSUES.md` if it reproduces at scale or on a GPU.
 
+### 11.2 Wheels for four platforms (probe, 2026-09-13)
+
+The Windows report above asked a question nobody had asked: *does the family build anywhere but
+Linux x86-64?* A throwaway `wheel-probe.yml` (umbrella, `workflow_dispatch`) answered it in five
+rounds — cibuildwheel for one interpreter per package per runner, `fail-fast: false`.
+
+**Result: everything builds.** Nothing in peclet's C++ was the obstacle, and nothing numerical
+changed. Kokkos 5.1.1 configures under MSVC 19.51 with `/std:c++20` and under AppleClang 21 with
+`-std=gnu++20`. Five build-system assumptions failed, each inert on Linux, each now fixed:
+
+| | what failed | fix |
+|---|---|---|
+| MSVC | `C1128: number of sections exceeded object file format limit` in the templated Kokkos TUs | `/bigobj` |
+| MSVC | `LNK2038: RuntimeLibrary MDd_DynamicDebug doesn't match MD_DynamicRelease` | a multi-config generator ignores `CMAKE_BUILD_TYPE`; the nested install needed `--config Release` |
+| MSVC | `D8021: invalid numeric argument '/Wextra'`, including inside nanobind-static | voro handed GNU warning flags to every target |
+| MSVC | `C2065: 'M_PI': undeclared identifier` ×8 | `M_PI` is POSIX, not C++; replaced by the same double (memcmp-identical to glibc's) |
+| MSVC, AppleClang | `Could NOT find OpenMP_CXX` — version 2.0, and absent, respectively | vendor Kokkos with OpenMP where `find_package(OpenMP 3.0)` succeeds, Serial where it does not |
+
+**The OpenMP finding is the one that shaped the outcome.** MSVC defines `_OPENMP` as 200203 whatever
+runtime is selected — `/openmp:llvm` reaches the LLVM runtime and CMake still reads 2.0, measured —
+and Kokkos requires 3.0. AppleClang ships no OpenMP at all, and Homebrew's libomp is a dead end for
+wheels: it now publishes only a Tahoe bottle, so delocate refuses anything with a floor below macOS
+26. So:
+
+**DECISION — Windows and macOS wheels ship the Kokkos Serial backend; Linux keeps OpenMP.**
+Rejected: vendoring a libomp built from LLVM source in every macOS wheel job (a floor of macOS 11 for
+free is worth more than threads on a laptop, and `coupling` importing flow+dem would then load two
+libomp copies); and arguing MSVC's `_OPENMP` down by pre-setting `OpenMP_CXX_SPEC_DATE`, which fakes
+a capability check. `execution_space` reports the backend, and the quick start prints it, so nobody
+is misled. Reversible in one line of each `cmake/PecletDeps.cmake`; a toolchain that grows a usable
+OpenMP is picked up with no change at all.
+
+**The shipping matrix** (each cell green on the probe, in the release configuration):
+
+| | x86-64 | aarch64 | backend |
+|---|---|---|---|
+| Linux | ✅ | ✅ | OpenMP |
+| Windows | ✅ | — (no runner) | Serial |
+| macOS | — (no Intel runner) | ✅ | Serial |
+
+CPython **3.10–3.14** (morton from 3.9). **cp314 was missing everywhere** and is the same trap from a
+different direction: a user on a current Python fell through to a source build even on Linux. Verified
+green for all five packages.
+
+**Not shipped, and why:** macOS x86-64 — GitHub has retired the Intel runners (a `macos-13` job now
+queues forever), so it could only be cross-compiled and never tested; Intel Macs build from the sdist,
+which the probe showed works. musllinux — never tried. win_arm64 — no runner, nobody asking.
+
+**Delete `wheel-probe.yml`** once a real release has gone out on this matrix; it exists only to
+answer a question that is now answered.
+
 **Also in this cycle, if cheap:** `peclet-core` and `peclet-amr` publish an **sdist only**. That is
 why `pip install peclet-core` starts a Kokkos source build, and why the quick-start CI job had to
 stop installing them (it hung for 20 minutes on the first attempt). Either ship wheels or say so in

@@ -76,21 +76,38 @@ KOKKOS_ARCH=HOPPER90 CUDA_ARCH=90 tools/bootstrap_deps.sh nvidia-cuda   # Snelli
 The pinned versions (Kokkos, ArborX) live in `cmake/SuiteKokkos.cmake` / `cmake/SuiteArborX.cmake` — see
 [Portability](PORTABILITY.md).
 
-## Operating system: Linux x86-64
+## Operating systems and wheels
 
-Everything on this page assumes **Linux on x86-64**, and that is not a soft assumption. The wheels
-are `manylinux_2_28` (the vendored Kokkos build wants GCC 12+ for C++20), the containers are Linux,
-and no member of either family — CPU or CUDA — publishes a Windows or macOS wheel. pip answers a
-missing wheel by falling back to the *source distribution*, so on those systems `pip install peclet`
-quietly turns into a CMake build and dies inside it; from 1.0.1 on it dies with a message naming the
-operating system, instead of CMake's "No CMAKE_CXX_COMPILER could be found".
+`pip install peclet` gets a **binary wheel** on every platform below — no compiler, no CMake, no
+Kokkos. Anywhere else pip falls back to the source distribution and builds, which works but takes
+minutes and needs a C++20 toolchain.
 
-| Host | What to do |
-|---|---|
-| **Linux x86-64** | `pip install peclet` — the rest of this page |
-| **Windows** | Install inside **WSL2**: `wsl --install`, then `pip install peclet` in the Ubuntu shell. An NVIDIA GPU is reachable from WSL2 through the Windows driver, so `peclet-cu13` works there too. |
-| **macOS** | Run a Linux container (`containers/`, or any Docker/Podman image with Python 3.10+). A native build is untested: Kokkos itself is portable, Apple's clang ships without OpenMP, and nothing in CI exercises it. |
-| **Anything, nothing installed** | The [quick-start notebook in Colab](https://colab.research.google.com/github/computational-chemical-engineering/peclet/blob/main/docs/notebooks/quickstart_sphere.ipynb) |
+| Platform | Wheel tag | Host backend | Notes |
+|---|---|---|---|
+| **Linux x86-64** | `manylinux_2_28_x86_64` | **OpenMP** (multicore) | the reference platform; also the CUDA wheels (`peclet-cu13`) |
+| **Linux aarch64** | `manylinux_2_28_aarch64` | **OpenMP** (multicore) | Graviton, Raspberry Pi, an ARM Chromebook's Linux container |
+| **Windows x64** | `win_amd64` | **Serial** (one thread) | MSVC defines `_OPENMP` as 200203 whatever runtime you select, and Kokkos requires OpenMP ≥ 3.0 |
+| **macOS arm64** | `macosx_11_0_arm64` | **Serial** (one thread) | AppleClang ships no OpenMP; floor is macOS 11, so every Apple-silicon Mac |
+| Intel Mac, musl, anything else | — | — | source build from the sdist |
+
+CPython **3.10 – 3.14** (`peclet-morton` from 3.9). Free-threaded builds (`cp313t`, `cp314t`) are not
+built.
+
+**`execution_space` tells you what you got** — `peclet.flow.execution_space`, and the same attribute
+on `dem`, `voro` and `pnm`. The quick start prints it. `Serial` is not a failure; it is one thread.
+
+**Want multicore or a GPU on a Windows machine?** Install inside **WSL2** — `wsl --install`, then
+`pip install peclet` in the Ubuntu shell. You get the Linux wheel, OpenMP and all, and an NVIDIA GPU
+is reachable through the Windows driver, so `peclet-cu13` works there too.
+
+**Why Serial on Windows and macOS rather than no wheel at all.** Measured, 2026-09-13: peclet's own
+C++ compiles on both (MSVC 19.51 with `/std:c++20`, AppleClang 21 with `-std=gnu++20`), and so does
+Kokkos 5.1.1. Only the *host parallel backend* is unavailable, for toolchain reasons outside this
+project. A single-threaded wheel that installs in seconds beats a multi-threaded one that does not
+exist — and on macOS it also keeps the floor at macOS 11, where a bundled libomp would force macOS 26
+(Homebrew publishes only a Tahoe bottle today). The choice is one line in each package's
+`cmake/PecletDeps.cmake`, which asks `find_package(OpenMP 3.0)` and falls back; a toolchain that
+grows a usable OpenMP picks it up with no change here.
 
 ## Installing the Python packages
 

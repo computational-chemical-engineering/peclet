@@ -87,12 +87,14 @@ Everything ships under one **`peclet` namespace** — installable parts of one f
 **Multicore CPU (OpenMP):** the compute packages ship **self-contained wheels** — `pip install peclet`
 (or an individual `pip install peclet-flow`) just works and runs multi-threaded (`OMP_NUM_THREADS`).
 
-**Platform: Linux x86-64.** The wheels are manylinux, CPU and CUDA alike; there is none for Windows
-or macOS, and pip answers a missing wheel by falling back to a *source* build — which is why
-`pip install peclet` on Windows ends in CMake rather than in a package. On Windows, install inside
-**WSL2** (`wsl --install`, then pip install in the Ubuntu shell — a CUDA GPU is reachable from there
-through the Windows driver); on macOS, use a Linux container. Or run the quick start in Colab and
-install nothing at all. [**docs/DEPLOYMENT.md**](docs/DEPLOYMENT.md) has the table.
+**Platforms:** **Linux** (x86-64 and aarch64), **Windows** x64, **macOS** on Apple silicon, CPython
+3.10–3.14. The Linux wheels are multi-threaded (OpenMP); the Windows and macOS wheels are
+single-threaded — MSVC reports OpenMP 2.0 whatever runtime you ask it for, and AppleClang ships none
+at all, so those get the Kokkos **Serial** backend. `flow.execution_space` prints which one you have.
+For multicore or GPU work on a Windows machine, install inside **WSL2** (`wsl --install`, then pip
+install in the Ubuntu shell) and you get the Linux wheel, CUDA included. An Intel Mac, or anything
+else, builds from the sdist — which works, it is just slower to install.
+[**docs/DEPLOYMENT.md**](docs/DEPLOYMENT.md) has the table. (1.0.0 shipped Linux x86-64 alone.)
 
 **Quick start** — Stokes flow past a sphere in a box of side `L`, start to finish: **2.5 s on two
 workstation cores**, around half a minute on the two shared vCPUs of a free Colab runtime (it prints its own
