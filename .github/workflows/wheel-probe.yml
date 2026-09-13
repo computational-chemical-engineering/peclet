@@ -72,7 +72,7 @@ jobs:
       # has a minimum target of 26.0" against a wheel tagged 13.0. Take the OLDEST bottle Homebrew
       # still publishes, and tag the wheel to match — that is the lowest floor actually available.
       - name: libomp built for an older macOS
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && !contains(inputs.kokkos_args, 'Kokkos_ENABLE_OPENMP=OFF')
         shell: bash
         run: |
           set -eu
@@ -108,7 +108,7 @@ jobs:
           set -eu
           OMP=""
           if [ "$RUNNER_OS" = "macOS" ]; then
-            OMP="OpenMP_ROOT=${OpenMP_ROOT}"                   # set by the libomp step above
+            OMP="OpenMP_ROOT=${OpenMP_ROOT:-}"                 # set by the libomp step above, if it ran
           fi
           if [ "${{ matrix.pkg }}" = "morton" ]; then
             echo "CIBW_ENVIRONMENT=$OMP CMAKE_ARGS=\"-DMORTON_ENABLE_BMI2=OFF -DMORTON_ENABLE_RUNTIME_DISPATCH=ON\"" >> "$GITHUB_ENV"
