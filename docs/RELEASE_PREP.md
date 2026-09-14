@@ -845,6 +845,45 @@ outright. Without that, every Windows and macOS wheel would have shipped single-
 nothing about it — the same shape of bug as SCALING_ISSUES issue 7, and this cycle exists for that
 one.
 
+### 11.4 `vof_bc_mpi_np2` — a gate tighter than the solver under it (open, NOT a 1.0.1 regression)
+
+flow's local battery is **154/155** at the documented `OMP_NUM_THREADS=8`. The one failure:
+
+```
+[packing np=2] colour vs single-rank 3.174e-09; budget |d sum(eps_eff C) - ledger| 4.547e-11
+               (rel 1.228e-14); solid colour 0.000e+00; pressure 16/400
+[packing np=2] FAIL — colour beyond the reduction floor (tol 1.0e-11)
+```
+
+**It is not this cycle's doing, and that is provable rather than likely.** `git diff v1.0.0..HEAD`
+over flow's `src/`, `include/` and `tests/` is **empty** — 1.0.1 changes flow's CMake and packaging
+only. morton's `include/` is byte-identical across the repin, and core's only header change on this
+path sits inside `#ifdef KOKKOS_ENABLE_THREADS`, which the `host-openmp` prefix does not define. The
+binary that fails here *is*, source for source, the 1.0.0 binary.
+
+**And CI does not see it**: flow's CI runs `-R '_np2$'` and reports 35/35 on this exact code, on a
+4-CPU runner. Locally, on 48 cores, it is deterministic to the digit across repeated runs.
+
+**The mechanism, as far as it has been checked.** The gate asks the VoF colour field to match the
+single-rank reference to `1e-11` for `size > 1` (`test_vof_bc_mpi.cpp:421`). The packing case
+(`configurePacking`, :180) sets `setPressureLevels(4)` and `setPressureIterations(400)` but **no
+pressure tolerance**, so it runs on the solver default `pcgRtol_ = 1e-10` (`src/flow_ibm.hpp:4284`)
+— the gate is **ten times tighter than the pressure solve underneath it**, and a colour field cannot
+be tighter than the velocity that advected it. The contrast inside the same test supports this: the
+jet case *does* set one explicitly (`setPressureFcg(true, 400, 1e-11)`, :152) and passes at 1.33e-15.
+
+This is a hypothesis about the tolerance, not a diagnosis of the 3.17e-9 itself — that is 30x the
+pressure rtol, which wants explaining rather than assuming. flow `65b2b6a` fixed a related but
+distinct shape (an *iteration-count* parity gate, not a field one); `vof_collocated_mpi`'s `d(iters)`
+parity is that shape exactly, and fails here at `OMP_NUM_THREADS=2` while passing at 1, 4 and 8.
+
+**Do not "fix" this by loosening the tolerance to get a release out.** Either the gate is wrong (in
+which case it deserves a considered change with its own reasoning, like 65b2b6a) or the np=2 packing
+path really does disagree at 3e-9 and that is worth knowing. Both are post-1.0.1 work, and the work
+order is written: [wo_vof_mpi_parity_gates.md](wo_vof_mpi_parity_gates.md) — reproduction, the three
+passing control cases, the gate and its anchors, the precedent to follow and to distinguish from, and
+what would count as an answer.
+
 **Also in this cycle, if cheap:** `peclet-core` and `peclet-amr` publish an **sdist only**. That is
 why `pip install peclet-core` starts a Kokkos source build, and why the quick-start CI job had to
 stop installing them (it hung for 20 minutes on the first attempt). Either ship wheels or say so in
