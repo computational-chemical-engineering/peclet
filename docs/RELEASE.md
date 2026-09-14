@@ -495,8 +495,16 @@ Gaps to close (tracked in `RELEASE_PREP.md`; none blocks a release, all reduce r
   This is the only automated place where the *family* is tested as a set before tagging.
 - **Version consistency check** as a CI step on tags (`tools/release/check_release_state.sh --ci`):
   fail the release job if the tag ≠ pyproject version or `__version__`.
-- The CUDA wheel job runs only on tags; a `workflow_dispatch` dry run that uploads the wheel as an
-  artifact (no publish) lets it be tested before the release day.
+- ~~The CUDA wheel job runs only on tags~~ — **wrong, and expensively so.** Not one of the four
+  cuda-wheel jobs (flow, pnm, dem, voro) carries an `if:`; only `publish` is tag-gated. So the dry
+  run this bullet asks for **already works today**: `gh workflow run release.yml` on any of them
+  builds the CUDA wheel and uploads it as an artifact, publishing nothing. Nobody knew, so nobody
+  rehearsed, and on 2026-09-14 voro's cuda-wheel job died at GitHub's 6-hour cap during the 1.0.1
+  release — the one job a rehearsal would have exercised. Corrected after the fact; see
+  RELEASE_PREP.md §11.5.
+- **No `release.yml` in any of the eight repos sets `timeout-minutes`**, so every job inherits the
+  6-hour default. That is not the cause of voro's failure — the work genuinely takes ~5 h — but it
+  means the cap arrives as a kill with no warning rather than as a stated budget.
 - `actions/upload-artifact` / `download-artifact` majors differ between repos (v4 vs v7/v8) — the
   Dependabot bumps must be merged consistently or the artifact hand-off between jobs breaks.
 

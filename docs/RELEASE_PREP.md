@@ -889,6 +889,48 @@ one V-cycle per step — with np=1 keeping its exact zero.
 
 No numerics changed: the diff is `tests/kokkos_mpi/` only.
 
+### 11.5 voro's CUDA job, and the rehearsal nobody knew they had (2026-09-14)
+
+`peclet-voro 1.0.1` is **tagged but unpublished**: every CPU wheel job and the sdist went green, then
+`cuda-wheel` was killed at **6 h 0 m 3 s** — GitHub's hard per-job cap — and `publish`, which needs
+it, was skipped. PyPI still serves voro 1.0.0, so the `peclet` metapackage (which pins
+`peclet-voro==1.0.1`) cannot go out either.
+
+**Nothing in 1.0.1 caused it.** At 1.0.0 the same job took **4 h 59 m**: it has been running at 83 %
+of the cap all along and this run drew a slower machine.
+
+**Where the five hours go** (step timings, 1.0.0 run): CUDA toolkit install 44 s, Kokkos-CUDA prefix
+**2 m 20 s**, then `for PY in cp310..cp313` — four *serial* `pip wheel` calls at **~73 min each**.
+No tests run in that job at all; it is pure compilation. And each 73 minutes is **one translation
+unit**: voro is header-only, so `nanobind_add_module(voro NB_STATIC NOMINSIZE src/voro_bindings.cpp)`
+pulls ~12,250 lines of templated device code through nvcc, for **five GPU architectures** (sm_75
+base + 80/90/100/120 via `NVCC_APPEND_FLAGS`).
+
+The five architectures are **not** the thing to cut — they are the fix for a real field failure
+(0.4.0–0.5.0 shipped sm_75 + PTX only and Kokkos aborted at import on every non-Turing GPU with a
+13.0/13.1 driver; RELEASE.md §6). What is wasteful is the *structure*: the device half of that TU
+does not depend on the Python ABI, yet it is recompiled once per CPython, serially. flow, whose
+module is split across TUs, does all four wheels in **54 min** — 5.4x faster per wheel.
+
+| repo | cuda-wheel duration |
+|---|---|
+| pnm | 9 min |
+| dem | 25 min |
+| flow | 54 min |
+| **voro** | **6 h (killed)** |
+
+**The fix, and the reason it need not be a gamble.** Matrix the `for PY` loop over CPython: Kokkos
+costs 2 minutes, so four parallel jobs are ~80 min each — 4.5x margin instead of none, with no build
+flag and no wheel content changed. And it can be **verified before any tag moves**, because
+`cuda-wheel` carries no `if:` in any of the four repos (RELEASE.md §11, corrected): a plain
+`gh workflow run release.yml` builds the CUDA wheel, uploads it as an artifact and publishes nothing.
+That rehearsal existed all along and the guide said it did not.
+
+**Open, for the user:** (a) fix, rehearse by dispatch, then re-point `v1.0.1` — never published, so
+the tag has no consumers; (b) same, shipped as 1.0.2, no ref rewrite; (c) re-run unchanged. The
+serial loop is in **all four** wheel-building members, so this is a family-wide fragility that voro
+merely reached first.
+
 **Also in this cycle, if cheap:** `peclet-core` and `peclet-amr` publish an **sdist only**. That is
 why `pip install peclet-core` starts a Kokkos source build, and why the quick-start CI job had to
 stop installing them (it hung for 20 minutes on the first attempt). Either ship wheels or say so in
