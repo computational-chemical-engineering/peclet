@@ -847,6 +847,11 @@ one.
 
 ### 11.4 `vof_bc_mpi_np2` and `vof_collocated_mpi` — RESOLVED 2026-09-14 (gates, not code)
 
+> **Release gate, on the tagged commit (flow v1.0.1): 155/155 at `OMP_NUM_THREADS=8` AND at
+> `OMP_NUM_THREADS=2`.** The second number is the one that matters — 2 is the thread count at which
+> `vof_collocated_mpi_np{2,4}` used to fail while passing at 1, 4 and 8. The re-specified gates are
+> not merely green at the documented count, they are green at the count that caught the old ones.
+
 Both gates were asking for something the discretization does not provide, and both have been
 replaced. flow's local battery is **155/155** at `OMP_NUM_THREADS=8` and at `OMP_NUM_THREADS=2`.
 The reasoning is in [decisions/flow.md](decisions/flow.md) ("The np>1 VoF colour parity gates gate

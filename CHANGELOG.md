@@ -4,6 +4,76 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-09-14 — it installs, and it uses your cores
+
+A patch release with no API change and no numerics change, prompted entirely by what two users hit on
+their own machines the day after 1.0.0.
+
+### Fixed
+
+- **A container no longer collapses the first run.** Kokkos sized its host thread pool from the CPUs
+  it could *see*; Colab, Binder, Docker and a Slurm cgroup show you the whole host while granting a
+  fraction of it through a cgroup quota, which OpenMP cannot see, so the pool spin-waited itself to a
+  standstill — measured, a 2.5-second quick start did not finish in **15 minutes** on 2 CPUs of quota
+  with 48 visible. `peclet-core` now resolves the process's own cgroup, walks up the chain for the
+  tightest quota, caps by the affinity mask, and passes the result to `Kokkos::initialize`. Inert on
+  an unconstrained machine: same thread count, same schedule, same numbers.
+- **`pip install peclet` on Windows no longer ends inside CMake.** There was no Windows wheel, so pip
+  fell back to the sdist and the build died with "No CMAKE_CXX_COMPILER could be found" — a message
+  about a compiler when the answer was "not this operating system". There are wheels now (below), and
+  a platform that still has none gets a message that says so.
+
+### Added
+
+- **Wheels for four platforms, not one.** `manylinux x86-64` (unchanged), **`manylinux aarch64`**
+  (Graviton, Raspberry Pi, an ARM Chromebook's Linux container), **`win_amd64`** and
+  **`macosx_11_0_arm64`** — every one multi-threaded, and every one built and import-tested in CI.
+  Linux uses the OpenMP host backend; Windows and macOS use Kokkos' C++ threads backend, because
+  MSVC reports OpenMP 2.0 whatever runtime you select and AppleClang ships none. The backend changes
+  nothing numerical — the quick start returns k = 1.2407e-01 in 14 steps on all three — and
+  `execution_space` reports which you have.
+- **CPython 3.14.** It was missing on every platform, Linux included: a user on a current Python was
+  falling through to a source build exactly like the Windows user above.
+- `OMP_NUM_THREADS` now works on every backend. Kokkos itself reads only `KOKKOS_NUM_THREADS`, so on
+  a Threads or Serial build nothing had been reading it.
+
+### Changed
+
+- Five build-system assumptions that were invisible on Linux and fatal elsewhere: `/bigobj` for
+  MSVC's COFF section limit, `--config Release` when installing vendored deps under a multi-config
+  generator, GNU warning flags no longer handed to MSVC, `M_PI` (a POSIX extension) replaced by the
+  same double, and the vendored Kokkos host backend chosen by `find_package(OpenMP 3.0)` rather than
+  hard-coded.
+- PyPI classifiers on every package, including `Operating System :: POSIX :: Linux` where that is
+  still the truth, and `docs/DEPLOYMENT.md` gained an "Operating systems and wheels" section.
+- **The quick start is 2.5 s instead of 25.6 s** (N = 48 → 32, and a three-step convergence window
+  instead of a single-step one that the iteration could dip through). Both values sit within 0.2 % of
+  what their own grid gives when iterated to convergence, and the page now prints its own wall clock.
+
+### Known issues
+
+- **flow's height-function curvature is selected far less often than before 1.0.0, and droplet
+  damping degrades with it.** On the capillary-oscillations benchmark, same page and same inputs:
+  the pre-1.0.0 build took the height function on 791 interface cells and the PLIC paraboloid on 464
+  (37 % fallback); 1.0.0 takes HF on 129 and PLIC on 1109 (89.6 % fallback), and the mode-2 damping
+  deficit at mu = 0.0025 roughly doubles, from −17.3 % to −34.9 %.
+
+  **This is present in 1.0.0 and is neither caused nor fixed by 1.0.1** — `git diff v1.0.0 v1.0.1 --
+  src include` on `peclet-flow` is empty, so the two releases ship identical compiled code and differ
+  only in tests, packaging and version literals.
+
+  The published [capillary-oscillations
+  page](https://computational-chemical-engineering.github.io/peclet-examples/examples/capillary-oscillations/)
+  prints the census itself, so the claim is checkable without building anything.
+
+  It is narrow: standing-wave frequency is identical to four digits, pressure iteration counts are
+  unchanged, and volume drift is better. It is not a backend difference — CUDA and OpenMP built from
+  the same v1.0.0 source agree to 3 cells in ~1240 with identical PLIC counts. The suspect is the
+  consolidation that replaced flow's own height-function and PLIC kernels with `peclet-core`'s
+  (`peclet-flow` 2f93ec0), which deleted ~1750 lines in favour of ~100 across the VoF headers.
+  Investigation is open; surface tension and curvature-sensitive two-phase results should be treated
+  with care until it closes.
+
 ## [1.0.0] — 2026-09-12 — the clean break
 
 **Every package goes to 1.0.0.** This release removes every non-canonical Python name instead of

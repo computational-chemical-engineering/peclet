@@ -290,6 +290,11 @@ Traps recorded from 0.1.0–0.6.0:
   non-Turing GPU with a 13.0/13.1 driver). The extra SASS goes in through `NVCC_APPEND_FLAGS` (nvcc reads it
   itself; nvcc_wrapper rejects a second `-arch`/`-gencode`), and the job pins the OLDEST 13.x toolkit so
   the PTX JITs on any 13.x driver. Check a wheel with `cuobjdump --list-elf <module>.so`.
+- **A gallery page with a stale freeze does not fail loudly.** Its bootstrap pip-installs peclet and
+  re-executes on CPU wheels, so a §9 re-check can quietly produce CPU-rendered numbers instead of a
+  clean red — the failure mode is a slow silent re-execution, not an error. Reported from the
+  peclet-examples side 2026-09-14, where a stray untracked draft installed peclet into a deliberately
+  peclet-free gate venv.
 - **Smoke test in a fresh venv** after the metapackage is live:
   `python -m venv /tmp/rel && /tmp/rel/bin/pip install peclet==<family> && /tmp/rel/bin/python -c "import peclet.flow, peclet.dem, peclet.voro, peclet.pnm, peclet.morton"`, then run one gallery example
   (`poiseuille-ibm`) against it; repeat with `peclet-cu13` on the GPU box AND `peclet[mpi,cfd-dem]` (the sdist members: core, coupling — the core sdist was silently unbuildable 0.1.0–0.6.0).
