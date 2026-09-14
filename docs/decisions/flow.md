@@ -2734,3 +2734,66 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - consequence: this changes numerics in the default build. Regression state hashes and
   `perf_baseline.json` must be re-blessed, per the standing rule that changing a numerics-affecting
   default re-blesses bed references and is itself a decision.
+
+### The np>1 VoF colour parity gates gate conservation, not the pointwise field
+- area: flow
+- source: tests/kokkos_mpi/test_vof_bc_mpi.cpp, tests/kokkos_mpi/test_vof_collocated_mpi.cpp —
+  work order docs/wo_vof_mpi_parity_gates.md, carried out 2026-09-14
+- decided: 2026-09-14
+- status: settled
+- quote: |
+    `vof_bc_mpi_np2` asked the VoF colour field to match a single-rank reference to 1e-11 after 40
+    coupled steps. It cannot: the colour is NOT a Lipschitz function of the velocity. `mycNormal`
+    (core/vof/plic.hpp) selects between the centred and the Youngs candidate with a strict
+    comparison, `if (fabs(mm[cn][cn]) > t0) cn = 3;`, and at a near-axis-aligned interface the two
+    candidates carry the same dominant component, so that comparison is an exact tie.
+
+    Traced on the failing face (packing case, cell (15,0,0), x-face, step 1): the two runs' 3x3x3
+    colour stencils agree to 1.4e-17 (1-2 ulp); the centred candidate scores 0.99986893026188128
+    against Youngs' 0.99986893026188106 at np=2 (one ulp apart, Youngs wins) and
+    0.99986893026188106 against 0.99986893026188106 single-rank (equal, so `>` is false and the
+    centred one wins). The two winners differ by 2.9e-06 in their transverse components; the slab
+    volume of that face moves by 4.795e-09, and two adjacent cells part by +/-4.795e-09, equal and
+    opposite. ONE ULP in, 4.8e-09 out.
+
+    It was therefore a coin toss, not a measurement. Over 24 (ranks, threads) pairs: np=1 bitwise
+    at 1..16 threads; np=2 flips at 2..16 threads and not at 1; np=4 flips at 2, 3, 4, 6 and 12
+    threads but NOT at 1, 8 and 16 — which is the only reason `vof_bc_mpi_np4` passed on the
+    48-core box while np2 failed, and why CI (4 CPUs) saw neither.
+
+    The VoF path itself is decomposition-EXACT: the new `packing-kin` case drives the same composed
+    cut-cell x open-boundary scene with a prescribed 3-D velocity and is bitwise at np=2 and 4 and
+    at 1..16 threads. Under `step()` every field the solver carries agrees at the allreduce floor
+    (u,v,w and their ghosts to 1.4e-14; p to 1.4e-13 on |p|=1.9e2).
+
+    So the gates moved: pointwise colour to 1e-6 (a bound on the field going WRONG), the
+    reduction-floor content to a new SIGNED-SUM gate at 1e-11 relative (a difference that cancels is
+    colour moved, one that does not is colour created), and the exactness to the new bitwise
+    kinematic case. Verified by injection: deleting the WO-F owner rule gives 1.000e+00 pointwise
+    against 1e-06 and 5.141e+02 signed-sum against 3.886e-08.
+
+    The same reasoning retired `vof_collocated_mpi`'s `d(iters) <= 1` lockstep gate. `hydro-z` is a
+    REST STATE (converged |uf| 1.9e-13 on |P| 1.2e+03), so the pressure solve's r0 is the round-off
+    of the hydrostatic balance, not a physical residual, and differs between decompositions by an
+    O(1) RELATIVE amount: the V-cycle count is a random walk, not a shifted copy. Measured over 20
+    steps at np=2 the sequences part at ten steps, by one at nine and by two at step 11 (10 vs 12),
+    and whether the worst gap is one or two depends on the OpenMP thread count alone (one at 1, 4,
+    8; two at 2, at both np=2 and np=4). The gate became the COST ENVELOPE — worst step within one
+    V-cycle of the reference's worst, total within one V-cycle per step — with np=1 keeping its
+    exact zero.
+- rejected: (a) loosening 1e-11 to a number above today's 3.174e-09 — it would have been fitted to
+  one sample of a coin toss and would fail again at a different thread count; (b) `d(iters) <= 2`
+  for the collocated gate, same objection — the random walk produces a 3 eventually; (c) adding
+  hysteresis to `mycNormal`'s estimator selection so the tie breaks stably — it changes numerics in
+  `core` for every VoF consumer to make a test pass, and it only MOVES the discontinuity rather
+  than removing it; the selection discontinuity is intrinsic to MYC as published; (d) pinning the
+  packing case's pressure rtol to 1e-11 (the work order's leading hypothesis) — measured irrelevant:
+  the velocity and pressure fields already agree to 1.4e-14, ten thousand times tighter than the
+  gate, and the colour difference is not proportional to any tolerance
+- why: a gate must assert something the code can deliver. The pointwise max-norm of a PLIC colour
+  field is a discontinuous functional of the data; conservation, cancellation and the kinematic
+  transport are not, and they are what a decomposition defect actually breaks
+- consequence: no numerics changed — `git diff` touches `tests/kokkos_mpi/` only. The suite-wide
+  rule this establishes: **do not gate a max-norm parity across decompositions on a field produced
+  by a branch-selecting reconstruction (PLIC/MYC, slope limiters, ENO/WENO stencil choice).** Gate
+  the conservative content, and gate exactness on a kinematic case where no reduction enters.

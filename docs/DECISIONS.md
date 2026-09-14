@@ -18,10 +18,11 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-164 in force, 37 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+165 in force, 37 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
+- **A max-norm parity gate across decompositions is invalid on a field built by a branch-selecting reconstruction (PLIC/MYC): gate conservation, cancellation and a kinematic bitwise case instead**. **Rejected:** fitting a looser pointwise tolerance to the observed 3.174e-09; `d(iters) <= 2` for the collocated lockstep gate; adding hysteresis to `mycNormal`'s estimator selection in core; pinning the packing case's pressure rtol (measured irrelevant — the fields already agree to 1.4e-14)  <sub>decisions/flow.md, wo_vof_mpi_parity_gates.md</sub>
 - **"Hand the stopping level to GraphAMG" telescoping idea is retired**. **Rejected:** handing the MG-telescoping stopping level to GraphAMG  <sub>mg-decomposition-alignment.md:75</sub>
 - **(1,2) mixed closure order is the recommended default going forward**. **Rejected:** binary-M lagging (divergent, ρ=1.087) and linear-everywhere (1,1) (worse pointwise near the IB)  <sub>flow-ghost-projection.md:50</sub>
 - **A masked solid cell is not a fluid sample**.  <sub>sdf-scene-campaign.md:44</sub>

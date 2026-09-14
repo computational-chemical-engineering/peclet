@@ -1,5 +1,18 @@
 # Work order — the VoF MPI parity gates: `vof_bc_mpi_np2` and `vof_collocated_mpi`
 
+> **CARRIED OUT 2026-09-14 — the answer is §1's second horn: both gates asked for more than the
+> solver beneath them delivers, and both were replaced.** The decision, with the numbers, is in
+> [decisions/flow.md](decisions/flow.md) ("The np>1 VoF colour parity gates gate conservation, not
+> the pointwise field"); the summary is [RELEASE_PREP.md §11.4](RELEASE_PREP.md). Headline: the
+> 3.174e-09 is **one ulp of colour** amplified by `mycNormal`'s estimator selection
+> (`if (fabs(mm[cn][cn]) > t0) cn = 3;`), which is an exact tie at a near-axis-aligned interface —
+> np=1 is bitwise at every thread count, np=2 flips at 2..16 threads and not at 1, np=4 flips at
+> 2, 3, 4, 6 and 12 but **not** at 1, 8 and 16, which is the only reason np4 ever passed. §3's
+> pressure-rtol hypothesis is **falsified**: the velocity and pressure fields already agree to
+> 1.4e-14 and 1.4e-13. The reproduction instrument is committed as
+> `flow/tests/kokkos_mpi/probe_vof_packing.cpp` (EXCLUDE_FROM_ALL). **Read the text below as the
+> question, not as findings.**
+
 Written 2026-09-14 during the peclet 1.0.1 release, which these failures did **not** cause and did
 not block. Self-contained: a session picking this up needs nothing from the conversation that
 produced it.

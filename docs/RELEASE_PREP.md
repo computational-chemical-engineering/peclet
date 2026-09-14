@@ -845,44 +845,49 @@ outright. Without that, every Windows and macOS wheel would have shipped single-
 nothing about it — the same shape of bug as SCALING_ISSUES issue 7, and this cycle exists for that
 one.
 
-### 11.4 `vof_bc_mpi_np2` — a gate tighter than the solver under it (open, NOT a 1.0.1 regression)
+### 11.4 `vof_bc_mpi_np2` and `vof_collocated_mpi` — RESOLVED 2026-09-14 (gates, not code)
 
-flow's local battery is **154/155** at the documented `OMP_NUM_THREADS=8`. The one failure:
+Both gates were asking for something the discretization does not provide, and both have been
+replaced. flow's local battery is **155/155** at `OMP_NUM_THREADS=8` and at `OMP_NUM_THREADS=2`.
+The reasoning is in [decisions/flow.md](decisions/flow.md) ("The np>1 VoF colour parity gates gate
+conservation, not the pointwise field"); the work order that produced it is
+[wo_vof_mpi_parity_gates.md](wo_vof_mpi_parity_gates.md). In short:
 
-```
-[packing np=2] colour vs single-rank 3.174e-09; budget |d sum(eps_eff C) - ledger| 4.547e-11
-               (rel 1.228e-14); solid colour 0.000e+00; pressure 16/400
-[packing np=2] FAIL — colour beyond the reduction floor (tol 1.0e-11)
-```
+**`vof_bc_mpi`.** The packing case's 3.174e-09 is not a decomposition defect and not a tolerance
+leak. It is **one ulp** of colour, amplified by `mycNormal`'s estimator selection — a strict
+comparison, `if (fabs(mm[cn][cn]) > t0) cn = 3;`, between the centred and the Youngs candidate,
+which at a near-axis-aligned interface is an exact tie. Traced on the failing face: the two runs'
+3x3x3 stencils agree to 1.4e-17, the centred candidate scores 0.99986893026188128 against Youngs'
+0.99986893026188106 at np=2 (Youngs wins by one ulp) and 0.99986893026188106 against
+0.99986893026188106 single-rank (equal, so the centred one wins); the winners differ by 2.9e-06 in
+their transverse components and the face's slab volume by 4.795e-09, which lands as +/-4.795e-09 in
+two adjacent cells, equal and opposite. Over 24 (ranks, threads) pairs the outcome is binary: np=1
+bitwise at every thread count, np=2 flips at 2..16 threads and not at 1, np=4 flips at 2, 3, 4, 6
+and 12 but not at 1, 8 and 16 — which is the whole reason np4 passed here and CI saw nothing.
 
-**It is not this cycle's doing, and that is provable rather than likely.** `git diff v1.0.0..HEAD`
-over flow's `src/`, `include/` and `tests/` is **empty** — 1.0.1 changes flow's CMake and packaging
-only. morton's `include/` is byte-identical across the repin, and core's only header change on this
-path sits inside `#ifdef KOKKOS_ENABLE_THREADS`, which the `host-openmp` prefix does not define. The
-binary that fails here *is*, source for source, the 1.0.0 binary.
+The pressure-rtol hypothesis recorded in this section is **falsified**: under `step()` the velocity
+and pressure fields agree between decompositions to 1.4e-14 and 1.4e-13 (on |p| = 1.9e+02), ten
+thousand times tighter than the gate, and the colour difference is not proportional to any
+tolerance.
 
-**And CI does not see it**: flow's CI runs `-R '_np2$'` and reports 35/35 on this exact code, on a
-4-CPU runner. Locally, on 48 cores, it is deterministic to the digit across repeated runs.
+The gates now are: pointwise colour at 1e-6 (a bound on the field going *wrong*, verified by
+injection — deleting the WO-F owner rule gives 1.000e+00 against it); a new **signed-sum** gate at
+1e-11 relative, which is the reduction-floor gate on the quantity that actually has one (a
+difference that cancels is colour moved, one that does not is colour created); and a new
+**`packing-kin`** case that drives the same composed cut-cell x open-boundary scene with a
+prescribed 3-D velocity and is gated **bitwise** — measured 0.000e+00 at np=2 and 4 and at 1..16
+threads, which is the exactness the 1e-11 was reaching for and never had.
 
-**The mechanism, as far as it has been checked.** The gate asks the VoF colour field to match the
-single-rank reference to `1e-11` for `size > 1` (`test_vof_bc_mpi.cpp:421`). The packing case
-(`configurePacking`, :180) sets `setPressureLevels(4)` and `setPressureIterations(400)` but **no
-pressure tolerance**, so it runs on the solver default `pcgRtol_ = 1e-10` (`src/flow_ibm.hpp:4284`)
-— the gate is **ten times tighter than the pressure solve underneath it**, and a colour field cannot
-be tighter than the velocity that advected it. The contrast inside the same test supports this: the
-jet case *does* set one explicitly (`setPressureFcg(true, 400, 1e-11)`, :152) and passes at 1.33e-15.
+**`vof_collocated_mpi`.** `hydro-z` is a rest state: converged |uf| = 1.9e-13 on |P| = 1.2e+03, so
+the pressure solve's r0 is the round-off of the hydrostatic balance, not a physical residual, and
+differs between decompositions by an O(1) *relative* amount. The V-cycle count is a random walk, not
+a shifted copy — over 20 steps at np=2 the sequences part at ten steps, by one at nine and by two at
+step 11 (10 vs 12), and whether the worst gap is one or two depends on the OpenMP thread count alone
+(one at 1, 4, 8; two at 2). `d(iters) <= 1` (flow `65b2b6a`'s shape) was a coin toss here. The gate
+is now the **cost envelope** — worst step within one V-cycle of the reference's worst, total within
+one V-cycle per step — with np=1 keeping its exact zero.
 
-This is a hypothesis about the tolerance, not a diagnosis of the 3.17e-9 itself — that is 30x the
-pressure rtol, which wants explaining rather than assuming. flow `65b2b6a` fixed a related but
-distinct shape (an *iteration-count* parity gate, not a field one); `vof_collocated_mpi`'s `d(iters)`
-parity is that shape exactly, and fails here at `OMP_NUM_THREADS=2` while passing at 1, 4 and 8.
-
-**Do not "fix" this by loosening the tolerance to get a release out.** Either the gate is wrong (in
-which case it deserves a considered change with its own reasoning, like 65b2b6a) or the np=2 packing
-path really does disagree at 3e-9 and that is worth knowing. Both are post-1.0.1 work, and the work
-order is written: [wo_vof_mpi_parity_gates.md](wo_vof_mpi_parity_gates.md) — reproduction, the three
-passing control cases, the gate and its anchors, the precedent to follow and to distinguish from, and
-what would count as an answer.
+No numerics changed: the diff is `tests/kokkos_mpi/` only.
 
 **Also in this cycle, if cheap:** `peclet-core` and `peclet-amr` publish an **sdist only**. That is
 why `pip install peclet-core` starts a Kokkos source build, and why the quick-start CI job had to
