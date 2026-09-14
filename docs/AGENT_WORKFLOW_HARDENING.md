@@ -38,6 +38,21 @@ is the same fault with another session as the counterparty: "the range I am push
 assumption about shared state that git can check in milliseconds and nobody asked. Class F alone is
 not a binding failure but a reporting-discipline one, and gets the weakest treatment below.
 
+**Addendum, 2026-09-14, from the release session that executed against this note's findings.** Pull
+media has a second failure mode this diagnosis understated: it can be *false*, not merely unread.
+`RELEASE.md` §11 stated that the CUDA wheel job "runs only on tags", and on that basis §11.2 filed a
+`workflow_dispatch` rehearsal as future work. Neither is true: no `cuda-wheel` job in any of the four
+wheel-building repos carries an `if:` — only `publish` is tag-gated — so the rehearsal existed, in all
+four, the whole time. The capability was there; the document denied it; and the voro job that was
+killed at the 6 h cap is exactly the job that rehearsal would have exercised. So the escape needed no
+skipped step: an agent that read the guide, believed it, and acted on it would still have been
+stranded. That strengthens rather than weakens the thesis — a check bound to the action would have
+refused the tag regardless of what the prose claimed — but it adds an obligation the contract below
+does not carry: **a document asserting that a capability is absent should be as checkable as a
+document asserting one is present**, or it becomes a licence not to try. Corrected in `RELEASE.md`
+(`60313e0`), with the rehearsal's first use measured in voro run `34865945237` (four CUDA jobs,
+one per interpreter, all started within one second of each other).
+
 ---
 
 ## The contract
