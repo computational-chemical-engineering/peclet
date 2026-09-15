@@ -18,11 +18,10 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-165 in force, 37 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+166 in force, 37 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
-- **A max-norm parity gate across decompositions is invalid on a field built by a branch-selecting reconstruction (PLIC/MYC): gate conservation, cancellation and a kinematic bitwise case instead**. **Rejected:** fitting a looser pointwise tolerance to the observed 3.174e-09; `d(iters) <= 2` for the collocated lockstep gate; adding hysteresis to `mycNormal`'s estimator selection in core; pinning the packing case's pressure rtol (measured irrelevant — the fields already agree to 1.4e-14)  <sub>decisions/flow.md, wo_vof_mpi_parity_gates.md</sub>
 - **"Hand the stopping level to GraphAMG" telescoping idea is retired**. **Rejected:** handing the MG-telescoping stopping level to GraphAMG  <sub>mg-decomposition-alignment.md:75</sub>
 - **(1,2) mixed closure order is the recommended default going forward**. **Rejected:** binary-M lagging (divergent, ρ=1.087) and linear-everywhere (1,1) (worse pointwise near the IB)  <sub>flow-ghost-projection.md:50</sub>
 - **A masked solid cell is not a fluid sample**.  <sub>sdf-scene-campaign.md:44</sub>
@@ -162,8 +161,10 @@ reading until they are settled.
 - **Ten-Cate periodic-image bug: periodic images are a union, not independent slabs**. **Rejected:** the earlier CSG-slab-per-image geometry construction (implicitly non-union)  <sub>sdf-scene-campaign.md:131</sub>
 - **The agglomerated-bottom MG anomaly required a per-fluid-component null-space projector, a double row-sum, and a looser inner tolerance**. **Rejected:** projecting the all-cell mean (rather than per-connected-fluid-component); leaving MG coefficients in single-precision row sums uncorrected; an inner t  <sub>agglomerated-bottom-ibm-fix.md:15</sub>
 - **The defect-correction rule: Krylov matvec/residual must be the exact double operator in flux form; preconditioners below may stay float**.  <sub>defect-correction-campaign.md:14-17</sub>
+- **The np>1 VoF colour parity gates gate conservation, not the pointwise field**. **Rejected:** (a) loosening 1e-11 to a number above today's 3.174e-09 — it would have been fitted to  <sub>tests/kokkos_mpi/test_vof_bc_mpi.cpp,</sub>
 - **The rotational (Timmermans) pressure update must be restored, not the non-rotational Goda form substituted**. **Rejected:** non-rotational Goda pressure update form; diagonal-preconditioned CG in place of geometric MG/MG-PCG; double-precision pressure operator storage  <sub>migration-faithful-port.md:61</sub>
 - **The standalone V-cycle pressure driver does not honor set_pressure_solver_params(n) and is ~30x slower at small grids**.  <sub>flow-thermal-convection-validated.md:25</sub>
+- **The velocity V-cycle is the DEFAULT momentum solver, at every rank count and every block size**. **Rejected:** (a) KEEPING the 2026-09-02 rule — red-black Gauss-Seidel by default, V-cycle only below  <sub>user</sub>
 - **UCX_RNDV_THRESH tuning is falsified as an explanation for the np8 anomaly — leave UCX defaults**. **Rejected:** tuning UCX_RNDV_THRESH=256k  <sub>comm-scaling-plan.md:57</sub>
 - **User decision: port Basilisk embed.h, not Trebotich–Graves, for 2nd-order collocated walls**. **Rejected:** Trebotich–Graves/EBChombo as the primary port target  <sub>sdflow-collocated-solver.md:186-191</sub>
 - **User directive: ghost-cell IBM must become production-grade (it generalizes to AMR better than cut-cell)**.  <sub>ghost-hardening-plan.md:11-14</sub>
@@ -575,9 +576,8 @@ reading until they are settled.
 
 ### In force
 
-- **A host backend that does not size itself must be handed the thread budget**. **Rejected:** the "say nothing on an unconstrained machine" policy for every backend (neutral only for OpenMP; on Kokkos::Threads it is a silent 7x cut)  <sub>RELEASE_PREP.md:11.3</sub>
+- **A host backend that does not size itself must be handed the thread budget**. **Rejected:** keeping the "say nothing on an unconstrained machine" policy for every backend (it is  <sub>RELEASE_PREP.md:11.3</sub>
 - **All coupled methods must share one BlockDecomposer; static-only co-decomposition is rejected**. **Rejected:** "Static-only co-decomposition"  <sub>multiphysics-framework-plan.md:410</sub>
-- **Wheels for a toolchain without OpenMP ship Kokkos::Threads, not Serial**. **Rejected:** the Serial backend; clang-cl; faking OpenMP_CXX_SPEC_DATE past Kokkos' 3.0 gate; Homebrew libomp (drags the macOS floor from 11 to 26)  <sub>RELEASE_PREP.md:11.3</sub>
 - **CMake suite_require_nanobind must be a macro, not a function**. **Rejected:** implementing suite_require_nanobind as a CMake function  <sub>nanobind-zero-copy-migration.md:15</sub>
 - **Collocated default is AUTO ghost projection (in both flow and AMR), with documented fallbacks**.  <sub>collocated-attractor-campaign.md:53</sub>
 - **Convention going forward: never add cell-unit API surface; new setters take physical inputs**. **Rejected:** adding new cell-unit-only API surface  <sub>physical-units-plan.md:44</sub>
@@ -602,6 +602,7 @@ reading until they are settled.
 - **USER DIRECTIVE: peclet.flow is the reference for shared-method design elsewhere in the suite, not Basilisk or the literature**. **Rejected:** taking Basilisk (or a paper) as the reference for a shared method design; the Basilisk face-acceleration form for the collocated projection  <sub>flow-is-the-method-reference.md:8-19</sub>
 - **USER DIRECTIVE: quality is the prime objective; next release is a clean-break 1.0.0, API-breaking allowed; AMR preserved not deleted**. **Rejected:** preserving backward compatibility / a minor version bump  <sub>suite-quality-plan-1-0-0.md:11-13</sub>
 - **USER DIRECTIVE: solvers take a physical domain + physical properties; spatial discretization must not influence physical property values**.  <sub>physical-units-plan.md:11</sub>
+- **Wheels for a toolchain without OpenMP ship Kokkos::Threads, not Serial**. **Rejected:** the Kokkos Serial backend (single-threaded, and it was chosen only because the third  <sub>RELEASE_PREP.md:11.3</sub>
 - **morton stays on ctypes by design; vorflow's legacy host bindings stay on pybind11**. **Rejected:** migrating morton's bindings to nanobind; migrating vorflow's legacy host bindings to nanobind  <sub>nanobind-zero-copy-migration.md:17</sub>
 - **nanobind Kokkos+CUDA modules require NOMINSIZE (nanobind's default -Os breaks nvcc)**. **Rejected:** nanobind's default -Os compile flag for Kokkos CUDA modules  <sub>nanobind-zero-copy-migration.md:24</sub>
 

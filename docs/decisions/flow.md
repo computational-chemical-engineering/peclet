@@ -2797,3 +2797,54 @@ Do not reverse an entry here without recording a new decision that supersedes it
   rule this establishes: **do not gate a max-norm parity across decompositions on a field produced
   by a branch-selecting reconstruction (PLIC/MYC, slope limiters, ENO/WENO stencil choice).** Gate
   the conservative content, and gate exactness on a kinematic case where no reduction enters.
+
+### The velocity V-cycle is the DEFAULT momentum solver, at every rank count and every block size
+- area: flow
+- source: user decision in session; benchmarks/momentum-solver (peclet-examples)
+- decided: 2026-09-15
+- status: settled
+- supersedes: "AUTO velocity MG under MPI below PECLET_FLOW_VMG_AUTO_CELLS=65536 cells/rank and
+  np>1" (2026-09-02, momentum-solve-residual-stop.md:32)
+- quote: |
+    "Make V-cycle default for momentum. I do not care that much if numbers shift, as long as the
+    shift is an improvement."
+- rejected: (a) KEEPING the 2026-09-02 rule — red-black Gauss-Seidel by default, V-cycle only below
+  65536 cells/rank and only at np > 1; (b) merely RETUNING that threshold upward; (c) a global-cell
+  floor as the small-problem guard; (d) leaving single-rank and non-MPI builds on red-black.
+- why: |
+    The 2026-09-02 rule had the SIGN OF THE EFFECT BACKWARDS. It switched the V-cycle on where
+    blocks were SMALL, but a pinned-solver re-run of the 1.0.0 scaling ladder (384^3 cut-cell bed,
+    Snellius) shows the V-cycle faster at EVERY rung of BOTH ladders with its margin LARGEST at the
+    BIGGEST blocks: Genoa 1.96x at 2.36 M cells/rank, 2.23x at 147 k, 1.66x at 74 k; H100 2.19x on
+    one GPU at 56.6 M cells/rank, 1.81x on four. Retuning the threshold (b) cannot express "always"
+    and would have preserved a rule whose premise is false.
+
+    Red-black was not merely slower: it ran at its iteration cap (velIters_ = 200 sweeps per
+    component) on EVERY rung of both ladders, so it was not converging. The V-cycle takes 9.7
+    cycles, rank-independent. The 3.7e-07 cross-configuration disagreement in the 1.0.0 deposit's
+    gate table is exactly this — a capped solve against a converged one.
+
+    The small-problem guard is stated in per-rank block EXTENT (16 cells on the shortest axis), not
+    in global cells (c), because extent is what decides whether a hierarchy can be built at all: a
+    block that cannot coarsen makes the V-cycle degenerate to its bottom smoother and add only
+    setup. It costs one MPI_Allreduce per geometry build, never per step, so every rank reaches the
+    same decision.
+- evidence: |
+    ACCURACY IS UNCHANGED, verified rather than assumed. This register carried
+    "sdflow accuracy resolved; ... velocity-MG (not pressure) was the drift source" (2026-06-11,
+    +3.5 % against Zick & Homsy at N=128), marked superseded after the clean-fluid exclude mask
+    fixed it. That flag was re-tested before the flip rather than trusted. Z&H SC drag factor,
+    old default -> new, N=64:
+      phi=0.125  K_ZH 4.292   4.291 (-0.02 %) -> 4.291 (-0.02 %)
+      phi=0.343  K_ZH 15.400  15.394 (-0.04 %) -> 15.394 (-0.04 %)
+    verify_poiseuille_flow PASS, worst node error 1.7e-08. Gates: tests/kokkos_mpi 106/106,
+    tests/kokkos 45/45. The MPI battery also ran FASTER (chunk 1: 109 s -> 66 s).
+- consequence: |
+    Numbers shift for any IBM run that was on the red-black default — by the momentum tolerance,
+    in the direction of the converged answer, and about 2x faster. The 1.0.0 scaling deposit's
+    figures are therefore a record of the OLD default and are labelled as such in its 2026-09-15
+    addendum. set_velocity_multigrid_auto(65536, 1 << 23) reproduces 1.0.0 exactly; (0) disables
+    the V-cycle; an explicit set_velocity_multigrid() still wins over everything.
+
+    NOT CHANGED: the all-fluid domain-BC path, which never reaches this rule (it fires from
+    set_solid). No evidence was gathered there, so it keeps red-black.
