@@ -57,7 +57,7 @@ away — at a price: N = 48 is eight times the work of N = 32. Run it as is, or 
 notebook in Colab — the first cell installs the wheels:
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/computational-chemical-engineering/peclet/blob/main/docs/notebooks/quickstart_sphere.ipynb)
-[![Download notebook](https://img.shields.io/badge/Download-notebook-F37626?logo=jupyter&logoColor=white)](https://github.com/computational-chemical-engineering/peclet/blob/main/docs/notebooks/quickstart_sphere.ipynb)
+[![Download notebook](https://img.shields.io/badge/Download-notebook-F37626?logo=jupyter&logoColor=white)](notebooks/quickstart_sphere.ipynb)
 
 ```python
 import time

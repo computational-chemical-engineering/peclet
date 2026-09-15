@@ -103,7 +103,7 @@ it buys accuracy with time. Run it as is after `pip install peclet matplotlib`, 
 Colab, whose first cell installs the wheels:
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/computational-chemical-engineering/peclet/blob/main/docs/notebooks/quickstart_sphere.ipynb)
-[![Download notebook](https://img.shields.io/badge/Download-notebook-F37626?logo=jupyter&logoColor=white)](https://github.com/computational-chemical-engineering/peclet/blob/main/docs/notebooks/quickstart_sphere.ipynb)
+[![Download notebook](https://img.shields.io/badge/Download-notebook-F37626?logo=jupyter&logoColor=white)](https://computational-chemical-engineering.github.io/peclet/notebooks/quickstart_sphere.ipynb)
 
 ```python
 import time
