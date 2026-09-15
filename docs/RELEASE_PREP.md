@@ -950,12 +950,25 @@ on every job, so no release.yml in the family can meet the 6-hour cap as a silen
 
 Measured, from each package's own `v1.0.1` release run:
 
-| repo | run | fixed setup (container + CUDA + Kokkos[+ArborX]) | 4 wheels, serial | per wheel | 5 wheels serial → fanned out | timeout |
-|---|---|---|---|---|---|---|
-| pnm | 34788223729 | 4 m 04 s | 4 m 54 s | ~1 m 14 s | ~10 min → ~5 min | 60 |
-| dem | 34788226605 | 4 m 11 s | 20 m 31 s | ~5 m 08 s | ~30 min → ~9 min | 60 |
-| flow | 34863077902 | 3 m 35 s | 40 m 58 s | ~10 m 15 s | ~55 min → ~14 min | 90 |
-| voro | 34876338696 | ~3 min | (already matrixed) | 72–93 min | ~5 h → ~93 min | 180 |
+| repo | v1.0.1 run | fixed setup (container + CUDA + Kokkos[+ArborX]) | 4 wheels, serial | per wheel | 5 wheels serial → predicted | **measured, fanned out** | timeout |
+|---|---|---|---|---|---|---|---|
+| pnm | 34788223729 | 4 m 04 s | 4 m 54 s | ~1 m 14 s | ~10 min → ~5 min | **4–5 min** | 60 |
+| dem | 34788226605 | 4 m 11 s | 20 m 31 s | ~5 m 08 s | ~30 min → ~9 min | **8–10 min** | 60 |
+| flow | 34863077902 | 3 m 35 s | 40 m 58 s | ~10 m 15 s | ~55 min → ~14 min | **12–18 min** | 90 |
+| voro | 34876338696 | ~3 min | (matrixed 09-14) | 72–93 min | ~5 h → ~95 min | **92–98 min** | 180 |
+
+**Rehearsed by dispatch before anything was tagged**, which is the property §11.5 established and
+RELEASE.md §11 had wrongly denied: `cuda-wheel` carries no `if:`, only `publish` does, so
+`gh workflow run release.yml` builds everything and publishes nothing. Runs 34976227196 (pnm),
+34976230935 (dem), 34976234668 (flow), 34976238591 (voro), 2026-09-15: **every job green in all four,
+`publish` skipped in all four, PyPI untouched.** Each produced five separate `wheels-cuda-cp3XX-cp3XX`
+artifacts — the per-interpreter artifact name is what keeps the five jobs from overwriting each other
+— and the cp314 CUDA wheel, which had never been built before, built everywhere. flow's CUDA stage
+went 41 min → 18 min wall *while gaining a fifth interpreter*; voro's ~5 h → 98 min.
+
+The timeouts are budgets with 5–12x margin except voro's, which is 1.8x on a 98-minute worst job.
+That is deliberate: the 1.0.1 kill came from a machine ~1.2x slower than the 1.0.0 one, and 180 holds
+that same slowdown at 118 min. Revisit if a voro job is ever seen past ~2 h.
 
 None of the other three was near the cap, and for **pnm the fan-out is a wash on wall clock** — the
 setup dominates a 1-minute wheel, so five jobs spend ~2.7x the machine minutes to save ~5 minutes.
