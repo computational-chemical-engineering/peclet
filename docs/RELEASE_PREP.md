@@ -941,3 +941,35 @@ why `pip install peclet-core` starts a Kokkos source build, and why the quick-st
 stop installing them (it hung for 20 minutes on the first attempt). Either ship wheels or say so in
 their PyPI descriptions; the `BUILD_GATED` list in `check_docs_snippets.py` widens on its own once
 they do.
+
+### 11.6 The same fix in the other three, and the cp314 hole it exposed (2026-09-15)
+
+§11.5 ended by saying the serial `for PY` loop was in **all four** wheel-building members and voro
+had merely reached the cap first. It is now matrixed in all four, together with `timeout-minutes`
+on every job, so no release.yml in the family can meet the 6-hour cap as a silent kill again.
+
+Measured, from each package's own `v1.0.1` release run:
+
+| repo | run | fixed setup (container + CUDA + Kokkos[+ArborX]) | 4 wheels, serial | per wheel | 5 wheels serial → fanned out | timeout |
+|---|---|---|---|---|---|---|
+| pnm | 34788223729 | 4 m 04 s | 4 m 54 s | ~1 m 14 s | ~10 min → ~5 min | 60 |
+| dem | 34788226605 | 4 m 11 s | 20 m 31 s | ~5 m 08 s | ~30 min → ~9 min | 60 |
+| flow | 34863077902 | 3 m 35 s | 40 m 58 s | ~10 m 15 s | ~55 min → ~14 min | 90 |
+| voro | 34876338696 | ~3 min | (already matrixed) | 72–93 min | ~5 h → ~93 min | 180 |
+
+None of the other three was near the cap, and for **pnm the fan-out is a wash on wall clock** — the
+setup dominates a 1-minute wheel, so five jobs spend ~2.7x the machine minutes to save ~5 minutes.
+It is done anyway: these four files diverging is not a neutral state, and the next item is what that
+costs.
+
+**The cp314 hole (found by the user, 2026-09-15).** `[tool.cibuildwheel] build` gained `cp314-*` on
+2026-09-13 (§11.2) and the `cuda-wheel` interpreter list did not — in **all four** repos. So
+`peclet-{flow,pnm,dem,voro} 1.0.1` each ship a CPU wheel for Python 3.14 and their `-cu13` twins stop
+at cp313, confirmed against PyPI: CPU `['cp310','cp311','cp312','cp313','cp314','sdist']` against
+cu13 `['cp310','cp311','cp312','cp313']`. A 3.14 user doing `pip install peclet-cu13` gets a source
+build that cannot succeed (no CUDA toolkit on the host by design). Both lists now read cp310–cp314,
+and the comment above each matrix says they are one decision. `/opt/python/cp314-cp314` is present in
+the `quay.io/pypa/manylinux_2_28_x86_64` image the CUDA job runs in — checked, not assumed.
+
+`docs/RELEASE.md` §0 said "cp310–cp313" and that three of the four cu13 packages "do not exist yet";
+both were stale and are corrected.
