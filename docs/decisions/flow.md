@@ -2802,7 +2802,8 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: user decision in session; benchmarks/momentum-solver (peclet-examples)
 - decided: 2026-09-15
-- status: settled
+- status: superseded (same day, by the condition-number rule below — the block-size half
+  stands; the 'whenever a solid is present' half does not)
 - supersedes: "AUTO velocity MG under MPI below PECLET_FLOW_VMG_AUTO_CELLS=65536 cells/rank and
   np>1" (2026-09-02, momentum-solve-residual-stop.md:32)
 - quote: |
@@ -2892,3 +2893,50 @@ Do not reverse an entry here without recording a new decision that supersedes it
     Numbers move for any surface-tension run: curvature on the affected cells switches from the
     PLIC-volumetric fallback to the height function, which is the more accurate branch. Runs with
     `wispEps = 0` (the standalone advector's default, and `enable_phase_change`) are bit-identical.
+
+### The momentum solver is chosen by the operator's CONDITION NUMBER, and the rule names no geometry
+- area: flow
+- source: user directive in session; measured on a domain-BC channel and the 384^3 cut-cell bed
+- decided: 2026-09-15
+- status: settled
+- supersedes: the entry above (V-cycle whenever a solid is present, 2026-09-15, hours earlier)
+- quote: |
+    "I do not like very much that schemes differ based on no-solid. IBM can also be used to sculp
+    the geometry. Try if velocityMG also performs well for case 1. If so, make the solver more
+    aligned."
+- rejected: (a) selecting on whether an immersed solid is present — the rule as first landed; IBM
+  is a way of SCULPTING GEOMETRY, so the same physical problem could get two different momentum
+  solvers depending on how its walls were expressed; (b) the V-cycle unconditionally, which is a
+  0.86x REGRESSION at D = 0.25 where the smoother already converges in 20 sweeps; (c) keeping
+  red-black for the no-solid path on the grounds that it had no evidence — the evidence was
+  cheap to get, and getting it found a segfault.
+- why: |
+    The criterion is now kappa = 1 + 4 dt mu (w_x + w_y + w_z) / rho, the Gershgorin condition
+    number of the implicit-diffusion operator (= 1 + 12 D isotropic, metric-correct anisotropic).
+    V-cycle at kappa >= 13, red-black below. That is the quantity that decides whether a smoother
+    suffices, and it is a property of the TIMESTEP -- not of the mesh, and not of whether the
+    walls came from an SDF or a boundary condition.
+
+    THE THRESHOLD IS A CORRECTNESS ONE, NOT A TUNING ONE. Channel with domain BCs, no solid:
+      D          0.25   0.50   1.00   2.00   4.00   6.00  12.00
+      V-cycle x  0.86   0.87   1.04   1.34   1.88   1.84   1.55
+      RB-GS it     20     35     59    107    189    200    200   (velIters_ = 200 is the cap)
+      RB-GS res 4e-11  7e-11  1e-10  8e-11  4e-10  7e-08  8e-06   (target 1e-10)
+    Below D ~ 1 the hierarchy is pure overhead; above D ~ 4 red-black stops MEETING ITS TOLERANCE.
+- evidence: |
+    Also fixed a PRE-EXISTING SEGFAULT this investigation surfaced: vmg_.init() was reachable only
+    from set_solid, so set_velocity_multigrid(True) on a configuration with no immersed solid built
+    a zero-level hierarchy and crashed on the first solve. Reproduced on the pre-change build, so
+    it predates the work. The velocity-MG hierarchy needs nothing from the solid.
+
+    The decision also moved to the head of the first step(), where dt/mu/rho are final; taking it
+    at set_solid time read a dt the caller need not have set yet, which for a condition-number
+    criterion is a live bug rather than a latent one.
+
+    Gates: tests/kokkos_mpi 106/106, tests/kokkos 45/45, Zick & Homsy unchanged to 4 digits
+    (4.291 at phi=0.125, 15.394 at phi=0.343), verify_poiseuille_flow PASS at 1.7e-08, and the
+    384^3 D=6 bed still selects the V-cycle.
+- consequence: |
+    Runs at D < 1 that the earlier same-day rule would have put on the V-cycle stay on red-black,
+    which is faster there. Runs with no immersed solid now reach the rule at all. The 1.0.0
+    scaling deposit is unaffected: its bed runs at D = 6.

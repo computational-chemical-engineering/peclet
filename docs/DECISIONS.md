@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-167 in force, 37 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+167 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -162,10 +162,10 @@ reading until they are settled.
 - **Ten-Cate periodic-image bug: periodic images are a union, not independent slabs**. **Rejected:** the earlier CSG-slab-per-image geometry construction (implicitly non-union)  <sub>sdf-scene-campaign.md:131</sub>
 - **The agglomerated-bottom MG anomaly required a per-fluid-component null-space projector, a double row-sum, and a looser inner tolerance**. **Rejected:** projecting the all-cell mean (rather than per-connected-fluid-component); leaving MG coefficients in single-precision row sums uncorrected; an inner t  <sub>agglomerated-bottom-ibm-fix.md:15</sub>
 - **The defect-correction rule: Krylov matvec/residual must be the exact double operator in flux form; preconditioners below may stay float**.  <sub>defect-correction-campaign.md:14-17</sub>
+- **The momentum solver is chosen by the operator's CONDITION NUMBER, and the rule names no geometry**. **Rejected:** (a) selecting on whether an immersed solid is present — the rule as first landed; IBM  <sub>user</sub>
 - **The np>1 VoF colour parity gates gate conservation, not the pointwise field**. **Rejected:** (a) loosening 1e-11 to a number above today's 3.174e-09 — it would have been fitted to  <sub>tests/kokkos_mpi/test_vof_bc_mpi.cpp,</sub>
 - **The rotational (Timmermans) pressure update must be restored, not the non-rotational Goda form substituted**. **Rejected:** non-rotational Goda pressure update form; diagonal-preconditioned CG in place of geometric MG/MG-PCG; double-precision pressure operator storage  <sub>migration-faithful-port.md:61</sub>
 - **The standalone V-cycle pressure driver does not honor set_pressure_solver_params(n) and is ~30x slower at small grids**.  <sub>flow-thermal-convection-validated.md:25</sub>
-- **The velocity V-cycle is the DEFAULT momentum solver, at every rank count and every block size**. **Rejected:** (a) KEEPING the 2026-09-02 rule — red-black Gauss-Seidel by default, V-cycle only below  <sub>user</sub>
 - **UCX_RNDV_THRESH tuning is falsified as an explanation for the np8 anomaly — leave UCX defaults**. **Rejected:** tuning UCX_RNDV_THRESH=256k  <sub>comm-scaling-plan.md:57</sub>
 - **User decision: port Basilisk embed.h, not Trebotich–Graves, for 2nd-order collocated walls**. **Rejected:** Trebotich–Graves/EBChombo as the primary port target  <sub>sdflow-collocated-solver.md:186-191</sub>
 - **User directive: ghost-cell IBM must become production-grade (it generalizes to AMR better than cut-cell)**.  <sub>ghost-hardening-plan.md:11-14</sub>
@@ -221,6 +221,7 @@ reading until they are settled.
 - The 47%-at-8-GPU "reduction tax" diagnosis is stale, superseded by 2026-08 solver fixes.  <sub>snellius-parallel-benchmark-campaign.md:25-27</sub>
 - The earlier "staircase not suited for packed materials" caveat is retracted.  <sub>velocity-mg-design.md:90-98</sub>
 - The ten-cate confined-flow deficit was a geometry (oversized periodic slab) bug, not a solver/advection defect.  <sub>advective-cutwall-flux-plan.md:49</sub>
+- The velocity V-cycle is the DEFAULT momentum solver, at every rank count and every block size.  <sub>user</sub>
 - The ~0.3% collocated accuracy "plateau" is not a truncation ceiling — it is an instability + an invisible pressure-subspace attractor family.  <sub>collocated-attractor-campaign.md:11</sub>
 - Wall-band "1/h amplitude growth" was a unit artifact, not a real localization signal.  <sub>collocated-second-order-verdict.md:36-39</sub>
 - Weak-scaling ladder must refine a fixed physical box, not grow box length at fixed cross-section (methodology correction).  <sub>channel-scaling-rebenchmark.md:156-168</sub>
