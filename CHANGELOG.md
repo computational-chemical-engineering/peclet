@@ -50,29 +50,33 @@ their own machines the day after 1.0.0.
   instead of a single-step one that the iteration could dip through). Both values sit within 0.2 % of
   what their own grid gives when iterated to convergence, and the page now prints its own wall clock.
 
-### Known issues
+### Fixed
 
-- **flow's height-function curvature is selected far less often than before 1.0.0, and droplet
-  damping degrades with it.** On the capillary-oscillations benchmark, same page and same inputs:
-  the pre-1.0.0 build took the height function on 791 interface cells and the PLIC paraboloid on 464
-  (37 % fallback); 1.0.0 takes HF on 129 and PLIC on 1109 (89.6 % fallback), and the mode-2 damping
-  deficit at mu = 0.0025 roughly doubles, from −17.3 % to −34.9 %.
+- **flow's height-function curvature is selected as often as it was before 1.0.0 again, and the
+  droplet damping with it.** The cascade and the advector disagreed about what a PURE cell is.
+  `enable_vof` runs Weymouth–Yue at `wispEps = 1e-8` (a cell that close to 0 or 1 is treated as a
+  pure phase and fluxed algebraically, which is what stops a DRAINED open domain from taking the
+  MYC normal of round-off residue and going to NaN in three steps). Such a cell is never
+  reconstructed back onto exactly 1.0, so the colour field legitimately carries bulk liquid at
+  `1 - O(1e-9)` — while the height-function column walk judged purity at its own hard-coded
+  `1e-10`, two orders tighter, found no pure end to the column, and rejected it.
 
-  **This is present in 1.0.0 and is neither caused nor fixed by 1.0.1** — `git diff v1.0.0 v1.0.1 --
-  src include` on `peclet-flow` is empty, so the two releases ship identical compiled code and differ
-  only in tests, packaging and version literals.
+  The result degraded *progressively and silently*: a fallback is a valid answer, so nothing
+  failed and no test went red — the curvature just got worse the longer a run went on. On the
+  capillary-oscillations mode-2 droplet the HF tier fell from 790 interface cells to 134
+  (37 % → 89 % PLIC fallback) over 2.5 periods, tracking 425 bulk cells drifting into the band
+  between the two tolerances, and the fitted damping rate came out 1.029e-3 against 1.460e-3.
 
-  The published [capillary-oscillations
-  page](https://computational-chemical-engineering.github.io/peclet-examples/examples/capillary-oscillations/)
-  prints the census itself, so the claim is checkable without building anything.
+  Every VoF consumer is now TOLD what a pure cell is instead of deciding for itself — the same
+  contract phase change was given in `633a144` when it hit this mechanism first. `core`'s
+  `hfColumnHeight` takes a `pureEps`; `Solver::computeVofCurvature` sets it from the advector's
+  `wispEps` at the point of use. With the fix the same run reads 784 HF cells / 37.0 % fallback
+  and a damping rate of 1.407e-3, against 790 / 37.2 % / 1.460e-3 for the pre-regression
+  configuration. `test_vof_curvature` gate H pins the contract: a bulk deficit inside the
+  advector's tolerance must not cost the HF tier (it cost all of it — 1968 cells → 0 — before).
 
-  It is narrow: standing-wave frequency is identical to four digits, pressure iteration counts are
-  unchanged, and volume drift is better. It is not a backend difference — CUDA and OpenMP built from
-  the same v1.0.0 source agree to 3 cells in ~1240 with identical PLIC counts. The suspect is the
-  consolidation that replaced flow's own height-function and PLIC kernels with `peclet-core`'s
-  (`peclet-flow` 2f93ec0), which deleted ~1750 lines in favour of ~100 across the VoF headers.
-  Investigation is open; surface tension and curvature-sensitive two-phase results should be treated
-  with care until it closes.
+  Runs at `wispEps = 0` (the standalone advector's default, and `enable_phase_change`) are
+  bit-identical. The drained-domain guard is untouched.
 
 ## [1.0.0] — 2026-09-12 — the clean break
 

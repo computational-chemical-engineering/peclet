@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-166 in force, 37 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+167 in force, 37 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -68,6 +68,7 @@ reading until they are settled.
 - **Earlier "slow convergence / non-converged" worry was a multiplied-dt float-precision artifact, fixed by the divided-dt engine convention**. **Rejected:** the multiplied-dt momentum-operator convention  <sub>ringbed-cfd-surrogate.md:63</sub>
 - **Embed momentum + mode-3 projection (mode 5) does not converge — over-drags**. **Rejected:** mode 5 (embed momentum + mode-3 projection) as a viable configuration  <sub>embed-port-progress.md:23</sub>
 - **Escalation rule: a twice-failed gate stops the work order, never gets its numerics tweaked to pass**. **Rejected:** tweaking numerics to force a failing gate to pass  <sub>vof-campaign.md:495-496</sub>
+- **Every VoF consumer is TOLD what a pure cell is; none decides on its own**. **Rejected:** |  <sub>this</sub>
 - **Exact-crossing openness overrides must be masked to 0 at solid velocity points**. **Rejected:** unmasked exact apertures at solid-velocity-point faces  <sub>flow-ghost-projection.md:61</sub>
 - **FV viscous operator confirmed 2nd-order-consistent — "face-flux placement" hypothesis refuted; barrier is the pressure coupling**. **Rejected:** the "face-flux placement" hypothesis; the wall-pressure-term-on-momentum-force fix (both signs)  <sub>sdflow-collocated-solver.md:152-166</sub>
 - **Face-primary uf reconstruction (mode 8) attempted and reverted — incompatible with flow's divided time convention**. **Rejected:** mode 8 (face-primary uf via Basilisk's acceleration-event reconstruction) under flow's current divided momentum-operator convention  <sub>embed-port-progress.md:33</sub>

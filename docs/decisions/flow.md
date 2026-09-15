@@ -2848,3 +2848,47 @@ Do not reverse an entry here without recording a new decision that supersedes it
 
     NOT CHANGED: the all-fluid domain-BC path, which never reaches this rule (it fires from
     set_solid). No evidence was gathered there, so it keeps red-black.
+
+### Every VoF consumer is TOLD what a pure cell is; none decides on its own
+- area: flow
+- source: this session (curvature HF collapse), flow `633a144`, core `kHfPureEps`
+- decided: 2026-09-15
+- status: settled
+- quote: |
+    `enable_vof` runs the advector at `wispEps = 1e-8` (WO-R2 item 4). A cell the advector calls
+    pure is fluxed ALGEBRAICALLY and never reconstructed back onto exactly 1.0, so the colour field
+    legitimately carries bulk cells at `1 - O(1e-9)`. Any consumer that judges purity at its OWN,
+    tighter tolerance disagrees with the field it was handed — and the disagreement is silent.
+- rejected: |
+    (a) letting each consumer keep a private purity constant (what the height function did: a
+    hard-coded 1e-10, two orders tighter than the advector);
+    (b) reverting `enable_vof` to `wispEps = 0` — that restores the HF tier but reinstates the
+    drained-open-domain failure WO-R2 exists to stop (`sum C` -> -inf -> NaN in three steps);
+    (c) clipping the colour field onto exactly [0, 1] — rung V1 refuses to clip on purpose, so
+    that conservation closes to round-off with nothing hiding the error.
+- why: |
+    Measured twice, the same mechanism both times. Phase change hit it first (`633a144`): the
+    Scriven bubble diverged at 48 % R(t) error because phase change judged interfaces at 1e-12
+    while the advector used 1e-8; the fix was `pcEffInterfaceEps() = max(own, wispEps)`.
+    The height-function cascade was the same class of consumer and was missed. On the mode-2
+    droplet (48^3, R = 8, mu = 0.0025, 2.5 periods) the HF tier fell from 790 cells to 134
+    (37 % -> 89 % PLIC fallback) as 425 bulk cells drifted into the band between 1e-10 and 1e-8,
+    and the fitted damping rate came out 1.029e-3 against 1.460e-3 — 30 % low.
+
+    It degrades SILENTLY and progressively: a fallback is a valid answer, so nothing fails, no
+    test goes red, and the curvature simply gets worse the longer the run goes. That is why the
+    contract is now pinned by a gate (`test_vof_curvature` gate H) rather than by a comment.
+
+    The drift is BOUNDED by `wispEps` — 425 of the 429 drifted cells were inside 1e-8, because a
+    cell that drifts past it becomes mixed again and gets reconstructed. So matching the tolerance
+    is a complete fix, not a threshold chase.
+- consequence: |
+    `core`'s `hfColumnHeight` takes a `pureEps` (floored at `kHfPureEps = 1e-10`, defaulted so
+    every existing caller is bit-identical); `VofCurvature::pureEps` and
+    `VofInterfaceArea::pureEps` carry it; `Solver::computeVofCurvature` sets it from
+    `vofAdv_.wispEps` AT THE POINT OF USE, because `set_vof_wisp_eps` and `enable_phase_change`
+    both move `wispEps` after `enable_vof` and a cached copy would go stale.
+
+    Numbers move for any surface-tension run: curvature on the affected cells switches from the
+    PLIC-volumetric fallback to the height function, which is the more accurate branch. Runs with
+    `wispEps = 0` (the standalone advector's default, and `enable_phase_change`) are bit-identical.
