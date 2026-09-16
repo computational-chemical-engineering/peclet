@@ -326,3 +326,52 @@ Do not reverse an entry here without recording a new decision that supersedes it
     never hit it.
 - rejected: cross-space deep_copy directly on a strided device subview
 - why: "cross-space deep_copy of a strided layout has no copy mechanism"
+
+---
+
+### The host backend is sized by the CPU BUDGET (cgroup quota ∧ affinity), not by the visible CPU count
+- area: core
+- source: user decision in session 2026-09-13; verified end-to-end 2026-09-16 (docs/SCALING_ISSUES.md issue 7)
+- decided: 2026-09-13
+- status: settled
+- quote: |
+    Kokkos sizes its host backend from the CPUs it can SEE. A container — Colab, Binder, Docker, a
+    Slurm cgroup — normally shows the whole host while granting a fraction of it through a cgroup
+    CPU *quota*, and a quota is invisible to OpenMP: `omp_get_max_threads()` returns the host count,
+    the pool spin-waits at every barrier, and the run collapses. Measured on the 1.0.0 CPU wheel, a
+    quick start that takes 25.7 s on two CPUs did NOT finish in fifteen minutes with 48 CPUs visible
+    and two CPUs of quota — and took 26.0 s with the pool bounded. The trap is silent and it is the
+    first thing a Colab user hits.
+- rejected: (a) **documentation alone** — the README/Colab bootstrap warning shipped 2026-09-12 and
+  was the state of the art for a day; rejected because the failure is silent and ≥35x, so a warning
+  protects only the user who already knows. (b) **reading `/sys/fs/cgroup/cpu.max` directly**, the
+  obvious one-liner and what the notebook first shipped: that path is the cgroup ROOT and on a
+  systemd host reads `max` while the real limit sits on the process's own scope below — it appears
+  to work in a container solely because a container has its own cgroup namespace. (c) **taking the
+  affinity mask as the budget**: an affinity mask is not the trap, because OpenMP honours a mask and
+  sizes itself correctly; the mask is only the ceiling. (d) **always calling `set_num_threads`**:
+  that would override the user's own `OMP_NUM_THREADS` and would change the thread count, schedule
+  and reduction order on an ordinary workstation.
+- why: |
+    `core/include/peclet/core/common/cpu_budget.hpp` resolves the process's own cgroup from
+    `/proc/self/cgroup` and walks UP, taking the TIGHTEST quota on the chain (v2 `cpu.max`, v1's cfs
+    pair), capped by the affinity mask. `defaultHostThreads()` returns 0 — "say nothing" — whenever
+    `KOKKOS_NUM_THREADS`/`OMP_NUM_THREADS` is set on a backend that reads it, or the budget is the
+    whole machine, which makes the fix INERT on a workstation: same thread count, same schedule,
+    same numbers. It speaks up in exactly two cases: a quota narrower than the visible machine, and
+    an `OMP_NUM_THREADS` that nothing else is going to read (`Kokkos::Threads` — the Windows/macOS
+    wheel backend — reads only `KOKKOS_NUM_THREADS` and defaults to ONE thread without hwloc, a 7x
+    cut measured 2026-09-13).
+
+    Applied at the ONE shared Kokkos init, `peclet::core::python::install()`
+    (`core/include/peclet/core/python/kokkos_teardown.hpp`), so flow, dem, voro, pnm, coupling and
+    amr all inherit it from a single place rather than each repeating the policy.
+
+    **Consequence for releases: core is header-only, so the fix reaches a user only when the
+    consumer is rebuilt against a core that carries it.** It landed in core `640c511`…`967b221`,
+    tagged `v1.0.1`; every consumer's `cmake/PecletDeps.cmake` was repinned `PECLET_CORE_TAG
+    v1.0.0 → v1.0.1` in its own 1.0.1 release commit, and the 1.0.1 wheels on PyPI were verified to
+    carry it (2026-09-16: `peclet-flow` 1.0.1 downloaded from PyPI builds a 2-thread pool under a
+    2-CPU cgroup quota where the pre-fix wheel builds 48). **A future core-side fix of this kind
+    needs the same repin, or it ships and does nothing** — that is the trap this paragraph exists
+    to prevent, and it is not visible from inside core.

@@ -21,7 +21,7 @@ is reproducible; the remaining defect is narrower.*
 | 4 | Intermittent multi-node hang in warmup | **High, silently wrong** (was: Medium) | **Root-caused and fixed 2026-09-02** (core `10294e6`): NBX inter-round tag race |
 | 5 | Momentum solve: cap-bound RB-GS (update criterion) | High (63 % of the packed step) | **Fixed 2026-09-02**: residual stop + velocity MG under MPI (mixed operator); packed step 2.2× faster at 384–1536 ranks |
 | 6 | `check_decomposition.py` unusable above ~100 ranks | Low (tooling) | Open |
-| 7 | Kokkos oversubscribes inside a CPU-quota container (Colab, Binder, Docker, Slurm) | **High, user-visible** | Open — docs fixed 2026-09-12, library default undecided |
+| 7 | Kokkos oversubscribes inside a CPU-quota container (Colab, Binder, Docker, Slurm) | **High, user-visible** | **CLOSED.** Fixed in the library 2026-09-13 (core `cpu_budget.hpp`); **already shipped** — the PyPI 1.0.1 wheels carry it, measured 2026-09-16 (quick start under a 2-CPU quota: **2.51 s**, was *unfinished in 15 min*) |
 
 ---
 
@@ -268,7 +268,7 @@ out or errored during this campaign, so the np=768 and np=1536 partitions could 
 before submitting. Given that issue 3 makes the partition the dominant performance variable, this
 tool should be fast enough to sweep the whole ladder in one call.
 
-## 7. Kokkos oversubscribes inside a CPU-quota container — HIGH, user-visible (added 2026-09-12)
+## 7. Kokkos oversubscribes inside a CPU-quota container — RESOLVED 2026-09-16 (added 2026-09-12)
 
 **Reported by the user**: the published quick start "takes forever" on Colab. It is neither the
 solver nor the install — all five wheels together are 5.7 MB.
@@ -326,6 +326,99 @@ A caution the fix itself turned up: reading `/sys/fs/cgroup/cpu.max` directly (t
 one-liner, and what the notebook first shipped) is right only by accident. That path is the cgroup
 ROOT; on a systemd host it reads `max` while the real limit sits on the process's scope below, and
 it appears to work in a container solely because a container has its own cgroup namespace.
+
+### Verified end-to-end and CLOSED, 2026-09-16
+
+The table above is the *unit* answer — what the library asks for. What follows is the failure itself,
+reproduced and then not reproduced, from a **built module** under a real `systemd-run --user -p
+CPUQuota=200% --scope` cgroup on this 48-CPU workstation: `flow` compiled fresh against current
+`core` (OpenMP host prefix, worktree `flow-quota-verify`), running the published README quick start
+at its shipped `N = 32`. This is `main`, not the 1.0.1 wheel — it converges in 10 steps where the
+wheel takes 14, because the momentum-solver work landed since — so compare rows *within* this table,
+and see the shipped-wheel numbers further down for the user-facing figure.
+
+| # | CPUs visible | budget | `OMP_NUM_THREADS` | host pool | solve | `u_mean` |
+|---|---|---|---|---|---|---|
+| A | 48 | 48 | unset | 48 | 1.32–1.57 s | `1.2410234213313371` |
+| B | 48 | **2 (cgroup quota)** | unset | **2** | **0.66 s** | `1.2410234213313376` |
+| C | 48 | 2 (cgroup quota) | unset, **budget defeated** (`KOKKOS_NUM_THREADS=48`) | 48 | **killed at the 600 s cap** | — |
+| F | 48 | 2 (cgroup quota) | **7** | 7 | 3.08 s | `1.2410234213313374` |
+| G | 48 | 2 (cgroup quota) | 2 (the documented manual workaround) | 2 | 0.72 s | `1.2410234213313376` |
+
+Read B against C: **the same binary, the same quota, the same script — 0.66 s with the budget, and
+still unfinished after 600 s without it**, i.e. ≥ 900x. C is a faithful stand-in for a pre-fix
+module and not a contrivance: an isolated probe of the one line `install()` changes shows
+`Kokkos::initialize()` (core `v1.0.0`) building a **48-thread** pool under that 2-CPU quota, which is
+exactly the pool `KOKKOS_NUM_THREADS=48` builds. Read G against B: the automatic budget reproduces
+what the README currently tells the user to do by hand. Read F: the library stays silent when the
+user has spoken, even when the user is wrong — 7 threads on 2 CPUs is 4.7x slower than the budget,
+and it is still their call.
+
+**Inert unconstrained, measured rather than asserted.** Three runs with the fix active (it requests
+nothing) and three with it bypassed entirely gave the same 48-thread pool, the same step count, and
+`u_mean` **bit-identical to the last digit** — `1.2410234213313371` six times out of six. (The
+last-digit differences in the table are between *different thread counts*, i.e. reduction order, and
+appear identically in B and G, which differ only in how the pool got its size.)
+
+**The mask is still not the trap**, re-confirmed: under `taskset -c 0,1` the pre-fix init already
+builds a 2-thread pool, and the library correctly says nothing.
+
+### It has already shipped — the crux, settled
+
+`core` is header-only, so the fix is *compiled into* each consumer and reaches a user only when that
+consumer is built against a `core` that carries it. A release that tags `core` and forgets the repin
+ships a fix that does nothing, so this was checked rather than assumed — and the chain is complete at
+every link:
+
+1. The fix landed in core `640c511`…`967b221` and is inside the **pushed tag `v1.0.1`**; it is absent
+   from `v1.0.0`, whose `install()` calls a bare `Kokkos::initialize()`.
+2. Every consumer's `cmake/PecletDeps.cmake` already moved `PECLET_CORE_TAG v1.0.0 → v1.0.1`, in its
+   own 1.0.1 release commit — verified *at the tag* for flow, dem, voro, pnm and coupling, and on
+   `main` for amr (unreleased).
+3. **peclet 1.0.1 is on PyPI for all seven packages**, so those wheels were built from the repinned
+   source.
+
+Point 3 was then confirmed against the artifact itself rather than inferred. Downloading
+`peclet-flow==1.0.1` and `peclet-dem==1.0.1` from PyPI and counting the pool's OS threads
+(`/proc/self/status`) across `import`, beside the July 2026 wheels still in the suite venv, which
+predate the fix:
+
+| module | Kokkos pool under 2 CPUs of quota | unconstrained |
+|---|---|---|
+| `peclet.flow` wheel, July 2026 (pre-fix `core`) | **48 — the defect** | 48 |
+| **`peclet-flow` 1.0.1 from PyPI** | **2** | 48 |
+| `peclet.dem` wheel, July 2026 (pre-fix `core`) | **48 — the defect** | 48 |
+| **`peclet-dem` 1.0.1 from PyPI** | **2** | 48 |
+| `flow` / `dem` built here against `core` `v1.0.1` | 2 | 48 |
+
+And the quick start on the **published wheel**, unmodified, under the same 2-CPU quota with
+`OMP_NUM_THREADS` unset: **2.51 s** — the 2.5 s the README advertises — against *did not finish in
+fifteen minutes* on the 1.0.0 wheel. Unconstrained the same wheel gives 1.37 s and a `u_mean`
+bit-identical to the quota run.
+
+**So: nothing is owed to this issue by the 1.1.0 release.** No repin, no code, no rebuild beyond what
+the release does anyway. Two consumers, one shared `install()`, the same result — which is the
+argument for the policy living in `core` rather than being restated six times.
+
+**A limit of the fix, found while measuring it.** `peclet.dem` imports numpy, and **numpy's own BLAS
+pool is 48 threads under that same 2-CPU quota**, fix or no fix — peclet does not own it and cannot
+size it. (Counted by importing numpy first and attributing only the delta: `peclet.dem` adds 47
+threads pre-fix and 1 post-fix; numpy's 47 are there either way.) It is the milder half of the same
+trap — a BLAS pool is not entered at every solver barrier, and the quick start above ran in 0.66 s
+with it present — but it means the container advice is *narrowed* by the library fix, not retired by
+it: `OMP_NUM_THREADS` bounded both pools, while the library bounds only Kokkos.
+
+**One thing is still owed, and it is documentation only:** the `> [!WARNING]` block in
+`README.md` and `docs/index.md` still tells the container user to set `OMP_NUM_THREADS` by hand
+before importing peclet, and the Colab notebook's bootstrap cell still computes the budget itself.
+As of the 1.0.1 wheels that is unnecessary *for peclet's own pool* — it is an override now, not a
+workaround — but the numpy caveat above means the advice should be **rewritten, not deleted**, and
+the notebook cell is harmless where it stands. This is a docs-site edit with no gate behind it; it
+is listed here so it is not lost, and it blocks nothing.
+
+Gates at closure: `core` `55/55` plain and `55/55` Kokkos (`OMP_NUM_THREADS=8 OMP_PROC_BIND=false`,
+np 1–8). The decision is recorded in [decisions/core.md](decisions/core.md) — *"The host backend is
+sized by the CPU BUDGET (cgroup quota ∧ affinity), not by the visible CPU count"*.
 
 
 ## Issues 1 and 2 compound — and that is the most important thing here

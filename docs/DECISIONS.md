@@ -499,7 +499,7 @@ reading until they are settled.
 
 ## core — decomposition, halo, rebalance
 
-23 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
+24 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
 
 ### In force
 
@@ -519,6 +519,7 @@ reading until they are settled.
 - **Periodic axis needs >=2 ranks**.  <sub>suite-distributed-status.md:27-28</sub>
 - **Port transport-core's device layer first (foundation-first sequencing)**. **Rejected:** porting each consumer's halo independently (double-porting)  <sub>cuda-kokkos-migration.md:79-82</sub>
 - **Rebalance is pure migration (same global mesh, new owners) and must never use transferField**. **Rejected:** using transferField (same-domain old→new octree conservative remap) to implement rebalance migration  <sub>dynamic-load-balancing.md:62</sub>
+- **The host backend is sized by the CPU BUDGET (cgroup quota ∧ affinity), not by the visible CPU count**. **Rejected:** (a) **documentation alone** — the README/Colab bootstrap warning shipped 2026-09-12 and  <sub>user</sub>
 - **Treat nvcc warnings #20013/#20015 as errors, not style noise**. **Rejected:** treating #20013/#20015 as benign style warnings  <sub>kokkos-cuda-constexpr-required.md:26-27</sub>
 - **Weighted ORB dynamic load balancing is one shared primitive that lives in the core layer**. **Rejected:** implementing separate load-balancing logic per consumer (AMR, dem)  <sub>dynamic-load-balancing.md:18</sub>
 - **Weighted ORB split boundary must remain on integer cell boundaries**.  <sub>dynamic-load-balancing.md:65</sub>
