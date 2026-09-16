@@ -215,6 +215,7 @@ in array order**, and never add a bare `origin`/`spacing` beside it in the other
 | `peclet.core.amr.{Octree, DistributedOctree, Poisson, Flow}` | `peclet.amr.{…}` — the whole AMR tree is the eighth package `peclet-amr` (QUALITY_PLAN G.2, D6) | **removed 1.0.0** (G.2, 2026-09-10) |
 | `Flow.last_mom_iters` / `last_pres_iters` / `last_outer_iters` / `divergence_norm_face` / `set_momentum_mg` / `set_momentum_gs` / `set_velocity_mg_staircase` / `set_momentum_mg_solver` / `set_ghost_gradient` / `set_aperture_order` | `Flow.diagnostics.<same>` | **removed 1.0.0** (F, 2026-09-10) |
 | env `PECLET_CORE_GPS_RHO` / `PECLET_CORE_GPS_MAXN` | `Flow.set_ghost_sampled(on, rho=2.2, max_samples=0)` | **removed 1.0.0** (E for amr) |
+| `amr.Flow.set_body_force(fx, fy, fz)` | `set_body_force((fx, fy, fz))` — one 3-sequence, as `flow`, `dem` and `voro` already take it (§2 flow row, removed there in 1.0.0) | **OPEN divergence** (found 2026-09-17): two spellings for one concept across two shipped APIs. `peclet-amr` is 0.x under D9's exception, so this is not a 1.0.0 break to answer for — but it is the exact shape NAMING exists to prevent, and it bit once already: while fixing stale 3-float callers of `flow`'s version, the two `amr.Flow` callers in `flow/scripts/` had to be checked individually because the spelling alone does not say which API is meant. Fix when amr next takes a breaking change. |
 
 ### peclet.coupling
 
