@@ -4,6 +4,145 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-09-16 — the momentum solve, twice as fast
+
+`peclet-flow` 1.1.0 · `peclet-core` / `peclet-dem` / `peclet-pnm` / `peclet-voro` 1.0.2 ·
+`peclet-morton` 1.0.1 and `peclet-coupling` 1.0.1 unchanged (no commits since their tag) ·
+`peclet-amr` 0.1.1 (still 0.x while under development).
+
+### Changed
+
+- **The implicit momentum solve now runs the velocity multigrid V-cycle by default, and it is
+  roughly 2x faster.** Red-black Gauss–Seidel was the default and the V-cycle was selected only
+  *below* 65536 cells per rank and only at `np > 1` — a rule whose premise had the sign of the
+  effect backwards. Measured on the 1.0.0 scaling benchmark (384³ cut-cell bed, Snellius), the
+  V-cycle is faster at every rung of both ladders and its margin is **largest at the biggest
+  blocks**:
+
+  | configuration | cells/rank | red-black | V-cycle | speed-up |
+  |---|---|---|---|---|
+  | Genoa, 24 cores | 2.36 M | 70890 ms | 36176 ms | 1.96x |
+  | Genoa, 384 cores | 147 k | 8130 ms | 3646 ms | 2.23x |
+  | Genoa, 768 cores | 74 k | 2904 ms | 1745 ms | 1.66x |
+  | H100, 1 GPU | 56.6 M | 4025 ms | 1840 ms | 2.19x |
+  | H100, 4 GPUs | 14.1 M | 1203 ms | 664 ms | 1.81x |
+
+  Red-black was not merely slower: it ran at its sweep cap (200 per component) on every rung of
+  both ladders, so it was **not converging**. The V-cycle takes 9.7 cycles, rank-independent.
+  Accuracy is unchanged — that was checked rather than assumed.
+
+  *If you benchmarked 1.0.x, note that the momentum default moved underneath you:* published
+  1.0.0 scaling figures were taken at the 1.0.0 default, not this one.
+
+- **The momentum solver is chosen by the operator's condition number, not by whether geometry is
+  present.** The previous rule keyed on "a solid is present", so an IBM-sculpted body and a plain
+  domain-BC box at the same `dt` got different solvers. The criterion is now
+  `kappa = 1 + 4 dt mu (w_x + w_y + w_z) / rho` (`= 1 + 12 D` isotropic): V-cycle at `kappa >= 13`
+  (`D >~ 1`), red-black below. The crossover was measured on a 64³/96³ channel with domain BCs and
+  **no solid** — the case that had no evidence behind it before.
+
+- The Chebyshev momentum solvers are bound on `solver.diagnostics`, not on the public `Solver`.
+  Under [docs/RELEASE.md](docs/RELEASE.md) §4.1 and [docs/NAMING.md](docs/NAMING.md)'s alias ladder,
+  removing public API later costs a major bump; ablation knobs belong on the diagnostics tier
+  (QUALITY_PLAN D2), beside `set_velocity_multigrid_auto` and dem's existing
+  `diagnostics.set_velocity_solver`.
+
+### Added
+
+- **One string selector per choice instead of a boolean per solver**, extensible without breaking
+  the API:
+
+  ```python
+  solver.diagnostics.set_velocity_solver('auto' | 'gauss_seidel' | 'multigrid' | 'chebyshev')
+  solver.diagnostics.set_velocity_mg_smoother('gauss_seidel' | 'chebyshev')
+  solver.diagnostics.velocity_solver()          # readbacks
+  solver.diagnostics.velocity_mg_smoother()
+  ```
+
+  Two axes, kept apart because they are orthogonal: which solver runs the momentum equation, and —
+  only when that is `'multigrid'` — which smoother runs inside the V-cycle. `'auto'` is reachable as
+  a value for the first time: it clears an explicit choice and re-decides at the next `step()`,
+  where `dt` and `mu` are final. Spelled as `peclet.dem` already spells it (NAMING.md's whole
+  point).
+
+- **Chebyshev semi-iteration as an alternative momentum solver**
+  (`diagnostics.set_velocity_chebyshev`). The implicit momentum solve is a screened Helmholtz whose
+  condition number is a property of the diffusion number `D = mu dt / (rho h²)` and not of the mesh,
+  so red-black needs `O(kappa)` sweeps where Chebyshev needs `O(sqrt(kappa))` — and one Chebyshev
+  step costs one residual and one halo exchange against a red-black sweep's two of each, with every
+  lane active instead of half. The spectral interval is Gershgorin arithmetic on the stored stencil,
+  reduced over the communicator so every rank iterates with the same polynomial; a degenerate
+  interval falls back to red-black rather than diverging. It delivers the predicted `sqrt(kappa)`
+  factor (107 iterations/component against 147, predicted 111) but **loses to the V-cycle except at
+  the smallest per-rank blocks**, and its docstring says so.
+
+- **Chebyshev as the velocity multigrid's smoother**
+  (`diagnostics.set_velocity_mg_chebyshev`), independent of the above. **Measured slower**, and the
+  docstring says that too: at degree 4 / ratio 6 it is the stronger smoother per cycle (8.0 V-cycles
+  against 9.3) and still loses on wall clock. Shipped because the measurement is worth keeping, not
+  because it wins.
+
+- **CPython 3.14 CUDA wheels.** `peclet-flow-cu13`, `peclet-pnm-cu13`, `peclet-dem-cu13` and
+  `peclet-voro-cu13` now build one job per interpreter across cp310–cp314, matching the CPU wheels;
+  cp314 users were falling through to a source build.
+
+### Fixed
+
+- **A solid cutting an inflow or outflow face no longer produces an unsolvable pressure system.**
+  Three defects hid in the same gap — nothing anywhere had put an immersed solid *on* an open
+  domain face — and none could be fixed alone, because each masked the next.
+
+  The SDF ghost band outside a non-periodic face was filled by **periodic wrap**, so the geometry an
+  inlet or outlet face saw was teleported from the opposite side of the domain. That decides the
+  boundary-face aperture: a solid cell against the inlet (`sdf = -0.73`) was handed the far side's
+  fluid and its inflow face came out fully **open**, so prescribed inflow was counted into a cell
+  whose pressure row is entirely closed. `0*p = U` is an inconsistent row, and no Krylov driver and
+  no multigrid depth solves an inconsistent system — which is precisely why the field evidence
+  showed FCG capping, Chebyshev NaN-ing and divergence at `MGLEVELS <= 2`, and why the agglomerated
+  bottom was (correctly) exonerated. The Dirichlet outlet row separately carried the literal
+  openness `1.0` instead of the face aperture, i.e. mass leaving through solid.
+
+  This closes [docs/SCALING_ISSUES.md](docs/SCALING_ISSUES.md) #3, and the **MPI-only** defect it
+  surfaced as #8 — the halo wrapped a non-periodic face's *high* boundary plane. Both halves
+  (openness and the outflow velocity plane) had to land together, since fixing either alone breaks
+  `vof_bc_mpi`'s composed conservation budget.
+
+  Gated by `test_openbc_solid{,_mpi}` — the first tests anywhere to combine `set_domain_bc` with
+  `set_solid` — now run on **both** the staggered and collocated grids, plus a `colo-jet` case
+  giving `SolverColocated` its first open-boundary conservation gate of any kind. The collocated
+  path needed no code change: every part of the fix is in the geometry, and geometry is
+  grid-independent. What was missing there was the gate, not the fix.
+
+- **flow's height-function curvature is selected as often as it was before 1.0.0 again, and the
+  droplet damping with it.** The cascade and the advector disagreed about what a PURE cell is.
+  `enable_vof` runs Weymouth–Yue at `wispEps = 1e-8` (a cell that close to 0 or 1 is treated as a
+  pure phase and fluxed algebraically, which is what stops a DRAINED open domain from taking the
+  MYC normal of round-off residue and going to NaN in three steps). Such a cell is never
+  reconstructed back onto exactly 1.0, so the colour field legitimately carries bulk liquid at
+  `1 - O(1e-9)` — while the height-function column walk judged purity at its own hard-coded
+  `1e-10`, two orders tighter, found no pure end to the column, and rejected it.
+
+  The result degraded *progressively and silently*: a fallback is a valid answer, so nothing
+  failed and no test went red — the curvature just got worse the longer a run went on. On the
+  capillary-oscillations mode-2 droplet the HF tier fell from 790 interface cells to 134
+  (37 % → 89 % PLIC fallback) over 2.5 periods, tracking 425 bulk cells drifting into the band
+  between the two tolerances, and the fitted damping rate came out 1.029e-3 against 1.460e-3.
+
+  Every VoF consumer is now TOLD what a pure cell is instead of deciding for itself — the same
+  contract phase change was given in `633a144` when it hit this mechanism first. `core`'s
+  `hfColumnHeight` takes a `pureEps`; `Solver::computeVofCurvature` sets it from the advector's
+  `wispEps` at the point of use. With the fix the same run reads 784 HF cells / 37.0 % fallback
+  and a damping rate of 1.407e-3, against 790 / 37.2 % / 1.460e-3 for the pre-regression
+  configuration. `test_vof_curvature` gate H pins the contract: a bulk deficit inside the
+  advector's tolerance must not cost the HF tier (it cost all of it — 1968 cells → 0 — before).
+
+  Runs at `wispEps = 0` (the standalone advector's default, and `enable_phase_change`) are
+  bit-identical. The drained-domain guard is untouched.
+
+  *This entry was briefly filed under 1.0.1 by mistake.* Both halves of the fix (core `e6a612d`,
+  flow `28d3224`) landed the day **after** the 1.0.1 tag, so 1.0.1 never carried them; it ships
+  here.
+
 ## [1.0.1] — 2026-09-14 — it installs, and it uses your cores
 
 A patch release with no API change and no numerics change, prompted entirely by what two users hit on
@@ -49,34 +188,6 @@ their own machines the day after 1.0.0.
 - **The quick start is 2.5 s instead of 25.6 s** (N = 48 → 32, and a three-step convergence window
   instead of a single-step one that the iteration could dip through). Both values sit within 0.2 % of
   what their own grid gives when iterated to convergence, and the page now prints its own wall clock.
-
-### Fixed
-
-- **flow's height-function curvature is selected as often as it was before 1.0.0 again, and the
-  droplet damping with it.** The cascade and the advector disagreed about what a PURE cell is.
-  `enable_vof` runs Weymouth–Yue at `wispEps = 1e-8` (a cell that close to 0 or 1 is treated as a
-  pure phase and fluxed algebraically, which is what stops a DRAINED open domain from taking the
-  MYC normal of round-off residue and going to NaN in three steps). Such a cell is never
-  reconstructed back onto exactly 1.0, so the colour field legitimately carries bulk liquid at
-  `1 - O(1e-9)` — while the height-function column walk judged purity at its own hard-coded
-  `1e-10`, two orders tighter, found no pure end to the column, and rejected it.
-
-  The result degraded *progressively and silently*: a fallback is a valid answer, so nothing
-  failed and no test went red — the curvature just got worse the longer a run went on. On the
-  capillary-oscillations mode-2 droplet the HF tier fell from 790 interface cells to 134
-  (37 % → 89 % PLIC fallback) over 2.5 periods, tracking 425 bulk cells drifting into the band
-  between the two tolerances, and the fitted damping rate came out 1.029e-3 against 1.460e-3.
-
-  Every VoF consumer is now TOLD what a pure cell is instead of deciding for itself — the same
-  contract phase change was given in `633a144` when it hit this mechanism first. `core`'s
-  `hfColumnHeight` takes a `pureEps`; `Solver::computeVofCurvature` sets it from the advector's
-  `wispEps` at the point of use. With the fix the same run reads 784 HF cells / 37.0 % fallback
-  and a damping rate of 1.407e-3, against 790 / 37.2 % / 1.460e-3 for the pre-regression
-  configuration. `test_vof_curvature` gate H pins the contract: a bulk deficit inside the
-  advector's tolerance must not cost the HF tier (it cost all of it — 1968 cells → 0 — before).
-
-  Runs at `wispEps = 0` (the standalone advector's default, and `enable_phase_change`) are
-  bit-identical. The drained-domain guard is untouched.
 
 ## [1.0.0] — 2026-09-12 — the clean break
 

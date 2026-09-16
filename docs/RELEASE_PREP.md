@@ -232,7 +232,7 @@ fixed and regression-tested.
    inlet) and the Dirichlet outlet row carried the literal openness 1.0 instead of the face
    aperture (mass leaving through solid). Gated by `test_openbc_solid{,_mpi}`, the first tests to
    combine `set_domain_bc` with `set_solid`. **Two consequences for the release:** the 1.0.0
-   "Known limitations" bullet in [../CHANGELOG.md](../CHANGELOG.md) is superseded and 1.1.0 needs a
+   "Known limitations" bullet in [the CHANGELOG](https://github.com/computational-chemical-engineering/peclet/blob/main/CHANGELOG.md) is superseded and 1.1.0 needs a
    Fixed entry; and a THIRD, MPI-only defect it surfaced is **new issue #8** (the halo wraps a
    non-periodic face's HIGH boundary plane), also fixed — both halves, openness and the outflow
    velocity plane, since fixing either alone breaks `vof_bc_mpi`'s composed conservation budget.
