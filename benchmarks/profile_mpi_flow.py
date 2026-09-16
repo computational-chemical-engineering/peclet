@@ -96,7 +96,7 @@ def configure(s: "flow.Solver", mu: float, dt: float, fx: float) -> None:
     s.set_dt(dt)
     s.set_body_force((fx, 0.0, 0.0))   # one 3-sequence since 1.0.0 (NAMING.md; the clean break)
     s.set_advection(False)                       # Stokes: the pressure solve is the cost we profile
-    s.set_velocity_solver_params(80)
+    s.diagnostics.set_velocity_solver_params(80)   # diagnostics tier since 1.0.0 (QUALITY_PLAN F)
     s.set_pressure_multigrid(True, 4)
     s.set_pressure_pcg(True, 200, 1e-9)
 
@@ -154,7 +154,7 @@ def main() -> None:
     comm.Barrier()
     per_step = (MPI.Wtime() - t0) / args.steps
 
-    piters = s.last_pressure_iterations()
+    piters = s.diagnostics.last_pressure_iterations()   # diagnostics tier since 1.0.0
     tmax = comm.reduce(per_step, op=MPI.MAX, root=0)
     tmin = comm.reduce(per_step, op=MPI.MIN, root=0)
     cells = lnx * lny * lnz
