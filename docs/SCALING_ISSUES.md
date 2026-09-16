@@ -15,7 +15,7 @@ is reproducible; the remaining defect is narrower.*
 
 | # | Issue | Severity | Status |
 |---|---|---|---|
-| 1 | Float operator storage caps MG-PCG on dense beds | **High, silently invalid** | Known (WO-M), fix not defaulted |
+| 1 | Float operator storage caps MG-PCG on dense beds | **High, silently invalid** | **CLOSED by decision 2026-09-11** (`PECLET_FLOW_OPERATOR_DOUBLE` defaults **ON**, `flow/CMakeLists.txt:93`; a float build warns and names this issue); **already shipped** in the 1.0.0 wheels |
 | 2 | MG depth capped by the per-rank block | High (scaling shape) | **Fixed 2026-09-02** (telescoping, opt-in), **measured**: iterations flat 24 → 1536 ranks, ≥ 99 % efficiency on the bed |
 | 3 | Solid intersecting an OPEN domain face stalls the solve | Medium, silently wrong (narrow) | **Fixed 2026-09-16** (flow: SDF ghost extension + Dirichlet-row aperture), gated `test_openbc_solid{,_mpi}` |
 | 4 | Intermittent multi-node hang in warmup | **High, silently wrong** (was: Medium) | **Root-caused and fixed 2026-09-02** (core `10294e6`): NBX inter-round tag race |

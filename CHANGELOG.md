@@ -143,6 +143,41 @@ All notable changes to the peclet suite are documented here. The format is based
   flow `28d3224`) landed the day **after** the 1.0.1 tag, so 1.0.1 never carried them; it ships
   here.
 
+### Known limitations in 1.1.0
+
+Carried over from 1.0.0 except the first bullet of that list — *an immersed solid cutting an inflow
+or outflow face* — which is **fixed** above.
+
+- **Multigrid depth is capped by the factors of two in the grid.** An axis coarsens only while it
+  stays even, so an odd dimension never coarsens at all, and under MPI only if every rank's block is
+  even on it. Telescoping ships and is the default; the underlying requirement that intermediate
+  levels coarsen in place is routed around, not solved, and it remains the top open item at scale
+  ([docs/SCALING_ISSUES.md](docs/SCALING_ISSUES.md) #2).
+- **Collocated solver:** the `(matrix_order=1, rhs_order=2)` ghost mode is march-unstable above about
+  2000 spheres and is documented do-not-use. Collocated MPI is validated at np = 1, 2, 4; np >= 16 is
+  unresolved. (New in 1.1.0: the collocated grid now has open-boundary gates — `test_openbc_solid`
+  runs on both grids and `colo-jet` gives `SolverColocated` its first open-boundary conservation
+  budget — but the np >= 16 question is untouched.)
+- **VoF:** the staggered grid is the reference. The collocated path is all-fluid and rated to density
+  ratio about 100 with motion; the per-bubble block container is all-fluid and staggered-only for its
+  surface tension. **Colliding markers are outside the rating** — a contacting pair drives through the
+  two-cell film at roughly 1.5 eddy turnovers, independent of the timestep.
+- **voro on CUDA:** `clipCellAgainstSdf` is wrong by up to 22 % on device at 128 and 256 grids, while
+  correct on the OpenMP backend. Unchanged in 1.0.2, which is a packaging-only release for `voro`.
+- **peclet-amr's octree V-cycle is a preconditioner, not a solver, on anisotropic (box) cells** — it
+  diverges at aspect ratio 2 and 4 even though the operators themselves are exact. See
+  `amr/docs/amr_anisotropic.md`.
+- **morton's AVX-512 batch kernels were not re-validated for this release either.** They need Intel
+  SDE or AVX-512 hardware and the release host has neither. `peclet-morton` is unchanged at 1.0.1.
+- **`core` has no automated test covering `vof/curvature.hpp`.** The height-function fix shipping
+  here was verified inert at its default by inspection and a standalone compile, and the behaviour it
+  restores is gated in `flow` (`test_vof_curvature` gate H) — but nothing in `core`'s own 198-test
+  suite reaches that header. Recorded so the next change to it is not made on the assumption that
+  core's gate would catch a mistake.
+- **Unresolved and recorded:** whether the reported permeability `K` is interstitial or superficial.
+  [docs/DECISIONS.md](docs/DECISIONS.md) carries the contradiction; it decides a (1−φ) factor. **No
+  permeability number is published in these release notes for that reason.**
+
 ## [1.0.1] — 2026-09-14 — it installs, and it uses your cores
 
 A patch release with no API change and no numerics change, prompted entirely by what two users hit on

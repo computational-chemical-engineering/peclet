@@ -175,7 +175,7 @@ def check_names(ref: str, installed: bool) -> int:
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--ref", default="v1.0.0", help="git ref of the submodule bindings to check "
+    ap.add_argument("--ref", default="v1.1.0", help="git ref of the submodule bindings to check "
                                                     "the names against (default v1.0.0; amr is "
                                                     "pinned to its own tag, see REF_OVERRIDE)")
     ap.add_argument("--installed", action="store_true",

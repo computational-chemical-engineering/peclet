@@ -1,4 +1,11 @@
-# Release preparation — state on 2026-09-11 (next family release: **peclet 1.0.0**)
+# Release preparation — state on 2026-09-11 (cycle: **peclet 1.0.0**, shipped; then 1.0.1 and 1.1.0)
+
+> **This file still describes the 1.0.0 cycle.** 1.0.0 shipped 2026-09-12, 1.0.1 on 2026-09-14 and
+> **1.1.0 on 2026-09-16** (flow 1.1.0; core/pnm/dem/voro 1.0.2; morton/coupling 1.0.1 and amr 0.1.1
+> unchanged). It has NOT been re-cut for those, so read every "next release" below as 1.0.0 and check
+> the item against the repo before acting on it. RELEASE.md's instruction to re-cut this file and
+> archive the previous cycle is outstanding — see the 1.1.0 entry in the CHANGELOG for what actually
+> shipped.
 
 The one-off companion of [RELEASE.md](RELEASE.md) (the durable workflow), re-cut for the 1.0.0 cycle
 as that file's own header instructed. The previous cycle's record (0.7.0/0.7.1/0.7.2, measured
