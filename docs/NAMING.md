@@ -241,6 +241,18 @@ in array order**, and never add a bare `origin`/`spacing` beside it in the other
 
 - 2026-09-07 — file created. Canon fixed; `smooth_length` (coupling) is the first entry landed under
   it, together with flow's already-shipped `spacing`/`cells`/`extent`/`origin` quartet.
+- 2026-09-16 — **flow gains `diagnostics.set_velocity_solver('auto'|'gauss_seidel'|'multigrid'|'chebyshev')`**
+  and `diagnostics.set_velocity_mg_smoother('gauss_seidel'|'chebyshev')`, with readbacks
+  `velocity_solver()` / `velocity_mg_smoother()`. ADDITIVE — nothing is renamed or removed, so no
+  alias ladder is owed. Named to the canon rather than invented: **dem already ships
+  `diagnostics.set_velocity_solver('gauss_seidel'|'jacobi')`** (row above), so this is the same
+  spelling for the same concept in a second API, and flow already had the sibling
+  `diagnostics.set_velocity_solver_params`. The four boolean setters this replaces
+  (`set_velocity_chebyshev`, `set_velocity_mg_chebyshev`, and their `*_active` readbacks) existed
+  only on `main` and were **never released**, so replacing them cost nothing — had they shipped in
+  1.1.0, removing them would have cost a major. That is the same conflation §1.0.0 removed from
+  `set_stabilization(bool) + set_stabilization_mode(str)`: a boolean per mode does not extend, a
+  string selector does.
 - 2026-09-08 (later) — **1.0.0 clean break** (QUALITY_PLAN D1): every *aliased* row above became
   *removed 1.0.0* in flow `b891b8e`, dem `4aff4db`, voro `9e7b1b0`, pnm `b2d4fce`, core `8d9f3c2`
   and the coupling/sweep commits of the same day; the alias ladder is binding from 1.0.0 on.
