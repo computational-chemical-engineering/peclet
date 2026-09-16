@@ -7,7 +7,9 @@
 #   * import checks for dem / voro / pnm / core.mpi / coupling (backend + MPI surface present).
 #
 #   sbatch --nodes=1 --gpus-per-node=4 --ntasks-per-node=4 tools/hpc/smoke_snellius.slurm v0.7.0 h100
-#   sbatch -p genoa --gpus=0 --ntasks-per-node=4 -c 4      tools/hpc/smoke_snellius.slurm v0.7.0 cpu
+#   sbatch -p gpu_a100 --nodes=1 --gpus-per-node=4 --ntasks-per-node=4 tools/hpc/smoke_snellius.slurm v0.7.0 a100
+#   sbatch -p genoa --gpus-per-node=0 --ntasks-per-node=4 -c 4 tools/hpc/smoke_snellius.slurm v0.7.0 cpu
+# It reads $PROJ/suite-<tag>-<target>, the tree install_snellius.sh built for that backend.
 # Record the job id + the two k lines in docs/SNELLIUS.md "Validated releases".
 #SBATCH --job-name=peclet-smoke
 #SBATCH --partition=gpu_h100
@@ -16,7 +18,10 @@
 #SBATCH --account=tes24005
 set -euo pipefail
 TAG="${1:?usage: smoke_snellius.slurm <tag> <h100|a100|cpu>}"; TARGET="${2:-h100}"
-PROJ="${PROJ:-/projects/0/prjs1022/peclet}"; SUITE="$PROJ/suite-$TAG"
+PROJ="${PROJ:-/projects/0/prjs1022/peclet}"
+# Per-backend tree, matching install_snellius.sh: h100 and a100 build the same nvidia-cuda prefix at
+# different arch and cannot share a tree or a venv (2026-09-16, the 1.1.0 release).
+SUITE="$PROJ/suite-$TAG-$TARGET"
 source "$SUITE/tools/hpc/snellius_env.sh"
 source "$SUITE/.venv/bin/activate"
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-4} OMP_PROC_BIND=false
