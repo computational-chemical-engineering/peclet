@@ -12,12 +12,15 @@ All notable changes to the peclet suite are documented here. The format is based
 
 ### Changed
 
-- **The implicit momentum solve now runs the velocity multigrid V-cycle by default, and it is
-  roughly 2x faster.** Red-black Gauss–Seidel was the default and the V-cycle was selected only
-  *below* 65536 cells per rank and only at `np > 1` — a rule whose premise had the sign of the
-  effect backwards. Measured on the 1.0.0 scaling benchmark (384³ cut-cell bed, Snellius), the
-  V-cycle is faster at every rung of both ladders and its margin is **largest at the biggest
-  blocks**:
+- **The implicit momentum solve now takes the velocity multigrid V-cycle wherever the operator
+  warrants it, and there it is roughly 2x faster.** Solver selection is `'auto'` by default and keys
+  on the operator's condition number (next bullet): at `kappa >= 13` — the diffusion-dominated
+  regime dense beds and large timesteps live in — it takes the V-cycle. Before, it took red-black
+  Gauss–Seidel unless the block was *below* 65536 cells per rank **and** `np > 1`, a rule whose
+  premise had the sign of the effect backwards. At low `kappa` red-black is still the right tool and
+  is still what you get, so this is not "multigrid everywhere". Measured on the 1.0.0 scaling
+  benchmark (384³ cut-cell bed, Snellius, `D = 6` i.e. `kappa = 73`), the V-cycle is faster at every
+  rung of both ladders and its margin is **largest at the biggest blocks**:
 
   | configuration | cells/rank | red-black | V-cycle | speed-up |
   |---|---|---|---|---|
