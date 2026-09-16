@@ -72,7 +72,17 @@ in the script — the recipe above is the corrected one; see [RELEASE](RELEASE.m
 
 | family | backend | tree | job | outcome |
 |---|---|---|---|---|
-| v1.1.0 | cpu (genoa) | `suite-v1.1.0-cpu` | 26813727 | **OK** — `flow OpenMP has_mpi True`; wheelhouse `v1.1.0-cpu` carries flow 1.1.0, core/dem/pnm/voro 1.0.2, morton/coupling 1.0.1 (cp312) |
+| v1.1.0 | cpu (genoa) | `suite-v1.1.0-cpu` | 26813727 | **OK** — `flow OpenMP has_mpi True` |
+| v1.1.0 | h100 | `suite-v1.1.0-h100` | 26813725 | **OK** — `flow Cuda has_mpi True` |
+| v1.1.0 | a100 | `suite-v1.1.0-a100` | 26813726 | **OK** — `flow Cuda has_mpi True` |
+
+Each wheelhouse (`$PROJ/wheelhouse/v1.1.0-<backend>/`) carries all seven packages at the released
+versions: flow 1.1.0, core/dem/pnm/voro 1.0.2, morton/coupling 1.0.1, cp312, linked against the
+module OpenMPI + CUDA 12.6 — **site-specific, never upload these to PyPI**. Project members install
+with `pip install --no-index --find-links $PROJ/wheelhouse/v1.1.0-<backend> peclet-flow`.
+
+`$PROJ/suite-v1.1.0` (no backend suffix) is the tree the release was submitted *from*; it carries
+`tools/` only and has no venv.
 
 The releases validated this way are also recorded in [RELEASE_PREP](RELEASE_PREP.md) (Snellius
 section) by the release procedure ([RELEASE](RELEASE.md) §7).
