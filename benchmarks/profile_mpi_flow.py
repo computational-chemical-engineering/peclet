@@ -94,7 +94,7 @@ def configure(s: "flow.Solver", mu: float, dt: float, fx: float) -> None:
     s.set_rho(1.0)
     s.set_mu(mu)
     s.set_dt(dt)
-    s.set_body_force(fx, 0.0, 0.0)
+    s.set_body_force((fx, 0.0, 0.0))   # one 3-sequence since 1.0.0 (NAMING.md; the clean break)
     s.set_advection(False)                       # Stokes: the pressure solve is the cost we profile
     s.set_velocity_solver_params(80)
     s.set_pressure_multigrid(True, 4)
