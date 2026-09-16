@@ -121,16 +121,31 @@ is the only place they are enforced.
 `coupling/tests/CMakeLists.txt` builds the ctest `PYTHONPATH` as
 `"${CMAKE_BINARY_DIR}:${PECLET_FLOW_BUILD}:${PECLET_DEM_BUILD}"`. Leave them unset and those two
 entries are empty, so the test subprocess falls through to whatever `peclet-flow` / `peclet-dem` are
-installed in the venv — which on this machine are **0.4.0 wheels from July**. Measured 2026-09-12:
+installed in the venv — which until 2026-09-16 were **0.4.0 wheels from July** (now uninstalled, see
+the note below; today the same omission raises `ModuleNotFoundError` instead). Measured 2026-09-12:
 the bare configure line makes 2 of 3 coupling tests abort with `TypeError: initialize_shape(): ...
 shape_type: int` and a matching `set_body_force()` error, i.e. the July signatures, not the current
 ones. That is the lucky outcome. The dangerous one is the same fall-through when the old signature
 still happens to match: the tests pass, against a module nobody intended.
 This is the same failure class as RELEASE_PREP §1.3's `SDFLOW_BUILD` trap, and it is worth stating
-the general rule: **`.venv` carries stale installed peclet wheels (`peclet` 0.6.0, `peclet-flow`
-0.4.0, `peclet-dem` 0.4.0, `peclet-voro` 0.4.0, `peclet-pnm` 0.1.0). Anything in this checklist that
-imports `peclet.*` must set `PYTHONPATH` to the build trees explicitly, or it is not testing what you
-think it is.** That includes `tools/gen_python_api.py` and `tools/release/audit_docstrings.py`.
+the general rule: **anything in this checklist that imports `peclet.*` must set `PYTHONPATH` to the
+build trees explicitly, or it is not testing what you think it is.** That includes
+`tools/gen_python_api.py` and `tools/release/audit_docstrings.py`.
+
+> **The silent half of this trap was removed on 2026-09-16.** `.venv` used to carry stale installed
+> peclet wheels (`peclet` 0.6.0, `peclet-flow` 0.4.0, `peclet-dem` 0.4.0, `peclet-voro` 0.4.0,
+> `peclet-pnm` 0.1.0 — July builds), so a forgotten `PYTHONPATH` fell through to *those* instead of
+> failing. They are uninstalled and site-packages carries no `peclet` residue, so a bare
+> `import peclet.flow` now raises `ModuleNotFoundError` — loud, and immediately diagnosable —
+> instead of quietly testing code from July. **Do not reinstall them into `.venv`**; develop against
+> build trees, and use a throwaway venv to test a published wheel.
+>
+> Two consequences worth knowing. A build-tree import reports `__version__ == "0+unknown"`, because
+> the version comes from `importlib.metadata` and a build tree has no dist-info — that string is now
+> the *signal* that you are correctly on a build tree, not a defect. And the family import smoke at
+> the foot of the matrix can no longer report a plausible-looking wrong version: its version column
+> was never trustworthy while those wheels were installed, which is why the criterion is
+> `execution_space`, not the version.
 
 ---
 
