@@ -143,6 +143,29 @@ All notable changes to the peclet suite are documented here. The format is based
   flow `28d3224`) landed the day **after** the 1.0.1 tag, so 1.0.1 never carried them; it ships
   here.
 
+### Tested
+
+Measured on the release host (48-core Genoa + RTX 5080, sm120) on 2026-09-16, `OMP_NUM_THREADS`
+bounded, every suite built fresh against `extern/install/{host-openmp,nvidia-cuda}`:
+
+| suite | result |
+|---|---|
+| `core` plain (serial + MPI halo, migration, load balancing) | **54/54**, np 1–8 |
+| `core` Kokkos (halo + AMR + solver layer), host and **CUDA** | **69/69** each |
+| `core` Python bindings | **6/6**, np 1–8 |
+| `flow` kernel units, host and **CUDA** | **46/46** each |
+| `flow` distributed `tests/kokkos_mpi` | **109/109**, np 1, 2, 4 |
+| `flow` accuracy/efficiency regression | **PASS** — `K_inf`, convergence order, pressure-iteration counts and step counts all `+0.00 %` against baseline on all three cases |
+| `flow` analytic verifications | **5/5 PASS** — Poiseuille, periodic spheres, lid cavity, channel, backward-facing step |
+| `dem` single-rank + MPI | **green on CI** at the release commit |
+
+Two notes on what these numbers do and do not cover. `flow`'s 109 distributed tests are 106 plus the
+three new `openbc_solid_mpi_np{1,2,4}` gates this release adds. And the **~2x momentum speed-up quoted
+above was measured on Snellius** (Genoa and H100 ladders, recorded in flow `8acab7c`) — it was *not*
+re-measured on the release host, whose timings were taken under deliberate contention and are not
+comparable. What the release host establishes is that the change is **numerically inert**: same
+answer, same iteration count, to every digit the regression prints.
+
 ### Known limitations in 1.1.0
 
 Carried over from 1.0.0 except the first bullet of that list — *an immersed solid cutting an inflow
