@@ -46,16 +46,36 @@ package with `PECLET_*_MPI=ON`, leaving a site-specific wheelhouse other project
 module OpenMPI and CUDA):
 
 ```bash
-sbatch --nodes=1 --gpus-per-node=1 --ntasks-per-node=1 tools/hpc/install_snellius.sh v<family> h100
-sbatch -p gpu_a100 --gpus-per-node=1 --ntasks-per-node=1 tools/hpc/install_snellius.sh v<family> a100
-sbatch -p genoa --gpus=0 -c 32                             tools/hpc/install_snellius.sh v<family> cpu
-sbatch tools/hpc/smoke_snellius.slurm                      # certifies it: 1- vs 8-rank permeability, dem step_mpi
+cd $PROJ/suite-v<family>          # SUBMIT FROM INSIDE THE TREE (see the traps below)
+sbatch --nodes=1 --gpus-per-node=1 --ntasks-per-node=1             tools/hpc/install_snellius.sh v<family> h100
+sbatch -p gpu_a100 --nodes=1 --gpus-per-node=1 --ntasks-per-node=1 tools/hpc/install_snellius.sh v<family> a100
+sbatch -p genoa --gpus-per-node=0 --ntasks=1 --cpus-per-task=32    tools/hpc/install_snellius.sh v<family> cpu
+sbatch tools/hpc/smoke_snellius.slurm     # certifies it: 1- vs 8-rank permeability, dem step_mpi
 ```
 
 Arguments are positional (SURF's `sbatch` drops leading `VAR=x`); `snellius_env.sh` next to it is the
 shared module recipe. The pre-built containers are the other route ([containers](containers.md)).
-The releases validated this way are recorded in [RELEASE_PREP](RELEASE_PREP.md) (Snellius section)
-by the release procedure ([RELEASE](RELEASE.md) §7).
+
+**Three traps, all hit on this script's first real run (2026-09-16, peclet 1.1.0) and all now fixed
+in the script — the recipe above is the corrected one; see [RELEASE](RELEASE.md) §7.**
+
+- **Submit from inside the tree.** sbatch copies the script to `/var/spool/slurm/...`, so the
+  `$SLURM_SUBMIT_DIR` fallback is what finds `snellius_env.sh`; submitting from the parent resolves
+  to a nonexistent `$PROJ/tools/hpc` and the job dies on a bare `No such file or directory`.
+- **Each backend gets its own tree** — `$PROJ/suite-<tag>-<backend>`. `h100` and `a100` both build
+  the `nvidia-cuda` prefix at different arch, and the script does `venv --clear` on `$SUITE/.venv`,
+  so two backends in one tree destroy each other whether run together or in sequence.
+- **`--gpus=0` does not override `#SBATCH --gpus-per-node=1`** on a GPU-less partition; use
+  `--gpus-per-node=0` or sbatch rejects the job.
+
+### Validated releases
+
+| family | backend | tree | job | outcome |
+|---|---|---|---|---|
+| v1.1.0 | cpu (genoa) | `suite-v1.1.0-cpu` | 26813727 | **OK** — `flow OpenMP has_mpi True`; wheelhouse `v1.1.0-cpu` carries flow 1.1.0, core/dem/pnm/voro 1.0.2, morton/coupling 1.0.1 (cp312) |
+
+The releases validated this way are also recorded in [RELEASE_PREP](RELEASE_PREP.md) (Snellius
+section) by the release procedure ([RELEASE](RELEASE.md) §7).
 
 ## Building the development tree
 
