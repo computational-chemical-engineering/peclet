@@ -3,13 +3,18 @@
 # Site install of a peclet RELEASE on Snellius (docs/RELEASE.md §7): the whole family, from a tag,
 # into its own tree + venv, leaving a wheelhouse for other project members.
 #
-#   sbatch --nodes=1 --gpus-per-node=1 --ntasks-per-node=1 tools/hpc/install_snellius.sh v0.7.0 h100
-#   sbatch -p gpu_a100 --gpus-per-node=1 --ntasks-per-node=1  tools/hpc/install_snellius.sh v0.7.0 a100
-#   sbatch -p genoa --gpus=0 -c 32                              tools/hpc/install_snellius.sh v0.7.0 cpu
+# Submit from INSIDE a tree that carries tools/hpc (see ENVDIR below); each backend gets its OWN
+# tree, so the three may run concurrently:
+#   cd $PROJ/suite-v0.7.0
+#   sbatch --nodes=1 --gpus-per-node=1 --ntasks-per-node=1      tools/hpc/install_snellius.sh v0.7.0 h100
+#   sbatch -p gpu_a100 --nodes=1 --gpus-per-node=1 --ntasks-per-node=1 tools/hpc/install_snellius.sh v0.7.0 a100
+#   sbatch -p genoa --gpus-per-node=0 --ntasks=1 --cpus-per-task=32    tools/hpc/install_snellius.sh v0.7.0 cpu
+# (`--gpus=0` does NOT override the #SBATCH --gpus-per-node=1 below on a GPU-less partition; the
+#  submission is rejected with "Requested node configuration is not available".)
 #
 # Arguments are POSITIONAL (SURF's sbatch drops leading VAR=x). Products:
-#   $PROJ/suite-<tag>/                     the checkout (never the shared campaign tree)
-#   $PROJ/suite-<tag>/.venv                venv with the family installed (PECLET_*_MPI=ON)
+#   $PROJ/suite-<tag>-<backend>/           the checkout (never the shared campaign tree)
+#   $PROJ/suite-<tag>-<backend>/.venv      venv with the family installed (PECLET_*_MPI=ON)
 #   $PROJ/wheelhouse/<tag>-<backend>/      site-specific wheels: pip install --no-index --find-links
 # Wheels built here link the module OpenMPI + CUDA 12.6 + sm_80/90 — NEVER upload them to PyPI.
 #
@@ -29,11 +34,31 @@ set -euo pipefail
 TAG="${1:?usage: install_snellius.sh <tag> <h100|a100|cpu>}"
 TARGET="${2:-h100}"
 PROJ="${PROJ:-/projects/0/prjs1022/peclet}"
-SUITE="$PROJ/suite-$TAG"
+# ONE TREE PER BACKEND. h100 and a100 both build the `nvidia-cuda` prefix but at different arch
+# (HOPPER90 vs AMPERE80), and step 2 does `venv --clear` on $SUITE/.venv while step 3 does
+# `rm -rf extern/install/$BACKEND` -- so two backends sharing a tree destroy each other's install,
+# concurrently OR sequentially (last one wins). Measured 2026-09-16 on the first real run of this
+# script: three backends submitted together, two died on a half-built venv
+# ("Permission denied: .../.venv/bin/activate.csh") and the survivor would have left a tree whose
+# venv matched only itself.
+SUITE="$PROJ/suite-$TAG-$TARGET"
 WHEELS="$PROJ/wheelhouse/$TAG-$TARGET"
 
-ENVDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-[ -f "$ENVDIR/snellius_env.sh" ] || ENVDIR="$SLURM_SUBMIT_DIR/tools/hpc"
+# sbatch copies the script to /var/spool/slurm/..., so $BASH_SOURCE is NOT in the repo and the
+# $SLURM_SUBMIT_DIR fallback is what actually resolves -- which means you must submit from INSIDE a
+# tree that has tools/hpc/. Submitting from its parent (as RELEASE.md used to say) silently resolved
+# to $PROJ/tools/hpc and died with a bare "No such file or directory" (measured 2026-09-16).
+ENVDIR=""
+for _c in "$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)" \
+          "${SLURM_SUBMIT_DIR:-}/tools/hpc" "${SLURM_SUBMIT_DIR:-}"; do
+  [ -n "$_c" ] && [ -f "$_c/snellius_env.sh" ] && { ENVDIR="$_c"; break; }
+done
+if [ -z "$ENVDIR" ]; then
+  echo "FATAL: snellius_env.sh not found. Tried the script dir, \$SLURM_SUBMIT_DIR/tools/hpc" >&2
+  echo "       and \$SLURM_SUBMIT_DIR (= '${SLURM_SUBMIT_DIR:-unset}')." >&2
+  echo "       Submit from INSIDE the release tree:  cd \$PROJ/suite-<tag> && sbatch tools/hpc/install_snellius.sh <tag> <target>" >&2
+  exit 1
+fi
 source "$ENVDIR/snellius_env.sh"
 
 # --- 1. checkout at the tag (HTTPS: compute nodes have no GitHub key) ------------------------

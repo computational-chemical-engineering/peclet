@@ -338,10 +338,29 @@ Release steps (billed: one build job per backend ≈ 1 GPU × ≤2 h; queue the 
 ```bash
 ssh snellius
 cd /projects/0/prjs1022/peclet && git clone --branch v<family> --recurse-submodules https://github.com/computational-chemical-engineering/peclet.git suite-v<family>
-sbatch --nodes=1 --gpus-per-node=1 --ntasks-per-node=1 suite-v<family>/tools/hpc/install_snellius.sh v<family> h100
-sbatch -p gpu_a100 suite-v<family>/tools/hpc/install_snellius.sh v<family> a100
-sbatch -p genoa   suite-v<family>/tools/hpc/install_snellius.sh v<family> cpu
+cd suite-v<family>                       # SUBMIT FROM INSIDE THE TREE -- see the two traps below
+sbatch --nodes=1 --gpus-per-node=1 --ntasks-per-node=1            tools/hpc/install_snellius.sh v<family> h100
+sbatch -p gpu_a100 --nodes=1 --gpus-per-node=1 --ntasks-per-node=1 tools/hpc/install_snellius.sh v<family> a100
+sbatch -p genoa --gpus-per-node=0 --ntasks=1 --cpus-per-task=32    tools/hpc/install_snellius.sh v<family> cpu
 ```
+
+**Two traps, both hit on this script's first real run (2026-09-16, the 1.1.0 release), both now
+fixed in the script — the recipe above is the corrected one.**
+
+- **Submit from inside the tree.** sbatch copies the script to `/var/spool/slurm/...`, so
+  `$BASH_SOURCE` is not in the repo and the `$SLURM_SUBMIT_DIR` fallback is what resolves
+  `snellius_env.sh`. Submitting from the *parent* (which this file used to say) resolved to
+  `$PROJ/tools/hpc` and died with a bare `No such file or directory`. The script now tries three
+  candidates and, failing all of them, prints what it tried and the fix.
+- **Each backend gets its own tree** (`suite-<tag>-<backend>`). `h100` and `a100` both build the
+  `nvidia-cuda` prefix but at different arch, and the script does `venv --clear` on `$SUITE/.venv`
+  and `rm -rf extern/install/$BACKEND` — so two backends in one tree destroy each other whether they
+  run together or in sequence. Submitted together against one tree, two of three died on a
+  half-built venv (`Permission denied: .../.venv/bin/activate.csh`) and the survivor would have left
+  a venv matching only itself. With per-backend trees the three run concurrently.
+- `--gpus=0` does **not** override the script's `#SBATCH --gpus-per-node=1` on a GPU-less partition;
+  use `--gpus-per-node=0` or sbatch rejects the job with "Requested node configuration is not
+  available".
 
 Then the **smoke job** `tools/hpc/smoke_snellius.slurm` (4 ranks on one node: `has_mpi: True`,
 `execution_space: Cuda`, flow `init_mpi` bit-exact k vs np=1, dem `step_mpi`) and record the job
