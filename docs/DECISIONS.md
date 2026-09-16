@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-167 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+168 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -151,6 +151,7 @@ reading until they are settled.
 - **Sequencing: "VoF vs multiphysics first" dissolves — VoF is the next multiphysics phase**.  <sub>vof-campaign.md:480-484</sub>
 - **Sign convention: closed divergence of the corrected field equals Aφ − b = −residual**.  <sub>flow-ghost-projection.md:43</sub>
 - **Sliver mask must pin only cells with cs<1e-6, not every cell with sdf(center)<0**. **Rejected:** the mode-0-style mask (zero every cell with sdf(center)<0, including solid-centred cut cells) for embed mode  <sub>embed-port-progress.md:27</sub>
+- **Solid cutting an OPEN domain face is FIXED, not rejected — but a sealed inlet pocket IS rejected**. **Rejected:** (a) rejecting the configuration outright, which the work order allowed; (b) fixing only  <sub>SCALING_ISSUES</sub>
 - **SolverColocated is the ABC approximate projection, NOT Rhie–Chow — user correction**. **Rejected:** describing SolverColocated's coupling as Rhie–Chow  <sub>vof-campaign.md:485-489</sub>
 - **Staggered converges onto Zick & Homsy; collocated is bias-dominated (irreducible ~0.9%)**.  <sub>peclet-examples-gallery.md:165-171</sub>
 - **Staircase coarse operator (binary classification, no volume-fraction coefficients) is the DEFAULT for the IBM volfrac path, removing the dt ceiling**. **Rejected:** the volume-fraction-weighted (area-fraction) coarse operator as coefficients; the plain const-coeff coarse op without staircase classification  <sub>velocity-mg-design.md:77-98</sub>

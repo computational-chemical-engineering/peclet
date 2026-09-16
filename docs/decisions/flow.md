@@ -2940,3 +2940,144 @@ Do not reverse an entry here without recording a new decision that supersedes it
     Runs at D < 1 that the earlier same-day rule would have put on the V-cycle stay on red-black,
     which is faster there. Runs with no immersed solid now reach the rule at all. The 1.0.0
     scaling deposit is unaffected: its bed runs at D = 6.
+
+### Solid cutting an OPEN domain face is FIXED, not rejected — but a sealed inlet pocket IS rejected
+- area: flow
+- source: SCALING_ISSUES #3 work order; flow/doc/cutcell_openbc_convergence.md
+- decided: 2026-09-16
+- status: settled
+- quote: |
+    "Fix it, or reject the configuration with a clear error — the issue states explicitly that
+    rejecting is legitimate, but that 'should be a decision, not the current silent stall.'"
+- rejected: (a) rejecting the configuration outright, which the work order allowed; (b) fixing only
+  the SDF ghost; (c) extending the SDF ghost by MIRROR, or by LINEAR extrapolation, rather than
+  constant; (d) leaving the porous coefficient path on the literal 1.0 behind a runtime rejection.
+  In detail:
+    (a) REJECTING the configuration outright ("solid may not touch an inflow/outflow face"), which
+    the work order allowed. A partially blocked inlet is a physically reasonable thing to want, and
+    both defects turned out to be ordinary bugs with local fixes — an aperture computed from a ghost
+    that had been teleported from the far side of the domain, and a boundary row that overwrote that
+    aperture with 1.0. Neither is a limitation of the discretization, so there was nothing to
+    reject.
+    (b) Fixing only the SDF ghost. That makes the outlet aperture honest and thereby EXPOSES the
+    second defect: the Dirichlet row still says 1.0, the constraint now says 0.59, and the projected
+    divergence plateaus at 6.7e-03 instead of falling to 3e-09. The two had to land together — which
+    is also why the outlet half looked healthy before: a wrapped ghost made the aperture come out
+    ~1 too, so operator and constraint agreed while both were wrong about the geometry.
+    (c) Extending the SDF ghost by MIRROR (what a free-slip face does) rather than constant. The
+    mirror is what a symmetry plane asserts about the geometry; an inlet or an outlet asserts
+    nothing, and the constant normal extension is the reading that makes the boundary face's
+    aperture the fluid fraction of the boundary plane itself. LINEAR extrapolation
+    (s_ghost = 2 s_0 - s_1) was also rejected, although it is the higher-order estimate of the SDF
+    ON the boundary plane where ds/dn != 0: an SDF is not linear along the normal near a curved
+    feature (for a sphere centred on the plane ds/dn is exactly 0 there, so constant is EXACT and
+    linear is wrong), extrapolation can flip the sign across a thin gap, and the order-1 aperture
+    model it feeds is itself first order.
+    (d) Leaving the POROUS coefficient path on the literal 1.0 with a runtime rejection for that
+    combination. Widening the three porous builders by one index along each axis costs three
+    characters each and puts their Dirichlet face on the same formula as every inner face.
+- why: |
+    Defect 1: `setSolidUploadSdf` fills the extended block by a PERIODIC gather and only free-slip
+    faces were repaired afterwards, so the SDF a non-periodic boundary face sees came from the
+    opposite side of the domain. `ccFaceOpen` samples AT the face, so that ghost decides the
+    boundary-face aperture: a solid cell against the inlet (sdf = -0.73) was handed a fully OPEN
+    inflow face, the prescribed inflow was counted into it, and its pressure row is entirely closed
+    -- 0*p = U, an inconsistent row. No Krylov driver and no MG depth solves an inconsistent
+    system, which is exactly why the field evidence showed FCG capping, Chebyshev NaN-ing and
+    divergence at MGLEVELS <= 2 and why the agglomerated bottom was (correctly) exonerated.
+    Defect 2: `CutcellMG::applyBoundaryOpennessFrom` wrote the literal 1.0 over the Dirichlet
+    outlet face on every level. That is right when the outlet is clear of solid and wrong when it
+    is cut -- the operator and the divergence constraint then disagree by (1 - aperture) and the
+    projection pushes mass out THROUGH SOLID. Silently wrong, which this project ranks worse than
+    visibly broken.
+    The fix for defect 2 is not new machinery: WO-R2 item 1 already solved the identical problem
+    for the variable-density coefficient (the LOW domain face is an inner index the caller wrote,
+    the HIGH one is a ghost index the periodic fill wraps, so save / restore / coarsen it). It is
+    generalized here from that coefficient to the openness itself, and
+    `set_outflow_operator_coefficient(False)` stays the ablation back to the literal 1.0.
+    What IS rejected: a cell whose pressure row is entirely closed but which a prescribed inflow
+    still feeds. That is a pocket of fluid the solid seals off from the domain, opening only onto
+    the inlet -- a physically impossible thing to ask of an incompressible fluid whatever the
+    discretization, so `checkSealedInflowCells` throws at set_solid time naming the face and the
+    count. Before defect 1 was fixed this condition fired on ordinary geometry; it now takes a
+    deliberately sealed pocket.
+- also: |
+    A THIRD defect, found while gating the fix distributed and made visible by the second fix. Ghost
+    indices along an axis are 0..g-1 and ext-g..ext-1, so the LOW domain face of an axis is an inner
+    index and the HIGH one is a ghost index; the halo wraps periodically on EVERY axis (the
+    decomposition is periodic by construction and the non-periodic conditions are imposed on top),
+    so on a rank owning that global face the openness came back carrying the OPPOSITE boundary's
+    aperture -- and divergOpen weights the last cell's outgoing flux by exactly that value, so the
+    constraint was wrong too. Measured AT np = 1: outlet-cut bed 1.8e-02 from single-rank, inlet-cut
+    bed 6.6e-01; 0.00e+00 on all four beds after buildOpennessHighFace re-derives the plane from the
+    SDF. REJECTED alternative: keeping a save/restore buffer across the exchange -- set_solid runs
+    per step on moving geometry, and the plane is a pure function of an SDF that is already
+    exchanged and already domain-extended, so re-deriving it needs no state.
+    The same wrap sits on fillVelGhostsTo(..., doOutflow = false), whose whole point is to preserve
+    the mass-conserving outflow face the projection wrote (WO-R, gate F2: it has to reach the VoF
+    advection). THE TWO HALVES ARE NOT SEPARABLE and the repo already had the gate that proves it:
+    tests/kokkos_mpi/test_vof_bc_mpi drives a packing whose last sphere CUTS THE +z OUTLET PLANE
+    ({8.0, 8.0, NZ, 3.6}, with that comment on the line) and gates the composed conservation
+    identity d sum(eps_eff C) = boundary ledger absolutely. At np = 1, where there is no
+    decomposition at all: 1.25e-14 before any of this, 2.46e-02 with the openness half fixed ALONE,
+    2.89e-14 with both. An outlet whose openness is its own aperture does not pair with an outlet
+    velocity that is still the inlet's; the two used to wrap together and stay mutually consistent
+    while both were wrong about the geometry. I had first deferred this half as "a physics path
+    with no distributed outlet gate, do not fix blind" -- the gate existed, and the deferral would
+    have shipped a broken conservation identity.
+    SCOPE of the velocity half: STAGGERED only. There the index in question IS the outflow face and
+    holds exactly what bcCorrectOutflow wrote; on the COLLOCATED grid that correction lives on the
+    FACE field while fillVelGhostsTo fills the CELL field, whose doOutflow = false means "leave the
+    whole ghost BAND alone", so restoring one layer of two would be a third behaviour on a path no
+    test covers (no collocated MPI test carries an outflow face). Left exactly as it was -- the
+    lesson of the vof_bc_mpi regression applied to itself.
+    REJECTED in the repair: restoring the plane over its FULL transverse extent. Its transverse
+    ghost rows are legitimately the NEIGHBOUR's inner values, which the exchange has just delivered
+    correctly; putting stale local values back over them trades one wrong plane for another. The
+    restore covers the INNER transverse range only.
+    The third caller, max_open_divergence_projected(), is covered by the same fix; under MPI with an
+    outlet it used to return approximately the inlet velocity on every bed, converged or not.
+- evidence: |
+    Duct 32x16x16, mu=1, dt=0.5, 3 MG levels, MG-PCG rtol 1e-10 cap 200, 8 steps, sphere R=4.3.
+    Projected max|div| (max_open_divergence_projected, the residual of the constraint the
+    projection actually solved):
+      bed                              after      before
+      all-fluid duct                   3.0e-14    3.0e-14
+      sphere clear of the open faces   4.4e-09    4.4e-09   (byte-identical)
+      sphere cutting the OUTLET        3.1e-09    1.6e-09   CONVERGED, AND WRONG (see below)
+      sphere cutting the INLET         6.1e-09    200 iters CAPPED, max|div| = 1.0 = U
+    The outlet row before the fix CONVERGED: the wrapped ghost handed the outlet an aperture of ~1
+    and the Dirichlet row also said 1, so operator and constraint agreed while both were wrong
+    about the geometry -- the mass they conserved was leaving THROUGH SOLID. Isolate defect 2 with
+    the honest aperture in place, i.e. ablate it on the fixed build: 6.7e-03, plateaued (4.8e-03
+    still at 60 steps against 2.5e-09 fixed). That is the assertion the test carries.
+    The new test run against the pre-fix build fails on four checks: the inlet bed's cap, its
+    divergence, the ablation assertion (the pre-fix outlet is consistent-but-wrong, not
+    inconsistent), and the sealed-pocket rejection, which did not exist.
+    Distributed (test_openbc_solid_mpi, 32^3, 4 steps): the distributed run reproduces the
+    single-rank one EXACTLY at np=1 (0.00e+00 relative on all four beds -- clear, outlet-cut,
+    inlet-cut, wall-cut) and to 1e-15 at np 2/4, with the openness fields bit-identical.
+    Gates: tests/kokkos 46/46, tests/kokkos_mpi 109/109 (np 1/2/4) -- vof_bc_mpi's composed budget
+    among them, back at 2.89e-14 -- Zick & Homsy 4.291 / 15.394 unchanged, verify_poiseuille_flow
+    PASS at 1.716e-08.
+    A DIAGNOSTIC TRAP found on the way: max_open_divergence() refills the outflow ghost with the
+    zero-gradient extrapolation BEFORE measuring, so at a partly blocked outlet it reports how far
+    zero-gradient is from the mass-conserving face -- a property of the boundary condition, not a
+    solver residual, and it does not decay (1.7e-02 on the outlet-cut bed). The original field A/B
+    read that diagnostic. Read max_open_divergence_projected() instead.
+- consequence: |
+    A bed clear of the open faces is byte-identical, which is what every existing gate runs. Any bed
+    that TOUCHES a non-periodic face changes: the aperture there is now computed from the geometry
+    instead of from the far side of the domain. That includes wall faces, where the aperture is
+    forced to 0 anyway but the near-boundary IBM stencils read the same ghost.
+    POROUS runs with an OUTLET change even without solid at that face, and deliberately: the LOW
+    outflow face already carried open_f*eps_f*w_f (it is an inner index buildPorousCoeff* writes)
+    while the HIGH one was overwritten with the literal 1.0, so the two ends of the same axis were
+    treated differently -- the exact asymmetry WO-R2 item 1 fixed for the density coefficient. The
+    two are now consistent. There is no CFD-DEM outlet gate to measure the shift against; it is
+    bounded by (1 - eps_f*w_f) on the outlet plane and is zero wherever eps = 1 and the drag is
+    slack there, which is the usual case.
+    The gap that hid this is closed: flow/tests/kokkos/test_openbc_solid.cpp and
+    flow/tests/kokkos_mpi/test_openbc_solid_mpi.cpp (np 1/2/4) are the first tests anywhere to call
+    setDomainBc together with setSolid with the solid ON an open face. Four existing tests called
+    both, but all of them keep the geometry clear of the non-periodic faces.

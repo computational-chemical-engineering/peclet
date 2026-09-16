@@ -227,8 +227,15 @@ fixed and regression-tested.
 2. **[R]** SCALING_ISSUES #2, MG depth cap: telescoping ships and is the default, but the underlying
    defect (intermediate levels must coarsen in place) is routed around, not solved. flow's CLAUDE.md
    calls it "the top open item at scale".
-3. **[R]** SCALING_ISSUES #3: an immersed solid cutting an inflow/outflow face breaks the pressure
-   solve (iteration cap, max|div| 4e-3). Narrow; legitimate to state as a limitation.
+3. **[A]** SCALING_ISSUES #3 — **FIXED 2026-09-16**, so it is no longer a limitation to state: the
+   SDF ghost outside a non-periodic face was periodic-wrapped (an inconsistent pressure row at a cut
+   inlet) and the Dirichlet outlet row carried the literal openness 1.0 instead of the face
+   aperture (mass leaving through solid). Gated by `test_openbc_solid{,_mpi}`, the first tests to
+   combine `set_domain_bc` with `set_solid`. **Two consequences for the release:** the 1.0.0
+   "Known limitations" bullet in [../CHANGELOG.md](../CHANGELOG.md) is superseded and 1.1.0 needs a
+   Fixed entry; and a THIRD, MPI-only defect it surfaced is **new issue #8** (the halo wraps a
+   non-periodic face's HIGH boundary plane), also fixed — both halves, openness and the outflow
+   velocity plane, since fixing either alone breaks `vof_bc_mpi`'s composed conservation budget.
 4. **[R]** Collocated ghost-mode `(matrix_order=1, rhs_order=2)` is march-unstable above ~2000
    spheres and is documented do-not-use. Collocated MPI validated only at np=1,2,4; np≥16 unresolved.
 5. **[R]** voro CUDA `clipCellAgainstSdf` wrong by up to 22% on device at 128/256 grids (correct on

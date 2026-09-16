@@ -17,11 +17,12 @@ is reproducible; the remaining defect is narrower.*
 |---|---|---|---|
 | 1 | Float operator storage caps MG-PCG on dense beds | **High, silently invalid** | Known (WO-M), fix not defaulted |
 | 2 | MG depth capped by the per-rank block | High (scaling shape) | **Fixed 2026-09-02** (telescoping, opt-in), **measured**: iterations flat 24 → 1536 ranks, ≥ 99 % efficiency on the bed |
-| 3 | Solid intersecting an OPEN domain face stalls the solve | Medium, silently wrong (narrow) | Open, new |
+| 3 | Solid intersecting an OPEN domain face stalls the solve | Medium, silently wrong (narrow) | **Fixed 2026-09-16** (flow: SDF ghost extension + Dirichlet-row aperture), gated `test_openbc_solid{,_mpi}` |
 | 4 | Intermittent multi-node hang in warmup | **High, silently wrong** (was: Medium) | **Root-caused and fixed 2026-09-02** (core `10294e6`): NBX inter-round tag race |
 | 5 | Momentum solve: cap-bound RB-GS (update criterion) | High (63 % of the packed step) | **Fixed 2026-09-02**: residual stop + velocity MG under MPI (mixed operator); packed step 2.2× faster at 384–1536 ranks |
 | 6 | `check_decomposition.py` unusable above ~100 ranks | Low (tooling) | Open |
 | 7 | Kokkos oversubscribes inside a CPU-quota container (Colab, Binder, Docker, Slurm) | **High, user-visible** | **CLOSED.** Fixed in the library 2026-09-13 (core `cpu_budget.hpp`); **already shipped** — the PyPI 1.0.1 wheels carry it, measured 2026-09-16 (quick start under a 2-CPU quota: **2.51 s**, was *unfinished in 15 min*) |
+| 8 | MPI: the halo wraps a NON-PERIODIC domain face, so the HIGH boundary-face plane returns carrying the opposite boundary | Medium, silently wrong | **Fixed 2026-09-16** (openness re-derived, outflow velocity plane preserved); gated by `vof_bc_mpi`'s composed budget |
 
 ---
 
@@ -114,7 +115,55 @@ takes the **smoothed** bottom on a 48-across coarsest grid (`auto` is gated to t
 while the packed case takes the redundant gather. Part of this issue's headline may be the bottom
 rather than the depth, and that changes which fix is urgent.
 
-## 3. Solid intersecting an OPEN domain face stalls the pressure solve — MEDIUM
+## 3. Solid intersecting an OPEN domain face stalls the pressure solve — FIXED 2026-09-16
+
+> **Two defects, and they had to be fixed together.** (a) The SDF ghost band outside a
+> **non-periodic** domain face was filled by PERIODIC WRAP — only free-slip faces were repaired —
+> so the boundary-face aperture was teleported from the opposite side of the domain. A solid cell
+> against the inlet was handed the far side's fluid, its inflow face came out fully OPEN, and the
+> prescribed inflow was counted into a cell whose pressure row is entirely closed: an
+> **inconsistent row**, which no Krylov driver and no MG depth can solve — hence the iteration cap,
+> `max|div|` stuck at the inflow velocity, and the NaN at shallow depth. (b) A Dirichlet (outflow)
+> row carried the literal openness 1.0 instead of the face's own cut-cell aperture, so with a solid
+> cutting the outlet the operator disagreed with the divergence constraint by `(1 - aperture)` and
+> **the projection pushed mass out through solid** — silently wrong, and invisible until (a) was
+> fixed, because the wrapped ghost made the aperture come out ≈ 1 too.
+>
+> A THIRD defect surfaced while gating the fix distributed, and is the same shape as (b): ghost
+> indices along an axis are `0..g-1` and `ext-g..ext-1`, so the LOW domain face of an axis is an
+> inner index but the HIGH one is a ghost index — and the halo exchange wraps periodically on every
+> axis, so on a rank owning that global face the openness came back carrying **the opposite
+> boundary's aperture**. `divergOpen` weights the last cell's outgoing flux by exactly that value,
+> so the constraint was wrong too. Invisible until (b), which used to overwrite the plane with 1.0.
+> Measured at **np = 1**: the outlet-cut bed differed from single-rank by 1.8e-02 and the inlet-cut
+> bed by 6.6e-01; after `buildOpennessHighFace` re-derives that plane, 0.00e+00 on all four beds.
+> The same wrap hits `fillVelGhostsTo(..., doOutflow = false)`, whose entire point is to preserve
+> the mass-conserving outflow face the projection wrote, and which is also repaired — see **issue
+> 8**, where the evidence for that half lives. The two halves are not separable: once the outlet's
+> OPENNESS is the outlet's own aperture, it no longer pairs with an outlet VELOCITY that is still
+> the inlet's, and `vof_bc_mpi`'s composed conservation budget breaks from 1.3e-14 to 2.5e-02. They
+> used to wrap together and stay mutually consistent while both were wrong about the geometry.
+>
+> Fixes, in `flow`: `extendSdfDomainGhosts` extends the SDF constant out of every non-periodic
+> face (type 4 keeps its mirror); the Dirichlet row carries the aperture through the WO-R2 item 1
+> save/restore/coarsen machinery, in the constant-density, variable-density and porous coefficient
+> paths alike (`set_outflow_operator_coefficient(False)` ablates back to the literal 1.0). Geometry
+> that genuinely SEALS fluid cells against an inlet — a row that is closed yet fed, which no
+> pressure field satisfies — is now **rejected by `set_solid` with a named error** rather than
+> stalled on. Measured, 32×16×16 duct, projected `max|div|`: inlet-cut bed 200 iters / 1.0 →
+> 14 iters / 6.1e-09; a bed clear of the open faces byte-identical. The outlet-cut bed *converged*
+> before the fix (1.6e-09) — the wrapped ghost handed it an aperture of ~1 and the Dirichlet row
+> also said 1, so operator and constraint agreed while both were wrong about the geometry, and the
+> mass they conserved was leaving through solid; ablate (b) with the honest aperture in place and it
+> reads 6.7e-03, plateaued. Mechanism, numbers and the diagnostic trap:
+> **`flow/doc/cutcell_openbc_convergence.md`**.
+>
+> **The gap it sat in is closed too**: `flow/tests/kokkos/test_openbc_solid.cpp` and
+> `flow/tests/kokkos_mpi/test_openbc_solid_mpi.cpp` (np 1/2/4) are the first tests anywhere to call
+> `setDomainBc` together with `setSolid` with the solid ON an open face.
+>
+> The analysis below stands as the record of what was measured before the cause was known.
+
 
 **Corrected from the original write-up, which called this a blocker and was wrong.** It was found
 with a bed whose spheres were *clipped by the inlet and outlet planes* — an artifact of how that bed
@@ -470,3 +519,41 @@ delivers imbalance 1.000 at every 384³ rung, per-iteration cost scales *super-l
 ranks, and peclet is **8.0–9.4× faster than FoxBerry on the single-phase case and 3.9–5.7× on the
 packed bed** across the measured ladder. Issues 1 and 2 are what stand between that and matching
 FoxBerry's scaling *shape* as well as beating its absolute time.
+
+---
+
+## 8. MPI: a non-periodic domain face's HIGH boundary plane is wrapped by the halo — FIXED 2026-09-16
+
+Found while gating issue 3 distributed, and inseparable from it. The decomposition is periodic by
+construction and the non-periodic conditions are imposed on top, so `GridHalo` wraps **every** axis.
+The face-index convention makes the two ends of an axis asymmetric: the LOW domain face is an inner
+index and survives an exchange, the HIGH one is the first ghost index and does not. Anything whose
+high-side boundary plane matters therefore comes back carrying the opposite boundary's value on the
+rank that owns that global face.
+
+Two things depend on that plane, and **fixing either one alone makes things worse**, because they
+used to wrap *together* and stay mutually consistent while both were wrong about the geometry:
+
+- the cut-cell **openness** — `buildOpennessHighFace` re-derives it from the (already exchanged,
+  already domain-extended) SDF after the exchange;
+- the **outflow face velocity** — `fillVelGhostsTo(..., doOutflow = false)` exists precisely to keep
+  the mass-conserving face the projection wrote (WO-R, gate F2: it has to reach the VoF advection),
+  and the exchange inside it destroyed that face anyway. It now saves and restores the plane over
+  the block's INNER transverse range; the plane's transverse ghost rows are legitimately the
+  neighbour's inner values, which the exchange delivers correctly, so putting stale local values
+  back over them would trade one wrong plane for another.
+
+**Scope:** the velocity half is STAGGERED only. There, the index in question IS the outflow face and
+holds exactly what `bcCorrectOutflow` wrote. On the COLLOCATED grid that correction lives on the
+FACE field while `fillVelGhostsTo` fills the CELL field, whose `doOutflow = false` means "leave the
+whole ghost BAND alone" — restoring one layer of two would be a third behaviour on a path no test
+covers (no collocated MPI test carries an outflow face). It is left exactly as it was, and that is
+what remains of this issue.
+
+*Measured, and the reason the rest is not filed as an open item:* `flow/tests/kokkos_mpi/test_vof_bc_mpi`
+already drives a packing whose last sphere **cuts the +z outlet plane**, and gates the composed
+conservation identity `d Σ(eps_eff C) = boundary ledger` absolutely. It read **1.25e-14** before any
+of this, **2.46e-02** with the openness half fixed alone, and **2.89e-14** with both — at np = 1,
+where there is no decomposition at all. Its three callers (the VoF velocity bridge, the VoF momentum
+bridge, `max_open_divergence_projected`) are all covered by the one fix; the last of those returned
+approximately the inlet velocity under MPI on every bed, converged or not.
