@@ -3025,7 +3025,22 @@ Do not reverse an entry here without recording a new decision that supersedes it
     while both were wrong about the geometry. I had first deferred this half as "a physics path
     with no distributed outlet gate, do not fix blind" -- the gate existed, and the deferral would
     have shipped a broken conservation identity.
-    SCOPE of the velocity half: STAGGERED only. There the index in question IS the outflow face and
+    COLLOCATED (2026-09-16, follow-up): no separate fix was needed, and that is a MEASURED result,
+    not an assumption. Every part of the fix is in the geometry, which is grid-independent, and the
+    pre-fix collocated inlet-cut bed reads 200 iterations / max|div| 1.000e+00 exactly as the
+    staggered one does -- the defect was never grid-specific. What was missing was the GATE:
+    test_openbc_solid now runs its cases on both grids, and test_vof_bc_mpi gained a `colo-jet`
+    conservation case, SolverColocated having had no open-boundary conservation gate at all. Two
+    things that look like collocated gaps and are not: the collocated grid's
+    maxOpenDivergenceProjected delegates to the clobbering diagnostic, so its number does not fall
+    to solver tolerance at a partly blocked outlet (a property of the grid, so the collocated gate
+    is the iteration count plus the rejection); and the collocated VoF bridge DOES re-fill the face
+    field's ghosts after the projection corrected the outflow face, which looks like the same
+    defect -- but the advector's boundary flux does not read that ghost index and the identity
+    closes at 1.1e-16. I had hypothesised the opposite and built the gate first; the gate refuted
+    it.
+    SCOPE of the velocity half: STAGGERED only, and UNREACHABLE on the collocated grid rather than
+    skipped -- all three callers passing doOutflow = false return or throw first. There the index in question IS the outflow face and
     holds exactly what bcCorrectOutflow wrote; on the COLLOCATED grid that correction lives on the
     FACE field while fillVelGhostsTo fills the CELL field, whose doOutflow = false means "leave the
     whole ghost BAND alone", so restoring one layer of two would be a third behaviour on a path no

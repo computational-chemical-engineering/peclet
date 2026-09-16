@@ -543,12 +543,19 @@ used to wrap *together* and stay mutually consistent while both were wrong about
   neighbour's inner values, which the exchange delivers correctly, so putting stale local values
   back over them would trade one wrong plane for another.
 
-**Scope:** the velocity half is STAGGERED only. There, the index in question IS the outflow face and
-holds exactly what `bcCorrectOutflow` wrote. On the COLLOCATED grid that correction lives on the
-FACE field while `fillVelGhostsTo` fills the CELL field, whose `doOutflow = false` means "leave the
-whole ghost BAND alone" — restoring one layer of two would be a third behaviour on a path no test
-covers (no collocated MPI test carries an outflow face). It is left exactly as it was, and that is
-what remains of this issue.
+**Scope:** the velocity half is STAGGERED only, and on the collocated grid it is **unreachable**
+rather than skipped — all three callers that pass `doOutflow = false` return or throw first
+(`bridgeVelocityToVof` takes its own face-field branch, `buildVofCellVelocity` throws,
+`maxOpenDivergenceProjectedInternal` delegates). The `!Grid::collocated` guard records that, so a
+future caller on that path has to decide deliberately: there the correction lives on the FACE field
+while `fillVelGhostsTo` fills the CELL field, whose `doOutflow = false` means "leave the whole ghost
+BAND alone", and one restored layer of two would be a third behaviour.
+
+The collocated VoF bridge *does* re-fill the face field's ghosts after the projection corrected the
+outflow face, which looks like the same defect — but the advector's boundary flux does not read that
+ghost index and the conservation identity closes at **1.1e-16**. Measured, not assumed, and now
+gated: `test_vof_bc_mpi`'s `colo-jet` case checks `d Σ C = boundary ledger` on `SolverColocated`,
+which had no open-boundary conservation gate of any kind. Nothing remains open on this issue.
 
 *Measured, and the reason the rest is not filed as an open item:* `flow/tests/kokkos_mpi/test_vof_bc_mpi`
 already drives a packing whose last sphere **cuts the +z outlet plane**, and gates the composed
