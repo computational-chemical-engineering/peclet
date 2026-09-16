@@ -72,7 +72,7 @@ in the script — the recipe above is the corrected one; see [RELEASE](RELEASE.m
 
 | family | backend | tree | job | outcome |
 |---|---|---|---|---|
-| v1.1.0 | cpu (genoa) | `suite-v1.1.0-cpu` | 26813727 | **OK** — `flow OpenMP has_mpi True` |
+| v1.1.0 | cpu (genoa) | `suite-v1.1.0-cpu` | 26813727 | **OK** — `flow OpenMP has_mpi True`; **smoke 26814834 CERTIFIED** (see below) |
 | v1.1.0 | h100 | `suite-v1.1.0-h100` | 26813725 | **OK** — `flow Cuda has_mpi True` |
 | v1.1.0 | a100 | `suite-v1.1.0-a100` | 26813726 | **OK** — `flow Cuda has_mpi True` |
 
@@ -83,6 +83,29 @@ with `pip install --no-index --find-links $PROJ/wheelhouse/v1.1.0-<backend> pecl
 
 `$PROJ/suite-v1.1.0` (no backend suffix) is the tree the release was submitted *from*; it carries
 `tools/` only and has no venv.
+
+**Smoke certification, v1.1.0 cpu/genoa (job 26814834, 4 ranks).** The first fully green run of
+`smoke_snellius.slurm` in its family-wide form:
+
+```
+flow OpenMP has_mpi=True | dem OpenMP step_mpi=True | voro OpenMP VoronoiHalo=True | pnm OpenMP mpi=True | coupling=True
+np=1: k=5.845422163491e+00  div=1.847e-13   block(rank0)=origin[0,0,0] size[32,32,32]
+np=4: k=5.845422163491e+00  div=1.847e-13   block(rank0)=origin[0,0,0] size[16,16,32]
+[OpenMP] np=4  grid=1x2x2  global=48x96x96  per-rank=48^3=110592 cells (~53 spheres/tile)
+    per-step: max 205.657 ms  min 205.656 ms  imbalance 0.0%  pressure_iters=9  0.54 Mcell/s/rank
+```
+
+`k` identical to all thirteen digits at np=1 and np=4 — the distributed solve on the site install is
+bit-exact to single-rank, which is what this job exists to prove.
+
+It took three submissions to get there, and the two failures were **real defects in the repo, not the
+install**: `benchmarks/profile_mpi_flow.py` still called `set_body_force(fx, fy, fz)` (repacked into
+one 3-sequence by 1.0.0) and then `set_velocity_solver_params` / `last_pressure_iterations` on the
+`Solver` (moved to `solver.diagnostics` by the 1.0.0 tiering). Both had been broken since 1.0.0 and
+neither is covered by CI. Five more of the same `set_body_force` defect were found in
+`pnm/scripts/`. **None of it was visible to a static audit** — nothing was *renamed* — which is the
+argument for this job existing at all.
+
 
 The releases validated this way are also recorded in [RELEASE_PREP](RELEASE_PREP.md) (Snellius
 section) by the release procedure ([RELEASE](RELEASE.md) §7).
