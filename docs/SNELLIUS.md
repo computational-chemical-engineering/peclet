@@ -74,7 +74,7 @@ in the script — the recipe above is the corrected one; see [RELEASE](RELEASE.m
 |---|---|---|---|---|
 | v1.1.0 | cpu (genoa) | `suite-v1.1.0-cpu` | 26813727 | **OK** — `flow OpenMP has_mpi True`; **smoke 26814834 CERTIFIED** (see below) |
 | v1.1.0 | h100 | `suite-v1.1.0-h100` | 26813725 | **OK** — `flow Cuda has_mpi True` |
-| v1.1.0 | a100 | `suite-v1.1.0-a100` | 26813726 | **OK** — `flow Cuda has_mpi True` |
+| v1.1.0 | a100 | `suite-v1.1.0-a100` | 26813726 | **OK** — `flow Cuda has_mpi True`; **smoke 26815101 CERTIFIED** (see below) |
 
 Each wheelhouse (`$PROJ/wheelhouse/v1.1.0-<backend>/`) carries all seven packages at the released
 versions: flow 1.1.0, core/dem/pnm/voro 1.0.2, morton/coupling 1.0.1, cp312, linked against the
@@ -97,6 +97,22 @@ np=4: k=5.845422163491e+00  div=1.847e-13   block(rank0)=origin[0,0,0] size[16,1
 
 `k` identical to all thirteen digits at np=1 and np=4 — the distributed solve on the site install is
 bit-exact to single-rank, which is what this job exists to prove.
+
+**Smoke certification, v1.1.0 a100 (job 26815101, 4 GPUs).**
+
+```
+flow Cuda has_mpi=True | dem Cuda step_mpi=True | voro Cuda VoronoiHalo=True | pnm Cuda mpi=True | coupling=True
+np=1: k=5.845422163491e+00  div=1.847e-13
+np=4: k=5.845422163491e+00  div=1.847e-13
+[Cuda] np=4  grid=1x2x2  global=48x96x96  per-rank=48^3
+    per-step: max 103.604 ms  min 103.603 ms  imbalance 0.0%  pressure_iters=9  1.07 Mcell/s/rank
+```
+
+**The CUDA `k` equals the OpenMP `k` to all thirteen digits** (`5.845422163491e+00`), at the same
+`div = 1.847e-13` and the same 9 pressure iterations. Two backends, one answer — direct evidence for
+the standing position that a backend change is a faithful port, not a re-derivation. The A100 runs
+the tile at 103.6 ms/step against genoa's 205.7 ms (1.07 vs 0.54 Mcell/s/rank), which is a timing
+difference and not a numerical one.
 
 It took three submissions to get there, and the two failures were **real defects in the repo, not the
 install**: `benchmarks/profile_mpi_flow.py` still called `set_body_force(fx, fy, fz)` (repacked into
