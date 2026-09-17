@@ -89,7 +89,7 @@ jobs:
             echo "CIBW_ENVIRONMENT=PECLET_VENDOR_DEPS=ON PECLET_VENDOR_KOKKOS_ARGS=\"$KK\"" >> "$GITHUB_ENV"
           fi
 
-      - uses: pypa/cibuildwheel@v3.2.1
+      - uses: pypa/cibuildwheel@v4.2.1
         with:
           package-dir: ${{ matrix.pkg }}
         env:
