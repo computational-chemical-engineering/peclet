@@ -73,7 +73,7 @@ in the script — the recipe above is the corrected one; see [RELEASE](RELEASE.m
 | family | backend | tree | job | outcome |
 |---|---|---|---|---|
 | v1.1.0 | cpu (genoa) | `suite-v1.1.0-cpu` | 26813727 | **OK** — `flow OpenMP has_mpi True`; **smoke 26814834 CERTIFIED** (see below) |
-| v1.1.0 | h100 | `suite-v1.1.0-h100` | 26813725 | **OK** — `flow Cuda has_mpi True` |
+| v1.1.0 | h100 | `suite-v1.1.0-h100` | 26813725 | **OK** — `flow Cuda has_mpi True`; smoke **26813984 queued** (gpu_h100 was at 56 alloc / 12 resv; est. start 2026-09-17T12:30) — result will be `suite-v1.1.0-h100/peclet-smoke-26813984.out`, compare its two `k` lines |
 | v1.1.0 | a100 | `suite-v1.1.0-a100` | 26813726 | **OK** — `flow Cuda has_mpi True`; **smoke 26815101 CERTIFIED** (see below) |
 
 Each wheelhouse (`$PROJ/wheelhouse/v1.1.0-<backend>/`) carries all seven packages at the released
@@ -113,6 +113,13 @@ np=4: k=5.845422163491e+00  div=1.847e-13
 the standing position that a backend change is a faithful port, not a re-derivation. The A100 runs
 the tile at 103.6 ms/step against genoa's 205.7 ms (1.07 vs 0.54 Mcell/s/rank), which is a timing
 difference and not a numerical one.
+
+The **h100 smoke is queued, not yet run** (job 26813984, submitted 2026-09-17T00:03, 4 GPUs). Its
+install is verified and the CUDA backend is already certified by the a100 run above, so this job is a
+third confirmation rather than an open question — but until it completes, the h100 row is
+*install-verified, not smoke-certified*. To finish it: read
+`$PROJ/suite-v1.1.0-h100/peclet-smoke-26813984.out`, check the np=1 and np=4 `k` lines are identical
+(expect `5.845422163491e+00`, the same value both other backends gave), and fill in the row.
 
 It took three submissions to get there, and the two failures were **real defects in the repo, not the
 install**: `benchmarks/profile_mpi_flow.py` still called `set_body_force(fx, fy, fz)` (repacked into
