@@ -496,9 +496,22 @@ Per release:
    re-stamp its hash, but only use it on a page whose frozen output is genuinely current — during a
    re-render pass (§10 step 2) the pages are re-executed anyway and a re-stamp would publish stale
    output as if it were fresh.
-5. **Interlink both ways**: every video description carries its page, the repository and the docs
+5. **Retire the previous film.** Set the previous release's entry to `privacy: private` and
+   `sync` it — do not delete the entry. The entry is what holds the video id, and `sync` only
+   pushes a privacy it can read from the manifest, so deleting it leaves the old film public with
+   nothing left to notice. Private keeps the watch history and is reversible; deleting the video
+   is not. Then move `channel_trailer:` to the new slug and `ytpub channel --apply`.
+6. **Interlink both ways**: every video description carries its page, the repository and the docs
    (`site.docs` in `videos.yaml`); the docs home page, the gallery landing page and the README carry
-   the film and the channel.
+   the film and the channel. Swapping a film means swapping the id in all three — and in the
+   gallery's landing page the embed MUST stay inside its ```{=html} fence, or Pandoc wraps the
+   iframe in a `<p>` and Bootstrap's `.ratio` renders it at 300x150.
+
+**Picture quality is `films/QUALITY.md`**, and it is a design contract, not advice: the 2160p
+master, `perspective` rather than `zoompan` for the push-in, one x264 encode per item, and the
+BT.709 conversion. `tools/quality_check.py film` gates all four on every cut. The 1.0.0 film
+shipped with a shimmering push-in and the channel teal displayed as (0,132,136); both were
+invisible to every check that existed at the time.
 
 ---
 
