@@ -254,7 +254,8 @@ installed" on 2026-09-18 while two copies existed — `peclet-examples/.venv/bin
 unused `~/.local/quarto-1.6.40` tarball — and a `find / -maxdepth 4` cannot reach a venv binary,
 which sits six levels down. **Activate first, then look**; to search, `find ~/Codes -maxdepth 8`.
 The version is pinned to the one the gallery's own venv carries (1.9.38) so a re-render does not
-silently change output.
+silently change output. The 1.6.40 tarball was deleted the same day and
+`peclet-examples/render_example.sh`, which hardcoded it, now uses `$SUITE/.venv/bin/quarto`.
 
 **Why one.** `coupling` composes `flow` + `dem` in a single interpreter by design, and `pnm` already
 borrowed flow's venv, so a shared interpreter was the de-facto requirement. The per-project venvs had
