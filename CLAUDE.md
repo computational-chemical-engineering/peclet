@@ -246,7 +246,15 @@ source /path/to/suite/.venv/bin/activate    # or ../.venv from inside a submodul
 
 It carries nanobind, numpy/scipy/numba/h5py/pandas, matplotlib/pyvista/scikit-image, mpi4py,
 cupy-cuda12x, scikit-build-core/hatchling/build, pytest, clang-format and the Jupyter stack — the
-union of what the per-project venvs held.
+union of what the per-project venvs held — **and `quarto` (the `quarto-cli` wheel, which ships the
+real binary), because the examples gallery is a Quarto site and rendering it is suite work.**
+
+**Tools live in the venv, so `which quarto` in a fresh shell says nothing.** It answered "not
+installed" on 2026-09-18 while two copies existed — `peclet-examples/.venv/bin/quarto` and an
+unused `~/.local/quarto-1.6.40` tarball — and a `find / -maxdepth 4` cannot reach a venv binary,
+which sits six levels down. **Activate first, then look**; to search, `find ~/Codes -maxdepth 8`.
+The version is pinned to the one the gallery's own venv carries (1.9.38) so a re-render does not
+silently change output.
 
 **Why one.** `coupling` composes `flow` + `dem` in a single interpreter by design, and `pnm` already
 borrowed flow's venv, so a shared interpreter was the de-facto requirement. The per-project venvs had
