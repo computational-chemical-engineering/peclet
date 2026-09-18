@@ -15,11 +15,11 @@ boundary** methodology, **GPU** support, and **Python bindings**.
 The name nods to the [Péclet number](https://en.wikipedia.org/wiki/P%C3%A9clet_number) — the ratio of
 advective to diffusive transport, the dimensionless heart of transport phenomena.
 
-🎬 **The 1.0.0 release film** — seven minutes on what the suite does and the evidence for it:
+🎬 **The 1.1.0 release film** — eight minutes on what the suite does and the evidence for it:
 
-<a href="https://www.youtube.com/watch?v=L_uAHnL6Gq8">
-  <img src="https://img.youtube.com/vi/L_uAHnL6Gq8/maxresdefault.jpg" width="560"
-       alt="Peclet 1.0.0 — resolve what you can, model what you must (7:30)">
+<a href="https://www.youtube.com/watch?v=7D5Em5zvZRI">
+  <img src="https://img.youtube.com/vi/7D5Em5zvZRI/maxresdefault.jpg" width="560"
+       alt="Peclet 1.1.0 — resolve what you can, model what you must (7:52)">
 </a>
 
 More on the channel **[@PecletHPC](https://www.youtube.com/@PecletHPC)**: a short movie for every

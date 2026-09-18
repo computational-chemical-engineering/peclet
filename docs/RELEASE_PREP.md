@@ -1000,3 +1000,42 @@ the `quay.io/pypa/manylinux_2_28_x86_64` image the CUDA job runs in — checked,
 
 `docs/RELEASE.md` §0 said "cp310–cp313" and that three of the four cu13 packages "do not exist yet";
 both were stale and are corrected.
+
+### 1.1.0: the film re-cut, and what a viewer's eye found that no gate did (2026-09-18)
+
+The 1.1.0 release film is **<https://www.youtube.com/watch?v=7D5Em5zvZRI>** (7:52, public, the
+channel trailer); the 1.0.0 cut is **private** on the channel, kept rather than deleted so a later
+`ytpub sync` keeps pushing `private` instead of leaving it public. Two things were wrong with the
+1.0.0 film and neither had a gate:
+
+1. **The picture.** A viewer reported it as blurred at the start with static graphs shimmering left
+   to right. `films/QUALITY.md` is the design note that came out of measuring it, and the ranking
+   was not what the pipeline's parameters suggested. The shimmer was `zoompan`, entirely: it
+   truncates its crop origin *and* its crop size to whole input pixels, so a 0.02 %-per-frame
+   push-in advances in whole-pixel jumps. Fitted to the zoom model, translation noise went
+   **0.69 px std / 2.21 px max → 0.0008 / 0.0055** by replacing it with `perspective` and per-frame
+   corner expressions. The blur was three separate things — the figures' source DPI (the gallery
+   pages set `figure.dpi: 130` in their own `rcParams`, so a plot is 627–751 px and gets enlarged
+   1.5–2.7×), YouTube's 1080p AVC rendition of a slow zoom over text, and an opening that was the
+   *YouTube channel banner* run through the figure branch. The film now masters at **3840×2160**,
+   draws its opening natively, fits pictures into the box the strips leave free (the old rule put a
+   4:3 figure's title under the caption strip), and encodes each item **once**. Generation loss,
+   the thing that looked most suspect, measured ≤ 0.4 % and was not a cause.
+   *The colour was also wrong and nobody had looked*: the composite went to `yuv420p` through
+   swscale's BT.601 default, untagged, so every BT.709 player showed the channel teal as
+   **(0,132,136)** instead of (13,148,136). The 1.1.0 master reads back (12,147,134).
+2. **The numbers.** The 1.0.0 film's headline — "7.7 Gcell/s at 90 % weak efficiency on 32 H100" —
+   is the *head-to-head* study on a geometry-free box with pressure iterations pinned at 4.0. True,
+   still published, and not what a release film should lead with. Beat 18 is now
+   `benchmarks/release-1.1.0-scaling`, measured at the tag on the case the solver is for: **1.81
+   billion cells on 32 H100 at 64 % weak efficiency**, with ⟨u⟩ identical to **8e-11** across 34
+   runs, 1 → 1536 ranks, both backends. Beat 20 carries 1.1.0's momentum-solve doubling and the
+   16-GPU rung the record reports as reproducible and undiagnosed; the old "MG depth cap costs a
+   third at 1536 ranks" line was **dropped because it had stopped being true** — SCALING_ISSUES #2
+   was fixed by telescoping on 2026-09-02.
+
+Gates now run on every cut (`tools/quality_check.py film`): the frame ledger against the narration
+clock, BT.709 tagging, one lossy encode per item asserted from the command log, and the zoom fit.
+The 1.1.0 master passes all four. **Open, and recommended in `films/QUALITY.md` §4.3:**
+`fig-format: retina` in the gallery, which is the only remaining fix for figure sharpness and needs
+Quarto — not installed on this host, so it belongs to whoever re-executes the pages next.
