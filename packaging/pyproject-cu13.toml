@@ -21,7 +21,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "peclet-cu13"
-version = "1.1.0"
+version = "1.1.1"
 description = "GPU-accelerated & parallel simulation of transport phenomena (CFD, DEM, Voronoi) — single-GPU CUDA family metapackage"
 readme = "README.md"
 requires-python = ">=3.10"

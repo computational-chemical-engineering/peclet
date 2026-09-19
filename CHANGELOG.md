@@ -4,6 +4,44 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-09-19 — the metapackage page, refreshed
+
+**Metapackage only.** `peclet` and `peclet-cu13` are republished; every member package is
+unchanged and the `==` pins are identical to 1.1.0 — `peclet-flow` 1.1.0, `peclet-core` /
+`peclet-dem` / `peclet-pnm` / `peclet-voro` 1.0.2, `peclet-morton` / `peclet-coupling` 1.0.1,
+`peclet-amr` 0.1.1. Installing 1.1.1 gets you exactly the code 1.1.0 did.
+
+### Why a release for metadata
+
+A published distribution carries a **frozen copy** of the README, and PyPI does not allow a
+version to be re-uploaded. The 1.1.0 sdist went up on 2026-09-16, two days before the 1.1.0
+release film replaced the 1.0.0 one — so <https://pypi.org/project/peclet/>, the page
+`pip install peclet` sends people to, still advertised the old film, and once that film was
+retired it was serving a 404 thumbnail and a sign-in wall. No repository edit can reach a page
+like that; only the next upload can.
+
+### Changed
+
+- **The project page now shows the 1.1.0 release film** (<https://www.youtube.com/watch?v=7D5Em5zvZRI>)
+  and the current README.
+- **Package metadata a reader actually uses.** Keywords, which no package had: the words people
+  search — "cut cell", "volume of fluid", "discrete element method", "pore network", "CFD-DEM".
+  Classifiers 6 → 14: the Python versions the wheels build for (3.10–3.14), Chemistry and
+  Mathematics beside Physics, and `Environment :: GPU :: NVIDIA CUDA` on `peclet-cu13` only, where
+  it is true. Every string validated against PyPI's live classifier list before tagging, because
+  an invalid one fails the upload rather than the build.
+- **Links.** `Examples gallery`, `Issues` and `Changelog` added; `Documentation` pointed at the
+  documentation site rather than back at the GitHub repository.
+- **One citable author identity** across the suite: `E.A.J.F. Peters`, ORCID
+  `0000-0001-6099-3583`, `e.a.j.f.peters@tue.nl` — matching the publication record and the Zenodo
+  deposits, so software citations accrue to the same author as the papers. The member packages
+  carry the same change and will ship it at their own next release.
+
+### Note for anyone comparing pages
+
+The member packages' PyPI pages still show 1.1.0-era metadata for the same frozen-README reason.
+That is expected and self-corrects at their next upload; the code is identical either way.
+
 ## [1.1.0] — 2026-09-16 — the momentum solve, twice as fast
 
 `peclet-flow` 1.1.0 · `peclet-core` / `peclet-dem` / `peclet-pnm` / `peclet-voro` 1.0.2 ·
