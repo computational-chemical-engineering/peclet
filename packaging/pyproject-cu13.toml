@@ -27,16 +27,26 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
-authors = [{ name = "Frank Peters", email = "e.a.j.f.peters@tue.nl" }]
+authors = [{ name = "E.A.J.F. Peters", email = "e.a.j.f.peters@tue.nl" }]
 # The wheels are manylinux x86-64 and there is no Windows or macOS build (suite docs/DEPLOYMENT.md,
 # "Operating system"); say so on the PyPI page, where a reader looks before pip tells them.
+keywords = ["computational fluid dynamics", "CFD", "discrete element method", "DEM", "immersed boundary", "porous media", "multiphase flow", "GPU", "MPI", "HPC", "Kokkos", "transport phenomena"]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Science/Research",
+  "Intended Audience :: Education",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: C++",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Scientific/Engineering :: Physics",
+  "Topic :: Scientific/Engineering :: Chemistry",
+  "Topic :: Scientific/Engineering :: Mathematics",
+  "Environment :: GPU :: NVIDIA CUDA",
 ]
 
 dependencies = [
@@ -58,10 +68,14 @@ cfd-dem = ["peclet-coupling==1.0.1"]
 
 [project.urls]
 Homepage = "https://github.com/computational-chemical-engineering/peclet"
-Documentation = "https://github.com/computational-chemical-engineering/peclet"
+Documentation = "https://computational-chemical-engineering.github.io/peclet/"
+"Examples gallery" = "https://computational-chemical-engineering.github.io/peclet-examples/"
 
 # No Python package is built — this metapackage is dependencies only. Point hatchling at an empty target
 # so it produces a valid (code-free) wheel/sdist.
+Issues = "https://github.com/computational-chemical-engineering/peclet/issues"
+Changelog = "https://github.com/computational-chemical-engineering/peclet/blob/main/CHANGELOG.md"
+
 [tool.hatch.build.targets.wheel]
 bypass-selection = true
 
