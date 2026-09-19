@@ -1039,3 +1039,23 @@ clock, BT.709 tagging, one lossy encode per item asserted from the command log, 
 The 1.1.0 master passes all four. **Open, and recommended in `films/QUALITY.md` §4.3:**
 `fig-format: retina` in the gallery, which is the only remaining fix for figure sharpness and needs
 Quarto — not installed on this host, so it belongs to whoever re-executes the pages next.
+
+
+### The README on PyPI is a snapshot, not a mirror (2026-09-19)
+
+`pypi.org/project/peclet/` showed the 1.0.0 film two days after the 1.1.0 film replaced it, and
+nothing in the repositories could change that: a distribution carries a **frozen copy** of the
+README, the 1.1.0 sdist was uploaded 2026-09-16 19:36 UTC, and PyPI forbids re-uploading a
+version. Anything on a PyPI page — README prose, keywords, classifiers, project URLs — lands only
+with the **next** upload.
+
+Two consequences worth planning around:
+
+1. **A superseded film is retired to `unlisted`, never `private`** (RELEASE.md §10.1). Private
+   broke the 1.1.0 page: 404 thumbnail, sign-in wall.
+2. **The metadata improvements of 2026-09-19 are not on PyPI yet** — keywords (there were none),
+   classifiers (6 → 14/15), and the Examples/Issues/Changelog URLs are all in the repositories and
+   will appear at the next upload. For the *metapackage* that upload is cheap: `peclet` is
+   dependency-only, so a patch release is one sdist and one pure-Python wheel with no compilation
+   and no per-interpreter matrix. Worth doing on its own if the front page matters before the next
+   feature release; the component packages can wait for theirs.

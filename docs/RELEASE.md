@@ -496,11 +496,17 @@ Per release:
    re-stamp its hash, but only use it on a page whose frozen output is genuinely current — during a
    re-render pass (§10 step 2) the pages are re-executed anyway and a re-stamp would publish stale
    output as if it were fresh.
-5. **Retire the previous film.** Set the previous release's entry to `privacy: private` and
-   `sync` it — do not delete the entry. The entry is what holds the video id, and `sync` only
-   pushes a privacy it can read from the manifest, so deleting it leaves the old film public with
-   nothing left to notice. Private keeps the watch history and is reversible; deleting the video
-   is not. Then move `channel_trailer:` to the new slug and `ytpub channel --apply`.
+5. **Retire the previous film to `unlisted`.** Set the previous release's entry to
+   `privacy: unlisted` and `sync` it — do not delete the entry, and do not use `private`. The
+   entry is what holds the video id, and `sync` only pushes a privacy it can read from the
+   manifest, so deleting it leaves the old film public with nothing left to notice.
+   **Why unlisted and not private:** a published distribution carries a FROZEN copy of the README
+   and PyPI will not let a version be re-uploaded, so every release artifact links to the film of
+   its day *immutably*. Private turned the peclet 1.1.0 page into a 404 thumbnail and a sign-in
+   wall on 2026-09-19 — the page `pip install peclet` sends people to. Unlisted keeps those
+   references alive while keeping the film off the channel and out of search. Reserve `private`
+   for something that should never have been published. Then move `channel_trailer:` to the new
+   slug and `ytpub channel --apply`.
 6. **Interlink both ways**: every video description carries its page, the repository and the docs
    (`site.docs` in `videos.yaml`); the docs home page, the gallery landing page and the README carry
    the film and the channel. Swapping a film means swapping the id in all three — and in the
