@@ -15,7 +15,7 @@ Please report suspected vulnerabilities **privately** — do not open a public i
 
 - Preferred: use GitHub's **[Report a vulnerability](https://github.com/computational-chemical-engineering/peclet/security/advisories/new)**
   (Security → Advisories) on the relevant repository, or
-- email **e.a.j.f.peters@gmail.com** with a description and a minimal reproducer.
+- email **e.a.j.f.peters@tue.nl** with a description and a minimal reproducer.
 
 Please allow a reasonable time for a fix before public disclosure. As scientific-computing software with no
 network-facing services, the most likely issues are memory-safety bugs reachable from crafted inputs
