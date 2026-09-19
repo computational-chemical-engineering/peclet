@@ -1,5 +1,8 @@
 site_name: Peclet
 site_description: GPU-accelerated & parallel simulation of transport phenomena (CFD, DEM, Voronoi)
+# Without site_url, MkDocs cannot build absolute URLs and emits an EMPTY sitemap.xml — the
+# published site was telling search engines it had zero pages (found 2026-09-19).
+site_url: https://computational-chemical-engineering.github.io/peclet/
 repo_url: https://github.com/computational-chemical-engineering/peclet
 repo_name: peclet
 docs_dir: docs
