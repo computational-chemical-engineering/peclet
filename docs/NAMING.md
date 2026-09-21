@@ -202,7 +202,23 @@ layout a VTI hands over — and its origin/spacing triples are stated in the SAM
 they describe. The `_zyx` suffix is therefore load-bearing. **Keep the suffix wherever the triple is
 in array order**, and never add a bare `origin`/`spacing` beside it in the other order.
 
-### peclet.core (`peclet.core.mpi`, `peclet.core.geom`) and peclet.amr (`peclet.core.amr` until 2026-09-10)
+### peclet.geom, peclet.halo, and peclet.core (`peclet.core.geom` / `peclet.core.mpi` until 2.0.0), and peclet.amr (`peclet.core.amr` until 2026-09-10)
+
+**Planned split, decided 2026-09-21** ([CORE_BOUNDARY.md](CORE_BOUNDARY.md)): the `peclet-core`
+distribution is cut at its *install-time requirement*, because `peclet.core.geom` is pure SDF
+authoring that today cannot be installed without an MPI toolchain (the sdist builds
+`core/python/CMakeLists.txt`, whose `find_package(MPI REQUIRED)` covers both bindings). The C++
+identity — `peclet::core`, `peclet/core/...`, the repo and its tags — does **not** move.
+
+| former | canonical | status |
+|---|---|---|
+| `peclet.core.geom` (dist `peclet-core`, sdist, behind `[mpi]`) | `peclet.geom` (dist `peclet-geom`, **wheels**, in plain `pip install peclet`) | **planned: aliased 1.2.0 → warns 1.3.0 → removed 2.0.0** |
+| `peclet.core.mpi` (dist `peclet-core`) | `peclet.halo` (dist `peclet-halo`, sdist, `pip install peclet[mpi]`) | **planned: aliased 1.2.0 → warns 1.3.0 → removed 2.0.0** |
+| `from peclet.core import geom, mpi` | `from peclet import geom, halo` | same ladder |
+| extra `[mpi]` | — | **canon** — an extra names the *requirement* of what it pulls, which is what an extra is for |
+| `peclet.mpi` as the halo's name | `peclet.halo` | **rejected 2026-09-21** — `mpi` names a dependency, not the thing; `halo` is already its C++ name (`peclet::halo`, `GridHalo`, `ParticleHalo`), and it would be the only package in the family named for what it links against |
+
+
 
 | former | canonical | status |
 |---|---|---|
