@@ -4,6 +4,40 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] — 2026-09-21 — the landing pages, corrected
+
+A refresh release: **no code changes in any package**. `peclet` / `peclet-cu13` 1.2.1 and
+`peclet-halo` / `peclet-core` 1.1.1 exist only to replace landing pages that described the layout
+1.2.0 had just replaced — the `peclet` page still listed `peclet-core | peclet.core (.mpi, .geom) |
+… sdist only (peclet[mpi])`, i.e. it told a reader that scene authoring was behind the MPI extra,
+which is precisely what 1.2.0 fixed.
+
+A PyPI long description is package metadata baked into the upload; pypi.org has no "edit README".
+Correcting one therefore costs a version, which is why this release exists at all.
+
+### Added
+
+- **`tools/release/check_landing_pages.py`**, so this stops recurring. It derives its rules from
+  [docs/NAMING.md](docs/NAMING.md) §2 — every `| former | canonical | status |` row marked
+  removed/aliased/planned — and greps every landing page for the retired spellings, so a rename is
+  covered the day it is recorded there. It also checks that a package's page names the distribution
+  it ships. It runs in the release pre-flight **and** as a `landing-pages` job that the umbrella's
+  `publish` job needs: the last moment the mistake is still cheap.
+
+  Naming an old spelling is not a failure if the replacement is named within three lines — that is
+  what migration prose looks like. A deliberate mention with nothing to replace it is marked
+  `<!-- landing-ok: why -->`.
+
+### Fixed
+
+- Landing pages across the suite: `dem` told readers to build `peclet.core.mpi`; `voro`'s code
+  sample called `peclet.core.geom.SceneBuilder()`; **`coupling`'s page never named
+  `peclet-coupling` at all**, so its PyPI page carried no install line; `core`'s was titled and
+  badged for `peclet-core` while publishing `peclet-halo`. The `dem`, `voro`, `pnm` and `coupling`
+  fixes are on their `main` branches and reach PyPI with those packages' next release — they are
+  deliberately **not** re-released here, because each carries unrelated unreleased work that a
+  documentation fix should not ship.
+
 ## [1.2.0] — 2026-09-21 — the core boundary, cut where the requirement is
 
 `peclet-geom` 1.0.0 (new) · `peclet-halo` 1.1.0 (new) · `peclet-core` 1.1.0 (now a compatibility

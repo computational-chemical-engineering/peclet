@@ -21,7 +21,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "peclet-cu13"
-version = "1.2.0"
+version = "1.2.1"
 description = "GPU-accelerated & parallel simulation of transport phenomena (CFD, DEM, Voronoi) — single-GPU CUDA family metapackage"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -68,7 +68,7 @@ dependencies = [
 # The shell (peclet-core 1.1.0) pulls peclet-halo and peclet-geom, so `peclet[mpi]` still provides
 # `peclet.core.mpi` as well as the canonical `peclet.halo`. At 2.0.0 this becomes peclet-halo
 # directly and the shell is gone (CORE_BOUNDARY.md §3).
-mpi = ["peclet-core==1.1.0"]
+mpi = ["peclet-core==1.1.1"]
 amr = ["peclet-amr==0.1.1"]
 # peclet-coupling is the unresolved point-particle CFD-DEM coupling of peclet.flow + peclet.dem
 # (sdist-only: builds its Kokkos kernels from source against a bootstrapped prefix).
