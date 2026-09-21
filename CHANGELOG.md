@@ -4,6 +4,71 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-09-21 — the core boundary, cut where the requirement is
+
+`peclet-geom` 1.0.0 (new) · `peclet-halo` 1.1.0 (new) · `peclet-core` 1.1.0 (now a compatibility
+shell) · metapackages `peclet` and `peclet-cu13` 1.2.0. **Every other member is unchanged and not
+re-released** — `peclet-flow` 1.1.0, `peclet-pnm` / `peclet-dem` / `peclet-voro` 1.0.2,
+`peclet-morton` / `peclet-coupling` 1.0.1, `peclet-amr` 0.1.1.
+
+### Fixed
+
+- **A pure-geometry API no longer needs an MPI toolchain to install.** `peclet.core.geom` is
+  host-only SDF scene authoring with no MPI anywhere in it, but it shared the `peclet-core`
+  distribution with the Lagrangian halo bindings — and that distribution's sdist builds
+  `core/python/CMakeLists.txt`, whose `find_package(MPI REQUIRED COMPONENTS CXX)` covered both
+  targets. So `pip install` of a CSG scene builder failed on a machine without MPI headers.
+
+  It is now `peclet.geom`, its own package with **wheels**, and it is in the base
+  `pip install peclet`. Measured on a clean venv: `pip install --only-binary=:all: peclet-geom`
+  resolves `numpy` alone and gives a working `SceneBuilder` — no compiler, no MPI, no `peclet-core`.
+
+  What this cost before the fix: eleven gallery pages were unrunnable from PyPI (their Colab badges
+  raised `ModuleNotFoundError`), and `peclet.dem`'s shipped `scene_particle.build()` — a feature
+  inside the dem *wheel* — was unusable without an MPI toolchain.
+
+### Changed
+
+- **`peclet.core` splits by install-time requirement**, which is also what makes the names honest
+  ([docs/CORE_BOUNDARY.md](docs/CORE_BOUNDARY.md)):
+
+  | was | is | ships as |
+  |---|---|---|
+  | `peclet.core.geom` | **`peclet.geom`** (`peclet-geom`) | wheels; in `pip install peclet` |
+  | `peclet.core.mpi` | **`peclet.halo`** (`peclet-halo`) | sdist; `pip install peclet[mpi]` |
+
+  `halo` names the thing rather than what it links against — it is already the name on the C++ side
+  (`peclet::halo`, `GridHalo`, `ParticleHalo`). `peclet.mpi` was considered and rejected: it would
+  have been the only package in the family named for a dependency.
+
+- **The C++ identity does not move.** `peclet::core`, the `peclet/core/...` header paths, the
+  `peclet-core` repository, its tags and its Zenodo lineage are all unchanged. The split is a
+  *packaging* change: six repos pin those headers by tag and see nothing different.
+
+### Deprecated
+
+- `peclet.core.geom` and `peclet.core.mpi` keep working **unchanged** in this release, provided by a
+  pure-Python `peclet-core` 1.1.0 shell that re-exports the new modules. They are the *same objects*
+  — `peclet.core.geom.SceneBuilder is peclet.geom.SceneBuilder` is `True` — so `isinstance`,
+  pickling and docs behave exactly as before. No warning fires in 1.2.0, by the rule in
+  [docs/NAMING.md](docs/NAMING.md) §0; a `DeprecationWarning` arrives in 1.3.0 and `peclet.core` is
+  removed in 2.0.0. The shell pins `<2`, so a 2.x install of `peclet-core` fails loudly at
+  resolution rather than resolving and then importing nothing.
+
+### Tested
+
+The move is proved rather than asserted. `state_hash.py` runs every public entry path with a fixed
+seed and hashes the final arrays; against references recorded from the **released** `peclet-core`
+1.0.2 on the same toolchain, both halves report `IDENTICAL`:
+
+- `peclet.geom` — all five geom paths (`bake`, `body_properties`, `eval`, `eval_root`,
+  `eval_root_grad`);
+- `peclet.halo` — all ten halo paths, at np=1 **and** np=2.
+
+`peclet-geom`'s CI builds and imports on a runner with **no MPI and no Kokkos installed**, and fails
+loudly if that runner ever acquires them — a no-MPI gate on an MPI-equipped machine would prove
+nothing.
+
 ## [1.1.1] — 2026-09-19 — the metapackage page, refreshed
 
 **Metapackage only.** `peclet` and `peclet-cu13` are republished; every member package is

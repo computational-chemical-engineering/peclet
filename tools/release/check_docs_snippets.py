@@ -98,15 +98,19 @@ def run_pages(python: str, timeout: int) -> int:
 # bindings, so a genuine deletion is still caught. Add to this list only with the reason.
 BUILD_GATED = {
     "extract_pore_network_mpi",   # pnm: -DPECLET_PNM_MPI=ON; the CPU/CUDA wheels are serial
-    "add_leaf",                   # peclet.core.geom.SceneBuilder: peclet-core publishes an SDIST
-                                  # ONLY, so CI cannot install it without a source build
+    # `add_leaf` (peclet.geom.SceneBuilder) came OFF this list on 2026-09-21: it was exempt only
+    # because peclet-core was sdist-only, and peclet-geom ships wheels and is in the base
+    # `pip install peclet` (suite/docs/CORE_BOUNDARY.md). Removing the exemption is the point of
+    # the split — the gate now actually checks it.
 }
 
 # Modules of the installed family, and the attribute that leads to each one's classes.
-# NB `pip install peclet` (the metapackage) pulls flow/pnm/dem/voro/morton only — peclet-core and
+# NB `pip install peclet` pulls flow/pnm/dem/voro/morton AND peclet-geom (wheels) — peclet-halo and
 # peclet-amr are separate installs, and peclet.coupling ships no wheel. A module that is simply
 # absent is skipped, so CI must install what it wants checked or the pass silently narrows.
 INSTALLED_MODULES = ["peclet.flow", "peclet.dem", "peclet.voro", "peclet.pnm", "peclet.morton",
+                     "peclet.geom", "peclet.halo",
+                     # the pre-1.2 spellings, kept here until 2.0.0 so the shell itself is checked
                      "peclet.core", "peclet.core.geom", "peclet.core.mpi", "peclet.coupling",
                      "peclet.amr", "peclet.voro.scenes"]
 

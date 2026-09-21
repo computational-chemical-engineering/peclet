@@ -23,7 +23,7 @@ So "1 MPI process / multicore / GPU" is really **backend × MPI**:
 
 | You want | Backend | MPI | How you get it |
 |----------|---------|-----|----------------|
-| 1 process, multicore CPU | OpenMP (`OMP_NUM_THREADS`) | off | `pip install peclet` (PyPI wheels) |
+| 1 process, multicore CPU | OpenMP (`OMP_NUM_THREADS`) | off | `pip install peclet` (PyPI wheels; includes `peclet.geom`) |
 | 1 process, 1 NVIDIA GPU | CUDA | off | `pip install peclet-cu13` (PyPI wheels) |
 | many processes, CPU | OpenMP/Serial | on | source build against `extern/install/host-openmp`, or the `peclet-cpu` container |
 | many GPUs (NVIDIA) | CUDA | on | source build against `extern/install/nvidia-cuda` (Snellius: `tools/hpc/install_snellius.sh`), or the `peclet-cuda` container |
@@ -48,9 +48,18 @@ toolkit generation. So the split is:
   driver (CUDA ≥ 13 capable) must be on the host — no system CUDA toolkit. The `-cu13` packages install
   the **same `peclet.*` imports** as the CPU ones and are therefore **mutually exclusive with `peclet`**
   in one environment (the CuPy `cupy` vs `cupy-cuda12x` model): one venv per backend. Single-rank only.
-- **Source-only packages:** `peclet-core` (MPI particle halo, AMR octree, `core.geom` scene authoring)
-  and `peclet-coupling` (CFD-DEM) are published as **sdists** — `pip install peclet[mpi]` /
-  `pip install peclet[cfd-dem]` builds them against your MPI and Kokkos prefix.
+- **Scene authoring is `peclet.geom`, and it is in the base install.** `peclet-geom` is host-only
+  (no MPI, no Kokkos; numpy is its only dependency), so it ships **wheels** and `pip install peclet`
+  provides it. Until peclet 1.2.0 this was `peclet.core.geom` inside the sdist-only `peclet-core`,
+  which meant a pure-geometry API could not be installed without an MPI toolchain — the defect that
+  motivated the split (suite/docs/CORE_BOUNDARY.md). `peclet.core.geom` still works as an alias
+  until 2.0.0.
+- **Source-only packages:** `peclet-halo` (the distributed Lagrangian particle halo — `peclet.halo`,
+  formerly `peclet.core.mpi`) and `peclet-coupling` (CFD-DEM) are published as **sdists** —
+  `pip install peclet[mpi]` / `pip install peclet[cfd-dem]` builds them against your MPI and Kokkos
+  prefix. `peclet[mpi]` pulls the `peclet-core` compatibility shell, so both `peclet.halo` and the
+  old `peclet.core.mpi` spelling are available; at 2.0.0 the extra points at `peclet-halo` directly
+  and the shell is gone.
 - **AMD/HIP or multi-rank MPI:** **build from source** (`pip install` against a Kokkos prefix) or use a
   **container** — both routes below.
 

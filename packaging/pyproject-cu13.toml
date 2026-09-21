@@ -21,7 +21,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "peclet-cu13"
-version = "1.1.1"
+version = "1.2.0"
 description = "GPU-accelerated & parallel simulation of transport phenomena (CFD, DEM, Voronoi) — single-GPU CUDA family metapackage"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -51,6 +51,11 @@ classifiers = [
 
 dependencies = [
   "peclet-morton==1.0.1",
+  # peclet-geom: host-only SDF scene authoring, wheels, numpy-only. In the BASE install (not an
+  # extra) because it is what peclet.dem's scene_particle.build() and eleven gallery pages need,
+  # and it was unobtainable behind [mpi] while it shared a distribution with the halo bindings —
+  # suite/docs/CORE_BOUNDARY.md. Same wheel for the CUDA family: there is nothing device-side in it.
+  "peclet-geom==1.0.0",
   "peclet-flow-cu13==1.1.0",
   "peclet-pnm-cu13==1.0.2",
   "peclet-dem-cu13==1.0.2",
@@ -60,7 +65,10 @@ dependencies = [
 [project.optional-dependencies]
 # peclet-core is sdist-only (MPI particle halo + Kokkos AMR): installing it builds from source and needs
 # an MPI toolchain (+ optional Kokkos prefix for the AMR module).
-mpi = ["peclet-core==1.0.2"]
+# The shell (peclet-core 1.1.0) pulls peclet-halo and peclet-geom, so `peclet[mpi]` still provides
+# `peclet.core.mpi` as well as the canonical `peclet.halo`. At 2.0.0 this becomes peclet-halo
+# directly and the shell is gone (CORE_BOUNDARY.md §3).
+mpi = ["peclet-core==1.1.0"]
 amr = ["peclet-amr==0.1.1"]
 # peclet-coupling is the unresolved point-particle CFD-DEM coupling of peclet.flow + peclet.dem
 # (sdist-only: builds its Kokkos kernels from source against a bootstrapped prefix).

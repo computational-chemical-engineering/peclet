@@ -13,8 +13,15 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 OFFLINE=0; CI=0
 for a in "$@"; do case "$a" in --offline) OFFLINE=1;; --ci) CI=1;; esac; done
-SUBS="core amr morton flow pnm dem voro coupling"
-declare -A DIST=([core]=peclet-core [amr]=peclet-amr [morton]=peclet-morton [flow]=peclet-flow [pnm]=peclet-pnm [dem]=peclet-dem [voro]=peclet-voro [coupling]=peclet-coupling)
+SUBS="core geom amr morton flow pnm dem voro coupling"
+# DIST is the PyPI distribution; REPO is the GitHub repository. They used to be the same string, and
+# the core boundary split (suite/docs/CORE_BOUNDARY.md) is where they part: the `core` checkout now
+# publishes peclet-halo, while its repo, tags and Zenodo lineage stay peclet-core. Conflating the two
+# would look up CI on a repository that does not exist.
+declare -A DIST=([core]=peclet-halo [geom]=peclet-geom [amr]=peclet-amr [morton]=peclet-morton [flow]=peclet-flow [pnm]=peclet-pnm [dem]=peclet-dem [voro]=peclet-voro [coupling]=peclet-coupling)
+declare -A REPO=([core]=peclet-core [geom]=peclet-geom [amr]=peclet-amr [morton]=peclet-morton [flow]=peclet-flow [pnm]=peclet-pnm [dem]=peclet-dem [voro]=peclet-voro [coupling]=peclet-coupling)
+# The `core` checkout additionally publishes the peclet-core compatibility SHELL from
+# packaging/pyproject-core.toml until 2.0.0; it carries its own version, checked separately below.
 fail=0
 say() { printf '%s\n' "$*"; }
 bad() { say "  !! $*"; fail=1; }
@@ -47,7 +54,7 @@ for s in $SUBS; do
   [ "$dv" != "-" ] && [ "$dv" != "$pv" ] && bad "$s: Doxyfile PROJECT_NUMBER $dv != pyproject $pv"
   # QUALITY_PLAN D4: pyproject is the single source. A CMake project(VERSION <literal>) must not exist
   # (CMake reads pyproject at configure time); a literal that differs is a drift.
-  cv=$(tr '\n' ' ' < "$s/CMakeLists.txt" 2>/dev/null | grep -m1 -oE 'project\s*\([^)]*VERSION\s+[0-9]+\.[0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$')
+  cv=$([ -f "$s/CMakeLists.txt" ] && tr '\n' ' ' < "$s/CMakeLists.txt" | grep -m1 -oE 'project\s*\([^)]*VERSION\s+[0-9]+\.[0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+$')
   [ -n "$cv" ] && [ "$cv" != "$pv" ] && bad "$s: CMakeLists.txt project(VERSION $cv) != pyproject $pv (D4: read it from pyproject.toml)"
   # morton's vcpkg manifest cannot read pyproject.toml; it carries a literal that must be bumped by hand.
   if [ "$s" = morton ] && [ -f morton/packaging/vcpkg/morton/vcpkg.json ]; then
@@ -71,7 +78,7 @@ for s in $SUBS; do
 done
 say ""
 say "== PecletDeps pins (consumers must pin the NEW core/morton tags before their own release)"
-for s in flow pnm dem voro coupling amr; do
+for s in flow pnm dem voro coupling amr geom; do
   f="$s/cmake/PecletDeps.cmake"; [ -f "$f" ] || continue
   printf '  %-9s core=%s morton=%s kokkos=%s arborx=%s\n' "$s" \
     "$(grep -m1 'set(PECLET_CORE_TAG' "$f" | grep -oE '"[^"]+"' | head -1 | tr -d '"')" \
@@ -86,12 +93,12 @@ say ""
 # every peclet/core header a consumer includes must exist at the tag that consumer pins.
 say "== consumer includes vs pinned core tag (a stale pin fails only at compile; CI's guard is configure-only)"
 _stale=0
-for s in flow pnm dem voro coupling amr; do
+for s in flow pnm dem voro coupling amr geom; do
   f="$s/cmake/PecletDeps.cmake"; [ -f "$f" ] || continue
   tag="$(grep -m1 'set(PECLET_CORE_TAG' "$f" | grep -oE '"[^"]+"' | head -1 | tr -d '"')"
   if [ -z "$tag" ]; then say "  $s: NO core pin found in $f"; _stale=1; continue; fi
   missing=""
-  for h in $(grep -rhoE 'peclet/core/[A-Za-z0-9_/]+\.hpp' "$s/include" "$s/src" 2>/dev/null | sort -u); do
+  for h in $(grep -rhoE 'peclet/core/[A-Za-z0-9_/]+\.hpp' "$s/include" "$s/src" "$s/python" 2>/dev/null | sort -u); do
     git -C core cat-file -e "${tag}:include/${h}" 2>/dev/null || missing="${missing} ${h}"
   done
   if [ -n "$missing" ]; then
@@ -151,7 +158,7 @@ if [ "$OFFLINE" = 0 ]; then
   say ""
   say "== GitHub CI on main (latest run per repo)"
   for s in $SUBS; do
-    gh run list -R "computational-chemical-engineering/${DIST[$s]}" -b main -L 3 --json workflowName,conclusion,createdAt \
+    gh run list -R "computational-chemical-engineering/${REPO[$s]}" -b main -L 3 --json workflowName,conclusion,createdAt \
       --jq '.[]|"  '"$s"' \(.workflowName): \(.conclusion) (\(.createdAt[:10]))"' 2>/dev/null
   done
   gh run list -R computational-chemical-engineering/peclet -L 3 --json workflowName,conclusion,createdAt --jq '.[]|"  umbrella \(.workflowName): \(.conclusion) (\(.createdAt[:10]))"' 2>/dev/null
