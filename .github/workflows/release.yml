@@ -26,7 +26,13 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: python tools/release/check_landing_pages.py
+      # ONLY the pages this upload creates. A member's PyPI description is created by that
+      # member's own release, and CI sees submodules at the umbrella's recorded POINTERS, which
+      # legitimately lag a member's main whenever that member is deliberately not re-released —
+      # so gating the metapackage on dem's README blocks a refresh for a page it does not publish.
+      # (That is not hypothetical: it blocked 1.2.1 on its first attempt.) Members should add this
+      # same job to their own release.yml with their own --dists.
+      - run: python tools/release/check_landing_pages.py --dists peclet,peclet-cu13
 
   build:
     runs-on: ubuntu-latest

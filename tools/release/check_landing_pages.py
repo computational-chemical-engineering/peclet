@@ -125,9 +125,16 @@ def landing_pages() -> list[tuple[Path, str | None]]:
             readme = readme.get("file")
         if not readme or not dist:
             continue
-        page = (pp.parent / readme).resolve()
-        if page.exists():
-            pages.append((page, dist))
+        # A pyproject under packaging/ (peclet-cu13, the peclet-core shell) is COPIED over the
+        # repo's pyproject.toml at build time, so its `readme` is relative to the repo ROOT, not to
+        # packaging/. Resolving it relative to its own directory silently finds nothing — and a
+        # page that silently is not checked is exactly how peclet-cu13 shipped a stale one.
+        base = pp.parent.parent if pp.parent.name == "packaging" else pp.parent
+        page = (base / readme).resolve()
+        if not page.exists():
+            print(f"!! {pp.relative_to(ROOT)} declares readme={readme!r} but {page} does not exist")
+            continue
+        pages.append((page, dist))
     for rel in EXTRA_PAGES:
         p = (ROOT / rel).resolve()
         if p.exists():
@@ -154,9 +161,20 @@ def _is_exempt(line: str) -> bool:
     return any(tok in line for tok in _EXEMPT)
 
 
-def check(verbose: bool = False) -> int:
+def check(verbose: bool = False, dists: set[str] | None = None) -> int:
     rules = divergences()
     pages = landing_pages()
+    if dists:
+        # Only the pages this upload CREATES. The umbrella's release publishes `peclet` and
+        # `peclet-cu13` and nothing else: a member's PyPI description is created by that member's
+        # own release, so gating the umbrella on dem's README blocks a metapackage refresh for a
+        # page it does not publish. Worse, it is not even the page CI can see — submodules are
+        # checked out at the umbrella's recorded POINTERS, which legitimately lag a member's main
+        # whenever that member is deliberately not being re-released.
+        pages = [(pg, d) for pg, d in pages if d in dists]
+        if not pages:
+            print(f"!! --dists {sorted(dists)} matched no landing page — check the names")
+            return 1
     if verbose:
         print(f"{len(rules)} retired spellings from NAMING.md §2; {len(pages)} landing pages\n")
         for p, d in pages:
@@ -215,4 +233,8 @@ def check(verbose: bool = False) -> int:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--list", action="store_true", help="show the landing pages and rule count, then exit")
-    sys.exit(check(verbose=ap.parse_args().list))
+    ap.add_argument("--dists", metavar="A,B",
+                    help="only the pages of these distributions — what a single upload CREATES. "
+                         "Omit for the whole suite (the pre-flight's broader sweep).")
+    a = ap.parse_args()
+    sys.exit(check(verbose=a.list, dists=set(a.dists.split(",")) if a.dists else None))

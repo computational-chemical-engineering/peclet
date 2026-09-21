@@ -217,8 +217,18 @@ Update, in this order, and read each one end to end (they drift in small factual
   (`peclet`, `peclet-cu13`, `peclet-halo`) describing the very layout that release replaced.
 
   `tools/release/check_landing_pages.py` is the gate, and it runs in two places so it cannot be
-  skipped: `check_release_state.sh` runs it in the pre-flight, and the umbrella's `release.yml` runs
-  it as a `landing-pages` job that `publish` **needs** — the last moment the mistake is still cheap.
+  skipped: `check_release_state.sh` runs it over the whole suite in the pre-flight, and the
+  umbrella's `release.yml` runs it as a `landing-pages` job that `publish` **needs** — the last
+  moment the mistake is still cheap.
+
+  **The CI job passes `--dists peclet,peclet-cu13`: only the pages that upload CREATES.** A member's
+  PyPI description is created by that member's own release, and CI checks submodules out at the
+  umbrella's recorded *pointers*, which legitimately lag a member's `main` whenever that member is
+  deliberately not being re-released. Without the scope, a metapackage refresh is blocked by a page
+  it does not publish — which is exactly what happened on 1.2.1's first attempt: the job failed on
+  dem/voro/pnm/coupling READMEs that were already fixed on their mains. Nothing was uploaded (the
+  gate ran before `publish`, so the version was not burned) and the tag was re-cut after scoping.
+  **Each member repo should add the same job to its own `release.yml` with its own `--dists`.**
 
   It needs no list of its own. `docs/NAMING.md` §2 is the canon; the tool parses every
   `| former | canonical | status |` row whose status is removed/aliased/planned and greps the
