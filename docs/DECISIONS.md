@@ -428,7 +428,7 @@ reading until they are settled.
 
 ## amr — block octree, mixed-level cut band
 
-61 in force, 2 superseded — full text in [`decisions/amr.md`](decisions/amr.md)
+62 in force, 2 superseded — full text in [`decisions/amr.md`](decisions/amr.md)
 
 ### In force
 
@@ -482,6 +482,7 @@ reading until they are settled.
 - **SOU (second-order-upwind) is the default advection flux; Koren TVD becomes an option**. **Rejected:** Koren TVD as the default (now opt-in)  <sub>amr-octree-status.md:770-776</sub>
 - **Sign convention: the AMR ghost operator is +L (negative-definite)**.  <sub>amr-ghost-collocated-ns-plan.md:44</sub>
 - **Staircase velocity-MG fixed by the clean-fluid exclude mask; Galerkin stays the robust default**.  <sub>amr-gpu-smoother-flow-port.md:29-38</sub>
+- **The C/F scheme DEFAULT is cf=1 (quadratic); cf=0 is the legacy path**. **Rejected:** keeping cf=0 as the default for backward compatibility  <sub>amr/docs/amr_graded_convergence.md, 2026-09-21</sub>
 - **Volume-weighted superficial velocity is required on graded meshes**. **Rejected:** non-volume-weighted superficial velocity on graded meshes  <sub>amr-ghost-collocated-ns-plan.md:57</sub>
 - **Zero pressure after finish_adapt rather than carry the accumulated pressure through coarsening**. **Rejected:** carrying the transferred/accumulated pressure through a coarsening adapt event  <sub>amr-ghost-collocated-ns-plan.md:121</sub>
 - **cf=1 (quadratic C/F flux) is not optional on graded meshes**. **Rejected:** standard (cf=0) two-point C/F flux on graded/throat meshes  <sub>amr-mixed-level-cut-band-plan.md:113</sub>

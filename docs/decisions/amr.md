@@ -762,6 +762,38 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - rejected: carrying the transferred/accumulated pressure through a coarsening adapt event
 - why: "the transferred accumulated p under COARSENING can be worse than p=0 (mid-cycle collapse K 1.28→4.5, recovery ≫ cold start)"
 
+### The C/F scheme DEFAULT is cf=1 (quadratic); cf=0 is the legacy path
+- area: amr
+- source: amr/docs/amr_graded_convergence.md §3; ROADMAP A6
+- decided: 2026-09-21
+- status: settled
+- quote: |
+    USER DECISION: make cf=1 default. `AmrFlow::cfScheme_` (and the oracle's) initialise to
+    `CfScheme::quadratic`; `set_cf_scheme(0)` is kept only to reproduce pre-2026-09-21 graded
+    results.
+
+    This closes a gap between the register and the code. The entry below already held that "cf=1 is
+    NOT optional (the standard flux cannot converge on graded meshes)" and rejected cf=0 there --
+    but the shipped default stayed cf=0, so a user who built a graded mesh silently got the
+    configuration the project had decided against.
+
+    Measured on a SELF-SIMILAR graded ladder (fixed physical refined region, coarse fraction
+    constant to four digits; max and L2 orders agree to two decimals), as orders:
+
+                                             standard   quadratic
+        2:1 interface NORMAL to the variation    2.00      2.00
+        2:1 interface TANGENTIAL                 0.41      1.60
+
+    with the absolute gap on the tangential arm widening from 3.8x at n=32 to 8.8x at n=64. This
+    SHARPENS the entry below rather than merely confirming it: cf=0 is perfectly second order where
+    the interface carries no tangential variation, so "cannot converge on graded meshes" is too
+    broad -- but a graded mesh around a curved body has interfaces at every orientation, so the
+    practical conclusion is unchanged.
+- rejected: keeping cf=0 as the default for backward compatibility
+- why: "the shipped default silently gave every graded mesh the configuration the project had
+    already decided against"; the new default is INERT BY GEOMETRY on any uniform or finest-band
+    mesh (no C/F faces => empty delta CSR => identical code path), so only graded runs move
+
 ### cf=1 (quadratic C/F flux) is not optional on graded meshes
 - area: amr
 - source: amr-mixed-level-cut-band-plan.md:113
