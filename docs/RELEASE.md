@@ -228,7 +228,20 @@ Update, in this order, and read each one end to end (they drift in small factual
   it does not publish — which is exactly what happened on 1.2.1's first attempt: the job failed on
   dem/voro/pnm/coupling READMEs that were already fixed on their mains. Nothing was uploaded (the
   gate ran before `publish`, so the version was not burned) and the tag was re-cut after scoping.
-  **Each member repo should add the same job to its own `release.yml` with its own `--dists`.**
+  **Every member repo now has the same job** (`landing-pages`, which its `publish` needs), added
+  2026-09-21. A member does not vendor the checker: its job sparse-checks `/docs/NAMING.md` and
+  `/tools/release/check_landing_pages.py` out of the umbrella's `main` and runs
+
+  ```bash
+  python .peclet-umbrella/tools/release/check_landing_pages.py \
+         --naming .peclet-umbrella/docs/NAMING.md \
+         --page README.md --dists peclet-flow,peclet-flow-cu13
+  ```
+
+  so nine repos cannot drift apart on what counts as a retired spelling — the canon has one home.
+  `--dists` is per repo and lists **every** distribution that README is the description of, which is
+  how the `*-cu13` pages get covered: `flow/README.md` is the PyPI page of both `peclet-flow` and
+  `peclet-flow-cu13`, and it used to name neither.
 
   It needs no list of its own. `docs/NAMING.md` §2 is the canon; the tool parses every
   `| former | canonical | status |` row whose status is removed/aliased/planned and greps the

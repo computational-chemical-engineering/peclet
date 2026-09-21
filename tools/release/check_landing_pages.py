@@ -44,7 +44,8 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-NAMING = ROOT / "docs" / "NAMING.md"
+NAMING = ROOT / "docs" / "NAMING.md"   # overridable with --naming, for a member repo running this
+                                       # out of a checked-out umbrella (see --page below)
 
 # Landing pages that are not a package readme but are the first thing a human reads.
 EXTRA_PAGES = ["README.md", "docs/index.md"]
@@ -161,9 +162,13 @@ def _is_exempt(line: str) -> bool:
     return any(tok in line for tok in _EXEMPT)
 
 
-def check(verbose: bool = False, dists: set[str] | None = None) -> int:
+def check(verbose: bool = False, dists: set[str] | None = None,
+          explicit: list[tuple[Path, str]] | None = None) -> int:
     rules = divergences()
-    pages = landing_pages()
+    # --page/--dists: a MEMBER repo checking its own README, with this script and NAMING.md coming
+    # from a checked-out umbrella. Keeps one source of truth instead of vendoring nine copies that
+    # would drift — the rules must not depend on which repo is asking.
+    pages = explicit if explicit else landing_pages()
     if dists:
         # Only the pages this upload CREATES. The umbrella's release publishes `peclet` and
         # `peclet-cu13` and nothing else: a member's PyPI description is created by that member's
@@ -236,5 +241,31 @@ if __name__ == "__main__":
     ap.add_argument("--dists", metavar="A,B",
                     help="only the pages of these distributions — what a single upload CREATES. "
                          "Omit for the whole suite (the pre-flight's broader sweep).")
+    ap.add_argument("--page", metavar="PATH", action="append", default=[],
+                    help="check THIS page (repeatable) instead of discovering them. For a member "
+                         "repo: --page README.md --dists peclet-flow,peclet-flow-cu13")
+    ap.add_argument("--naming", metavar="PATH",
+                    help="path to docs/NAMING.md — required with --page from outside the umbrella")
     a = ap.parse_args()
-    sys.exit(check(verbose=a.list, dists=set(a.dists.split(",")) if a.dists else None))
+    if a.naming:
+        NAMING = Path(a.naming).resolve()
+        if not NAMING.exists():
+            print(f"!! --naming {a.naming} does not exist; the gate would pass vacuously")
+            sys.exit(1)
+        globals()["NAMING"] = NAMING
+    explicit = None
+    if a.page:
+        if not a.dists:
+            print("!! --page needs --dists: a page must say which distribution(s) it is the description of")
+            sys.exit(1)
+        explicit = []
+        for pg in a.page:
+            pth = Path(pg).resolve()
+            if not pth.exists():
+                print(f"!! --page {pg} does not exist")
+                sys.exit(1)
+            for d in a.dists.split(","):
+                explicit.append((pth, d))
+        globals()["ROOT"] = Path.cwd()          # report paths relative to the repo being checked
+    sys.exit(check(verbose=a.list, dists=None if explicit else (set(a.dists.split(",")) if a.dists else None),
+                   explicit=explicit))
