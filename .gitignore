@@ -10,8 +10,17 @@
 # the per-project venvs had drifted (three nanobind copies, three numpy versions).
 /.venv/
 
-# Per-agent / per-campaign git worktrees of the submodules (flow-*, tel/) and stray logs.
+# Per-agent / per-campaign git worktrees of the submodules and stray logs. The convention
+# (CLAUDE.md "Worktrees") is a SIBLING of the submodule named <repo>-<topic>, so every submodule
+# needs its own line — /flow-*/ alone left amr-, core-, voro-… worktrees showing up as untracked.
+/amr-*/
+/core-*/
+/coupling-*/
+/dem-*/
 /flow-*/
+/morton-*/
+/pnm-*/
+/voro-*/
 /tel/
 /.claude/worktrees/
 # agent briefs for the QUALITY_PLAN packages (see its handoff section)
