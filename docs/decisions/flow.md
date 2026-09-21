@@ -10,6 +10,49 @@ the index with `docs/decisions/build_index.py` after editing.
 
 Do not reverse an entry here without recording a new decision that supersedes it.
 
+### Collocated momentum advection uses the PROJECTED divergence-free face field, not the cell→face average
+- area: flow
+- source: flow/doc/uf_advection.md; amr/docs/amr_flow_uniform_parity.md §3/§7 (P1)
+- decided: 2026-09-21
+- status: settled
+- quote: |
+    On the collocated grid the advecting velocity is the projected, discretely divergence-free MAC
+    face field `uf_/vf_/wf_` produced by the previous step's approximate (ABC) projection — read
+    verbatim at the control volume's faces — NOT the un-projected cell→face average ½(u_i+u_j).
+    The average survives only as the developer-tier ablation
+    `diagnostics.set_uf_advection(False)`, which reproduces the pre-change binary BIT FOR BIT
+    (state_hash `colocated_advect` e7e376f79469, `colocated_advect_bc` 93bde5cd6f16).
+
+    Three pre-existing statements all prescribed it: flow's own design note
+    (`doc/flow_colocated_plan.md` §1 step 3, "these u_f become the advecting velocities for the
+    next step's advection"), the Almgren–Bell–Colella convention (the field the projection just
+    made solenoidal IS the conservative advective flux), and the FOU operator's conservative
+    row-sum identity, which `docs/decisions/flow.md` already recorded "holds only for
+    uniform/div-free advecting field". `colocated_advection.hpp` had said "this header's adv_vel
+    is where that swap happens" since phase 2 and the swap had never been made.
+
+    Measured: max|div_h(advecting field)| 7.5e-06 → 4.6e-15 at N=32 (1.7e-07 → 2.1e-16 at N=64);
+    Taylor–Green L2 vs the exact solution ~1 % BETTER at the same observed order at N=32/64/128;
+    the amr↔flow uniform-grid NS parity gap 2.49e-04 → 1.90e-11 over 20 steps. The ten
+    pre-existing state_hash cases (staggered bed, all four collocated Stokes schemes, channel, VoF
+    droplet, scalar, porous, moving scene) are bit-identical: the staggered grid and every
+    advection-off collocated baseline are untouched.
+- rejected: the un-projected cell→face average ½(u_i+u_j) as the collocated advecting velocity
+    (the phase-2 form, flow's behaviour from phase 2 until 2026-09-21); also rejected: leaving the
+    difference in place as amr_flow_uniform_parity.md P1's "not taken" default, now superseded by
+    this decision.
+- why: "the field the projection just made solenoidal IS the conservative advective flux"; the FOU
+    row-sum identity needs a divergence-free advecting field; it was the last uniform-grid
+    difference between peclet.flow and peclet.amr. Accuracy is NOT the reason — on smooth flow the
+    two are within 1 %; consistency is.
+- note: |
+    Does NOT reverse `docs/decisions/amr.md:13` (amr already advects with uf); it aligns flow to
+    it. Does NOT touch the suite-wide ABC-not-Rhie–Chow prohibition: the residual CELL divergence
+    is intrinsic to cell-centred placement and no advecting-velocity choice removes it.
+    Consequence for amr: its `tg_advect_matched.json` parity case ablates amr to flow's OLD
+    choice, so it now measures the difference rather than the agreement — that case wants updating
+    on the amr side.
+
 ### "Hand the stopping level to GraphAMG" telescoping idea is retired
 - area: flow
 - source: mg-decomposition-alignment.md:75

@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-168 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+169 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -45,6 +45,7 @@ reading until they are settled.
 - **Clean-fluid-interior mask required on both restriction and prolongation for IBM velocity-MG correctness**. **Rejected:** θ-weighting the diagonal's identity (I) term; coupling the coarse grid at cut/solid cells (masking cut cells only, not solid cells, was tried and stil  <sub>velocity-mg-design.md:54-64</sub>
 - **Coarse-first decomposition ships opt-in, legacy remains the default**. **Rejected:** making coarse-first decomposition the default  <sub>mg-decomposition-alignment.md:22</sub>
 - **Coarse-level solve policy default stays "smoother", not "auto", because auto regresses the cut-cell IBM path**. **Rejected:** making "auto" the default coarse-level solve policy  <sub>mg-decomposition-alignment.md:28</sub>
+- **Collocated momentum advection uses the PROJECTED divergence-free face field, not the cell→face average**. **Rejected:** the un-projected cell→face average ½(u_i+u_j) as the collocated advecting velocity  <sub>flow/doc/uf_advection.md;</sub>
 - **Collocated pressure coupling is the ABC (MAC) approximate projection, NOT Rhie–Chow**. **Rejected:** Rhie–Chow interpolation as the collocated coupling  <sub>sdflow-collocated-solver.md:37-39</sub>
 - **Container slab half-extent must equal L/2 + wall thickness, never more (periodic-image rule)**. **Rejected:** an oversized slab half-extent  <sub>advective-cutwall-flux-plan.md:57</sub>
 - **Correction: the raw field registry hands out internal (unconverted) arrays**.  <sub>physical-units-plan.md:28</sub>
