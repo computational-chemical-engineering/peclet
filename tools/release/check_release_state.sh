@@ -164,6 +164,14 @@ if [ "$OFFLINE" = 0 ]; then
   gh run list -R computational-chemical-engineering/peclet -L 3 --json workflowName,conclusion,createdAt --jq '.[]|"  umbrella \(.workflowName): \(.conclusion) (\(.createdAt[:10]))"' 2>/dev/null
 fi
 say ""
+say ""
+# Landing pages, LAST because it is the check with the shortest fuse: a PyPI description is baked
+# into the upload and cannot be edited afterwards, so a stale README discovered after the tag costs
+# a whole extra release to fix (peclet 1.1.1 was exactly that). Run before every tag.
+say "== landing pages (PyPI descriptions) vs the retired spellings in docs/NAMING.md §2"
+_lp=".venv/bin/python"; [ -x "$_lp" ] || _lp=python3   # PY above is scoped to the online block
+if "$_lp" tools/release/check_landing_pages.py; then :; else fail=1; fi
+say ""
 say "== untracked scratch in the umbrella (not part of any release):"
 git status --porcelain --ignored=no | grep '^??' | sed 's/^/  /'
 [ "$CI" = 1 ] && exit $fail

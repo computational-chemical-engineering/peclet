@@ -12,6 +12,22 @@ on:
   workflow_dispatch:
 
 jobs:
+  # BEFORE anything is built. A PyPI description is baked into the upload and cannot be edited
+  # afterwards, so a stale README noticed after publishing costs an entire extra release to fix
+  # (peclet 1.1.1 was exactly that, and 1.2.0 shipped three pages describing the layout it replaced).
+  # This is the last moment the mistake is still cheap.
+  landing-pages:
+    name: landing pages are not stale
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive     # the check reads each member's README
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python tools/release/check_landing_pages.py
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -44,7 +60,7 @@ jobs:
           path: dist/*
 
   publish:
-    needs: [build, build-cu13]
+    needs: [landing-pages, build, build-cu13]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     environment: pypi

@@ -210,6 +210,30 @@ Update, in this order, and read each one end to end (they drift in small factual
 - `CHANGELOG.md` — write the family section from the per-package `git log <old-tag>..HEAD --oneline`
   and the campaign summaries in `docs/*_PLAN.md`;
 - `CLAUDE.md` links.
+- **The landing pages are PyPI metadata, and PyPI metadata is IMMUTABLE.** There is no "edit
+  README" on pypi.org: the long description is fixed at upload time. A stale README noticed after a
+  tag can only be corrected by publishing *another version*, which is why `peclet 1.1.1` exists
+  ("metapackage only, to refresh a page no edit could reach") — and 1.2.0 still shipped three pages
+  (`peclet`, `peclet-cu13`, `peclet-halo`) describing the very layout that release replaced.
+
+  `tools/release/check_landing_pages.py` is the gate, and it runs in two places so it cannot be
+  skipped: `check_release_state.sh` runs it in the pre-flight, and the umbrella's `release.yml` runs
+  it as a `landing-pages` job that `publish` **needs** — the last moment the mistake is still cheap.
+
+  It needs no list of its own. `docs/NAMING.md` §2 is the canon; the tool parses every
+  `| former | canonical | status |` row whose status is removed/aliased/planned and greps the
+  landing pages for the former spellings. So **every rename is covered the day it is recorded in
+  NAMING.md**, which is one more reason to record it there. It also checks that a package's page
+  names the distribution it actually ships (core's README badged `peclet-core` while publishing
+  `peclet-halo`).
+
+  Naming an old spelling is not itself a failure — good migration prose *should* ("was
+  `peclet.core.geom` until 1.2.0"). The rule is that the canonical replacement must appear within
+  three lines. For a deliberate mention with no replacement to name — a negative statement like
+  "the module has no `mpi_rank()`" — mark it `<!-- landing-ok: why -->`. Repository URLs, badge
+  URLs, Zenodo DOIs and `find_package(...)` are exempt: the peclet-core *repository* did not move,
+  only the distribution did.
+
 - **No version literals on the site pages** (`docs/index.md`, `DEPLOYMENT.md`, `containers.md`,
   `python/index.md`, umbrella `README.md`): the PyPI badge, the CHANGELOG and the moving container
   tags (`latest` / `sm80` / `sm90` / `gfx90a`) carry the current version, and `CITATION.cff` keeps only

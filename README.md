@@ -79,7 +79,9 @@ Everything ships under one **`peclet` namespace** — installable parts of one f
 | `peclet-dem` | `peclet.dem` | Lagrangian DEM/XPBD particle packing |
 | `peclet-voro` | `peclet.voro` | Dynamic Voronoi tessellation + mesh generator |
 | `peclet-coupling` | `peclet.coupling` | CFD-DEM coupling drivers over flow + dem — sdist only (`peclet[cfd-dem]`) |
-| `peclet-core` | `peclet.core` (`.mpi`, `.geom`) | Shared infra (particle halo, analytic-SDF scenes) — sdist only (`peclet[mpi]`) |
+| `peclet-geom` | `peclet.geom` | Analytic-SDF scene authoring: CSG trees, batch evaluation, lattice baking, rigid-body mass properties — host-only, **wheels**, in `pip install peclet` |
+| `peclet-halo` | `peclet.halo` | Distributed Lagrangian particle halo: ORB decomposition, migration, ghosts, rebalancing — sdist only, needs MPI (`peclet[mpi]`) |
+| `peclet-core` | `peclet.core` (`.geom`, `.mpi`) | Compatibility shell for the pre-1.2 spellings; re-exports the two above, same objects. Warns in 1.3.0, removed in 2.0.0 |
 | `peclet-amr` | `peclet.amr` | Block-octree AMR + collocated cut-cell Navier–Stokes solver on it — **0.x, under development** (API may change between minors) — sdist only (`peclet[amr]`) |
 | `peclet` | — | metapackage: `pip install peclet` pulls the CPU family |
 | `peclet-cu13` | — | metapackage: `pip install peclet-cu13` pulls the CUDA family (`peclet-{flow,pnm,dem,voro}-cu13`) |

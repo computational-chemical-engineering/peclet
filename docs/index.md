@@ -136,7 +136,8 @@ validated notebooks) · **[Python API reference](python/index.md)** · **[Instal
 
 | Code | PyPI · import | Role |
 |------|---------------|------|
-| [**core**](https://github.com/computational-chemical-engineering/peclet-core) | `peclet-core` · `peclet.core` | Shared infrastructure: ORB block decomposition, async grid/particle halo, analytic + sampled SDF geometry (`core.geom` scenes), VTI I/O, AMR octree |
+| [**geom**](https://github.com/computational-chemical-engineering/peclet-geom) | `peclet-geom` · `peclet.geom` | Analytic-SDF scene authoring: CSG trees, batch evaluation, lattice baking, rigid-body mass properties. Host-only — wheels, numpy the only dependency, included in `pip install peclet` |
+| [**core**](https://github.com/computational-chemical-engineering/peclet-core) | `peclet-halo` · `peclet.halo` | Shared infrastructure: ORB block decomposition, async grid/particle halo, migration and rebalancing, sampled SDF geometry, VTI I/O. The C++ headers remain `peclet/core/…`; the Python distribution is `peclet-halo` |
 | [**flow**](https://github.com/computational-chemical-engineering/peclet-flow) | `peclet-flow` · `peclet.flow` | Incompressible Navier–Stokes for porous media (staggered MAC or collocated grid, cut-cell IBM, multigrid), geometric VoF two-phase flow, moving analytic geometry |
 | [**pnm**](https://github.com/computational-chemical-engineering/peclet-pnm) | `peclet-pnm` · `peclet.pnm` | Pore-network extraction from SDF geometry (pores, watershed segmentation, throat topology) and network flow data from a `flow` DNS |
 | [**dem**](https://github.com/computational-chemical-engineering/peclet-dem) | `peclet-dem` · `peclet.dem` | Discrete Element Method (XPBD and Hertz–Mindlin) with SDF point-shell collision for spheres and arbitrary SDF shapes |
