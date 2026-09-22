@@ -112,6 +112,12 @@ Do not reverse an entry here without recording a new decision that supersedes it
     move steady — (1,2) placement).
 - rejected: moving the matrix itself to quadratic C/F order
 - why: "φ→0 at the fixed point ⇒ matrix C/F order can't move steady"
+- clarified 2026-09-22: the justification is about the STEADY solution and is sound for it. Its
+    consequence for the FACE FIELD during transients was not traced until 2026-09-21: because the
+    matrix inverts G_std, every term of uf's gradient must be a term the matrix inverted, or the
+    divergence does not cancel. A quadratic gradient was being substituted into uf and nothing
+    balanced it (amr 1b0d5b5). The route to having both is a deferred correction on the RHS, which
+    leaves the matrix standard — see amr/docs/amr_pressure_iteration.md.
 
 ### C/F-consistent flow operators fix graded-mesh drag (supersedes the "momentum only" attempt)
 - area: amr
@@ -805,11 +811,44 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - rejected: standard (cf=0) two-point C/F flux on graded/throat meshes
 - why: "the standard flux cannot converge on graded meshes"
 
+### C/F face-value delta is gated per FACE (`regular(i) && regular(j)`), never per row
+- area: amr
+- source: amr/docs/amr_cf_flux_gate.md (Fable design pass + review)
+- decided: 2026-09-22
+- status: settled
+- quote: |
+    The quadratic C/F face value applies on a 2:1 sub-face IFF BOTH incident cells are regular
+    fluid (fluid && !cut), evaluated with a ghost-visible cut flag, and that ONE per-face predicate
+    drives the divergence RHS, the ABC cell-gradient substitution and the advecting face field
+    through one shared emitter, so D_std(Delta_uf) == Delta_cfDiv holds identically on every mesh.
+
+    A face flux is one number shared by two cells, so a gate that is a property of a CELL cannot be
+    conservative. Under the previous row gate, at a 2:1 sub-face with a cut cell on one side the
+    regular cell booked the correction in its constraint, the cut cell did not, and uf carried it
+    for both -- a volumetric source proportional to the VELOCITY, not to phi, so it did not decay
+    at steady state. Measured on a mesh whose cut band meets the level boundary (band=0, N=32,
+    lmax=2): 2.018e-01, dominating div(uf) = 2.016e-01. After: 9.88e-17 / 1.91e-12.
+
+    Literature: Berger-Colella refluxing as generalised by Chombo's EBFluxRegister, and
+    Trebotich & Graves on gradient matching at coarse-fine interfaces. Interpolation order is a
+    property of the FACE's stencil with a lower-order fallback -- never of a cell's row.
+- rejected: the rowRegular ROW gate (superseded below); rowFluid on both builders (the 2026-08-27
+    configuration, which marched 2 of 12 throat meshes to k~1e12); moving the correction into the
+    matrix (L = D_std*G_quad -- wrong operator for this bug, and costs SPD-ness); forbidding the
+    configuration (it is the defining configuration of the shipped mixed-level cut band, and no
+    reference code forbids it); gating the face-field builder alone (moves the mismatch from the
+    cut row to the regular row rather than removing it)
+- why: "a face flux is one number shared by two cells; a gate that is a property of a cell cannot
+    be conservative"
+
 ### cfDiv/cfGrad row gate must be rowRegular, not rowFluid
 - area: amr
 - source: amr-mixed-level-cut-band-plan.md:70
 - decided: 2026-08-27
-- status: settled
+- status: SUPERSEDED 2026-09-22 by the per-FACE gate above — right about the mechanism (rowFluid at
+    cut rows is a support-consistency violation and does march to k~1e12), wrong about the scope of
+    the fix: a ROW gate cannot be conservative, because the flux it gates is shared with the
+    neighbour. The per-face gate keeps cut rows withheld exactly as this entry requires.
 - quote: |
     Real carrier = **cfDiv (the C/F divergence delta) firing at CUT rows**
     (row gate was rowFluid under the dead assumption "cut rows are finest-band"); per-path bisect:
