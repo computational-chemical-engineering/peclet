@@ -26,3 +26,7 @@
 # agent briefs for the QUALITY_PLAN packages (see its handoff section)
 /.claude/preambles/
 /*.log
+
+# Python bytecode from the release tooling (tools/release/*.py are run in place)
+__pycache__/
+*.pyc
