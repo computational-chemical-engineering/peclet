@@ -845,9 +845,10 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: amr
 - source: amr-mixed-level-cut-band-plan.md:70
 - decided: 2026-08-27
-- status: SUPERSEDED 2026-09-22 by the per-FACE gate above — right about the mechanism (rowFluid at
-    cut rows is a support-consistency violation and does march to k~1e12), wrong about the scope of
-    the fix: a ROW gate cannot be conservative, because the flux it gates is shared with the
+- status: superseded
+- superseded-by: the per-FACE gate entry above (2026-09-22) — right about the mechanism (rowFluid
+    at cut rows is a support-consistency violation and does march to k~1e12), wrong about the scope
+    of the fix: a ROW gate cannot be conservative, because the flux it gates is shared with the
     neighbour. The per-face gate keeps cut rows withheld exactly as this entry requires.
 - quote: |
     Real carrier = **cfDiv (the C/F divergence delta) firing at CUT rows**

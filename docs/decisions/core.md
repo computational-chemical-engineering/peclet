@@ -375,3 +375,63 @@ Do not reverse an entry here without recording a new decision that supersedes it
     2-CPU cgroup quota where the pre-fix wheel builds 48). **A future core-side fix of this kind
     needs the same repin, or it ships and does nothing** — that is the trap this paragraph exists
     to prevent, and it is not visible from inside core.
+
+### The `peclet-core` DISTRIBUTION splits into `peclet-geom` and `peclet-halo`; the C++ identity does not move
+- area: core
+- source: docs/CORE_BOUNDARY.md §0-1
+- decided: 2026-09-21
+- status: settled
+- quote: |
+    The distribution splits by INSTALL-TIME REQUIREMENT: `peclet-geom` (`peclet.geom`, wheels) and
+    `peclet-halo` (`peclet.halo`, sdist). The C++ identity `peclet::core` / `peclet/core/...` does
+    NOT move.
+- rejected: a top-level `peclet::geom` / `peclet::halo` C++ namespace and header path, and
+    splitting the header repo
+- why: build-time-only identity, six consumers pin it by tag, no user-visible gain
+
+### The halo package is named `peclet.halo`, not `peclet.mpi`
+- area: core
+- source: docs/CORE_BOUNDARY.md §6
+- decided: 2026-09-21
+- status: settled
+- quote: |
+    `mpi` names a dependency rather than the thing, it would be the only package in the family
+    named for what it links against, and `halo` is already its C++ name (`peclet::halo`,
+    `GridHalo`, `ParticleHalo`). Maintainer's decision.
+- rejected: `peclet.mpi`
+- why: "mpi names a dependency rather than the thing"
+
+### A core header is on the MPI side iff it includes `common/mpi.hpp`, held by a CI manifest gate
+- area: core
+- source: docs/CORE_BOUNDARY.md §2.1
+- decided: 2026-09-21
+- status: settled
+- quote: |
+    The MPI boundary is explicit and gated, because it had already drifted:
+    `decomp/grid_redistribute.hpp:23` pulls the shim and `halo/nbx.hpp` while sitting in an
+    otherwise MPI-free directory.
+- rejected: leaving the MPI boundary implicit
+- why: "it had already drifted"
+
+### No silent `if(MPI_FOUND)` guard on the core Python bindings; the stopgap is a loud opt-in
+- area: core
+- source: docs/CORE_BOUNDARY.md §4
+- decided: 2026-09-21
+- status: settled
+- quote: |
+    A silent `if(MPI_FOUND)` guard is rejected; the stopgap, if used, is a loud opt-in
+    `PECLET_CORE_PYTHON_MPI` that fails with both remedies named.
+- rejected: the silent guard
+- why: "it turns a loud build failure into a silent partial install, where `pip install
+    peclet[mpi]` succeeds with no `mpi` module in it"
+
+### `peclet-core` becomes a pure-Python compatibility shell, frozen at its last 1.x with a `<2` ceiling
+- area: core
+- source: docs/CORE_BOUNDARY.md §6
+- decided: 2026-09-21
+- status: settled
+- quote: |
+    `peclet-core` becomes a pure-Python compatibility shell for the ladder and is frozen at its
+    last 1.x with a `<2` ceiling at 2.0.0.
+- rejected: a code-free 2.0.0 depending on the new packages
+- why: "a loud resolver error beats a silent import failure"

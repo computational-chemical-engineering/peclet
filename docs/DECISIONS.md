@@ -439,6 +439,7 @@ reading until they are settled.
 - **AMR rebalance weight grid is defined over root cells, not fine cells**. **Rejected:** weighting over fine cells  <sub>dynamic-load-balancing.md:67</sub>
 - **All world-coordinate evaluation must use the global frame, never per-rank local coordinates**. **Rejected:** per-rank local-frame world-coordinate evaluation  <sub>amr-distributed-flow-campaign.md:22</sub>
 - **Bind host AMR classes before the Kokkos device path**. **Rejected:** binding the Kokkos device AMR classes first  <sub>amr-python-bindings-next.md:203-204</sub>
+- **C/F face-value delta is gated per FACE (`regular(i) && regular(j)`), never per row**. **Rejected:** the rowRegular ROW gate (superseded below); rowFluid on both builders (the 2026-08-27  <sub>amr/docs/amr_cf_flux_gate.md</sub>
 - **C/F scheme pressure matrix/MG/PCG stays standard order — placement is (1,2)**. **Rejected:** moving the matrix itself to quadratic C/F order  <sub>amr-ghost-collocated-ns-plan.md:71</sub>
 - **C/F-consistent flow operators fix graded-mesh drag (supersedes the "momentum only" attempt)**. **Rejected:** solveQuad projection (quadratic coarse-fine flux) for the graded flow's pressure solve; momentum-only C/F fix  <sub>amr-octree-status.md:947-958</sub>
 - **Cell-count savings did not reduce march time — the saving is a spent, not lost, quantity**. **Rejected:** H-iters and H-mg as explanations for the flat step time (both REFUTED)  <sub>amr-mixed-level-cut-band-plan.md:238</sub>
@@ -482,12 +483,10 @@ reading until they are settled.
 - **SOU (second-order-upwind) is the default advection flux; Koren TVD becomes an option**. **Rejected:** Koren TVD as the default (now opt-in)  <sub>amr-octree-status.md:770-776</sub>
 - **Sign convention: the AMR ghost operator is +L (negative-definite)**.  <sub>amr-ghost-collocated-ns-plan.md:44</sub>
 - **Staircase velocity-MG fixed by the clean-fluid exclude mask; Galerkin stays the robust default**.  <sub>amr-gpu-smoother-flow-port.md:29-38</sub>
-- **C/F face-value delta is gated per FACE (`regular(i) && regular(j)`), never per row**. **Rejected:** the rowRegular ROW gate — a face flux is one number shared by two cells, so a per-cell gate cannot be conservative  <sub>amr/docs/amr_cf_flux_gate.md, 2026-09-22</sub>
-- **The C/F scheme DEFAULT is cf=1 (quadratic); cf=0 is the legacy path**. **Rejected:** keeping cf=0 as the default for backward compatibility  <sub>amr/docs/amr_graded_convergence.md, 2026-09-21</sub>
+- **The C/F scheme DEFAULT is cf=1 (quadratic); cf=0 is the legacy path**. **Rejected:** keeping cf=0 as the default for backward compatibility  <sub>amr/docs/amr_graded_convergence.md</sub>
 - **Volume-weighted superficial velocity is required on graded meshes**. **Rejected:** non-volume-weighted superficial velocity on graded meshes  <sub>amr-ghost-collocated-ns-plan.md:57</sub>
 - **Zero pressure after finish_adapt rather than carry the accumulated pressure through coarsening**. **Rejected:** carrying the transferred/accumulated pressure through a coarsening adapt event  <sub>amr-ghost-collocated-ns-plan.md:121</sub>
 - **cf=1 (quadratic C/F flux) is not optional on graded meshes**. **Rejected:** standard (cf=0) two-point C/F flux on graded/throat meshes  <sub>amr-mixed-level-cut-band-plan.md:113</sub>
-- **cfDiv/cfGrad row gate must be rowRegular, not rowFluid**. **Rejected:** rowFluid gate under the assumption "cut rows are finest-band"  <sub>amr-mixed-level-cut-band-plan.md:70</sub>
 - **mpi4py rule: never call a collective inside a rank-0-only block**.  <sub>amr-distributed-flow-campaign.md:84</sub>
 - **np=1 bit-exactness is the gate for every distributed default**.  <sub>amr-distributed-flow-campaign.md:75</sub>
 - **setGhostProjection default is AUTO (tri-state), not always-on or always-off**.  <sub>amr-ghost-collocated-ns-plan.md:98</sub>
@@ -500,13 +499,15 @@ reading until they are settled.
 
 - G.2 decision changed: the whole core/amr tree becomes its own package peclet-amr, depending on core alone.  <sub>suite-quality-plan-1-0-0.md:68-80</sub>
 - Graded-mesh flow requires ALL flow operators (momentum, divergence/gradient, advection) to be C/F-consistent — momentum-only fix insufficient.  <sub>amr-octree-status.md:947-958</sub>
+- cfDiv/cfGrad row gate must be rowRegular, not rowFluid.  <sub>amr-mixed-level-cut-band-plan.md:70</sub>
 
 ## core — decomposition, halo, rebalance
 
-24 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
+29 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
 
 ### In force
 
+- **A core header is on the MPI side iff it includes `common/mpi.hpp`, held by a CI manifest gate**. **Rejected:** leaving the MPI boundary implicit  <sub>docs/CORE_BOUNDARY.md</sub>
 - **AMR PCG must mask solid AND project onto the fluid range (mask + fluid-only mean), not just deflate the constant mode**. **Rejected:** deflating only the constant/all-cell mean without masking solid cells  <sub>device-naming-retirement.md:89-95</sub>
 - **Anisotropic coarse-grid partitioning requires cellExtent, not raw cell-count kLargest**. **Rejected:** partitioning by raw cell-count kLargest on an anisotropic coarse grid  <sub>mg-decomposition-alignment.md:43</sub>
 - **Convention: keep NBX tag families >= 64 apart**.  <sub>nbx-round-tag-race.md:28</sub>
@@ -518,23 +519,22 @@ reading until they are settled.
 - **NBX consecutive rounds must use distinct message tags**. **Rejected:** sharing tag 0 across NBX request/reply rounds  <sub>amr-octree-status.md:786-791</sub>
 - **NBX inter-round tag race fixed by rotating the tag per round; buildTopology now verifies promised==requested cells**. **Rejected:** running consecutive NBX consensus rounds on one communicator with a single fixed tag  <sub>nbx-round-tag-race.md:17-19</sub>
 - **NBX tag interaction: two standing rules for wire tags**.  <sub>amr-march-distributed-campaign.md:66-77</sub>
+- **No silent `if(MPI_FOUND)` guard on the core Python bindings; the stopgap is a loud opt-in**. **Rejected:** the silent guard  <sub>docs/CORE_BOUNDARY.md</sub>
 - **ParticleHalo gather() throws on capacity overflow instead of silently truncating**. **Rejected:** silent truncation of ghost count on overflow  <sub>cuda-kokkos-migration.md:627-629</sub>
 - **ParticleHalo periodic self-ghosts default OFF for byte-identical compatibility**. **Rejected:** making periodic self-ghosts on by default  <sub>cuda-kokkos-migration.md:618-621</sub>
 - **Periodic axis needs >=2 ranks**.  <sub>suite-distributed-status.md:27-28</sub>
 - **Port transport-core's device layer first (foundation-first sequencing)**. **Rejected:** porting each consumer's halo independently (double-porting)  <sub>cuda-kokkos-migration.md:79-82</sub>
 - **Rebalance is pure migration (same global mesh, new owners) and must never use transferField**. **Rejected:** using transferField (same-domain old→new octree conservative remap) to implement rebalance migration  <sub>dynamic-load-balancing.md:62</sub>
+- **The `peclet-core` DISTRIBUTION splits into `peclet-geom` and `peclet-halo`; the C++ identity does not move**. **Rejected:** a top-level `peclet::geom` / `peclet::halo` C++ namespace and header path, and  <sub>docs/CORE_BOUNDARY.md</sub>
+- **The halo package is named `peclet.halo`, not `peclet.mpi`**. **Rejected:** `peclet.mpi`  <sub>docs/CORE_BOUNDARY.md</sub>
 - **The host backend is sized by the CPU BUDGET (cgroup quota ∧ affinity), not by the visible CPU count**. **Rejected:** (a) **documentation alone** — the README/Colab bootstrap warning shipped 2026-09-12 and  <sub>user</sub>
 - **Treat nvcc warnings #20013/#20015 as errors, not style noise**. **Rejected:** treating #20013/#20015 as benign style warnings  <sub>kokkos-cuda-constexpr-required.md:26-27</sub>
 - **Weighted ORB dynamic load balancing is one shared primitive that lives in the core layer**. **Rejected:** implementing separate load-balancing logic per consumer (AMR, dem)  <sub>dynamic-load-balancing.md:18</sub>
 - **Weighted ORB split boundary must remain on integer cell boundaries**.  <sub>dynamic-load-balancing.md:65</sub>
+- **`peclet-core` becomes a pure-Python compatibility shell, frozen at its last 1.x with a `<2` ceiling**. **Rejected:** a code-free 2.0.0 depending on the new packages  <sub>docs/CORE_BOUNDARY.md</sub>
 - **block_decomposer retired/archived, replaced by transport-core (core)**.  <sub>cuda-kokkos-migration.md:57-58</sub>
 - **coarsenAlignment bug: natural-max alignment over-constrains ORB; cap alignment at 2^4**. **Rejected:** natural-max alignment for ORB decomposition snapping  <sub>parallel-scaling-study.md:60-64</sub>
 - **peclet-core sdist must vendor its own SuiteNanobind copy, not depend on the umbrella cmake/**. **Rejected:** the core sdist referencing the umbrella's cmake/ directory for SuiteNanobind  <sub>release-workflow-prep.md:93</sub>
-- **The `peclet-core` DISTRIBUTION splits by install-time requirement into `peclet-geom` (`peclet.geom`, wheels) and `peclet-halo` (`peclet.halo`, sdist); the C++ identity `peclet::core` / `peclet/core/...` does NOT move**. **Rejected:** a top-level `peclet::geom`/`peclet::halo` C++ namespace and header path, and splitting the header repo — build-time-only identity, six consumers pin it by tag, no user-visible gain  <sub>CORE_BOUNDARY.md:0-1, 2026-09-21</sub>
-- **The halo package is named `peclet.halo`, not `peclet.mpi`**. **Rejected:** `peclet.mpi` — `mpi` names a dependency rather than the thing, it would be the only package in the family named for what it links against, and `halo` is already its C++ name (`peclet::halo`, `GridHalo`, `ParticleHalo`). Maintainer's decision  <sub>CORE_BOUNDARY.md:6, 2026-09-21</sub>
-- **A C++ core header is on the MPI side iff it includes `common/mpi.hpp`, and a CI manifest gate holds that line**. **Rejected:** leaving the MPI boundary implicit — it had already drifted: `decomp/grid_redistribute.hpp:23` pulls the shim and `halo/nbx.hpp` while sitting in an otherwise MPI-free directory  <sub>CORE_BOUNDARY.md:2.1, 2026-09-21</sub>
-- **A silent `if(MPI_FOUND)` guard around the core Python bindings is rejected; the stopgap, if used, is a loud opt-in `PECLET_CORE_PYTHON_MPI` that fails with both remedies named**. **Rejected:** the silent guard — it turns a loud build failure into a silent partial install, where `pip install peclet[mpi]` "succeeds" with no `mpi` module in it  <sub>CORE_BOUNDARY.md:4, 2026-09-21</sub>
-- **`peclet-core` becomes a pure-Python compatibility shell for the ladder and is frozen at its last 1.x with a `<2` ceiling at 2.0.0**. **Rejected:** a code-free 2.0.0 depending on the new packages — a loud resolver error beats a silent import failure  <sub>CORE_BOUNDARY.md:6, 2026-09-21</sub>
 - **toVector must repack a strided device subview to a contiguous buffer before cross-space deep_copy**. **Rejected:** cross-space deep_copy directly on a strided device subview  <sub>dem-cubes-gpu-pyvista.md:30-34</sub>
 
 ### Superseded — history, do not re-derive the old reading
