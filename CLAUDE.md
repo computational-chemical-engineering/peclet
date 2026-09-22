@@ -293,7 +293,7 @@ location that the wheel install maps into place.
   `parallel_for`/`parallel_scan` (the AMR setup builders) run multithreaded. Consequences:
   **bound the pool** — `OMP_NUM_THREADS=8 OMP_PROC_BIND=false` for test batteries (an unbounded
   pool on a 48-core host is a measured hour-long trap), and thread-count-pinned probes (e.g.
-  `.sdf-campaign-probes/flow_probe.py` at 4 threads) must keep their pinned counts. Binaries
+  `flow/tests/study/sdf_campaign/flow_probe.py` at 4 threads) must keep their pinned counts. Binaries
   built before the switch statically link the old Kokkos and are unaffected until rebuilt —
   but do NOT compose old- and new-prefix modules in one Python process (e.g. `coupling`
   importing flow + dem) until both are rebuilt against the same prefix.

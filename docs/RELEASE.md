@@ -74,7 +74,8 @@ tools/release/check_release_state.sh          # versions, tags, pins, PyPI, work
 - A2. Fast-forward every checkout: `git -C <sub> pull --ff-only` for each of
   `core morton flow pnm dem voro coupling`, then `git submodule status` must show no `+`.
 - A3. Scratch hygiene. The umbrella working tree carries untracked campaign directories
-  (`flow-*` worktrees, `.sdf-campaign-probes/`, a hash-named paper directory; `sphere-cfd-validation/` and `proposal/` moved to `~/Codes/` on 2026-09-08).
+  (`flow-*` worktrees and a hash-named paper directory; `sphere-cfd-validation/` and `proposal/` moved to
+  `~/Codes/` on 2026-09-08, and `.sdf-campaign-probes/` into `flow/tests/study/sdf_campaign/` on 2026-09-22).
   They are not committed and do not affect the release, but the sdist of a *submodule* built
   while the repo is a submodule (`.git` is a file) tree-walks and pulls in `build/`/`.venv`. Never
   build a release sdist locally from the submodule checkout — CI builds from a real clone. If you
