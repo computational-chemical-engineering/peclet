@@ -22,3 +22,6 @@
 [submodule "amr"]
 	path = amr
 	url = git@github.com:computational-chemical-engineering/peclet-amr.git
+[submodule "geom"]
+	path = geom
+	url = git@github.com:computational-chemical-engineering/peclet-geom.git
