@@ -428,10 +428,11 @@ reading until they are settled.
 
 ## amr — block octree, mixed-level cut band
 
-66 in force, 3 superseded — full text in [`decisions/amr.md`](decisions/amr.md)
+68 in force, 3 superseded — full text in [`decisions/amr.md`](decisions/amr.md)
 
 ### In force
 
+- **A multigrid level below the octree's root brick is the SAME octree with its root LIFTED — not a new level type**. **Rejected:** generalising the openness-free `inner_` chain (a second level type, host-only, used by no production path); flow's agglomerated CSR bottom ALONE on th  <sub>amr/docs/amr_mg_depth.md</sub>
 - **AMR NS advection keeps the fluid-fluid scheme unchanged; uf stays the face-averaged form**.  <sub>amr-ghost-collocated-ns-plan.md:83</sub>
 - **AMR gets its own separate Python binding module (tpx_amr), not folded into tpx_mpi**. **Rejected:** extending tpx_mpi to include AMR bindings  <sub>amr-python-bindings-next.md:14-17,</sub>
 - **AMR keeps ORB block decomposition, not a global SFC partition**. **Rejected:** one global SFC partitioned by index range (p4est/Dendro style)  <sub>amr-octree-status.md:12-15</sub>
@@ -487,6 +488,7 @@ reading until they are settled.
 - **Staircase velocity-MG fixed by the clean-fluid exclude mask; Galerkin stays the robust default**.  <sub>amr-gpu-smoother-flow-port.md:29-38</sub>
 - **The C/F scheme DEFAULT is cf=1 (quadratic); cf=0 is the legacy path**. **Rejected:** keeping cf=0 as the default for backward compatibility  <sub>amr/docs/amr_graded_convergence.md</sub>
 - **The advected value at a 2:1 seam is reconstructed from the UPWIND side with level-aware probes, the tangential sample applied ONCE**. **Rejected:** Martin-Colella's quadratic NORMAL fill (mixes downstream fine cells into the seam value — amplitude and the dt = 1e20 stability margin); minmod-limite  <sub>amr/docs/amr_cf_convective.md</sub>
+- **The coarsest-grid extent stays at 4 — the depth dependence was measured and is ~1 iteration, not 4**. **Rejected:** flipping the default to extent 8 on the single-sample evidence; escalating the deepest-level observation to a design pass  <sub>amr/docs/amr_mg_depth.md</sub>
 - **Volume-weighted superficial velocity is required on graded meshes**. **Rejected:** non-volume-weighted superficial velocity on graded meshes  <sub>amr-ghost-collocated-ns-plan.md:57</sub>
 - **What remains at a 2:1 seam is the JUMP in the flux-error constant, and the lever is MATCHING the two sides, not maximising either**. **Rejected:** chasing the residual graded-vs-coarse penalty with a better sub-face reconstruction  <sub>amr/docs/amr_cf_convective.md</sub>
 - **Zero pressure after finish_adapt rather than carry the accumulated pressure through coarsening**. **Rejected:** carrying the transferred/accumulated pressure through a coarsening adapt event  <sub>amr-ghost-collocated-ns-plan.md:121</sub>

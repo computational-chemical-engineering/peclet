@@ -10,6 +10,57 @@ the index with `docs/decisions/build_index.py` after editing.
 
 Do not reverse an entry here without recording a new decision that supersedes it.
 
+### A multigrid level below the octree's root brick is the SAME octree with its root LIFTED — not a new level type
+- area: amr
+- source: amr/docs/amr_mg_depth.md §1, §5, §6; amr/docs/amr_mg_core_boundary.md
+- decided: 2026-09-23
+- status: settled
+- quote: |
+    `AmrMultigrid::build` coarsened by merging octree siblings, and a leaf that is already a ROOT
+    cell has none — so the hierarchy was `lmax + 1` levels deep with the root brick as its coarsest
+    grid, and **on a uniform mesh, at any lmax, that is ONE level**: the pressure "multigrid" was a
+    smoother with no coarse-grid correction at all, and the step was 92 % pressure solve. A level
+    below the root brick is the same `BlockOctree` with its root **lifted** — brick halved on every
+    axis, global origin halved, `lmax` incremented, **leaf codes and level bytes untouched** — so
+    `coarsenIf` simply keeps merging. Coordinates are fine units and `level` is a size exponent, so
+    `AmrPoisson::init`, the area-averaged openness ladder, the covering-leaf `c2p`, the device
+    face-CSR assembly and the per-level `LeafHalo` all work on a lifted level **verbatim**; the
+    premise that "the coarse levels stop being octrees" is false, and that is what makes the fix
+    small. The ORB follows by nesting (lockstep lift while every block's origin and size are even,
+    one Allreduce); where nesting stops the level moves to a new decomposition through a `MgStage`
+    (replicated first, keyed by global cell id); the bottom is damped Jacobi at extent ≤ 4 and an
+    agglomerated GraphAMG-PCG solve otherwise. **Measured: uniform 64³ 1941.8 → ~300 ms/step with
+    pressure iterations 23 → 13, uniform 32³ 144.7 → 33.0, every graded configuration faster and
+    none slower, ~0.88 µs/leaf against `peclet.flow`'s 0.84 µs/cell.** The validation is a BITWISE
+    oracle: a uniform mesh inside a depth-3 tree *is* the same mesh inside a depth-0 tree with two
+    scalars changed, so the emulated deep build gives identical per-level CSRs and an identical
+    solution after five V-cycles. Level 0 is untouched; the five byte-gate keys that moved are all
+    pressure keys, no topology or momentum key moved.
+- rejected: generalising the openness-free `inner_` chain (a second level type, host-only, used by no production path); flow's agglomerated CSR bottom ALONE on the root brick (262 144 cells is not a bottom); "require a large lmax" (the root grid is the rebalance weight grid and the ORB unit — coarsening it to help the solver destroys load-balance resolution); semi-coarsening below the root (a non-cubic level type and a second operator set, for a residue the exact bottom already covers)
+- why: "the hierarchy must go below the root without moving the root"
+
+### The coarsest-grid extent stays at 4 — the depth dependence was measured and is ~1 iteration, not 4
+- area: amr
+- source: amr/docs/amr_mg_depth.md §11.4, §11.10, §11.12
+- decided: 2026-09-23
+- status: settled
+- quote: |
+    A 2-D sweep (`bottomExtent ∈ {4,8,16}` × `{"smoother","agglomerated"}`, three meshes) found
+    **bottom quality is a variable nowhere** — all nine pairs have identical iteration counts,
+    including where sixty damped sweeps only damp 0.30 — so depth is the only variable; and at
+    extent 4 the exact solve buys literally nothing, the first direct confirmation that sixty
+    sweeps are exact there. The apparent 15-vs-11 iteration penalty for the deepest level was a
+    **single-sample artefact**: `last_pres_iters` is one sample of a Krylov count against a moving
+    right-hand side and wanders ±2, and a 33-step trace of the same configuration reads median
+    13 vs 12. The real dependence is ~1 iteration and 3–5 % of the step on one case of three, zero
+    on both graded meshes, and **exactly zero without a solid** (5 iterations, flat, zero scatter —
+    which does exonerate the transfer pair for this effect, though not for the separate N-growth).
+    That does not buy a seven-test pinning refactor and a second byte-gate move. **Read the study's
+    iteration column as a distribution, never as one sample** (§11.10, and the instrument's own
+    docstring).
+- rejected: flipping the default to extent 8 on the single-sample evidence; escalating the deepest-level observation to a design pass
+- why: "one iteration is near enough to flat, and the 15-vs-11 that motivated the question was a sampling artefact"
+
 ### The advected value at a 2:1 seam is reconstructed from the UPWIND side with level-aware probes, the tangential sample applied ONCE
 - area: amr
 - source: amr/docs/amr_cf_convective.md §0, §4, §5, §12
