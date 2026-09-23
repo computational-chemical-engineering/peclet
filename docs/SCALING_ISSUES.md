@@ -121,7 +121,7 @@ last sentence is reasoning, not measured).
 
 *Measured* (flow `main` 8789e2b, host-openmp MPI build, probe
 `flow/tests/study/weighted_dec0_telescope_probe.py` + raw logs in `weighted_dec0_results/`, on
-flow branch `trap-probe` b10020f in the worktree `suite/flow-trap`, not merged): 96³, periodic 2³ sphere array, cut-cell pressure,
+flow `0ae29d6` on main, `tests/study/weighted_dec0_telescope_probe.py` + `weighted_dec0_results/`): 96³, periodic 2³ sphere array, cut-cell pressure,
 default telescope + `auto` bottom, `rebalance_by_weights(1 + Poisson(4) counts in a bed)` —
 exactly what `CfdDem.rebalance(gamma=1)` builds. Ladder from flow's own `[mg]` print
 (`PECLET_FLOW_MG_DEBUG=1`, trace only). Before: every case telescopes only at the 6³→3³ bottom
