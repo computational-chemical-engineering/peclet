@@ -428,7 +428,7 @@ reading until they are settled.
 
 ## amr — block octree, mixed-level cut band
 
-64 in force, 3 superseded — full text in [`decisions/amr.md`](decisions/amr.md)
+66 in force, 3 superseded — full text in [`decisions/amr.md`](decisions/amr.md)
 
 ### In force
 
@@ -486,7 +486,9 @@ reading until they are settled.
 - **Sign convention: the AMR ghost operator is +L (negative-definite)**.  <sub>amr-ghost-collocated-ns-plan.md:44</sub>
 - **Staircase velocity-MG fixed by the clean-fluid exclude mask; Galerkin stays the robust default**.  <sub>amr-gpu-smoother-flow-port.md:29-38</sub>
 - **The C/F scheme DEFAULT is cf=1 (quadratic); cf=0 is the legacy path**. **Rejected:** keeping cf=0 as the default for backward compatibility  <sub>amr/docs/amr_graded_convergence.md</sub>
+- **The advected value at a 2:1 seam is reconstructed from the UPWIND side with level-aware probes, the tangential sample applied ONCE**. **Rejected:** Martin-Colella's quadratic NORMAL fill (mixes downstream fine cells into the seam value — amplitude and the dt = 1e20 stability margin); minmod-limite  <sub>amr/docs/amr_cf_convective.md</sub>
 - **Volume-weighted superficial velocity is required on graded meshes**. **Rejected:** non-volume-weighted superficial velocity on graded meshes  <sub>amr-ghost-collocated-ns-plan.md:57</sub>
+- **What remains at a 2:1 seam is the JUMP in the flux-error constant, and the lever is MATCHING the two sides, not maximising either**. **Rejected:** chasing the residual graded-vs-coarse penalty with a better sub-face reconstruction  <sub>amr/docs/amr_cf_convective.md</sub>
 - **Zero pressure after finish_adapt rather than carry the accumulated pressure through coarsening**. **Rejected:** carrying the transferred/accumulated pressure through a coarsening adapt event  <sub>amr-ghost-collocated-ns-plan.md:121</sub>
 - **cf=1 (quadratic C/F flux) is not optional on graded meshes**. **Rejected:** standard (cf=0) two-point C/F flux on graded/throat meshes  <sub>amr-mixed-level-cut-band-plan.md:113</sub>
 - **mpi4py rule: never call a collective inside a rank-0-only block**.  <sub>amr-distributed-flow-campaign.md:84</sub>

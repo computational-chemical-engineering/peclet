@@ -10,6 +10,56 @@ the index with `docs/decisions/build_index.py` after editing.
 
 Do not reverse an entry here without recording a new decision that supersedes it.
 
+### The advected value at a 2:1 seam is reconstructed from the UPWIND side with level-aware probes, the tangential sample applied ONCE
+- area: amr
+- source: amr/docs/amr_cf_convective.md §0, §4, §5, §12
+- decided: 2026-09-23
+- status: settled
+- quote: |
+    At a 2:1 sub-face the coarse cell's column is offset TANGENTIALLY from the sub-face centroid by
+    half a fine cell, so the shipped `1.5 φ_C − 0.5 φ_CC` was **first order** there. The four
+    sub-faces of one coarse face carry that error with opposite signs, so it sums to zero over the
+    coarse face — the coarse cell barely notices — while each FINE cell sees its own sub-face's
+    O(h) error against its other faces' O(h²), divided by h: an **O(1) forcing alternating across
+    the 2×2 fine patch**. Two same-level faces beside the seam were broken too (their second
+    upwind probe sits across the level jump, wrong distance AND wrong tangential position), at 16×
+    the true bulk truncation. The rule now reconstructs from the upwind side with level-aware
+    probes: the coarse value tangentially sampled by `cfAppendStencil` **applied once, to the
+    extrapolated value** (sampling the two stencil points separately and combining them with the
+    (1.5, −0.5) weights makes the correction enter with weight −0.5 wherever one lookup is skipped
+    — the artefact that made the first two prototypes look like a ceiling), and an upstream probe
+    at another level taken at its TRUE distance (a coarser one as the same sample, a finer one as
+    the four-cell face-layer mean). Measured at N = 64: one-step seam truncation 7.881e-03 →
+    2.008e-03, seam/bulk 9.23 → 3.40, the graded mesh against the same mesh unrefined 1.556× →
+    1.218× (perfect-seam ceiling 0.96×). Inert without advection and on any uniform mesh;
+    `Flow.diagnostics.set_seam_reconstruction(bool)`, default on.
+- rejected: Martin-Colella's quadratic NORMAL fill (mixes downstream fine cells into the seam value — amplitude and the dt = 1e20 stability margin); minmod-limited tangential slope (+14 %); an 8-child block probe for the normal upstream (+23 % on coarse seam cells, needs ±2 children); tangential slopes from the downstream 2x2 patch (anti-diffusive)
+- why: "the upwind-side linear reconstruction keeps the SOU/Koren character at the seam — no downstream data enters the advected value"
+
+### What remains at a 2:1 seam is the JUMP in the flux-error constant, and the lever is MATCHING the two sides, not maximising either
+- area: amr
+- source: amr/docs/amr_cf_convective.md §4 fact 2, §12.1; ROADMAP B6
+- decided: 2026-09-23
+- status: settled
+- quote: |
+    Second-order accuracy of a finite-volume scheme comes from adjacent faces being wrong by the
+    SAME amount, so the error cancels in their difference — not from any face being accurate. A
+    resolution jump destroys that cancellation, so a seam cell's truncation is one order worse than
+    EITHER uniform mesh, not intermediate between them. With every face second order the seam pair
+    telescopes to the difference of the two regular constants whatever the sub-face stencil does:
+    first order on the seam is the floor (Gustafsson 1975; Kreiss et al. 1986 — the global order is
+    kept, a constant is left, and every AMR code carries it). Consequences that must not be
+    relitigated: a bound of 1 on graded-vs-coarse is NOT reachable by any face stencil; the gate
+    "the interface/bulk ratio must stop growing" is unattainable by construction (the right gate is
+    the seam converging at first order and the layer behind it becoming bulk-like); and the
+    remaining lever is a higher-order flux on the coarse cells BESIDE the seam chosen to MATCH the
+    fine side's constant, a buffer of intermediate constant, or the mesh generator's band — never a
+    better sub-face value. Measured 2026-09-23: after the upwind fix the residual is 59 % coherent
+    (the intrinsic layer) and what is left of the alternating part is spread like the viscous seam
+    layer, not concentrated like a stencil fallback — no stencil suspect survives.
+- rejected: chasing the residual graded-vs-coarse penalty with a better sub-face reconstruction
+- why: "the h → 2h jump in the flux-error constant is intrinsic and cannot be cancelled by any sub-face stencil"
+
 ### Inner pressure iterations and the deferred-corrected C/F gradient: both DECLINED, (B) designed and parked on a measurement
 - area: amr
 - source: amr/docs/amr_pressure_iteration.md §1, §4, §14
