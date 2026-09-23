@@ -428,7 +428,7 @@ reading until they are settled.
 
 ## amr — block octree, mixed-level cut band
 
-62 in force, 3 superseded — full text in [`decisions/amr.md`](decisions/amr.md)
+64 in force, 3 superseded — full text in [`decisions/amr.md`](decisions/amr.md)
 
 ### In force
 
@@ -458,6 +458,7 @@ reading until they are settled.
 - **Fragmentation guard: pocket cells pinned and excluded from the mean and gradients, not zero-forced**. **Rejected:** gating pocket creep as exactly zero  <sub>amr-ghost-collocated-ns-plan.md:112</sub>
 - **GOTCHA/invariant: detect non-finite explicitly — max|u| via std::max(0,NaN) hides blowup**. **Rejected:** relying on max|u| alone to detect solver blowup  <sub>amr-octree-status.md:781-782</sub>
 - **Gap-floor policy default n=4 is the calibrated floor, not sharper**. **Rejected:** n=8 or sharper (non-monotone, not a reliable improvement)  <sub>amr-mixed-level-cut-band-plan.md:102</sub>
+- **Gate W is stated on the leak itself, never on m1/m3 — a ratio of two totals cannot measure a defect proportional to φ**. **Rejected:** m1/m3 (max over a codimension-1 set ÷ volume L2) as the worth-it statistic  <sub>amr/docs/amr_pressure_iteration.md</sub>
 - **Geometric octree-walk kernels kept as an independent oracle alongside the shared-CSR kernels**. **Rejected:** deleting the geometric octree-walk implementations once the shared CSR body existed  <sub>amr-host-device-kernel-consolidation.md:31-32</sub>
 - **Ghost metadata must be re-installed into builders at the top of every discovery round**.  <sub>amr-distributed-flow-campaign.md:77</sub>
 - **Ghost projection is retired suite-wide; ghost_closure has no production consumer**. **Rejected:** AUTO-selecting ghost projection as a production scheme  <sub>amr-aperture-advection-resolved.md:36</sub>
@@ -466,6 +467,7 @@ reading until they are settled.
 - **Host pressure runtime deliberately kept geometric (not switched to shared CSR kernels) for performance reasons**. **Rejected:** switching the host pressure runtime to the shared assembled-CSR kernel  <sub>amr-host-device-kernel-consolidation.md:33-36</sub>
 - **Implicit-FOU deferred correction defaults ON for AmrFlow advection**. **Rejected:** pure explicit advection (default before this change)  <sub>amr-octree-status.md:777-782</sub>
 - **Incremental rotational pressure projection replaces non-incremental Chorin (removes dt-dependent error)**. **Rejected:** plain non-incremental Chorin projection  <sub>amr-octree-status.md:763-767</sub>
+- **Inner pressure iterations and the deferred-corrected C/F gradient: both DECLINED, (B) designed and parked on a measurement**. **Rejected:** inner predictor→projection iterations (A), permanently; building (B) now  <sub>amr/docs/amr_pressure_iteration.md</sub>
 - **Invariant: faceNeighborGather slot layout is [+x,-x,+y,-y,+z,-z]**. **Rejected:** a [-x,+x,-y,+y,-z,+z] slot ordering  <sub>amr-python-bindings-next.md:34-35</sub>
 - **Island-corner C/F stencils sample a finer tangential neighbour by child-volume average**.  <sub>amr-ghost-collocated-ns-plan.md:109</sub>
 - **M2/D3 verdicts: H-launch accepted as a small-mesh tax; np>1 ~3e-7 residual class accepted**. **Rejected:** reworking H-launch cost immediately (deferred instead to device-assembly campaign)  <sub>amr-mixed-level-cut-band-plan.md:357</sub>

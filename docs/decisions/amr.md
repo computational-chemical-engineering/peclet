@@ -10,6 +10,45 @@ the index with `docs/decisions/build_index.py` after editing.
 
 Do not reverse an entry here without recording a new decision that supersedes it.
 
+### Inner pressure iterations and the deferred-corrected C/F gradient: both DECLINED, (B) designed and parked on a measurement
+- area: amr
+- source: amr/docs/amr_pressure_iteration.md §1, §4, §14
+- decided: 2026-09-23
+- status: settled
+- quote: |
+    Neither option is built. (A) inner predictor→projection iterations within a step is declined
+    outright (§4): it costs a momentum re-solve per pass, it is a global scheme change rather than
+    a C/F fix, it cannot improve time accuracy below the backward-Euler integrator's, and it
+    inherits the aperture path's attractor family and large-dt instability. (B) the deferred
+    correction `L φ_{k+1} = rhs − (L_q − L) φ_k`, whose fixed point inverts the accurate C/F
+    gradient, is DESIGNED to implementation detail (§6–§8) and PARKED on the benchmark it was
+    gated against (WO0, `amr_tg_graded.md`): the pressure-increment leak it would remove measures
+    **1.0e-4 at N = 32, CFL 0.5 on a graded mesh — 0.09 % of the worst face-velocity error the
+    solver makes at an ordinary face of the same mesh — and it is O(dt²)**, so it shrinks twice as
+    fast as the time step (§14.2). Its trigger is a consumer at `dt ≫` CFL with an evolving
+    pressure (a scalar-transport or coupling driver on a graded octree), not this benchmark.
+- rejected: inner predictor→projection iterations (A), permanently; building (B) now
+- why: "the leak is 0.4 % of the face error the solver makes anyway at the largest time-accurate dt, and O(dt²)"
+
+### Gate W is stated on the leak itself, never on m1/m3 — a ratio of two totals cannot measure a defect proportional to φ
+- area: amr
+- source: amr/docs/amr_pressure_iteration.md §14.1, §14.3
+- decided: 2026-09-23
+- status: settled
+- quote: |
+    The criterion as first written (`m5 = m1/m3 ≥ 0.3` ⇒ build the deferred correction) fires on a
+    graded Taylor–Green mesh and fires for a reason unrelated to the C/F pressure gradient: m1 is
+    the TOTAL face-normal velocity error at the 2:1 sub-faces and m3 the TOTAL cell velocity error,
+    and on this mesh both are dominated by the solver's spatial error — so the ratio reads 1.4–2.6
+    at EVERY time step, including the smallest, and is structurally incapable of measuring anything
+    proportional to the pressure increment. The gate is restated on `ε_cf = max |Δ_G φ|` over the
+    2:1 sub-faces, built from the solver's own last-step `φ = (dt/ρ)(pⁿ⁺¹ − pⁿ)`, against `m2r`,
+    the same max over the REGULAR faces of the same mesh: `ε_cf/m2r ≥ 0.3` ⇒ build. Measured
+    4.0e-3 (N = 32) and 2.2e-3 (N = 64) ⇒ park. The ctest `python_amr_tg_graded` carries the
+    regression bound `ε_cf/m2r ≤ 0.05`.
+- rejected: m1/m3 (max over a codimension-1 set ÷ volume L2) as the worth-it statistic
+- why: "a ratio that is flat in dt cannot be a measure of a dt-proportional leak"
+
 ### AMR NS advection keeps the fluid-fluid scheme unchanged; uf stays the face-averaged form
 - area: amr
 - source: amr-ghost-collocated-ns-plan.md:83
