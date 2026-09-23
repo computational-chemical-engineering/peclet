@@ -118,9 +118,13 @@ coarsenable axis. Its own comment says *"depth 0 (one block: origin 0, size gs, 
 always qualifies"* — so when no intermediate depth qualifies it selects **`d = 0`**, one block
 holding the entire level, on one rank, every V-cycle.
 
-This sits directly on the CFD-DEM path: `flow` and `dem` share one `BlockDecomposer` by settled
-decision, and a coupled run that rebalances (`enable_mpi_step(rebalance_every=…)`) makes that
-shared decomposition weighted. The two fixes are independent and both wanted: an **aligned**
+**Reachable through a shipped public API, not hypothetically.** `CfdDem.rebalance(gamma)`
+(`coupling/python/peclet_coupling/driver.py:683–707`) builds a weighted ORB from the coupled
+weights and calls `diagnostics.rebalance_by_weights(w)`, which migrates and rebuilds `flow` on it —
+the driver's own comment at :291 says *"default equal-cell ORB flow's init_mpi built; rebalance()
+overwrites it"*. So any coupled run that rebalances puts `flow`'s pressure multigrid on a weighted
+level 0, which is the unguarded combination above. `flow` and `dem` share one `BlockDecomposer` by
+settled decision, so this is the intended CFD-DEM path, not a misuse. The two fixes are independent and both wanted: an **aligned**
 weighted ORB (split planes on multiples of `2^a`; `coarsenAlignment` at
 `mac_cutcell_mg.hpp:524` already computes the unweighted analogue, and at flow's granularity
 `a = 1–2` costs a few per cent imbalance at 1536 ranks), and a **repartition** telescope kind that
