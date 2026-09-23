@@ -10,6 +10,32 @@ the index with `docs/decisions/build_index.py` after editing.
 
 Do not reverse an entry here without recording a new decision that supersedes it.
 
+### Coarse-level redistribution lives in core; the hierarchies stay in the methods
+- area: core
+- source: amr/docs/amr_mg_core_boundary.md §1, §3, §4, §10; amr/docs/amr_mg_depth.md §5.6; docs/archive/MG_TELESCOPING_PLAN.md §4
+- decided: 2026-09-24
+- status: settled
+- quote: |
+    The target decomposition of a multigrid level (sibling merge on the ORB tree, a fresh
+    proportional ORB on fewer ranks, or replication), the stage communicators and membership, and
+    the planned up/down movement of level fields are `peclet::core::decomp` infrastructure, with
+    flow and amr as consumers and voro taking the communicator bookkeeping and the id-keyed gather.
+    What a level IS, its operator and openness on the target, the transfers, the smoother, the
+    bottom and the V-cycle stay method-specific. The test is ARCHITECTURE.md's own: core provides
+    where data lives and how it moves, not how the physics is integrated — everything on the core
+    side is nameable with `BlockDecomposer`, `Block`, `MPI_Comm`, `T*` and an index functor, and
+    nothing on the method side is. The planned movement is `RedistributeTopology`, following the
+    `GridHaloTopology` / `ParticleHaloTopology` precedent of describe-once, move-many; the existing
+    one-shot `redistributeGridFields` keeps its role for rebalancing. Trigger: flow's sibling-merge
+    telescoping cannot handle the WEIGHTED decomposition that load-balanced CFD-DEM runs on
+    (`mac_cutcell_mg.hpp:513–517` documents the limit and nothing enforces it; its depth search
+    falls through to one block, the whole level on one rank per V-cycle), and amr's C1 needed the
+    same machinery — three private copies were forming (flow's `Telescope`, amr's
+    `ReplicatedTailStage`, voro's coming GraphAMG bottom). flow's existing telescoping migrates
+    onto it behind a byte-identity gate with no change of policy or default.
+- rejected: per-method private implementations (three were forming); a core "multigrid stage" that owns the continued hierarchy below the stage point (core cannot name a level, and V-cycle orchestration is deliberately not consolidated); leaving flow's telescoping in place and serving only new consumers (flow is the first production consumer of the missing Repartition kind)
+- why: "the seam is below the hierarchy, not through it"
+
 ### AMR PCG must mask solid AND project onto the fluid range (mask + fluid-only mean), not just deflate the constant mode
 - area: core
 - source: device-naming-retirement.md:89-95

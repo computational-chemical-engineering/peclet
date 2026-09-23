@@ -509,13 +509,14 @@ reading until they are settled.
 
 ## core — decomposition, halo, rebalance
 
-29 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
+30 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
 
 ### In force
 
 - **A core header is on the MPI side iff it includes `common/mpi.hpp`, held by a CI manifest gate**. **Rejected:** leaving the MPI boundary implicit  <sub>docs/CORE_BOUNDARY.md</sub>
 - **AMR PCG must mask solid AND project onto the fluid range (mask + fluid-only mean), not just deflate the constant mode**. **Rejected:** deflating only the constant/all-cell mean without masking solid cells  <sub>device-naming-retirement.md:89-95</sub>
 - **Anisotropic coarse-grid partitioning requires cellExtent, not raw cell-count kLargest**. **Rejected:** partitioning by raw cell-count kLargest on an anisotropic coarse grid  <sub>mg-decomposition-alignment.md:43</sub>
+- **Coarse-level redistribution lives in core; the hierarchies stay in the methods**. **Rejected:** per-method private implementations (three were forming); a core "multigrid stage" that owns the continued hierarchy below the stage point (core cannot  <sub>amr/docs/amr_mg_core_boundary.md</sub>
 - **Convention: keep NBX tag families >= 64 apart**.  <sub>nbx-round-tag-race.md:28</sub>
 - **Device-vs-host numerical comparison policy: bit-exact assembly, tolerance-based apply on CUDA/HIP**. **Rejected:** requiring bit-exact apply/V-cycle results on CUDA/HIP (impossible given FMA contraction)  <sub>kokkos-cuda-constexpr-required.md:27-30</sub>
 - **GPU-aware MPI auto-detection uses query + checksum loopback probe, never blind probing**. **Rejected:** blind device-pointer probing to auto-detect CUDA-aware MPI  <sub>suite-mpi-gpu-campaign.md:16</sub>
