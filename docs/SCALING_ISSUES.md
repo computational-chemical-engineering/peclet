@@ -106,17 +106,53 @@ variable-density outflow coefficient crosses a telescope point since the same ev
 host-staged (fine on CPU; a device build would want a device-aware path).
 
 **TRAP — a WEIGHTED `dec0` with telescoping on and `nLevels > 1` gathers the whole fine grid onto
-one rank per V-cycle.** Found 2026-09-23 from the `peclet-amr` C1 design (`amr/docs/
-amr_mg_core_boundary.md` §3), by reading the code, **not yet measured at scale**.
-`mac_cutcell_mg.hpp:513–517` already documents the constraint — *"For a weighted dec0 the
+one rank per V-cycle — MEASURED 2026-09-24, confirmed (with one qualification below).** Found
+2026-09-23 from the `peclet-amr` C1 design (`amr/docs/amr_mg_core_boundary.md` §3) by reading the
+code. `mac_cutcell_mg.hpp:513–517` documents the constraint — *"For a weighted dec0 the
 coarse-level transfer is only clean when `nLevels==1` (pure RB-GS) — use that (or the
 decomposition-agnostic GraphAMG) for a weighted co-decomposition"* — but **nothing enforces it**
-(no throw, no warning; grep confirms). A weighted level-0 block is generally not evenly divisible,
-so `blocked` is true at L = 0, the telescope fires there, and the depth search
-(`mac_cutcell_mg.hpp:751–770`) walks down looking for a depth whose blocks are even on every
-coarsenable axis. Its own comment says *"depth 0 (one block: origin 0, size gs, even by `can()`)
-always qualifies"* — so when no intermediate depth qualifies it selects **`d = 0`**, one block
-holding the entire level, on one rank, every V-cycle.
+(no throw, no warning). A weighted level-0 block is generally not even, so `blocked` is true at
+L = 0, the telescope fires there, and the depth search (`mac_cutcell_mg.hpp:751–770`) walks down
+for a depth whose blocks are even on every coarsenable axis; *"depth 0 (one block …) always
+qualifies"*. What the search really selects is the **shallowest ORB-tree depth that has an odd
+split**, so `d = 0` whenever the **root** split lands on an odd plane — by parity alone roughly half of all weight
+fields, and at large `np` the shallowest odd split is almost surely within the top few depths (that
+last sentence is reasoning, not measured).
+
+*Measured* (flow `main` 8789e2b, host-openmp MPI build, probe
+`flow/tests/study/weighted_dec0_telescope_probe.py` + raw logs in `weighted_dec0_results/`, on
+flow branch `trap-probe` b10020f in the worktree `suite/flow-trap`, not merged): 96³, periodic 2³ sphere array, cut-cell pressure,
+default telescope + `auto` bottom, `rebalance_by_weights(1 + Poisson(4) counts in a bed)` —
+exactly what `CfdDem.rebalance(gamma=1)` builds. Ladder from flow's own `[mg]` print
+(`PECLET_FLOW_MG_DEBUG=1`, trace only). Before: every case telescopes only at the 6³→3³ bottom
+(levels 8) or not at all (levels 4). After:
+
+| bed | np | levels | weighted blocks | ladder after | iters | projection s (max rank) | momentum s |
+|---|---|---|---|---|---|---|---|
+| heap (tilt 0.5) | 8 | 8 | odd x,y,z (root split x = 45) | **L0 → TELESCOPE, L1–L5 on 1 rank (`d = 0`)** | 8 → 8 | 0.080 → 0.180 | 0.079 → 0.100 |
+| heap | 8 | 4 (default) | same | **L0 → 1 rank (`d = 0`)** | 8 → 8 | 0.068 → 0.175 | 0.062 → 0.099 |
+| heap | 4 | 8 | odd x,y (root 45) | **L0 → 1 rank (`d = 0`)** | 8 → 8 | 0.167 → 0.241 | 0.166 → 0.173 |
+| heap | 4 | 4 | same | **L0 → 1 rank (`d = 0`)** | 8 → 8 | 0.172 → 0.245 | 0.167 → 0.173 |
+| flat bed | 8 | 8 | only z odd (x,y stay 48) | L0 → 4 ranks (`d = 2`), then 1 rank below 6³ | 8 → 8 | 0.064 → 0.099 | 0.062 → 0.085 |
+| heap (tilt 0.3, seed 11) | 8 | 8 | z odd; x,y at 46 | L0 → 4 ranks, **L1 (23-wide) → 1 rank** | 8 → 8 | 0.079 → 0.111 | 0.079 → 0.088 |
+| heap (tilt 0.3, seed 11) | 4 | 8 | all even (46/50) | **L1 (23-wide) → 1 rank** | 8 → 8 | 0.166 → 0.168 | 0.166 → 0.153 |
+| flat bed | 4 | 8 | unchanged (np=4 never splits z) | unchanged — null | 8 → 8 | 0.167 → 0.166 | 0.166 → 0.160 |
+
+So the signature (`d = 0` at L0, the root rank receiving the whole 96³ level-0 residual every
+V-cycle) appears at both np = 4 and np = 8, at the default depth 4 and at depth 8. The
+qualification: it is not always L0 and not always `d = 0` — when the top splits happen to land even,
+the collapse is to `2^d` ranks, or it lands one level lower (46 → 23), which is cheap at this size.
+**Iterations never change** (8/step throughout): the collapsed hierarchy is the same hierarchy on
+one rank, so the cost is time, not convergence — projection ×2.25–2.6 at np = 8 while momentum,
+which feels only the (up to 1.8×) cell imbalance a flow-only weighted partition has, rose ×1.27–1.6.
+**The two documented escapes do not escape**: the GraphAMG bottom
+(`set_pressure_graph_amg(True)`) is what `auto` already runs at 12³ and leaves the L0 telescope
+untouched (np = 8: identical ladder, projection 0.085 → 0.218 s); `nLevels = 1` avoids the
+telescope but with `auto` it hands the whole 96³ grid to the redundant GraphAMG on every rank (9 s
+per step before and after, ~55× slower), and with `set_pressure_bottom("smoother")` it is pure
+RB-GS at 29 iterations/step, 0.211 → 0.306 s projection at np = 8 — slower than the collapsed
+telescope it was meant to replace. Not measured: np ≥ 16, GPU, a coupled `CfdDem` run (the flow-only
+path is the same call), or anything beyond 5 steps.
 
 **Reachable through a shipped public API, not hypothetically.** `CfdDem.rebalance(gamma)`
 (`coupling/python/peclet_coupling/driver.py:683–707`) builds a weighted ORB from the coupled
@@ -129,8 +165,9 @@ weighted ORB (split planes on multiples of `2^a`; `coarsenAlignment` at
 `mac_cutcell_mg.hpp:524` already computes the unweighted analogue, and at flow's granularity
 `a = 1–2` costs a few per cent imbalance at 1536 ranks), and a **repartition** telescope kind that
 moves a level onto a fresh proportional ORB on fewer ranks instead of collapsing to one block.
-Cheapest confirmation before anything is built: run a coupled or `rebalance`d case at `np ≥ 8` with
-`PECLET_FLOW_TELESCOPE=1` and print the selected depth — `d = 0` at level 0 is the signature.
+The confirmation this paragraph asked for is the measurement above (`PECLET_FLOW_TELESCOPE` no
+longer exists — telescoping is a setter since QUALITY_PLAN D3; the ladder trace is
+`PECLET_FLOW_MG_DEBUG=1`).
 
 **P0 answered (2026-09-02).** The anchored-bottom half is real: single-phase np=384 with the
 agglomerated bottom *forced* on the inlet/outlet path went **24.9 → 10.9 iterations, 2.48 → 1.88
