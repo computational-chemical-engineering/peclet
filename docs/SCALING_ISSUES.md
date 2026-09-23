@@ -105,6 +105,29 @@ variable-density outflow coefficient crosses a telescope point since the same ev
 `test_telescope_varrho_mpi`); the `MIN_EXTENT` default (4) is untuned, and the gather is
 host-staged (fine on CPU; a device build would want a device-aware path).
 
+**TRAP — a WEIGHTED `dec0` with telescoping on and `nLevels > 1` gathers the whole fine grid onto
+one rank per V-cycle.** Found 2026-09-23 from the `peclet-amr` C1 design (`amr/docs/
+amr_mg_core_boundary.md` §3), by reading the code, **not yet measured at scale**.
+`mac_cutcell_mg.hpp:513–517` already documents the constraint — *"For a weighted dec0 the
+coarse-level transfer is only clean when `nLevels==1` (pure RB-GS) — use that (or the
+decomposition-agnostic GraphAMG) for a weighted co-decomposition"* — but **nothing enforces it**
+(no throw, no warning; grep confirms). A weighted level-0 block is generally not evenly divisible,
+so `blocked` is true at L = 0, the telescope fires there, and the depth search
+(`mac_cutcell_mg.hpp:751–770`) walks down looking for a depth whose blocks are even on every
+coarsenable axis. Its own comment says *"depth 0 (one block: origin 0, size gs, even by `can()`)
+always qualifies"* — so when no intermediate depth qualifies it selects **`d = 0`**, one block
+holding the entire level, on one rank, every V-cycle.
+
+This sits directly on the CFD-DEM path: `flow` and `dem` share one `BlockDecomposer` by settled
+decision, and a coupled run that rebalances (`enable_mpi_step(rebalance_every=…)`) makes that
+shared decomposition weighted. The two fixes are independent and both wanted: an **aligned**
+weighted ORB (split planes on multiples of `2^a`; `coarsenAlignment` at
+`mac_cutcell_mg.hpp:524` already computes the unweighted analogue, and at flow's granularity
+`a = 1–2` costs a few per cent imbalance at 1536 ranks), and a **repartition** telescope kind that
+moves a level onto a fresh proportional ORB on fewer ranks instead of collapsing to one block.
+Cheapest confirmation before anything is built: run a coupled or `rebalance`d case at `np ≥ 8` with
+`PECLET_FLOW_TELESCOPE=1` and print the selected depth — `d = 0` at level 0 is the signature.
+
 **P0 answered (2026-09-02).** The anchored-bottom half is real: single-phase np=384 with the
 agglomerated bottom *forced* on the inlet/outlet path went **24.9 → 10.9 iterations, 2.48 → 1.88
 s/step, with the floor improving 2.1e-9 → 3.4e-10** — the §2.7 degradation did not appear here.
