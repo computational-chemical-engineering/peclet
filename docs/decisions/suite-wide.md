@@ -412,3 +412,23 @@ Do not reverse an entry here without recording a new decision that supersedes it
     stay quiet; Kokkos itself reads only KOKKOS_NUM_THREADS, so on Threads and Serial neither the
     user's variable nor a sensible default reaches anything unless peclet supplies it. Verified end
     to end on a Threads wheel: default 4.428 s -> 0.899 s, same k, both variables still honoured.
+
+### A solver's internal grid-count threshold is a count, not cell-unit API
+- area: suite-wide
+- source: amr documentation pass 2026-09-24 (amr `4758ba7`, `8b913b1`); USER DECISION 2026-09-24
+- decided: 2026-09-24
+- status: settled
+- quote: |
+    The coarsest multigrid level's size (flow `set_pressure_bottom_extent(cells=)`, amr the same
+    after its rename) is a count of cells per axis on the coarsest grid, not a length: the limit
+    exists because the bottom smoother (60 Jacobi sweeps) solves a level only up to about 4 cells
+    per axis, whatever the physical size of the domain. Such solver-internal grid-count thresholds
+    are exempt from "never add cell-unit API surface". The exemption is narrow: the quantity must
+    be a property of the discrete solver that does not scale with the physical problem, the keyword
+    is `cells` (NAMING.md §1.8), and the docstring says "a count, not a length".
+- rejected: a physical-length form (wrong: the same length means a different level count at a
+    different resolution, while the smoother's limit is a cell count); hiding the knob on the
+    diagnostics tier only (flow already ships it public, and one concept gets one tier)
+- why: the directive exists so that a user states the PROBLEM physically and the discretization
+    is derived; a solver threshold on the discrete grid is not part of the problem statement, and
+    forcing it into a length would make it resolution-dependent

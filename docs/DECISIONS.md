@@ -591,11 +591,12 @@ reading until they are settled.
 
 ## suite-wide — naming, layout, provisioning
 
-29 in force, 1 superseded — full text in [`decisions/suite-wide.md`](decisions/suite-wide.md)
+30 in force, 1 superseded — full text in [`decisions/suite-wide.md`](decisions/suite-wide.md)
 
 ### In force
 
 - **A host backend that does not size itself must be handed the thread budget**. **Rejected:** keeping the "say nothing on an unconstrained machine" policy for every backend (it is  <sub>RELEASE_PREP.md:11.3</sub>
+- **A solver's internal grid-count threshold is a count, not cell-unit API**. **Rejected:** a physical-length form (wrong: the same length means a different level count at a  <sub>amr</sub>
 - **All coupled methods must share one BlockDecomposer; static-only co-decomposition is rejected**. **Rejected:** "Static-only co-decomposition"  <sub>multiphysics-framework-plan.md:410</sub>
 - **CMake suite_require_nanobind must be a macro, not a function**. **Rejected:** implementing suite_require_nanobind as a CMake function  <sub>nanobind-zero-copy-migration.md:15</sub>
 - **Collocated default is AUTO ghost projection (in both flow and AMR), with documented fallbacks**.  <sub>collocated-attractor-campaign.md:53</sub>

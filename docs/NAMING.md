@@ -118,6 +118,16 @@ carry a `_zyx` suffix saying so. The suffix is a feature, not a defect: it is wh
 guessing whether `spacing[0]` is dx or dz. `pnm` is the only module in this position, and the rule
 is that a module never ships both spellings — one order per module, marked.
 
+### 1.8 A solver's grid-count threshold is `cells`, and is not cell-unit API
+
+Setters take physical inputs (suite directive; [decisions/suite-wide.md](decisions/suite-wide.md)).
+The one exemption is a threshold of the *discrete solver* that does not scale with the physical
+problem — the coarsest multigrid level's size is the case in point: the bottom smoother solves a
+level only up to about 4 cells per axis, whatever the domain. Such a count is spelled `cells=`
+(`set_pressure_bottom_extent(cells=4)`), lives on the same tier in every package that has it, and
+its docstring says "a count, not a length". Anything a user would scale with the problem —
+a smoothing width, a band thickness, a refinement radius — is a length and is not covered.
+
 ## 2. The divergence table
 
 Status: **removed 1.0.0** = the non-canonical spelling was deleted in the clean-break release
@@ -143,6 +153,7 @@ Status: **removed 1.0.0** = the non-canonical spelling was deleted in the clean-
 | `set_contact_angle_dynamic(…)` + `_off()`, `set_phase_change_thermal(…)` + `_off()`, `set_phase_change_energy(…)` + `_off()`, `disable_vof_blocks()` | one setter with a leading `enabled`; `enable_vof_blocks(None)` | **removed 1.0.0** (F) |
 | 125 developer members (`*_diagnostics/_stats/_census/_budget/_ledger/_probe/_timing`, `last_*`, solver tuning beyond selection, ablation switches, `field_view`, `exchange_field*`, `rebalance_by_weights`, `bcast_from_root`, …; the list is flow `853816f`) | `solver.diagnostics.<same>` (`SolverDiagnostics`) | **removed 1.0.0** (F) |
 | `set_body_force(fx, fy, fz)`; `set_domain_bc(face, type, vx, vy, vz)` | `set_body_force((fx, fy, fz))`; `set_domain_bc(face, type, velocity=(vx, vy, vz))` — one 3-sequence, as dem and voro | **removed 1.0.0** (F, 2026-09-11, flow `a0a8c27`) |
+| `predict_hierarchy(gnx, gny, gnz, np, levels, …, min_extent)` | `cells=(nx, ny, nz)`, `num_ranks=` (§1.1, §1.3); the bottom threshold as amr's `bottom_extent` | **OPEN divergence** (found 2026-09-24): amr's forecast follows the canon, flow's predates it. Fix at flow's next breaking change, through §0's ladder. |
 | call-order docstrings ("call BEFORE set_solid / init_mpi") | state checks: `set_domain_bc(_profile)`, `set_aperture_order`, `set_fluid_only_constraint`, `set_exact_crossings`, `set_openness_override`, `set_ghost_projection`/`'ghost'` RAISE after geometry; `set_decomposition`, `set_comm_avoiding` RAISE after `init_mpi`; late `set_rho`/`set_mu` now dirty the stencil (were silently wrong); `set_domain_bc(_profile)` after geometry is ALLOWED for a VALUE update on a face whose type is unchanged (a ramped inflow or lid — the tangential fold is refreshed) and raises only on a type change | **canon** (F) |
 
 ### peclet.dem
@@ -232,6 +243,8 @@ identity — `peclet::core`, `peclet/core/...`, the repo and its tags — does *
 | `Flow.last_mom_iters` / `last_pres_iters` / `last_outer_iters` / `divergence_norm_face` / `set_momentum_mg` / `set_momentum_gs` / `set_velocity_mg_staircase` / `set_momentum_mg_solver` / `set_ghost_gradient` / `set_aperture_order` | `Flow.diagnostics.<same>` | **removed 1.0.0** (F, 2026-09-10) |
 | env `PECLET_CORE_GPS_RHO` / `PECLET_CORE_GPS_MAXN` | `Flow.set_ghost_sampled(on, rho=2.2, max_samples=0)` | **removed 1.0.0** (E for amr) |
 | `amr.Flow.set_body_force(fx, fy, fz)` | `set_body_force((fx, fy, fz))` — one 3-sequence, as `flow`, `dem` and `voro` already take it (§2 flow row, removed there in 1.0.0) | **OPEN divergence** (found 2026-09-17): two spellings for one concept across two shipped APIs. `peclet-amr` is 0.x under D9's exception, so this is not a 1.0.0 break to answer for — but it is the exact shape NAMING exists to prevent, and it bit once already: while fixing stale 3-float callers of `flow`'s version, the two `amr.Flow` callers in `flow/scripts/` had to be checked individually because the spelling alone does not say which API is meant. Fix when amr next takes a breaking change. |
+
+| `Flow.diagnostics.set_pressure_bottom(kind=)`, `Flow.diagnostics.set_pressure_bottom_extent(extent=)`, `predict_pressure_hierarchy(...)` | `Flow.set_pressure_bottom(mode=)`, `Flow.set_pressure_bottom_extent(cells=)`, `predict_hierarchy(...)` — flow's spellings and tier (flow is the reference) | **renamed before release** (2026-09-24, USER DECISION): added in the C1 work after amr v0.1.1 and never shipped, so no alias |
 
 ### peclet.coupling
 
