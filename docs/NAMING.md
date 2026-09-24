@@ -174,6 +174,7 @@ Status: **removed 1.0.0** = the non-canonical spelling was deleted in the clean-
 | `get_growth_factor()` / `get_growth_rate()`; `init_mpi(size=, gsize=)` | `growth_factor` / `growth_rate`; `init_mpi(origin, extent, cells, periodic)` | **removed 1.0.0** |
 | `add_plane(px, py, pz, nx, ny, nz)` | `add_plane(point, normal)` | **removed 1.0.0** |
 | `num_particles`, `num_shapes`, … ; `get_positions()`, `get_velocities()`, … | — | **canon** |
+| `migrate_to_weights(weights, align=1)` — `align`: every block boundary on a multiple of `align` cells (a power of two); a coupled run passes what flow's `diagnostics.rebalance_by_weights` returns | — | **canon** (new keyword, user-approved 2026-09-24; dem `9c93253`) |
 
 ### peclet.voro
 
@@ -269,6 +270,12 @@ identity — `peclet::core`, `peclet/core/...`, the repo and its tags — does *
 
 ## 4. History
 
+- 2026-09-24 — **dem `migrate_to_weights(weights, align=1)`**, user-approved. ADDITIVE (a new
+  keyword with the old behaviour as its default), so no alias ladder is owed. `align` is the word
+  core already uses for the same concept (`BlockDecomposer::init(…, weights, align)`, `align_`), and
+  flow hands the value over as the RETURN of `diagnostics.rebalance_by_weights` (it returned None),
+  which adds no name. Not added: `weights=` on flow's `predict_hierarchy` (for
+  `check_decomposition.py --predict` to log the alignment) — a new public keyword, not decided.
 - 2026-09-07 — file created. Canon fixed; `smooth_length` (coupling) is the first entry landed under
   it, together with flow's already-shipped `spacing`/`cells`/`extent`/`origin` quartet.
 - 2026-09-16 — **flow gains `diagnostics.set_velocity_solver('auto'|'gauss_seidel'|'multigrid'|'chebyshev')`**
