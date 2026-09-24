@@ -4,12 +4,13 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## `peclet-halo` / `peclet-core` 1.2.0 — 2026-09-24 — coarse-level multigrid stages, and an aligned weighted ORB
 
-### `peclet-halo` / `peclet-core` 1.2.0 — coarse-level multigrid stages, and an aligned weighted ORB
-
-*Prepared on core's `release-prep` branch, not tagged. The consumers' adoption (amr S3, flow S4–S5)
-lands first and may add to this entry.* One `v*` tag in `peclet-core` publishes two distributions at
+A core-only release (the family version is unchanged). Its consumers adopted it before the tag
+with no core change needed: `peclet-amr`'s pressure multigrid moves coarse levels through these
+stages and turns them on by default (amr `2d3fe0e`…`4ee0f99`), and `peclet.flow`'s telescope
+delegates to them byte-identically and gains a Repartition stage after a weighted rebalance (flow
+`4da7171`…`d907c57`); both reach PyPI with those packages' next releases. One `v*` tag in `peclet-core` publishes two distributions at
 the same number: `peclet-halo` (`peclet.halo`, sdist, needs MPI) and the pure-Python `peclet-core`
 compatibility shell. The C++ headers (`peclet/core/...`) are versioned by the same tag, which the
 consumers pin as `PECLET_CORE_TAG`.
