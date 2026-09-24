@@ -59,12 +59,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# peclet-core is sdist-only (MPI particle halo + Kokkos AMR): installing it builds from source and needs
-# an MPI toolchain (+ optional Kokkos prefix for the AMR module).
-# The shell (peclet-core 1.1.0) pulls peclet-halo and peclet-geom, so `peclet[mpi]` still provides
-# `peclet.core.mpi` as well as the canonical `peclet.halo`. At 2.0.0 this becomes peclet-halo
-# directly and the shell is gone (CORE_BOUNDARY.md §3).
-mpi = ["peclet-core==1.1.1"]
+# The MPI particle halo (peclet-halo) is sdist-only: installing it builds from source and needs an MPI
+# toolchain. It is reached through the peclet-core compatibility shell, which (since 1.1.0) pulls
+# peclet-halo and peclet-geom, so `peclet[mpi]` still provides `peclet.core.mpi` as well as the
+# canonical `peclet.halo`. At 2.0.0 this becomes peclet-halo directly and the shell is gone
+# (CORE_BOUNDARY.md §3).
+mpi = ["peclet-core==1.2.0"]
 # peclet-amr (block-octree AMR + its solver, under development) is sdist-only too: needs MPI, a Kokkos
 # backend and peclet-morton; pinned to the family version at tag time like every member.
 amr = ["peclet-amr==0.1.1"]
