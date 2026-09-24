@@ -169,6 +169,21 @@ The confirmation this paragraph asked for is the measurement above (`PECLET_FLOW
 longer exists — telescoping is a setter since QUALITY_PLAN D3; the ladder trace is
 `PECLET_FLOW_MG_DEBUG=1`).
 
+**FIXED IN PART, 2026-09-24 (flow `d907c57`, on the core stage machinery S4 moved the telescope
+onto).** After `rebalance_by_weights` the pressure MG now takes a **Repartition** stage where the
+sibling merge would collapse a level larger than one level-0 block onto fewer ranks: the level moves
+onto a proportional ORB of its own grid on `np_L` ranks (`[mg]` trace `-> REPARTITION`). Same bits
+as the collapse (the coarse arithmetic is pointwise), iterations unchanged. Measured on the probe
+above, pinned, median of 5: projection ÷ momentum after the rebalance 1.87 → 1.05 (np = 8, depth 8),
+1.77 → 1.09 (np = 8, depth 4), 1.58 → 1.10 (np = 4, depth 8), against 0.97–1.04 unweighted; in a
+coupled `CfdDem` run 0.69 → 0.37 (np = 8; 0.34 unweighted). Runs that never rebalance are
+byte-identical. **Still open:** the ALIGNED weighted ORB (split planes on multiples of 2^a), which
+brings every row to ≤ 1.15× by itself and moves the first stage to level a, is built and measured
+(flow branch `s5-aligned-rebalance`) but not landed — dem's `migrate_to_weights` must build the same
+partition from the same weights and has no way to yet. The two escapes the source comment used to
+recommend (`nLevels = 1`, the GraphAMG bottom) are corrected there. Not measured: np ≥ 16, GPU.
+Full record: `amr/docs/amr_mg_core_boundary.md` §11.9.
+
 **P0 answered (2026-09-02).** The anchored-bottom half is real: single-phase np=384 with the
 agglomerated bottom *forced* on the inlet/outlet path went **24.9 → 10.9 iterations, 2.48 → 1.88
 s/step, with the floor improving 2.1e-9 → 3.4e-10** — the §2.7 degradation did not appear here.
