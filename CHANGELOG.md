@@ -4,6 +4,77 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### `peclet-halo` / `peclet-core` 1.2.0 — coarse-level multigrid stages, and an aligned weighted ORB
+
+*Prepared on core's `release-prep` branch, not tagged. The consumers' adoption (amr S3, flow S4–S5)
+lands first and may add to this entry.* One `v*` tag in `peclet-core` publishes two distributions at
+the same number: `peclet-halo` (`peclet.halo`, sdist, needs MPI) and the pure-Python `peclet-core`
+compatibility shell. The C++ headers (`peclet/core/...`) are versioned by the same tag, which the
+consumers pin as `PECLET_CORE_TAG`.
+
+No change to the `peclet.halo` Python API (docstrings only); the new capability is C++, for the
+multigrid hierarchies of `flow` and `peclet-amr`. Design: `amr/docs/amr_mg_core_boundary.md`
+(§4, §11); decision "Coarse-level redistribution lives in core; the hierarchies stay in the
+methods" ([docs/decisions/core.md](docs/decisions/core.md)).
+
+#### Added
+
+- **Coarse-level multigrid stages** (`include/peclet/core/decomp/`): where a multigrid level goes
+  when it can no longer coarsen on its own decomposition, and how its fields get there and back.
+  - `stage_target.hpp` — `chooseStageTarget(cur, levelGrid, liftable, minExtent,
+    maxBlockCells = 0)`, a pure, replicated policy over the caller's lift predicate: `InPlace`,
+    `SiblingMerge` (the ORB tree truncated), `Repartition` (a proportional ORB on `np_L` ranks,
+    rounded up to a power of two and never above the extent cap) or `Replicated`. With
+    `maxBlockCells = 0` it is flow's telescope search verbatim (4872 ladder levels compared, all
+    identical). Also `shallowestLiftableMerge`, `repartitionTarget`, `largestBlockCells`,
+    `minBlockExtent`, `StageKind`, `StageTarget`, `SiblingMergeChoice`.
+  - `stage_comm.hpp` — `makeStageComm(parent, target)` → `StageComm`, the stage's group and
+    owners-only sub-communicators (flow's `Telescope` splits verbatim for a sibling merge; for a
+    repartition the group is the parent itself). RAII, `MPI_Finalized`-guarded.
+  - `redistribute_topology.hpp` — `RedistributeTopology<Dim, T>`: build the movement once from the
+    two decompositions and the caller's index functors, then `forward` / `backward` every V-cycle
+    with no handshake — group `Gatherv`/`Scatterv`, `Allgatherv`, or planned point-to-point over
+    the box intersections (tags 1–10, one per level). Pure copies, bitwise.
+  - `gather_by_global_id.hpp` — `gatherByGlobalId`, the id-keyed replicated gather that flow's
+    GraphAMG bottom and amr's replicated tail wrote inline.
+- **Aligned weighted ORB** (`block_decomposer.hpp`): `BlockDecomposer::init(numBlocks, globalSize,
+  weights, align)` balances a work field while keeping every block a multiple of `align` —
+  coarse-first (sum onto the align-grid, weighted ORB there, `refined(align)` back), never snapped
+  after — and is `init(…, weights)` bit for bit at `align = 1`. `chooseAlignedWeighted(numBlocks,
+  G, weights, budget = 1.05, aMax)` picks the deepest `align = 2^a` whose `weightImbalance` stays
+  within the budget, else today's partition.
+- A `landing-pages` job in `release.yml` that `publish` needs: the tag fails before upload if this
+  README (the PyPI page of both distributions) names a retired spelling.
+
+#### Fixed
+
+- `redistributeGridFields` no longer reads out of range when the new decomposition has fewer
+  blocks than ranks (a rank beyond it only sends). Inert for every existing caller: the MPI test
+  prints the same bytes at np 1/2/4/8.
+- CI on `main` was red from the 1.2.0 boundary split (2026-09-21, so also at the 1.1.1 tag): the
+  Kokkos + Python job still imported `peclet.core`, which this repository no longer builds, and
+  its Python ctests never ran. It imports `peclet.halo` now.
+
+#### Documentation
+
+- Doxygen contracts for every new type and function: what is replicated and what is collective,
+  preconditions, what throws and which throws are rank-local (and therefore fatal).
+- `peclet.halo` docstrings say what is collective, that MPI must already be initialised, what
+  `gather_ghosts` does and does not return, and that `reverse` returns a new array. The type stub
+  is regenerated to match.
+- README: an install section, the new features, measured test counts, absolute links (the
+  relative ones resolved neither on PyPI nor on GitHub).
+
+#### Tested
+
+72 ctests in the plain host + MPI build, 87 with Kokkos (OpenMP), 6 Python ctests (the
+`state_hash` byte gate passing, not skipped) — np 1–8, `OMP_NUM_THREADS=2`. New:
+`test_stage_target`, `test_stage_redistribute_mpi` (bitwise against flow's `Telescope` and amr's
+`ReplicatedTailStage`), `test_stage_repartition_mpi` (bitwise against `redistributeGridFields`),
+`test_aligned_weighted` and `_mpi`.
+
 ## [1.2.1] — 2026-09-21 — the landing pages, corrected
 
 A refresh release: **no code changes in any package**. `peclet` / `peclet-cu13` 1.2.1 and

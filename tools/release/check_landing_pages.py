@@ -32,6 +32,12 @@ WHAT IT CHECKS, and why it needs no list of its own:
      core/README.md badged `peclet-core` while its pyproject published `peclet-halo`; a reader
      landing on the peclet-halo page saw another package's name and version.
 
+  3. PROJECT URLS. `[project.urls]` is upload metadata too, shown in the PyPI sidebar and just as
+     uneditable. Every package's "Changelog" link pointed at a per-package CHANGELOG.md that was
+     never written (found 2026-09-24): the suite keeps ONE family CHANGELOG in the umbrella. So
+     every distribution must carry a `Changelog` URL, and every `…/<repo>/blob/main/<path>` URL
+     into a peclet repository must name a file that exists in the local checkout of that repo.
+
   Because the rule set comes from NAMING.md, every future rename is covered the day it is recorded
   there — which is also an incentive to record it.
 """
@@ -158,6 +164,41 @@ _EXEMPT = (
 )
 
 
+_BLOB = re.compile(r"github\.com/computational-chemical-engineering/([\w.-]+)/blob/main/(\S+?)(?:#.*)?$")
+
+
+def url_findings(dists: set[str] | None = None) -> int:
+    """Check 3: every distribution has a Changelog URL, and every blob URL into a peclet repository
+    names a file that exists locally (`peclet` is the umbrella, `peclet-<x>` the checkout `<x>/`)."""
+    findings = 0
+    for d in package_dirs():
+        for pp in [d / "pyproject.toml", *sorted(d.glob("packaging/pyproject-*.toml"))]:
+            if not pp.exists():
+                continue
+            try:
+                proj = tomllib.loads(pp.read_text()).get("project", {})
+            except Exception:
+                continue
+            dist, urls = proj.get("name"), proj.get("urls", {}) or {}
+            if not dist or (dists and dist not in dists):
+                continue
+            rel = pp.relative_to(ROOT)
+            if "Changelog" not in urls:
+                findings += 1
+                print(f"  !! {rel}  `{dist}` has no Changelog URL in [project.urls]")
+            for key, url in urls.items():
+                m = _BLOB.search(url)
+                if not m:
+                    continue
+                repo, path = m.groups()
+                local = ROOT if repo == "peclet" else ROOT / repo.removeprefix("peclet-")
+                if local.is_dir() and not (local / path).exists():
+                    findings += 1
+                    print(f"  !! {rel}  `{dist}` {key} = {url}")
+                    print(f"     {local.relative_to(ROOT) if local != ROOT else '(umbrella)'}/{path} does not exist")
+    return findings
+
+
 def _is_exempt(line: str) -> bool:
     return any(tok in line for tok in _EXEMPT)
 
@@ -227,11 +268,14 @@ def check(verbose: bool = False, dists: set[str] | None = None,
             print(f"  !! {rel}  is the PyPI description of `{dist}` but never names it")
             print(f"     a reader landing on the {dist} page sees another package's name/badges")
 
+    findings += url_findings({d for _, d in pages if d} if (dists or explicit) else None)
+
     if findings:
         print(f"\n{findings} finding(s). A PyPI description CANNOT be edited after upload — fix these")
         print("BEFORE tagging, or the only remedy is publishing another version to refresh the page.")
         return 1
-    print(f"landing pages OK — {len(pages)} pages checked against {len(rules)} retired spellings")
+    print(f"landing pages OK — {len(pages)} pages checked against {len(rules)} retired spellings;"
+          " project URLs resolve")
     return 0
 
 
