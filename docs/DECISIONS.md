@@ -428,11 +428,12 @@ reading until they are settled.
 
 ## amr — block octree, mixed-level cut band
 
-68 in force, 3 superseded — full text in [`decisions/amr.md`](decisions/amr.md)
+70 in force, 3 superseded — full text in [`decisions/amr.md`](decisions/amr.md)
 
 ### In force
 
 - **A multigrid level below the octree's root brick is the SAME octree with its root LIFTED — not a new level type**. **Rejected:** generalising the openness-free `inner_` chain (a second level type, host-only, used by no production path); flow's agglomerated CSR bottom ALONE on th  <sub>amr/docs/amr_mg_depth.md</sub>
+- **A pressure stage never hands a rank more coarse-level cells than its FINEST LEAF COUNT — maxBlockCells is the leaf count, not the fine-cell count**. **Rejected:** the fine-cell count of the largest finest-level block  <sub>amr/docs/amr_mg_core_boundary.md</sub>
 - **AMR NS advection keeps the fluid-fluid scheme unchanged; uf stays the face-averaged form**.  <sub>amr-ghost-collocated-ns-plan.md:83</sub>
 - **AMR gets its own separate Python binding module (tpx_amr), not folded into tpx_mpi**. **Rejected:** extending tpx_mpi to include AMR bindings  <sub>amr-python-bindings-next.md:14-17,</sub>
 - **AMR keeps ORB block decomposition, not a global SFC partition**. **Rejected:** one global SFC partitioned by index range (p4est/Dendro style)  <sub>amr-octree-status.md:12-15</sub>
@@ -492,6 +493,7 @@ reading until they are settled.
 - **Volume-weighted superficial velocity is required on graded meshes**. **Rejected:** non-volume-weighted superficial velocity on graded meshes  <sub>amr-ghost-collocated-ns-plan.md:57</sub>
 - **What remains at a 2:1 seam is the JUMP in the flux-error constant, and the lever is MATCHING the two sides, not maximising either**. **Rejected:** chasing the residual graded-vs-coarse penalty with a better sub-face reconstruction  <sub>amr/docs/amr_cf_convective.md</sub>
 - **Zero pressure after finish_adapt rather than carry the accumulated pressure through coarsening**. **Rejected:** carrying the transferred/accumulated pressure through a coarsening adapt event  <sub>amr-ghost-collocated-ns-plan.md:121</sub>
+- **amr's stage policy takes minExtent = 4, flow's trigger verbatim — inert while the policy is consulted only after the §6.2 lift stops**. **Rejected:** minExtent = 0 (amr's ladder has no economic trigger — rejected only for consistency with flow, since it measures identical); consulting the policy bef  <sub>amr/docs/amr_mg_core_boundary.md</sub>
 - **cf=1 (quadratic C/F flux) is not optional on graded meshes**. **Rejected:** standard (cf=0) two-point C/F flux on graded/throat meshes  <sub>amr-mixed-level-cut-band-plan.md:113</sub>
 - **mpi4py rule: never call a collective inside a rank-0-only block**.  <sub>amr-distributed-flow-campaign.md:84</sub>
 - **np=1 bit-exactness is the gate for every distributed default**.  <sub>amr-distributed-flow-campaign.md:75</sub>

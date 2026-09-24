@@ -10,6 +10,38 @@ the index with `docs/decisions/build_index.py` after editing.
 
 Do not reverse an entry here without recording a new decision that supersedes it.
 
+### A pressure stage never hands a rank more coarse-level cells than its FINEST LEAF COUNT — maxBlockCells is the leaf count, not the fine-cell count
+- area: amr
+- source: amr/docs/amr_mg_core_boundary.md §9.6, §11.1; amr/docs/amr_mg_depth.md WO4b as built
+- decided: 2026-09-24
+- status: settled
+- quote: |
+    `maxBlockCells` is the LEAF count of the largest finest-level block (the rank's actual
+    unknowns), Allreduced MAX over level 0 and inherited by a stage's continued ladder. The rule
+    exists so that no coarse level becomes the bottleneck: a rank never holds more of a coarse
+    level than its real finest-level work. On graded meshes the fine-cell count
+    `Π blockBrick · 2^(lmax·Dim)` overstates that work many times: the S3 probe (24³ root,
+    lmax 2, off-centre sphere, 93 904 leaves) shows it merging a whole 13 824-cell level onto ONE
+    rank at np = 64, where each rank's finest work is ~1 500 leaves; the leaf count repartitions
+    that level onto 8 ranks.
+- rejected: the fine-cell count of the largest finest-level block
+- why: "a rank's work is its leaves; the fine-cell count overstates it by up to 8^lmax on a graded mesh and collapses coarse levels onto one rank"
+
+### amr's stage policy takes minExtent = 4, flow's trigger verbatim — inert while the policy is consulted only after the §6.2 lift stops
+- area: amr
+- source: amr/docs/amr_mg_core_boundary.md §9.7; amr/docs/amr_mg_depth.md §6.2, WO4b
+- decided: 2026-09-24
+- status: settled
+- quote: |
+    `minExtent` = 4, flow's default `teleMinExtent`, passed to core's `chooseStageTarget`. It is
+    INERT in amr's wiring: the policy is consulted only where §6.2's lockstep lift has already
+    stopped, so step 1's `tooSmall` economic trigger never fires and the in-place ladder is
+    unchanged; 4 reaches only the fat-candidate rule and the np_L extent cap. Measured: 0 and 4
+    give identical targets, ladders and numbers on every WO4b gate configuration and on the
+    graded-mesh policy probe. Do not let `tooSmall` cut the in-place ladder short.
+- rejected: minExtent = 0 (amr's ladder has no economic trigger — rejected only for consistency with flow, since it measures identical); consulting the policy before the §6.2 lift stops (would change the in-place ladder)
+- why: "flow's trigger verbatim; it changes nothing measured, and the in-place ladder must not move"
+
 ### A multigrid level below the octree's root brick is the SAME octree with its root LIFTED — not a new level type
 - area: amr
 - source: amr/docs/amr_mg_depth.md §1, §5, §6; amr/docs/amr_mg_core_boundary.md
