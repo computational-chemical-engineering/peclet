@@ -1146,3 +1146,32 @@ Do not reverse an entry here without recording a new decision that supersedes it
     separate problem and the 6 MPI parity ctests must be preserved.
 - rejected: none stated (scope boundary decision)
 - why: distributed colouring across rank ghosts is a separate problem from the single-GPU GS solve
+
+---
+
+### The distributed step's local particle order is canonical (ascending source rank), never MPI arrival order
+- area: dem
+- source: dem f7b7b22 (src/mpi_halo.hpp); dem/CLAUDE.md reproducibility trap (e4e17f0)
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    core's NBX exchange delivers in arrival order; ghost blocks and migrants were appended in that order,
+    which set the manifold order → colorKey → colouring → Gauss–Seidel sweep order. np=8 differed run to
+    run in 6 of 8 scenarios. Ghost blocks now unpack in ascending source rank, migrants are stably
+    re-sorted by MigratePack::srcRank; np 4/8 bitwise reproducible (OMP_NUM_THREADS=1), np 1/2 unchanged.
+- rejected: accepting arrival-order nondeterminism; changing core's NBX delivery order
+- why: USER: "you need to understand the nondeterminism" — it was a defect (sweep order of a fixed-iteration solve, chaos-amplified to O(1) in ~20 steps), fixable in dem at no measured cost
+
+---
+
+### ghost_band_* ctests run on one host thread; contact order across threads stays unfixed
+- area: dem
+- source: dem c64e117
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    The margin flake is thread order, not a missed contact: the narrow phase appends contacts in thread
+    order, the rank-face Gauss–Seidel does not conserve momentum when the two owners sweep a shared
+    contact in different states, and the p-q-s chain shifts rigidly by 0.0213.
+- rejected: sorting contacts by gid pair after the narrow phase (changes numbers everywhere, one sort per substep; GPU nondeterminism is already accepted)
+- why: the test checks contact detection, which is correct; thread-order reproducibility is a separate, unrequested change

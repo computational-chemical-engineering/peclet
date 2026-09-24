@@ -44,7 +44,7 @@ The design contract lives in `docs/`:
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — layering, dependency graph, Lagrangian/Eulerian/mixed taxonomy, how each code maps onto the core.
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — SDF sign, x-fastest indexing, types, precision policy, periodic/Lees–Edwards, Python array shapes.
-- [docs/DECISIONS.md](docs/DECISIONS.md) — the **decision register**: what the project chose, what it rejected, and why, for all 541 decisions (487 in force, 54 superseded), with verbatim quotes and provenance in [docs/decisions/](docs/decisions/). It exists because settled decisions were being silently reversed — a later session picking the textbook alternative because nothing in front of it said the project had already rejected that alternative on purpose. Each submodule's `CLAUDE.md` inlines its own highest-risk prohibitions. **Read the entry for anything you are about to change; reversing one takes a new recorded decision, not a judgement call in the moment.**
+- [docs/DECISIONS.md](docs/DECISIONS.md) — the **decision register**: what the project chose, what it rejected, and why, for all 543 decisions (489 in force, 54 superseded), with verbatim quotes and provenance in [docs/decisions/](docs/decisions/). It exists because settled decisions were being silently reversed — a later session picking the textbook alternative because nothing in front of it said the project had already rejected that alternative on purpose. Each submodule's `CLAUDE.md` inlines its own highest-risk prohibitions. **Read the entry for anything you are about to change; reversing one takes a new recorded decision, not a judgement call in the moment.**
 - [docs/NAMING.md](docs/NAMING.md) — the **naming canon**: one spelling per concept across all five Python APIs (the `origin`/`extent`/`cells`/`spacing` domain quartet, `num_*` counts, `periodic=`, `set_dt`, American spelling, `get_` only for a transfer), the table of every current divergence and its status, and the additive-alias rule for changing a shipped name. **Read before adding a public name.**
 - [docs/STYLE.md](docs/STYLE.md) — C++20 host & Kokkos device (morton pins C++17), clang-format/tidy (from voronoi), namespaces, CMake/CI.
 - [docs/INTERFACES.md](docs/INTERFACES.md) — shared C++20 concepts: `Domain`, `Decomposition`, `Field`, `HaloExchange`, `SdfGeometry`, `ImmersedBoundary`, `Stepper`.
@@ -205,7 +205,7 @@ cmake --build build -j$(nproc)                  # -> build/peclet/dem/_dem.*.so 
 export PYTHONPATH=$PYTHONPATH:$(pwd)/build
 python examples/verify_packing_spheres.py       # examples/ = demos; tests/python/ = pytest
 # Registered tests: -DPECLET_DEM_BUILD_TESTS=ON → 11 ctests (kokkos + arborx + pytest),
-# + -DPECLET_DEM_MPI=ON → 74 (kokkos_mpi + Python MPI at np=1,2,4); every test SKIPs with exit 77.
+# + -DPECLET_DEM_MPI=ON → 78 (kokkos_mpi + Python MPI at np=1,2,4); every test SKIPs with exit 77.
 ```
 Since 2026-09-08 (QUALITY_PLAN D) there are no root-level scripts: `tests/python/test_*.py` are pytest
 functions run by ctest, `tests/python/mpi/` the MPI ones, `examples/` the demos (`pack.py`,

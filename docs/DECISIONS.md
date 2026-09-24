@@ -236,7 +236,7 @@ reading until they are settled.
 
 ## dem — XPBD, contacts, packing
 
-82 in force, 2 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
+84 in force, 2 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
 
 ### In force
 
@@ -304,6 +304,7 @@ reading until they are settled.
 - **Symmetric release beats one-sided grounded release**. **Rejected:** one-sided grounded release  <sub>dem-event-level-restitution.md:45</sub>
 - **The MPI velocity/position solve reuses the single-GPU driver via a Hooks template, not a separate implementation**. **Rejected:** a rank-local adaptive-stop break under MPI  <sub>dem-mpi-solver-port-plan.md:15</sub>
 - **The correct fix, if needed, is proper sequential-impulse friction with an accumulated per-contact tangential impulse clamped to the total Coulomb bound**. **Rejected:** the current Jacobi count-averaged friction scheme, for quantitative frictional-packing studies  <sub>packing-friction-followup.md:26</sub>
+- **The distributed step's local particle order is canonical (ascending source rank), never MPI arrival order**. **Rejected:** accepting arrival-order nondeterminism; changing core's NBX delivery order  <sub>dem</sub>
 - **The force engine was generalized into a Law/Hooks-templated driver per the device-first + MPI directive**. **Rejected:** a Hertz-only, non-generalized implementation  <sub>dem-mpi-solver-port-plan.md:40</sub>
 - **The multilevel-stabilizer rebound loss is an under-convergence artifact, not a momentum-sink effect — refuting the project's original premise**. **Rejected:** the mission brief's premise that a momentum-conserving stabilizer sink was deleting the rebound  <sub>dem-multilevel-contact-solver.md:42</sub>
 - **Uncapped grid is the default for the fused kernel launch**. **Rejected:** capping the launch grid to fewer blocks  <sub>dem-perf-campaign.md:31-32</sub>
@@ -315,6 +316,7 @@ reading until they are settled.
 - **dem set_positions (N,4): w==0 does not mean fixed — invMass remap convention**. **Rejected:** assuming w==0 in set_positions means invMass=0 (fixed)  <sub>stale-build-mphys-trees.md:14</sub>
 - **dem set_positions resets every particle to shape 0 — set_shape_ids must be called after**.  <sub>sdf-scene-campaign.md:32</sub>
 - **dem.step() with no argument advances nothing**.  <sub>sdf-scene-campaign.md:19</sub>
+- **ghost_band_* ctests run on one host thread; contact order across threads stays unfixed**. **Rejected:** sorting contacts by gid pair after the narrow phase (changes numbers everywhere, one sort per substep; GPU nondeterminism is already accepted)  <sub>dem</sub>
 - **globalScale folded into effScaleA/effScaleB throughout body-body narrowphase**. **Rejected:** the prior narrowphase code that omitted globalScale from B's canonical remap  <sub>dem-global-scale-sphere-limitation.md:10-18</sub>
 - **packing broad-phase: ArborX replaces cuBQL**. **Rejected:** cuBQL (NVIDIA-only BVH)  <sub>cuda-kokkos-migration.md:82-86</sub>
 - **random-packed-bed example: use effective radius including growth_factor; use annealed pack.py protocol**. **Rejected:** baseRadius*scale alone (omitting growth_factor); phi_ref 0.66 crude-feedback protocol  <sub>peclet-examples-gallery.md:58-71</sub>
