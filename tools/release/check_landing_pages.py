@@ -167,9 +167,14 @@ _EXEMPT = (
 _BLOB = re.compile(r"github\.com/computational-chemical-engineering/([\w.-]+)/blob/main/(\S+?)(?:#.*)?$")
 
 
-def url_findings(dists: set[str] | None = None) -> int:
+def url_findings(dists: set[str] | None = None, resolve: bool = True) -> int:
     """Check 3: every distribution has a Changelog URL, and every blob URL into a peclet repository
-    names a file that exists locally (`peclet` is the umbrella, `peclet-<x>` the checkout `<x>/`)."""
+    names a file that exists locally (`peclet` is the umbrella, `peclet-<x>` the checkout `<x>/`).
+
+    `resolve=False` skips the existence half. A member's release job runs this script out of a
+    SPARSE checkout of the umbrella (NAMING.md and this file only), where every umbrella path looks
+    missing — the v1.2.0 core release failed its gate on exactly that. The existence check belongs to
+    the umbrella pre-flight, which runs on a full checkout of every repository."""
     findings = 0
     for d in package_dirs():
         for pp in [d / "pyproject.toml", *sorted(d.glob("packaging/pyproject-*.toml"))]:
@@ -192,7 +197,7 @@ def url_findings(dists: set[str] | None = None) -> int:
                     continue
                 repo, path = m.groups()
                 local = ROOT if repo == "peclet" else ROOT / repo.removeprefix("peclet-")
-                if local.is_dir() and not (local / path).exists():
+                if resolve and local.is_dir() and not (local / path).exists():
                     findings += 1
                     print(f"  !! {rel}  `{dist}` {key} = {url}")
                     print(f"     {local.relative_to(ROOT) if local != ROOT else '(umbrella)'}/{path} does not exist")
@@ -268,7 +273,8 @@ def check(verbose: bool = False, dists: set[str] | None = None,
             print(f"  !! {rel}  is the PyPI description of `{dist}` but never names it")
             print(f"     a reader landing on the {dist} page sees another package's name/badges")
 
-    findings += url_findings({d for _, d in pages if d} if (dists or explicit) else None)
+    findings += url_findings({d for _, d in pages if d} if (dists or explicit) else None,
+                             resolve=not explicit)
 
     if findings:
         print(f"\n{findings} finding(s). A PyPI description CANNOT be edited after upload — fix these")
