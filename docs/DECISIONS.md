@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-169 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+170 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -186,6 +186,7 @@ reading until they are settled.
 - **cylinder-vortex-street dropped from the gallery; confirmed flow bug pins the fix location**. **Rejected:** shipping a sub-resolution "steady" wake result (would misrepresent physics)  <sub>peclet-examples-gallery.md:106-118</sub>
 - **fillPorousEpsGhosts: mirror-around-1 at inflow/outflow, zero-gradient at walls — one policy for RHS/coeffs/residual**. **Rejected:** reading eps ghosts in three different states across RHS/coeffs/residual  <sub>porous-cfddem-cuda-two-bugs.md:36</sub>
 - **flow's grid is isotropic unit spacing with no wall-normal stretching**. **Rejected:** wall-normal grid stretching  <sub>channel-dns-isotropic-grid.md:14</sub>
+- **init_mpi precedes the geometry; the order is enforced by a raise, not by a rebuild**. **Rejected:** `initMpi` rebuilding the geometry itself, as `redistribute()` does (a silent rebuild  <sub>flow</sub>
 - **set_exact_crossings and set_openness_override remain single-rank-guarded (v1 scope exclusions unchanged)**. **Rejected:** extending this MPI landing to cover set_exact_crossings/set_openness_override or the v1-excluded modes  <sub>flow-ghost-projection-mpi-plan.md:17</sub>
 - **set_face_interp(9) hybrid (aperture projection + gpCenterGrad) is the throat-safe collocated scheme**. **Rejected:** pure collocated ghost projection (mode-0 with gpCenterGrad only) for tight-throat porous media — it inherits the throat defect  <sub>flow-ghost-projection.md:115</sub>
 - **set_ghost_projection(True) must be called before set_solid**.  <sub>flow-ghost-projection.md:33</sub>

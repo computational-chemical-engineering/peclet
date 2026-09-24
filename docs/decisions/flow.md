@@ -3139,3 +3139,22 @@ Do not reverse an entry here without recording a new decision that supersedes it
     flow/tests/kokkos_mpi/test_openbc_solid_mpi.cpp (np 1/2/4) are the first tests anywhere to call
     setDomainBc together with setSolid with the solid ON an open face. Four existing tests called
     both, but all of them keep the geometry clear of the non-periodic faces.
+
+### init_mpi precedes the geometry; the order is enforced by a raise, not by a rebuild
+- area: flow
+- source: flow `1e6f278` (initMpi guard), `f41be8f` (test_cellforce_mpi); coupling `30d1c99`; found 2026-09-24 through coupling's np = 4 moving-suspension test
+- decided: 2026-09-24
+- status: settled
+- quote: |
+    `set_pressure_geometry` builds the pressure and velocity multigrids, the SDF ghosts and the
+    cut-cell overlays for whatever partition exists when it runs. Called before `init_mpi`, that is
+    the single-rank partition, and `initMpi` never rebuilt it: each rank solved its own block as an
+    independent periodic pressure problem, every PCG converged, nothing reported an error, and the
+    result was wrong (np = 4: max|du| 4.05e-2 at max|u| 0.358; np = 1 correct by accident). `initMpi`
+    now raises if a geometry already exists (`geometryBuilt_ && !distributed_`); `redistribute()` /
+    `rebalance_by_weights` re-enter with `distributed_` set and are unaffected.
+- rejected: `initMpi` rebuilding the geometry itself, as `redistribute()` does (a silent rebuild
+    would zero any state set between the two calls, and flow already enforces call order where a
+    wrong order gives a wrong answer — `set_decomposition` raises after `init_mpi`)
+- why: a wrong call order produced a silently wrong distributed answer; an error at the call is the
+    only outcome a user cannot mistake for a result
