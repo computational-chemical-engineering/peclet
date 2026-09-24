@@ -1,6 +1,6 @@
 # VoF campaign — handoff for the next session
 
-**Status 2026-09-02 (Fable, finishing campaign started).** Items 1–4 below are the 2026-08-31
+**Status 2026-09-02 (architect, finishing campaign started).** Items 1–4 below are the 2026-08-31
 handoff; their state now:
 
 - **Item 1 — precision:** RESOLVED by the defect-correction campaign (P1 passed, double-diagonal
@@ -242,7 +242,7 @@ levels (inside the preconditioner, stay float), `applyOutflowGhost` and the CA g
 act on the vector, not the operator).
 
 **Promoted to a suite-wide campaign (2026-09-01)**: the plan is `DEFECT_CORRECTION_PLAN.md`
-(rule, per-solver inventory, rungs P1/P2/P3/A0/A1/M1/M2/D1/X, Opus↔Fable handoff protocol) and the
+(rule, per-solver inventory, rungs P1/P2/P3/A0/A1/M1/M2/D1/X, Opus↔architect handoff protocol) and the
 executing session's prompt is `DEFECT_CORRECTION_PROMPT.md`. This item is now that campaign's P1.
 
 **The discriminating experiment**, when this is implemented behind an env gate: the RCP bed at
@@ -305,7 +305,7 @@ families of hard `(float)` casts kept their operator fp32 even in a double build
 
 ---
 
-## Item 2 — Trace the Lamb mode-2 discrepancy  [Fable]
+## Item 2 — Trace the Lamb mode-2 discrepancy  [the architect]
 
 **The observation** (WO-P): the oscillating-droplet frequency is **6.3–7.0 % below** Lamb's
 analytical mode-2 result, consistently. Recorded as an open measured deviation, explicitly
@@ -344,7 +344,7 @@ finding about the method and is worth writing up.
 
 ---
 
-## Item 3 — The V3 curvature issues  [Fable]
+## Item 3 — The V3 curvature issues  [the architect]
 
 These now matter **more than when V3 shipped**, because V4 proved the spurious-current budget
 is set by curvature, not by the force (see Item 4 and `VOF_PLAN.md` §4 V7 preamble).
@@ -379,7 +379,7 @@ is set by curvature, not by the force (see Item 4 and `VOF_PLAN.md` §4 V7 pream
 
 ---
 
-## Item 4 — Scope V5–V7  [Fable]
+## Item 4 — Scope V5–V7  [the architect]
 
 **V5 (SDF wetting / band RDF) has gained a second motivation.** It was scoped for the contact
 angle; it is now also the most promising route to better curvature (plicRDF gives 2nd-order

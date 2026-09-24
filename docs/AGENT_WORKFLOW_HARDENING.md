@@ -1,6 +1,6 @@
 # Agent workflow hardening — design note
 
-*Written 2026-09-14 against the brief `fable-brief-workflow-hardening.md` (seven failure classes
+*Written 2026-09-14 against the architect brief on workflow hardening (seven failure classes
 A–G, ~20 verified events over 14 days, ~12 concurrent sessions). Status: **proposal** — nothing here
 is installed. Everything named as a file, flag or workflow was opened and checked on the day; where
 a claim rests on something not checked, the note says so.*

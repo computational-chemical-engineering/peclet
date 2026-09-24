@@ -1,6 +1,6 @@
 # Exact residual, approximate preconditioner — the suite-wide defect-correction campaign
 
-Written 2026-09-01 (Fable, from the source survey recorded in `VOF_NEXT_SESSION.md` Item 1).
+Written 2026-09-01 (architect, from the source survey recorded in `VOF_NEXT_SESSION.md` Item 1).
 Executed in a separate session — see the prompt in `DEFECT_CORRECTION_PROMPT.md`.
 
 ## 0. The rule, and why it is a rule
@@ -77,12 +77,12 @@ exact matvec needs are already allocated and ghost-valid at solve time.
 | flow const-coeff periodic MG (FlowReference) | `flow/src/mac_mg.hpp` :101-141 | matrix-free double `(6φ − Σ)/h²` | n/a | plain MG, but the residual is exact ⇒ already defect correction | compliant |
 | flow bottom AMG (agglomerated) | `mac_cutcell_mg.hpp` :1411 (diag re-sum precedent) → `core/.../solver/graph_amg*.hpp` | double CSR | inside the preconditioner | — | compliant |
 | **core AMR pressure** (`AmrFlow`) | `core/include/peclet/core/amr/fv_op.hpp` (`FvOp` faceW/bcDiag/invVol all double, `applyFv` :114), `pcg.hpp` (double PCG, MG precond), `flow.hpp` (`presPCG_ = true` :2042) | double | yes | yes | **A0** audit only: verify `applyFv` is flux-form; confirm the `setPressurePCG(false)` plain-MG path recomputes the fine residual exactly (then it is defect correction by construction) |
-| core AMR **ghost-projection** overlay | `core/.../amr/ghost_projection.hpp` :364-366, :299-307; `ghost_projection_sampled.hpp` :1142-1144 | **float** `rescale, wm_n1, wm_n2` inside the matvec | **WRONG — see §4 handoff**: computed in float in the SHARED `scheme/ghost_closure.hpp`, whose three consumers are flow's gp overlay and both AMR overlays. P2 and A1 are ONE change, in core, and it moves double-build results (trigger 2). | yes | **A1 == P2**, blocked on a Fable ruling |
+| core AMR **ghost-projection** overlay | `core/.../amr/ghost_projection.hpp` :364-366, :299-307; `ghost_projection_sampled.hpp` :1142-1144 | **float** `rescale, wm_n1, wm_n2` inside the matvec | **WRONG — see §4 handoff**: computed in float in the SHARED `scheme/ghost_closure.hpp`, whose three consumers are flow's gp overlay and both AMR overlays. P2 and A1 are ONE change, in core, and it moves double-build results (trigger 2). | yes | **A1 == P2**, blocked on an architect ruling |
 | core AMR momentum | `core/.../amr/momentum_assembly.hpp` (all `View<double>`), BiCGStab | double | yes | yes | compliant |
 | core `DistributedPoissonMG` | `core/.../amr/distributed_poisson.hpp` :200 `vcycle` | double, plain MG | — | check: test-only, or a production solver? | **A0** |
 | **voro** mesh-optimizer CG (+GraphAMG precond) | `voro/include/peclet/voro/mesh_optimizer.hpp` :33-41, :396, :691 | double CSR / `View<double>` | yes | CG | compliant — **X** audit: confirm the assembled `Aop` and the wall-Jacobian term are double end-to-end |
 | **pnm** `extract_network_flow` | `pnm/src/pore_extraction.hpp` :860-905 | no linear solve — fluxes from a given velocity field, all double | — | — | out of scope |
-| **dem** XPBD / coloured PGS / multilevel stabiliser | `dem/src/solver_*.hpp`, `particles.hpp` (`V3 = View<float*[3]>`, λ float) | float **state**, nonlinear complementarity — there is no operator to widen and no double source to correct against | no | no | **D1** — evaluation only, Fable |
+| **dem** XPBD / coloured PGS / multilevel stabiliser | `dem/src/solver_*.hpp`, `particles.hpp` (`V3 = View<float*[3]>`, λ float) | float **state**, nonlinear complementarity — there is no operator to widen and no double source to correct against | no | no | **D1** — evaluation only, the architect |
 
 Three things the inventory makes plain:
 
@@ -172,7 +172,7 @@ two disagree).
 **Then** flip the default ON in a separate commit with the regression re-baseline
 (`--update`), recording the per-metric deltas.
 
-### P2 — flow overlays exact  [Opus; Fable reviews the `rescale` semantics]
+### P2 — flow overlays exact  [Opus; the architect reviews the `rescale` semantics]
 
 `StarOverlay::a` (`star_elimination.hpp:37`): replace the float `a[6]` in `starApplyDelta` with
 the masked openness recomputed on the fly from `ox/oy/oz` + the sdf sign (the `:75-80` logic),
@@ -182,7 +182,7 @@ because it removes a build step that must otherwise stay consistent with `setOpe
 `GpOverlay` (`ghost_projection.hpp:81-101`): `wm_n1, wm_n2, rescale` → double. These are the
 *matrix* weights; `th, w_bc, w_n1, w_n2` are RHS/diagnostic closure weights and may stay float
 (they enter `b`, not `A` — but note that a float `b` is a *different* problem, not an inexact
-solve of the same one; leave them and record it). **The `rescale` question for Fable**: it is a
+solve of the same one; leave them and record it). **The `rescale` question for the architect**: it is a
 row scaling `D·A` applied in the matvec; the fixed point of `D A x = D b` is unchanged by the
 precision of `D` only if the same `D` scales `b`. Confirm where `b` is scaled and that it is the
 same view.
@@ -218,7 +218,7 @@ Same as P2's `GpOverlay` half, in `core/.../amr/ghost_projection.hpp:364-366` an
 ghost-collocated ctests (`amr-ghost-collocated-ns-plan`, mixed-level band np=1 bitwise / np=2,4
 3e-7) unchanged with the gate off; iteration counts with it on.
 
-### M1 — flow momentum: an exact residual exists  [design: Fable → implementation: Opus]
+### M1 — flow momentum: an exact residual exists  [design: the architect → implementation: Opus]
 
 Today there is **no function that computes `r(u) = b − A_mom u`** for the momentum system at
 all; the sweeps stop on an increment. M1 creates one, matrix-free in double, in flux form for
@@ -241,7 +241,7 @@ the diffusion and advection parts:
   its `u_bc` half is inhomogeneous. Both verified 2026-09-01. The design's ruling is to store
   nothing and evaluate the rows in double on the fly.]**
 
-**Fable decides first** (before Opus writes a line): (a) whether the exact residual should be
+**The architect decides first** (before Opus writes a line): (a) whether the exact residual should be
 one fused kernel or composed from the existing builders evaluated in double into scratch — the
 overlay's row modification is algebraically a rescaled row (`rscale`, `inhom`) and the
 composition must reproduce it exactly; (b) how `inhom` (the inhomogeneous wall-velocity term the
@@ -254,7 +254,7 @@ Gates for M1 alone (no solver change yet): `r(u*)` evaluated at the converged RB
 uniform-velocity identity residual is at 1e-15 with the exact operator applied to a uniform
 field (bitwise 0 in flux form), while `|r(u*)|` shows what the float sweeps actually left.
 
-### M2 — flow momentum: outer defect-correction loop  [Fable chooses; Opus implements]
+### M2 — flow momentum: outer defect-correction loop  [the architect chooses; Opus implements]
 
 `u ← u + P(r(u))` where `P` = k RB-GS colour pairs (or `VelocityMG` V-cycles on the domain-BC
 path) applied to the residual, in float, with the stop criterion on `|r(u)|` (double,
@@ -262,7 +262,7 @@ rank-uniform via the same `MPI_Allreduce` pattern as `velSweepLoop`). This subsu
 `velSweepLoop`'s increment test: the increment stop stays as the *inner* control, the residual
 stop is the *outer* one.
 
-**Fable's choice**: plain defect correction (Richardson on the preconditioned residual) is the
+**The architect's choice**: plain defect correction (Richardson on the preconditioned residual) is the
 minimal form and is what the existing structure becomes with one loop around it; if its rate on
 the FOU (non-symmetric) operator at large dt is poor, BiCGStab with the same `P` is the next
 step — `solveBiCGStab` in `mac_cutcell_mg.hpp:988` is the template, and the momentum operator is
@@ -276,13 +276,13 @@ Poiseuille, Z&H drag (4.292), RCP k unchanged to 6 digits; total sweep count per
 bitwise gate-off, np=1/2/4 identical across np gate-on; `set_ghost_projection` collocated momentum
 path exercised.
 
-### D1 — dem: double state, float solve  [Fable, evaluation only]
+### D1 — dem: double state, float solve  [the architect, evaluation only]
 
 The methodology's shape for a nonlinear complementarity solve is *state in double, correction
 in float*: positions/velocities in double, `Δx`/`Δv` from the float PGS/XPBD sweeps, constraint
 residual `C(x)` evaluated in double. Today `V3 = View<float*[3]>` end to end. This is a
 memory-bandwidth decision for the whole DEM, not a solver switch, and it must be weighed against
-the measured perf curve (`dem-perf-campaign`). Fable writes the a-priori estimate (bytes/particle
+the measured perf curve (`dem-perf-campaign`). The architect writes the a-priori estimate (bytes/particle
 today vs proposed; which kernels are bandwidth-bound; what precision the Hertz history and the
 persistent-contact ledger need) and a *recommendation*; nothing is implemented this campaign.
 
@@ -294,11 +294,11 @@ linear solve, out of scope. `mac_mg.hpp`: already exact matrix-free. One paragra
 
 ## 3. Order, ownership, and the handoff protocol
 
-**Order**: **M1 + M2 design (Fable) FIRST** → P1 → (P2, A0, A1 in any order) → M1 → M2 → P3
-(if perf says so) → D1 (Fable) → X.
+**Order**: **M1 + M2 design (architect) FIRST** → P1 → (P2, A0, A1 in any order) → M1 → M2 → P3
+(if perf says so) → D1 (architect) → X.
 
 The design leads deliberately (user decision, 2026-09-01). Both momentum design sections are
-written up front, in one Fable session, before any Opus implementation starts — so that Opus then
+written up front, in one architect session, before any Opus implementation starts — so that Opus then
 has a long uninterrupted run (P1 → P2/A0/A1 → M1 → M2) with no mid-campaign wait for a ruling, and
 so that M1's exact-residual design is settled while the inventory that motivated it is fresh. It
 costs nothing to front-load: the design is reading and reasoning, no builds, no GPU time.
@@ -310,20 +310,20 @@ design first does not lower that bar; it only means the design is already on pap
 answers. If P1 fails, the M1/M2 design sections stay in §4 as unexecuted design, and the handoff
 question becomes why the premise failed.
 
-Consequence for Fable's first session: it writes M1 and M2 designs against the *inventory* (§1),
+Consequence for the architect's first session: it writes M1 and M2 designs against the *inventory* (§1),
 not against P1's measurements, which do not exist yet. Where a design decision genuinely depends
 on a number P1 would produce, do not guess — state the dependency explicitly in the design section
 (`**Depends on P1:** …`) and give the decision rule rather than the decision, so Opus can resolve
 it from P1's numbers without another handoff.
 
-**Ownership**: Opus executes every rung marked [Opus]; Fable owns the design decisions in M1, M2,
-the `rescale` semantics in P2, and D1. Opus does not start M1/M2 implementation until the Fable
+**Ownership**: Opus executes every rung marked [Opus]; the architect owns the design decisions in M1, M2,
+the `rescale` semantics in P2, and D1. Opus does not start M1/M2 implementation until the architect
 design section for it exists in §4 of this file — which, under the order above, it will, since the
-campaign opens with that Fable session. If an Opus session somehow starts first and §4 is empty,
+campaign opens with that architect session. If an Opus session somehow starts first and §4 is empty,
 it may still run P1/P2/A0/A1 (none of them depend on the momentum design) and must leave M1/M2
 alone.
 
-**Handoff triggers (Opus → Fable)** — stop, write the handoff, do not push past it:
+**Handoff triggers (Opus → the architect)** — stop, write the handoff, do not push past it:
 1. A gate fails and two attempts have not isolated the *mechanism* (not "made it pass").
 2. The change needed is to numerics semantics, not precision (a different operator, a different
    stop criterion, a different identity) — anything that would change a double-build result.
@@ -333,13 +333,13 @@ alone.
 5. Anything touching `buildOpenness` / the coefficient path (S3's trap: it feeds both the
    geometric openness and the coefficient path).
 
-**The handoff itself** is a section appended to §4 of this file: `### Handoff → Fable: <one-line
+**The handoff itself** is a section appended to §4 of this file: `### Handoff → the architect: <one-line
 question>` with *what was measured* (numbers, commands, build flags, np), *what was tried*, *what
-the mechanism is believed to be* and *the decision needed*. Commit it. The next session (Fable)
-starts from `DEFECT_CORRECTION_PROMPT.md`, which says to read §4 first. Fable answers in the
-same section (`**Fable ruling (date):**`) and the following Opus session resumes from there.
+the mechanism is believed to be* and *the decision needed*. Commit it. The next session (architect)
+starts from `DEFECT_CORRECTION_PROMPT.md`, which says to read §4 first. The architect answers in the
+same section (`**Architect ruling (date):**`) and the following Opus session resumes from there.
 
-**Fable → Opus** works the same way in reverse: a design section in §4 ends with
+**The architect → Opus** works the same way in reverse: a design section in §4 ends with
 `**Ready for Opus:**` and the concrete change list.
 
 ## 4. Status log (append-only; newest at the bottom)
@@ -348,7 +348,7 @@ same section (`**Fable ruling (date):**`) and the following Opus session resumes
 numbers, and any handoff sections. The two momentum design sections below were written before
 any implementation, per §3.)*
 
-### M1 design (Fable, 2026-09-01) — the exact momentum residual
+### M1 design (architect, 2026-09-01) — the exact momentum residual
 
 Read-only session: everything below is from the source, nothing was built or run. Line numbers
 are flow HEAD as of the umbrella's `flow` pointer on 2026-09-01.
@@ -560,7 +560,7 @@ drag: that is what "a rescaled row preserves a zero residual but not the raw ide
 6. Then run the M1 gate battery (`precision_ab.py` cases `vof`, `porous`, `zh`; Poiseuille) with
    the gate on and record gate 2/3 numbers here. No solver change in this rung.
 
-### M2 design (Fable, 2026-09-01) — the outer loop
+### M2 design (architect, 2026-09-01) — the outer loop
 
 **Choice: plain defect correction (Richardson on the preconditioned residual), with outer
 iteration 0 being today's solve verbatim.**
@@ -801,7 +801,7 @@ arithmetic against 7 FMAs. At step level it disappears into +0.1…+0.4 % becaus
 kernel per PCG iteration against a whole V-cycle — and where it matters the change is a large
 *win*: Ng=96 goes 0.40 → 0.10 s/step because 28 valid iterations replace 300 burnt ones.
 
-**This number resolves M2's `Depends on P1` without a handoff.** Fable's decision rule: `ρ_x ≤ 1.5`
+**This number resolves M2's `Depends on P1` without a handoff.** The architect's decision rule: `ρ_x ≤ 1.5`
 ⇒ the Richardson-vs-BiCGStab choice is decided by outer-iteration counts alone. Measured
 `ρ_x = 1.07…1.31`, so the **`ρ_x ≤ 1.5` branch holds** and the `ρ_x > 2` handoff branch does not
 fire. M2 proceeds on iteration counts.
@@ -911,7 +911,7 @@ and it is a *reference* path, not production, so **no change is proposed**; reco
 distinction. Making it bitwise is a one-line rewrite to
 `((phi(i)−phi(i+sx)) + (phi(i)−phi(i−sx)) + …)/h2` if anyone ever wants it.
 
-### Handoff → Fable: P1's matvec is 7–31 % *slower* per kernel, not ≤ 0 — does P3 survive its own perf gate?
+### Handoff → the architect: P1's matvec is 7–31 % *slower* per kernel, not ≤ 0 — does P3 survive its own perf gate?
 
 **Trigger 3** (a measurement contradicts a prediction in this plan). P1 itself passes every gate;
 this is about what P1's perf number does to **P3**, which is gated on it.
@@ -975,7 +975,7 @@ handoff. Measured `ρ_x = 1.07…1.31`, so the `≤ 1.5` branch holds and M2 pro
 Writing the decision rule into the design did exactly what §3 intended it to.
 
 
-### Handoff → Fable: P2 and A1 are the SAME change, in a shared `core` header — and widening the storage as scoped would buy nothing
+### Handoff → the architect: P2 and A1 are the SAME change, in a shared `core` header — and widening the storage as scoped would buy nothing
 
 **Triggers 4** (a design fork with more than one defensible option and no measurement that decides
 it) **and 2** (the change alters a *double-build* result). Found by source inspection while
@@ -1019,7 +1019,7 @@ not achieve its stated goal.
    deliberate re-baseline rather than an unchanged-to-tolerance check. P2's stated gates
    ("gate-off byte-identical; the gp order-2 Z&H tests unchanged to tolerance") are written for the
    storage-only change and do not fit this one.
-3. **`rescale` does not need widening at all — settled from source, this is the Fable question P2
+3. **`rescale` does not need widening at all — settled from source, this is the architect question P2
    reserved.** `ov.rescale` is read in exactly two places: `gpApplyDelta`
    (`flow/src/ghost_projection.hpp:268`, `y(r) = rho*(y(r) + delta)`) and `gpDivergDelta` (`:322`,
    `d(r) = rescale(s)*dd`) — the **same view, same slot, applied multiplicatively to the whole row

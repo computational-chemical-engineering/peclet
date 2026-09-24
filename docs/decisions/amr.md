@@ -298,7 +298,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - decided: 2026-09-04
 - status: uncertain
 - quote: |
-    1. **M2b — pick the production LS-cloud size. A [FABLE] DECISION, data already in hand**
+    1. **M2b — pick the production LS-cloud size. A [ARCHITECT] DECISION, data already in hand**
     (plan §M2a results). Clean variants: `rho 1.8`, `rho 1.5`, `N ≤ 32` (all gates). `N ≤ 32` takes
     the depth-8 overlay CSR from 4.33× the uniform arm's to 1.65×, which is exactly where M1's
     +210 ms/step penalty lives. Knobs are already on main and INERT at their defaults
@@ -670,7 +670,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - decided: 2026-08-30
 - status: settled
 - quote: |
-    **M2 VERDICT + D3 RULINGS ISSUED 2026-08-30 (Fable, core `bc2b117`, umbrella bumped, pushed) —
+    **M2 VERDICT + D3 RULINGS ISSUED 2026-08-30 (architect, core `bc2b117`, umbrella bumped, pushed) —
     THE OPUS QUEUE IS SETTLED.** M2: H-launch ACCEPTED (small-mesh tax; fixes → device-assembly
     campaign); H-band attacked via cloud economy (clouds ~10× oversampled: deg-2 LS needs 12 pts,
     rho=2.2·max(h,H) gathers 95–162). D3(a): the ~3e-7 np>1 class ACCEPTED (build bitwise, residual
@@ -709,7 +709,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - decided: 2026-08-30
 - status: settled
 - quote: |
-    **F2 RESOLVED 2026-08-30 (Fable, core `dfe8065`, umbrella `6421d4e`, pushed): the true-period
+    **F2 RESOLVED 2026-08-30 (architect, core `dfe8065`, umbrella `6421d4e`, pushed): the true-period
     fix is on main.** The decision needed no weighing — the minimum-image period of a periodic domain
     is `fineExt·h0` (what probeSlot/LeafHalo::wrap already use); the short value was an off-by-one
     (inclusive `bounds()`) through a truncating divide, not a convention. Landed as a MINIMAL change
@@ -758,7 +758,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - decided: 2026-08-30
 - status: settled
 - quote: |
-    **F1 RESOLVED 2026-08-30 (Fable, core 33fd58f, pushed): mutex-on-miss.** Neither candidate
+    **F1 RESOLVED 2026-08-30 (architect, core 33fd58f, pushed): mutex-on-miss.** Neither candidate
     fix was needed — two structural facts shrink the race to one statement: `misses_` is a
     coord-KEYED std::map (sorted iteration ⇒ ghost numbering depends only on the miss SET, thread
     interleaving canonicalizes bitwise), and `resolve()` checks `frozen_` BEFORE the emplace
@@ -953,7 +953,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 
 ### C/F face-value delta is gated per FACE (`regular(i) && regular(j)`), never per row
 - area: amr
-- source: amr/docs/amr_cf_flux_gate.md (Fable design pass + review)
+- source: amr/docs/amr_cf_flux_gate.md (architect design pass + review)
 - decided: 2026-09-22
 - status: settled
 - quote: |

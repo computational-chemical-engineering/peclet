@@ -2254,7 +2254,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - status: settled
 - quote: |
     **The rule:** Krylov matvec + residual = exact double operator in FLUX form (A·1=0 bitwise); V-cycles/
-    smoothers/AMG below are preconditioners and may stay float. User's proposal; Fable's evaluation found
+    smoothers/AMG below are preconditioners and may stay float. User's proposal; the architect's evaluation found
     no outer loop is needed — PCG already separates `matvec`/`precond` lambdas, only `matvecOverlap`
     (`mac_cutcell_mg.hpp:1715`) reads the float bands
 - rejected: none stated (this is the adopted rule)
@@ -2486,7 +2486,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - decided: 2026-08-30
 - status: settled
 - quote: |
-    Fable corrections on top: WY CFL default → Weymouth's PROVEN 3D bound 0.25 (the famous
+    Architect corrections on top: WY CFL default → Weymouth's PROVEN 3D bound 0.25 (the famous
       "CFL<0.5" is his 2D value, thesis eq. A.33), inclusive comparison (flow af8d6f1).
 - rejected: CFL<0.5 (Weymouth's 2D value, mistakenly applied to 3D)
 - why: "the famous 'CFL<0.5' is his 2D value, thesis eq. A.33"

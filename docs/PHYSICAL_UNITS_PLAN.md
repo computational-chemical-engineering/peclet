@@ -236,7 +236,7 @@ core and coupling (new API, old form kept).
 ## 9. Execution guide for the implementing session
 
 This section is written for a Claude Opus session that starts cold. It gives the order of work, the exact
-anchors, the recipes, the gates, and the points at which to stop and hand a *design* question to a Fable
+anchors, the recipes, the gates, and the points at which to stop and hand a *design* question to an architect
 session (§9.6) instead of guessing. Read `suite/CLAUDE.md`, `flow/CLAUDE.md` ("Build Commands", "Running
 Tests and Verification", "MPI") and `core/CLAUDE.md` first; then this file top to bottom.
 
@@ -380,7 +380,7 @@ The work orders below are the record of what was asked for.
 discrete operator flow has (const-coefficient fold, cut-cell/FOU stencil with implicit FOU + deferred
 correction, velocity MG restriction/prolongation, the incremental-rotational projection, the Robust-Scaled
 ghost closure with an anisotropic index-space normal, domain BCs, outflow census, backflow stabilisation),
-with the exact per-axis constants and where each enters. Fable writes it; Opus implements from it.
+with the exact per-axis constants and where each enters. The architect writes it; Opus implements from it.
 
 **U10 momentum** — `beta = mu_` at `flow_ibm.hpp:4204, :4998, :5365, :5689` becomes `beta_b = mu'/h_b'²`
 per derivative axis (`h_b' = h_b/hRef`); `Ac = rho/dt + 2Σ_b beta_b`. Gate: anisotropic Poiseuille exactness
@@ -389,7 +389,7 @@ per derivative axis (`h_b' = h_b/hRef`); `Ac = rho/dt + 2Σ_b beta_b`. Gate: ani
 **U11 pressure** — `CutcellMG::setOpenness(..., idx2, idy2, idz2)` (`mac_cutcell_mg.hpp:987`) already takes
 per-axis factors: pass `1/h_a'²`; the projection's gradient/correction (`mac_approx_projection.hpp`) gets the
 same weights. ⚑ coarsening order for aspect ratios (coarsen the finest axis first; extends the
-semi-coarsening rule in `DECOMPOSITION_AND_MULTIGRID.md`) — Fable decides the rule, Opus implements.
+semi-coarsening rule in `DECOMPOSITION_AND_MULTIGRID.md`) — the architect decides the rule, Opus implements.
 Gate: pressure-only ctest (`cutcellmg_*`) with `(dx, 0.5dx, 2dx)` converging at the cubic rate.
 
 **U12 ⚑ ghost closure** — the Robust-Scaled foot point and normal with the metric
@@ -400,7 +400,7 @@ grid; TGV on a stretched box.
 
 PLIC in normalised stretched cells, height-function curvature with physical column heights, the CSF face
 force, the phase-change layer's `V_cell`; AMR per-axis root spacing through the mixed-level cut band and
-the sampled builders. Fable designs each; Opus implements against the design note's gates.
+the sampled builders. The architect designs each; Opus implements against the design note's gates.
 
 **PHASE 3 LANDED 2026-09-07** — both halves are on main. `flow/doc/anisotropic_vof.md` (VoF) and
 `core/docs/amr_anisotropic.md` (AMR) carry the design and the measured gate numbers.
@@ -504,13 +504,13 @@ Phase 3 touches `flow/src/vof/*` + `core/.../amr/*` + `core/.../vof/*`). So:
 operator that is right must reduce to today's arithmetic when the three spacings are equal, and the
 `extent=None` bit-identity battery is still the first gate of every commit.
 
-**Escalation runs the other way in these phases.** §9.4 and §9.5 mark the design points ⚑ because a
-Fable session writes them; the implementation that follows a settled design note is ordinary work.
+**Escalation runs the other way in these phases.** §9.4 and §9.5 mark the design points ⚑ because an
+architect session writes them; the implementation that follows a settled design note is ordinary work.
 The hand-back gate is the design note itself: when `flow/doc/anisotropic_metric.md` (Phase 2) or the
 Phase 3 design note exists, is committed, and its acceptance gates are written down with the numbers
 they must hit, the design half is done.
 
-### 9.6 When to stop and hand over to Fable
+### 9.6 When to stop and hand over to the architect
 
 Escalate (write the question + the evidence into `flow/doc/units_escalation.md`, commit, and say so) when:
 1. a bit-identity gate fails and two focused attempts have not found the cause;

@@ -1,6 +1,6 @@
 ---
 name: opus-implementer
-description: Implements a SETTLED design note on Opus — the hand-back half of the Fable-designs / Opus-implements split used by the physical-domains phases (suite/docs/PHYSICAL_UNITS_PLAN.md §9.4–§9.6, §9.8). Give it the path to a committed design note, the work orders to execute, and the gates the result must pass. Do NOT use it to make design decisions: if the note leaves a choice open, it must stop and say so rather than choose.
+description: Implements a SETTLED design note on Opus — the hand-back half of the architect-designs / Opus-implements split used by the physical-domains phases (suite/docs/PHYSICAL_UNITS_PLAN.md §9.4–§9.6, §9.8). Give it the path to a committed design note, the work orders to execute, and the gates the result must pass. Do NOT use it to make design decisions: if the note leaves a choice open, it must stop and say so rather than choose.
 model: opus
 ---
 

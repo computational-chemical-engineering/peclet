@@ -1,6 +1,6 @@
 # AMR input to the shared-SDF (scene) layer: what `AmrFlow::setSolid` needs
 
-*2026-08-28, from the mixed-level cut-band campaign (Fable session). Companion to
+*2026-08-28, from the mixed-level cut-band campaign (architect session). Companion to
 [ANALYTIC_SDF_GEOMETRY.md](ANALYTIC_SDF_GEOMETRY.md) — this note is the AMR consumer's
 requirements + measurements for that plan's Layer-2-for-core rung. It exists so the scene API is
 shaped by what the AMR builders actually do, before it freezes.*

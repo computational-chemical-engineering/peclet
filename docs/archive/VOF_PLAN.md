@@ -872,7 +872,7 @@ at-finest-level contract coincides with the existing cut-band-at-finest contract
 Part III's block container stays in flow regardless.
 
 **Ownership model** (the AMR-campaign pattern: Opus executes rungs specified as
-work orders with deterministic gates; Fable does design-heavy derivation and writes the
+work orders with deterministic gates; the architect does design-heavy derivation and writes the
 work orders). Detailed phase-0 work orders: `flow/doc/history/vof_workorders.md`.
 
 | rung | owner | notes |
@@ -881,26 +881,26 @@ work orders). Detailed phase-0 work orders: `flow/doc/history/vof_workorders.md`
 | S0 solver battery | **Opus** | WO-B written — measurement only |
 | S1 flexible CG | **Opus** | WO-C written — one-formula change, inert-by-default gate |
 | S2 bound amortization | **Opus** | spec after S0 numbers |
-| S3 series-harmonic coarsening | Fable spec → Opus | touches CutcellMG internals |
-| S4 Galerkin/BoxMG transfers | **Fable** | only if S0–S3 say so |
+| S3 series-harmonic coarsening | Architect spec → Opus | touches CutcellMG internals |
+| S4 Galerkin/BoxMG transfers | **The architect** | only if S0–S3 say so |
 | V0 PLIC toolbox | **Opus** | WO-D written — self-checking gates (round-trip 1e-13) |
 | V1 WY advection | **Opus** | WO-E written — traps pre-loaded, conservation gate |
 | V2a closures/projection wiring | **Opus** | hydrostatic acid test is the loud gate |
-| V2b momentum-consistent transport | **Fable** design → Opus | half-shifted fractions; the subtle rung |
+| V2b momentum-consistent transport | **The architect** design → Opus | half-shifted fractions; the subtle rung |
 | V3 HF cascade | **Opus** (detailed WO to come) | Popinet 2009 is a precise spec |
-| V3 PV paraboloid fallback | Fable spec → Opus | LSq fit + weighting choices |
+| V3 PV paraboloid fallback | Architect spec → Opus | LSq fit + weighting choices |
 | V4 balanced CSF + capillary dt | **Opus** | one-rule force placement; machine-zero droplet gate |
-| V5 SDF wetting | **Fable** (+ Opus harness) | research-grade; reference impl has known fixmes |
-| V6 dynamic θ / hysteresis | Fable design → Opus | model implementation after the derivation |
-| V7 pore-scale campaign | **Opus** runs, Fable/user interpret | scripts + sweeps |
-| V8 collocated | **Fable** | attractor-campaign territory |
-| V9 scale-out | mixed | probes Opus; lever selection Fable |
-| V10 AMR | **Fable** | separate campaign |
+| V5 SDF wetting | **The architect** (+ Opus harness) | research-grade; reference impl has known fixmes |
+| V6 dynamic θ / hysteresis | Architect design → Opus | model implementation after the derivation |
+| V7 pore-scale campaign | **Opus** runs, the architect/user interpret | scripts + sweeps |
+| V8 collocated | **The architect** | attractor-campaign territory |
+| V9 scale-out | mixed | probes Opus; lever selection the architect |
+| V10 AMR | **The architect** | separate campaign |
 | P0–P2 phase-change basics | **Opus** after Part-II kernel specs | Stefan/sucking are deterministic gates |
-| P3+ | Fable design → Opus | extrapolation quality is the crux |
-| W0 block container | Fable exchange design → Opus arena | core-NBX gather/scatter is the design part |
+| P3+ | Architect design → Opus | extrapolation quality is the crux |
+| W0 block container | Architect exchange design → Opus arena | core-NBX gather/scatter is the design part |
 | W1–W3 bubbly rungs | mostly **Opus** | channel_18 cross-code gate |
-| W4–W5 coalescence models / dem bridge | **Fable** | modeling decisions |
+| W4–W5 coalescence models / dem bridge | **The architect** | modeling decisions |
 
 Net: **roughly two-thirds of the rung-work is Opus-executable** once specified at WO
 grain, because the plan's gate style (bitwise, analytic, loud acid tests) makes
@@ -939,7 +939,7 @@ Welch & Wilson JCP 2000 · Scriven CES 1959 · Berenson 1961 / Klimenko 1981.
 
 ## 12. The finishing campaign (2026-09-02) — review verdict, new rungs, order
 
-Written by Fable at the start of the session that finishes Part I and ships the example gallery.
+Written by the architect at the start of the session that finishes Part I and ships the example gallery.
 Companion work orders: `flow/doc/history/vof_workorders_v5.md` (WO-Q … WO-U).
 
 ### 12.1 What the 2026-09-01 solver work changed under V0–V4 (review verdict)
@@ -987,7 +987,7 @@ run static θ. V9/V10 unchanged. Part II/III unchanged.
 
 ```
 now      WO-Q (Opus, worktree flow-woq)  ∥  WO-R (Opus, flow-wor)  ∥  WO-U part 1: E2, E4 (Opus, peclet-examples)
-         Fable: Lamb trace; WO-S derivation (written, in WO-S); WO-T design (written); E3 reference
+         The architect: Lamb trace; WO-S derivation (written, in WO-S); WO-T design (written); E3 reference
 then     WO-S (Opus, on Q)  ∥  WO-T (Opus, on R)  ∥  WO-U part 2: E1, E3 (Opus, on Q)
 then     WO-U part 3: E5, E6, E7 (Opus, on S+R)  ∥  E8 collocated column (on T)
 gates    every rung: bit-identity of everything existing, np 1/2/4, both backends, regression +0.00 %
@@ -1042,7 +1042,7 @@ pattern — the ABC counterpart of the V4 rule).
   Also found: `max_open_divergence()` MUTATES the velocity at an outflow (non-mutating sibling
   `max_open_divergence_projected()`; the default is a user decision).
 - **Merged-main validation 09-03 19:00 (nvidia-cuda)**: `tests/kokkos` 33/33, `tests/kokkos_mpi` VoF/varRho/phase-change/wall-slip battery 46/46 at np 1/2/4.
-- 09-04 13:00 (user decisions taken): P3h DOCUMENTED (dossier); W3 DONE on Snellius (blow-up at 1.5 turnovers from the overlapping-marker CSF → W4 critical; TBFsolver reference collected); **`rebalance_by_weights` FIXED** (a FieldSet/redistribute defect, not VoF-specific); **V7 page PUBLISHED** (results corrected on the fixed build); YouTube later today. V6c (band-local contact-line resistance) and V10 (AMR) remain Fable design items. P23 + P3b + P3c LANDED (P3 open at 1.3 % with mode 3; P3d = joined area); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
+- 09-04 13:00 (user decisions taken): P3h DOCUMENTED (dossier); W3 DONE on Snellius (blow-up at 1.5 turnovers from the overlapping-marker CSF → W4 critical; TBFsolver reference collected); **`rebalance_by_weights` FIXED** (a FieldSet/redistribute defect, not VoF-specific); **V7 page PUBLISHED** (results corrected on the fixed build); YouTube later today. V6c (band-local contact-line resistance) and V10 (AMR) remain architect design items. P23 + P3b + P3c LANDED (P3 open at 1.3 % with mode 3; P3d = joined area); W12 + V6b LANDED; V6c instrument started (numbers in item 7); WO-V9 after them; V7's page needs a frozen render (~6 h) before publication; W3–W5 and the TBFsolver cross-code run remain.
 
 ## 13. Revised ladder for the remainder (2026-09-02, evening) — review and execution plan
 
@@ -1050,7 +1050,7 @@ Review of §§4, 9, 10 against the state after today's landings. Nothing in the 
 (§0), the architecture (§3) or the three-layer/AMR structure (§11) needs changing; what changes
 is *status*, *sequencing* and the grain at which the remaining rungs are specified. Work orders
 for everything below: `flow/doc/history/vof_workorders_v6.md` (Part I remainder, Part II start, Part III
-start). Ownership stays as §11: Fable writes the derivations into the WO, Opus executes against
+start). Ownership stays as §11: the architect writes the derivations into the WO, Opus executes against
 gates, twice-failed gates escalate.
 
 ### 13.1 Status of the ladder
@@ -1062,7 +1062,7 @@ gates, twice-failed gates escalate.
 | V5b static θ | **done 09-02** (WO-S) | ≤1.3° for θ ≤ 90°, −3.6° at 120°; Jurin inconclusive |
 | V-BC open boundaries | **done 09-02** (WO-R + WO-R2) | outflow operator fixed on BOTH faces (Nusselt film at ratio 100/1000 within 0.2 %); cut-cell × boundary composed; `enable_vof` sets the exact residual and the wisp guard; open: a gas stream over a pool at ratio 1000 still stirs the pool (~3 % of the inlet speed) |
 | V8 collocated (minimal) | **done 09-02** (WO-T) | all-fluid, rated ratio ~100; cut-cell + collocated = later |
-| V6 dynamic θ / hysteresis | **done 09-02/03 (angle half + Navier slip)** (WO-V6, WO-V6b) | Cox–Voinov + pinning exact; Jurin −1 %; slip closure exact at the float floor, Cox–Voinov slip sensitivity −22 %; **contact-line mobility still ~175× low and the bottleneck is in the WETTING BAND, not the wall condition** (front speed ∝ 1/w, apparent 70° vs imposed 37°) → **V6c** (Fable instrument) |
+| V6 dynamic θ / hysteresis | **done 09-02/03 (angle half + Navier slip)** (WO-V6, WO-V6b) | Cox–Voinov + pinning exact; Jurin −1 %; slip closure exact at the float floor, Cox–Voinov slip sensitivity −22 %; **contact-line mobility still ~175× low and the bottleneck is in the WETTING BAND, not the wall condition** (front speed ∝ 1/w, apparent 70° vs imposed 37°) → **V6c** (architect instrument) |
 | V7 pore-scale campaign | **done, page PUBLISHED 09-04** (WO-V7 + `pore-scale-imbibition`) | drainage quantitative at every Ca (angle alone moves the narrow branch's saturation ×212 at Ca 1e-3); imbibition QUALITATIVE: the doublet verdict stays reversed at Ca 1e-3 and a wall-slip sweep does not flip it (the bottleneck is the wetting band, V6c); the re-run on the fixed build shows the packing's wettability effect is ABSENT (1 %) rather than inverted, and the micromodel trend neither monotone nor large (11 %) — the draft's stronger claims did not survive and the page says so |
 | V9 performance | **done 09-04** (WO-V9, idle machine) | the pressure projection is 43–88 % of every step, all of VoF 5–18 % (curvature cascade ≤ 8 %, g=3 fill ≤ 6 % CUDA / 16 % host; advection arithmetic ≤ 3 %); CUDA beats host-openmp 2.8–7.6× when idle; PARIS halo trick NOT indicated (fill cost is the band fill, not the exchange); lever landed: curvature cascade over the interfacial worklist (bit-identical, −3…−7 % per step at 128³); **`rebalance_by_weights` heap corruption FIXED 09-04 at the root**: every FieldSet-allocated field (VoF, scalars, CFD-DEM's eps/drag/force) kept its OLD block size across `redistribute` (only the adopted u/v/w/p/sdf were re-adopted), the migration never refilled ghosts (du 1e-1 after one step at np 4), and size-blind `ready()` flags hid stale phase-change scratch; `Solver::resizeForBlock()` + a ghost exchange in `redistribute`, new ctest `vof_redistribute_mpi_np{1,2,4}` (bitwise after a MOVING rebalance), regression +0.00 %; the plume swarm now rebalances 1.79 → 1.04 and −23 % ms/step; residual: a redistribute is ~1 ULP non-neutral at np 1 because `phi_` is not a registered field (pre-existing) |
 | V10 AMR | design only (§13.4) | blocked on varRho-on-AMR and cut-cell + collocated |
@@ -1090,7 +1090,7 @@ gates, twice-failed gates escalate.
    estimator, the transport or the reference. It does not block anything below, but any rung
    that reports a capillary *frequency* must quote it. A dedicated instrument (linearised
    discrete normal-mode analysis of the CSF band on a sphere) is the way to close it; it is
-   listed as an optional Fable item, not a rung.
+   listed as an optional architect item, not a rung.
 4. **The collocated path is all-fluid and undamped** (explicit face force outside `A`; ceiling
    `μ dt/(ρ_min h²)`). AMR VoF inherits that, so V10's design (§13.4) must include the
    viscous-augmented explicit-force step limit and the cut-cell face acceleration.
@@ -1123,7 +1123,7 @@ gates, twice-failed gates escalate.
    is state-dependent (the first dt of a gas-filled domain is 7× too large — re-pick dt from the
    solver's limiter EVERY step), and `CutcellMG::solveFCG` prints "preconditioner produced
    non-finite z" and then silently zeroes the correction (rule 3b's cap check does not see it).
-7. **V6c — the band-local contact-line resistance (Fable instrument, next).** With the Navier
+7. **V6c — the band-local contact-line resistance (architect instrument, next).** With the Navier
    slip in, Lucas–Washburn is still 175× slow and the pore-doublet verdict does not flip; the
    gap-width probe (front speed ∝ 1/w instead of ∝ w) and the persistent apparent-vs-imposed
    angle gap locate the resistance in the θ-fill/curvature/force chain at the contact cell,
