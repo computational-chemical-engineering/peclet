@@ -242,3 +242,16 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - why: none stated beyond the correctness argument above
 
 ---
+
+### One partition from construction on, chosen by the combined CFD + DEM cost
+- area: coupling
+- source: user decision 2026-09-25 (coupling session); implemented in coupling `CfdDem.__init__` → `_corebalance`
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    rebalance at construction. In CFD-DEM there should be one partition, and it should be determined
+    by a combined weighing of the costs of CFD and DEM.
+- rejected: dem adopting flow's `init_mpi` partition at start-up (and the interim guard that raised at the first step and told the user to call `rebalance()` by hand)
+- why: a coupled run's cost per rank is fluid work plus particle work, so the partition that balances it is the weighted ORB of the combined field `1 + gamma × particles per cell` (gamma = 1 until calibrated), not flow's equal-cell split; copying flow's partition would co-locate the codes but leave the DEM load, usually the dominant cost, unbalanced from the first step. Doing it at construction, through the same path as `rebalance()` (flow `rebalance_by_weights` → alignment → dem `migrate_to_weights(w, align)` → co-location assertion), also closes the start-up mismatch (48³ at np = 4: flow 32|16 vs dem 24|24) without user action. Fixed beds (`move_particles=False`) are exempt: dem never migrates there, so particles stay in flow's `init_mpi` block.
+
+---

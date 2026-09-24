@@ -553,7 +553,7 @@ reading until they are settled.
 
 ## coupling — CFD-DEM
 
-17 in force, 1 superseded — full text in [`decisions/coupling.md`](decisions/coupling.md)
+18 in force, 1 superseded — full text in [`decisions/coupling.md`](decisions/coupling.md)
 
 ### In force
 
@@ -565,6 +565,7 @@ reading until they are settled.
 - **Exponential-integrator effective drag replaces plain explicit particle-side drag exchange**. **Rejected:** explicit particle-side drag exchange (β·dt/m unconstrained)  <sub>porous-eps-conservative-momentum.md:46-54</sub>
 - **Kuipers deposit-after-push reorder tested, not adopted**. **Rejected:** Deen/Kuipers synchronous eps-update ordering  <sub>porous-cfddem-cuda-two-bugs.md:39</sub>
 - **Model-B drag conversion: β_B = β_A/ε; CfdDem defaults changed (advection=True, eps_min 0.4)**. **Rejected:** eps_min=0.2 or 0.3  <sub>porous-cfddem-cuda-two-bugs.md:25-26</sub>
+- **One partition from construction on, chosen by the combined CFD + DEM cost**. **Rejected:** dem adopting flow's `init_mpi` partition at start-up (and the interim guard that raised at the first step and told the user to call `rebalance()` by h  <sub>user</sub>
 - **Porosity clip changed from a 0.4 floor to [0,1]-only, per user directive; MFIX-faithful smoothing/drag law added instead**. **Rejected:** clamping ε at a 0.4 floor  <sub>porous-cfddem-cuda-two-bugs.md:59-62</sub>
 - **Reaction torque coupling stays off by default despite being resolved**. **Rejected:** turning reaction-torque coupling on by default  <sub>sdf-scene-campaign.md:56</sub>
 - **Rebuild all three mphys host trees before diagnosing a coupling test failure**.  <sub>stale-build-mphys-trees.md:10</sub>
