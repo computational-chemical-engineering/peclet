@@ -62,7 +62,17 @@ depends on primitives. No method depends on another method; primitives depend on
   error/logging). Codifies [CONVENTIONS](CONVENTIONS.md).
 - **decomposition** — orthogonal recursive bisection of the global domain into rank-owned blocks
   (`BlockDecomposer`), global↔local indexing with ghost layers (`BlockIndexer`), and morton/Z-order
-  cell indexing (via `morton`). Ported from the retired `block_decomposer` (see above).
+  cell indexing (via `morton`). Ported from the retired `block_decomposer` (see above). The weighted
+  ORB balances a work field for dynamic load balancing; its **aligned** form keeps every split on a
+  multiple of `2^a` so a multigrid level coarsens `a` times before any block turns odd.
+- **coarse-level stages** (`decomp/stage_*.hpp`, `redistribute_topology.hpp`) — where a multigrid
+  level goes when it can no longer coarsen on its own decomposition, and how its fields get there
+  and back: the policy (`chooseStageTarget` — stay, merge sibling ranks, repartition onto fewer ranks,
+  or replicate), the stage communicators (`makeStageComm`), and the planned movement
+  (`RedistributeTopology`, built once, `forward`/`backward` every V-cycle). What a level *is* — its
+  operator, transfers, smoother and bottom — stays in the method: flow's telescope and amr's
+  pressure stages are the two consumers ([decision](decisions/core.md), design
+  `amr/docs/amr_mg_core_boundary.md`).
 - **halo** — the asynchronous ghost-layer exchange. One `HaloExchange` interface, two engines: an
   **NBX nonblocking-consensus** loop for dynamic/sparse patterns (particle migration) and a
   **persistent neighborhood-collective** path for static grid halos. Field-agnostic pack/unpack so a

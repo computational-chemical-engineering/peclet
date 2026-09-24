@@ -1,5 +1,11 @@
 # Coarse-level telescoping for the pressure multigrid — design + implementation plan
 
+> **Status 2026-09-24:** the machinery this plan built in flow now lives in `core`
+> (`peclet::core::decomp` stage policy, communicators and `RedistributeTopology`); flow's telescope
+> delegates to it byte-identically (flow `4da7171`, `84aaa62`) and gained a Repartition stage for a
+> weighted level-0 decomposition (`d907c57`); amr uses the same machinery for its pressure stages.
+> Design: `amr/docs/amr_mg_core_boundary.md` §7–§11. This note is history.
+
 Written 2026-09-01, answering open problem 1 of
 [`DECOMPOSITION_AND_MULTIGRID.md`](../DECOMPOSITION_AND_MULTIGRID.md) and issue 2 of
 [`SCALING_ISSUES.md`](../SCALING_ISSUES.md): the multigrid hierarchy stops coarsening when a per-rank
