@@ -205,7 +205,7 @@ cmake --build build -j$(nproc)                  # -> build/peclet/dem/_dem.*.so 
 export PYTHONPATH=$PYTHONPATH:$(pwd)/build
 python examples/verify_packing_spheres.py       # examples/ = demos; tests/python/ = pytest
 # Registered tests: -DPECLET_DEM_BUILD_TESTS=ON → 11 ctests (kokkos + arborx + pytest),
-# + -DPECLET_DEM_MPI=ON → 47 (kokkos_mpi + Python MPI at np=1,2,4); every test SKIPs with exit 77.
+# + -DPECLET_DEM_MPI=ON → 74 (kokkos_mpi + Python MPI at np=1,2,4); every test SKIPs with exit 77.
 ```
 Since 2026-09-08 (QUALITY_PLAN D) there are no root-level scripts: `tests/python/test_*.py` are pytest
 functions run by ctest, `tests/python/mpi/` the MPI ones, `examples/` the demos (`pack.py`,
