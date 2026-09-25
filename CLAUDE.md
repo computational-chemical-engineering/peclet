@@ -44,7 +44,7 @@ The design contract lives in `docs/`:
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — layering, dependency graph, Lagrangian/Eulerian/mixed taxonomy, how each code maps onto the core.
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — SDF sign, x-fastest indexing, types, precision policy, periodic/Lees–Edwards, Python array shapes.
-- [docs/DECISIONS.md](docs/DECISIONS.md) — the **decision register**: what the project chose, what it rejected, and why, for all 549 decisions (494 in force, 55 superseded), with verbatim quotes and provenance in [docs/decisions/](docs/decisions/). It exists because settled decisions were being silently reversed — a later session picking the textbook alternative because nothing in front of it said the project had already rejected that alternative on purpose. Each submodule's `CLAUDE.md` inlines its own highest-risk prohibitions. **Read the entry for anything you are about to change; reversing one takes a new recorded decision, not a judgement call in the moment.**
+- [docs/DECISIONS.md](docs/DECISIONS.md) — the **decision register**: what the project chose, what it rejected, and why, for all 553 decisions (498 in force, 55 superseded), with verbatim quotes and provenance in [docs/decisions/](docs/decisions/). It exists because settled decisions were being silently reversed — a later session picking the textbook alternative because nothing in front of it said the project had already rejected that alternative on purpose. Each submodule's `CLAUDE.md` inlines its own highest-risk prohibitions. **Read the entry for anything you are about to change; reversing one takes a new recorded decision, not a judgement call in the moment.**
 - [docs/NAMING.md](docs/NAMING.md) — the **naming canon**: one spelling per concept across all five Python APIs (the `origin`/`extent`/`cells`/`spacing` domain quartet, `num_*` counts, `periodic=`, `set_dt`, American spelling, `get_` only for a transfer), the table of every current divergence and its status, and the additive-alias rule for changing a shipped name. **Read before adding a public name.**
 - [docs/STYLE.md](docs/STYLE.md) — C++20 host & Kokkos device (morton pins C++17), clang-format/tidy (from voronoi), namespaces, CMake/CI.
 - [docs/INTERFACES.md](docs/INTERFACES.md) — shared C++20 concepts: `Domain`, `Decomposition`, `Field`, `HaloExchange`, `SdfGeometry`, `ImmersedBoundary`, `Stepper`.
@@ -117,6 +117,14 @@ submodule's `CLAUDE.md` carries its own.
   Rhie–Chow.** Held independently by `flow`, `amr` and `voro`, and re-proposed by mistake in all
   three. The residual cell divergence is *intrinsic* to cell-centred velocity placement; Rhie–Chow
   is not an "upgrade".
+- **Collocated pressure and forces stay INSIDE the implicit momentum predictor — never a face
+  acceleration added after the viscous solve (the Basilisk `centered.h` "kick").** Held by `flow`,
+  `amr` and `voro`. After the implicit solve the projection cancels the lagged pressure exactly:
+  Chorin's dt-dependent steady state, and with the rotational update an explicit pressure diffusion
+  growing −12κ·dt/(ρh²) per step (measured −12.0000; it capped flow's collocated VoF at density
+  ratio ~100). It came back once despite a register entry, so the guard is a GATE — flow's
+  `collocated_stability_guard` and amr's `amr_stability_guard` ctests — not a grep. Design:
+  flow `doc/collocated_varrho_forces.md`.
 - **Every numerical method runs fully on-device and must be MPI-distributable.** Host serial paths
   are permitted only as oracles and unit tests, never as the production path.
 - **Never change numerics while porting.** A backend change is a faithful port, proved bit-identical.

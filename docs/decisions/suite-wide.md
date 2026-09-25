@@ -451,3 +451,32 @@ Do not reverse an entry here without recording a new decision that supersedes it
     explicit policies without an alias and a guard (the default crept back in 283 sites)
 - why: USER DIRECTIVE "too silly — repair it": storage, kernel order, NumPy order and file-format
     order are ONE convention, stated once in CONVENTIONS §1
+
+### Collocated pressure and forces stay in the implicit predictor — never a face acceleration after the viscous solve
+- area: suite-wide (flow, amr, voro collocated paths)
+- source: flow doc/collocated_varrho_forces.md §2, §7; flow 26c7717, 693f83c; amr 5ccf518, ece52bd; USER DIRECTIVE 2026-09-25
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    On a collocated grid the lagged pressure gradient and every force enter the momentum equation
+    INSIDE the implicit (viscous/drag) predictor. They are never added as a face acceleration
+    after the implicit solve (Basilisk centered.h's uf += dt*a, and any equivalent "kick",
+    whatever it is called). Mechanism: after A^{-1}, -dt G P^n/rho_f lies exactly in the range
+    the projection removes, so P^n never reaches u. With kappa = 0 the scheme is non-incremental
+    Chorin: the steady state is scaled by (1 + dt mu Lambda) (V8: TG error 9.2/9.8/10.6 at
+    N = 16/32/64, order -0.1; drag 2.48). With the rotational update the pressure obeys
+    P^{n+1} = -4 kappa dt S P^n/(rho h^2): -12 at (pi,pi,pi), measured -12.0000 at mu dt = 1 and
+    -1.2000 at 0.1, unstable once mu dt/(rho h^2) > 1/12. The same instability rated flow's
+    collocated VoF to density ratio ~100 (T2 "~4x per step"). The WO-T port reintroduced this
+    in 2026-09 despite the earlier clause, which named the form but not the mechanism. The guard
+    is therefore a GATE, not a grep: every collocated density path runs the seeded-checkerboard
+    growth test (dt 0.1-100) and the dt-independence test (flow
+    tests/python/test_collocated_stability_guard.py; amr test_amr_stability_guard). Variable
+    density keeps balance through the mass-adjoint pair and the optional balanced-force
+    projection.
+- rejected: the Basilisk face-acceleration ("centered.h") form on any collocated path; a text
+    prohibition alone (already existed and was bypassed)
+- why: the defect is structural and silent at small mu*dt, so only a signature test at large
+    mu*dt catches it
+- conflict: sharpens suite-wide "flow is the reference ... Basilisk face-acceleration form
+    REJECTED" (2026-09-03)

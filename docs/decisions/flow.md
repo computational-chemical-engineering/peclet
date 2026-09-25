@@ -3249,3 +3249,77 @@ Do not reverse an entry here without recording a new decision that supersedes it
     silently on a constant-mu operator (results 50-70 % off Gauss-Seidel under mu(T))
 - why: a coefficient must live where its flux does (same rule as volumetric forces at the velocity
     location, 1fdee46); a silent wrong answer is never acceptable
+
+### Collocated variable density (V8): the mass-adjoint ABC pair; the face-acceleration form is retired
+- area: flow
+- source: flow doc/collocated_varrho_forces.md; flow 26c7717 (WO-V1) .. b416144
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    V8 (WO-T) added the pressure gradient and every force as a MAC face acceleration AFTER the
+    implicit viscous solve (Basilisk centered.h). The velocity update was therefore non-incremental:
+    P^n cancelled exactly in the projection, the steady state was scaled by (1 + dt mu Lambda) (TG
+    order -0.1, drag 2.48), and the rotational term became an explicit pressure diffusion,
+    -12 kappa dt/(rho h^2) at (pi,pi,pi), measured -12.0000. The step now puts pressure and forces
+    inside the implicit predictor. Pressure, CSF and set_body_force act on the cell as
+    rho_c * avg_faces[o (F_f - w G_f P)/rho_f]; per-cell forces act at the cell value times the
+    reconstruction weight sum W. The projection reads the momentum-weighted face velocity
+    (rho_L u_L + rho_R u_R)/(rho_L + rho_R), so M*Gamma = -(D O Pi_rho)^T for any openness. Model:
+    spectral radius exactly 1 in ~1200 step operators (ratio to 1e6, dt to 1e4, kappa = mu and 0,
+    immersed disk); steady state dt-independent to 1e-10 (model) and <= 1e-12 relative in the
+    code (guard G3, every V8 path). The rotational update is unchanged.
+- rejected: face acceleration after the viscous solve (non-incremental; unstable with the rotational
+    term); kappa = 0 (Chorin); completing centered.h with a lagged g (a Rhie-Chow-type dt-dependent
+    constraint); arithmetic centre->face with the rho-weighted force (1.018/step at ratio 1e4); the
+    naive g - G_c P/rho_c (245x/step); force-aware reconstruction for volumetric forces (places
+    1/4(1,2,1) f)
+- why: stability at every dt and ratio, a dt-independent steady state and cell-value placement
+    need the incremental predictor with an adjoint pair
+- conflict: conforms to suite-wide "Collocated forces stay in the implicit predictor" (entry C) and
+    "ABC never Rhie-Chow"; keeps "rotational update must be restored" and "chi*mu_min under varProps"
+
+### The balanced-force projection is an option on both grids, default ON on collocated variable-rho (V8), OFF elsewhere
+- area: flow
+- source: flow doc/collocated_varrho_forces.md §4.6-4.8, flow 87f2da9/940d190/1b444ea/d5ed74d/e4a8ad7; USER DECISION 2026-09-25 (an option, on both grids); the V8 default ON is an orchestrator decision 2026-09-25 (the user's cost call is open)
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    set_balanced_force_projection(enabled) (Solver and SolverColocated; default True on the
+    collocated variable-rho/CSF path unless it has inflow/outflow faces, False elsewhere) solves, once
+    per step and with the projection's own operator, constraint divergence and driver,
+    D(O c w G X) = D(O c beta) (beta = the predictor's own face force: f_const + face mean of the
+    cell forces + CSF; c = rho0/rho_f^op), then P += X - P_b, P_b = X. X is solved as the
+    INCREMENT on P_b with the stop relative to the full right-hand side, and skipped when P_b
+    already meets it: a static interface costs no iterations, a changing force about one extra
+    pressure solve with its own persistent Chebyshev bounds (step ON/OFF ~1.2x for a moving
+    ratio-1000 drop or a height-function drop at rest, ~1.0x for a static balance). P_b is restart
+    state (field "p_balanced"): after an OFF->ON switch or a restart without it the step re-splits
+    (P_b := X, P unchanged) and never double-counts (1.25e-2 -> 6e-14, ctest balanced_force_restart). Gradient forces (hydrostatics, constant-kappa CSF)
+    are then balanced exactly from step 1 at every mu, dt, density ratio and openness. That
+    includes immersed solids on the staggered grid, where it removes WO-P's mu*dt^2 residue
+    (code: staggered drop 2.0e-5 / 1.0e-5 at ratio 10 / 1000 -> <= 2e-17; sphere across a
+    ratio-1000 column 9.3e-4 -> 8.7e-14; sessile cap 1.0e-4 -> 2.8e-17). It is state-independent,
+    so stability and the steady state are identical ON and OFF; OFF leaves a decaying transient
+    (code, 3-D: V8 constant-kappa drop face 1.0e-4 at ratio 1 and 6.2e-5 at ratio 1000 after
+    30 steps, decaying; ON <= 2e-17). Staggered OFF is byte-identical.
+- rejected: always-on (the user asked for an option); default off on V8 (loses the settled
+    constant-kappa CSF annihilation); a new staggered predictor (the existing one reads the
+    total P); lagged P_b (first-order for moving interfaces)
+- why: exact static balance is a physics choice with a cost (one extra solve), so the user makes it;
+    one setter, one meaning on both grids
+
+### On the collocated variable-density path set_body_force is a mean pressure gradient (face form)
+- area: flow
+- source: flow doc/collocated_varrho_forces.md §5; USER DECISION 2026-09-25
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    A uniform per-volume drive in a two-phase fluid stands in for a mean pressure gradient, so it
+    is a surface force and enters as rho_c * avg_faces(o f_const / rho_f), balanced exactly by a
+    linear pressure. Per-cell force fields stay volumetric (cell value), including across density
+    jumps (residual O(delta(f/rho)) in interface cells, accepted). On the staggered grid and at
+    uniform density the two readings coincide bit for bit.
+- rejected: f_const at the cell value (periodic hydrostatic box: cell 20.5 after 30 steps at
+    ratio 1000, against 2.4e-13); the force-aware reconstruction for per-cell forces (places
+    1/4(1,2,1) f)
+- why: exact balance of the only uniform drives two-phase users apply; matches the staggered semantics

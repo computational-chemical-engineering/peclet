@@ -1,6 +1,10 @@
 # Handoff: collocated + variable density diverges under an axially varying cell force
 
-Opened 2026-09-25. Owner: next session → `architect` design pass. Status: OPEN, not started.
+Opened 2026-09-25. **Status: CLOSED 2026-09-26** — landed as flow `d24528a..b416144` + amr
+`5ccf518..ece52bd`. The leading suspicion below was REFUTED: the cause was the rotational update acting
+on a pressure kick that bypassed the implicit solve (multiplier −12κ·dt/(ρh²), measured −12.0000), not the
+force stencil. Design, evidence and gates: flow `doc/collocated_varrho_forces.md`; next package (immersed
+solids): flow `doc/collocated_multiphase_solids_plan.md`. Register: flow + suite-wide entries of 2026-09-25.
 
 ## The question
 

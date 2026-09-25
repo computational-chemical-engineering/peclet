@@ -18,10 +18,13 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-174 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+177 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
+- **Collocated variable density (V8): the mass-adjoint ABC pair; the face-acceleration form is retired**. **Rejected:** face acceleration after the viscous solve (non-incremental; unstable with the rotational term); kappa = 0 (Chorin); arithmetic centre->face with the rho-weighted force  <sub>flow doc/collocated_varrho_forces.md</sub>
+- **The balanced-force projection is an option on both grids, default ON on collocated variable-rho (V8), OFF elsewhere**. **Rejected:** always-on; default off on V8 (loses constant-kappa CSF annihilation); lagged P_b  <sub>flow doc/collocated_varrho_forces.md §4.6-4.8</sub>
+- **On the collocated variable-density path set_body_force is a mean pressure gradient (face form)**. **Rejected:** f_const at the cell value (periodic hydrostatic box 20.5 vs 2.4e-13)  <sub>flow doc/collocated_varrho_forces.md §5</sub>
 - **"Hand the stopping level to GraphAMG" telescoping idea is retired**. **Rejected:** handing the MG-telescoping stopping level to GraphAMG  <sub>mg-decomposition-alignment.md:75</sub>
 - **(1,2) mixed closure order is the recommended default going forward**. **Rejected:** binary-M lagging (divergent, ρ=1.087) and linear-everywhere (1,1) (worse pointwise near the IB)  <sub>flow-ghost-projection.md:50</sub>
 - **A masked solid cell is not a fluid sample**.  <sub>sdf-scene-campaign.md:44</sub>
@@ -605,10 +608,11 @@ reading until they are settled.
 
 ## suite-wide — naming, layout, provisioning
 
-31 in force, 1 superseded — full text in [`decisions/suite-wide.md`](decisions/suite-wide.md)
+32 in force, 1 superseded — full text in [`decisions/suite-wide.md`](decisions/suite-wide.md)
 
 ### In force
 
+- **Collocated pressure and forces stay in the implicit predictor — never a face acceleration after the viscous solve**. **Rejected:** the Basilisk face-acceleration (centered.h) form on any collocated path; a text prohibition alone (already existed and was bypassed)  <sub>flow doc/collocated_varrho_forces.md §2, §7</sub>
 - **A host backend that does not size itself must be handed the thread budget**. **Rejected:** keeping the "say nothing on an unconstrained machine" policy for every backend (it is  <sub>RELEASE_PREP.md:11.3</sub>
 - **A solver's internal grid-count threshold is a count, not cell-unit API**. **Rejected:** a physical-length form (wrong: the same length means a different level count at a  <sub>amr</sub>
 - **All coupled methods must share one BlockDecomposer; static-only co-decomposition is rejected**. **Rejected:** "Static-only co-decomposition"  <sub>multiphysics-framework-plan.md:410</sub>
