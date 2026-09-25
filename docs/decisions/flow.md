@@ -3204,3 +3204,28 @@ Do not reverse an entry here without recording a new decision that supersedes it
     loss over 20 turnovers); the clip on the structured path (fires in single-field gates)
 - why: the failure was a local estimator defect on non-interface data, so the fix removes that data
     conservatively instead of changing the force assembly that was already balanced
+
+### Scoped constant-coefficient (Dodd–Ferrante) pressure driver: opt-in, solid-free boxes, accuracy-gated
+- area: flow
+- source: USER DECISION 2026-09-25 on `flow/doc/vof_step_performance_design.md` §10 option E2(a); Snellius same-node measurement (TBFsolver 45 ms/step vs peclet 187 ms/step on 24 cores, projection 67 %)
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    The user's standing directive (on par with or better than SOTA on every case peclet handles)
+    makes CPU parity with TBFsolver a goal, and the performance design shows no variable-coefficient
+    path reaches it (main line: 187 -> ~80-125 ms vs 45). So peclet gets an OPT-IN constant-
+    coefficient pressure driver (Dodd & Ferrante 2014; Cifani 2019): lap(p^{n+1})/rho0 =
+    div(u*)/dt + div((1/rho0 - 1/rho) grad p_hat), p_hat = 2p^n - p^{n-1}, rho0 = min rho, for
+    solid-free boxes (periodic + wall BCs, uniform grid), solved first by the existing MG-PCG on the
+    constant operator (option (a)); the FFT solver (option (b), a new dependency) is a separate,
+    later decision. The general variable-coefficient projection stays the DEFAULT. Adoption for a
+    case requires its accuracy gates against the exact projection at equal resolution: static drop
+    (spurious currents), Hysing 1 and 2, bubble-column statistics (hold-up, rise velocity, wall
+    collection). Order: the main-line performance work first.
+- rejected: making the splitting the default (its error ~ (1/rho - 1/rho0) grad(p^{n+1} - p_hat)
+    sits where the capillary jump moves between cells — the earlier objection stands for the
+    general path); accepting a 2x CPU gap to TBFsolver
+- why: this SCOPES, not reverses, "Part III ... Dodd–Ferrante FFT not needed" and "S-ladder;
+    Dodd–Ferrante splitting rejected": both still hold for the default driver and for pore-scale /
+    solid cases; the opt-in driver exists only where the splitting is known to work and its error is
+    measured per case

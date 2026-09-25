@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-172 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+173 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -149,6 +149,7 @@ reading until they are settled.
 - **Rung 3 fix: openness-weighted centered gradient replaces plain ½(g⁻+g⁺) projection correction for embed mode**. **Rejected:** plain projectCorrectCenter's ½(g⁻+g⁺) correction (with closed faces zeroed) for the embed-momentum mode  <sub>embed-port-progress.md:24-25</sub>
 - **S-ladder plan; Dodd–Ferrante splitting rejected for the pressure driver**. **Rejected:** Dodd–Ferrante splitting for the pressure driver  <sub>vof-campaign.md:473-479</sub>
 - **S3 coarsening indefiniteness is real, but coarsenOpenAvg must NOT switch to harmonic**. **Rejected:** switching coarsenOpenAvg's face-coefficient averaging to harmonic  <sub>vof-campaign.md:253-260</sub>
+- **Scoped constant-coefficient (Dodd–Ferrante) pressure driver: opt-in, solid-free boxes, accuracy-gated**. **Rejected:** making the splitting the default (its error ~ (1/rho - 1/rho0) grad(p^{n+1} - p_hat)  <sub>USER</sub>
 - **SdflowIbm MPI requires constructing each rank with local ORB block dims (ctor refactor, not a gated add-on)**.  <sub>cuda-kokkos-migration.md:558-570</sub>
 - **Sequencing: "VoF vs multiphysics first" dissolves — VoF is the next multiphysics phase**.  <sub>vof-campaign.md:480-484</sub>
 - **Sign convention: closed divergence of the corrected field equals Aφ − b = −residual**.  <sub>flow-ghost-projection.md:43</sub>
