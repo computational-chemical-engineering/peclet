@@ -14,6 +14,14 @@ the gaps. Two pillars are non-negotiable because they are already shared and loa
 
 - **Canonical axis order:** x fastest, then y, then z. Grid linear index
   `I = x + y*nx + z*nx*ny`. (flow, block_decomposer already use this.)
+- **Iteration order follows storage: x fastest on every backend, never Kokkos' backend default.**
+  Kokkos' default `MDRangePolicy` order is `Iterate::Left` (first index fastest) on CUDA/HIP but
+  `Iterate::Right` (last index fastest) on OpenMP/Serial, so a bare `MDRangePolicy<Exec, Rank<3>>`
+  over `(x, y, z)` strides `nx*ny` elements per iteration on the host. Pin
+  `Rank<N, Iterate::Left, Iterate::Left>` and pass the storage-fastest index first (flow: the
+  `MDRange2`/`MDRange3` aliases in `src/policy.hpp`, guarded by the ctest `iteration_order`). The
+  same order holds on disk and in Python: VTI/VTK `DataArray`s are x-fastest, NumPy arrays are
+  `order='F'` with shape `(nx, ny, nz)` — one convention from kernel to file, never a transpose.
 - **Cell-centred vs staggered:** scalar fields (pressure, SDF, density) live at cell centres
   `(i+½, j+½, k+½)·spacing`. Staggered velocity components:
   `u` at `(i, j+½, k+½)`, `v` at `(i+½, j, k+½)`, `w` at `(i+½, j+½, k)`. (MAC grid — flow.)
