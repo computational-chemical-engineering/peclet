@@ -3229,3 +3229,23 @@ Do not reverse an entry here without recording a new decision that supersedes it
     Dodd–Ferrante splitting rejected": both still hold for the default driver and for pore-scale /
     solid cases; the opt-in driver exists only where the splitting is known to work and its error is
     measured per case
+
+### Staggered variable viscosity on the control volume's own faces; explicit velocity MG refuses variable mu
+- area: flow
+- source: flow `b273031` (`src/face_props.hpp` VarFaceProps::beta, `fillMuGhosts` edges), `392bf9a` (ctest `mirror_symmetry`), `fe377a5` (ctest `velocity_solver_variable_mu`); `doc/variable_viscosity_projection.md` §2
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    The staggered unknown u_c(i) sits on the -c face of cell i, so its viscous control volume is
+    centred there: along c, mu is the CELL value (mu_i, mu_{i-e_c}); across c, the EDGE value
+    1/2[mu_f(i,j) + mu_f(i-e_c, j-e_c)] (the configured mean across the face, arithmetic along c).
+    The old cell-face mean 1/2(mu_i + mu_j) for every component read mu half a cell towards +c:
+    first order (manufactured variable-mu Stokes order 1.39/1.05 -> 1.99/2.00) and, in the
+    wall-normal direction, a preference for the LOW wall — the bubble column's bubbles collected at
+    y = 0 in the case AND its y-mirror (mirror-pair velocity difference 0.44 -> 1.4e-9 after).
+    An explicit velocity multigrid (scalar-mu operator) with a variable viscosity RAISES; AUTO
+    already falls back to Gauss-Seidel.
+- rejected: the cell-face mean for every component (h/2 shift); letting an explicit velocity MG run
+    silently on a constant-mu operator (results 50-70 % off Gauss-Seidel under mu(T))
+- why: a coefficient must live where its flux does (same rule as volumetric forces at the velocity
+    location, 1fdee46); a silent wrong answer is never acceptable

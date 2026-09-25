@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-173 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+174 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -157,6 +157,7 @@ reading until they are settled.
 - **Solid cutting an OPEN domain face is FIXED, not rejected — but a sealed inlet pocket IS rejected**. **Rejected:** (a) rejecting the configuration outright, which the work order allowed; (b) fixing only  <sub>SCALING_ISSUES</sub>
 - **SolverColocated is the ABC approximate projection, NOT Rhie–Chow — user correction**. **Rejected:** describing SolverColocated's coupling as Rhie–Chow  <sub>vof-campaign.md:485-489</sub>
 - **Staggered converges onto Zick & Homsy; collocated is bias-dominated (irreducible ~0.9%)**.  <sub>peclet-examples-gallery.md:165-171</sub>
+- **Staggered variable viscosity on the control volume's own faces; explicit velocity MG refuses variable mu**. **Rejected:** the cell-face mean for every component (h/2 shift); letting an explicit velocity MG run  <sub>flow</sub>
 - **Staircase coarse operator (binary classification, no volume-fraction coefficients) is the DEFAULT for the IBM volfrac path, removing the dt ceiling**. **Rejected:** the volume-fraction-weighted (area-fraction) coarse operator as coefficients; the plain const-coeff coarse op without staircase classification  <sub>velocity-mg-design.md:77-98</sub>
 - **Staircase is consolidated as the ONLY IBM velocity-MG coarse op — const and area-fraction paths removed from the code**. **Rejected:** geometry-blind const-coarse (setDiffusionCoarse) and area-fraction (setVelocityVolfracCoarse) IBM coarse operators — both deleted from the code  <sub>velocity-mg-design.md:100-116</sub>
 - **Star half fix: phibar mean was not bitwise-annihilating even in double — replaced by flux form**. **Rejected:** the phibar=Sum(a*x)/Sum(a) formulation  <sub>defect-correction-campaign.md:52-54</sub>
