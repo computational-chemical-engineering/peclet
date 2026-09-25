@@ -1,23 +1,48 @@
 # Handoff: dem's distributed contact solve must conserve momentum across rank boundaries
 
 Opened 2026-09-25. Owner: next session, which runs the `architect` design pass and then the
-implementation. Status: **DONE 2026-09-25** (dem 7074ee6..c771e07, pushed). Design: `dem/docs/mpi_momentum_conservation.md`;
+implementation. Status: first fix landed (dem 7074ee6..c771e07, pushed); **REOPENED** — see below. Design: `dem/docs/mpi_momentum_conservation.md`;
 numbers: `dem/docs/momentum_evidence/AFTER.md`. Performance was measured at host load 55–60; a quiet-host
 re-measure (`run_perf_ab.sh`) is still owed.
 
-**Follow-ups found on the way (not fixed, each needs its own work order):**
-1. **Colour overflow (correctness, likely a race):** both colourings put every contact beyond a body's
-   62nd into colour 62. A body with more than 63 contacts then has several same-colour contacts, i.e.
-   concurrent read-modify-write on multi-thread/GPU. The stall-break fallback never fires. This comes
-   from reading the code; there is no reproduction yet.
-2. **Legacy friction lever-arm couple:** `solveContactFrictionKokkos` applies ±J_t at two surface
-   points δ apart, so ΔL = δ n × J_t per contact. Serial dLvel is 1.9e-5. The fix changes np = 1.
-3. **The count-averaged Jacobi paths** (`velocityUseGS=false`, and the GS fallbacks) use per-body
-   factors, so they are momentum non-conserving even serially (np 1 dP 9e-3). They are gated at the
-   serial level only.
-4. **Pairs no rank sees:** both ends drifted out of their owners' blocks with `rebalance_every=0`.
-   Also, in a strongly jittered periodic box, np 2/4 lose 2–3 corner-wrap pairs. A missed contact is
-   an interpenetration.
+**Status 2026-09-25 evening: REOPENED as a framework redesign** (USER: "It feels that we are trying to
+patch this issue while it needs a rigorous design. Think of a principled method ... implementation plan.
+Take performance also into account. Test it well"). Documentation is on dem main e90caff:
+- `dem/docs/contact_evidence/FOLLOWUPS.md` — four defects reproduced, with report-only ctests (3e72ad5).
+- `dem/docs/contact_evidence/review/review_momentum.md` — the independent review of c771e07.
+- `dem/docs/contact_evidence/ARCHITECT_BRIEF.md` — the brief for the framework design.
+
+**Defects, most severe first:**
+1. **Colour overflow: a race in PRODUCTION defaults.**
+   - Five colourings cap at 63 colours, so contact 64 and up at a body reuse colour 62. The fallback
+     is dead.
+   - Ring beds: 79–613 contact points per particle, 1240–6439 same-colour pairs per step in the
+     position phase.
+   - Sphere beds reach it at size ratio ≥ 6.
+   - CUDA dP is 1–4e-2.
+2. **Energy creation at rank faces: a regression in c771e07** (review, CONFIRMED).
+   - The one-shot g = 0 restitution sweep never retracts, so owner-exclusive solves add up on a face
+     body.
+   - 3-body KE at e = 0.8: np 2 gives 0.555, np 1 gives 0.246, and before c771e07 it was 0.340.
+   - The PGS (gravity) path is fine.
+3. **Pairs no rank sees.**
+   - (a) Drift with `rebalance_every=0`, which is the step_mpi default: a pair is lost once both
+     bodies are more than 1.857 R past their blocks, at np ≥ 4.
+   - (b) core's halo sends one periodic image per (particle, rank), so an undecomposed periodic axis
+     loses edge-wrap pairs: np 2 loses 2, np 4 loses 3.
+4. **No gate detects a dropped contact** (review, confirmed by mutation). The ovl metric counts owned
+   contacts only.
+5. **Legacy friction couple.** ±J_t is applied at two points, so ΔL = dist·n × J_t (ratio 1.000).
+   Reached by g = 0 runs with friction. The PGS cone is clean.
+6. **Per-body Jacobi factors** are non-conserving serially (np 1 dP 9e-3). Not reached from defaults.
+
+**Proposed principle, under test by the architect:** one owned impulse per contact, with bodies always
+v0 + M⁻¹Jᵀλ, plus mass splitting (m/k, I/k) and mass-weighted consensus averaging at syncs. The same
+mechanism covers rank faces, colour-overflow hubs and the Jacobi paths. It conserves momentum, cannot
+create kinetic energy (Jensen), and its fixed point is the coupled solution. It also needs:
+- a single application point per contact;
+- visibility guaranteed by band = reach + skin, with drift-vote migration and ghosts keyed by
+  (gid, image shift).
 
 ## The user's decisions (2026-09-25, verbatim)
 
