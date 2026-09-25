@@ -1,7 +1,23 @@
 # Handoff: dem's distributed contact solve must conserve momentum across rank boundaries
 
 Opened 2026-09-25. Owner: next session, which runs the `architect` design pass and then the
-implementation. Status: OPEN, not started. **Release-blocking** (USER, 2026-09-25).
+implementation. Status: **DONE 2026-09-25** (dem 7074ee6..c771e07, pushed). Design: `dem/docs/mpi_momentum_conservation.md`;
+numbers: `dem/docs/momentum_evidence/AFTER.md`. Performance was measured at host load 55–60; a quiet-host
+re-measure (`run_perf_ab.sh`) is still owed.
+
+**Follow-ups found on the way (not fixed, each needs its own work order):**
+1. **Colour overflow (correctness, likely a race):** both colourings put every contact beyond a body's
+   62nd into colour 62. A body with more than 63 contacts then has several same-colour contacts, i.e.
+   concurrent read-modify-write on multi-thread/GPU. The stall-break fallback never fires. This comes
+   from reading the code; there is no reproduction yet.
+2. **Legacy friction lever-arm couple:** `solveContactFrictionKokkos` applies ±J_t at two surface
+   points δ apart, so ΔL = δ n × J_t per contact. Serial dLvel is 1.9e-5. The fix changes np = 1.
+3. **The count-averaged Jacobi paths** (`velocityUseGS=false`, and the GS fallbacks) use per-body
+   factors, so they are momentum non-conserving even serially (np 1 dP 9e-3). They are gated at the
+   serial level only.
+4. **Pairs no rank sees:** both ends drifted out of their owners' blocks with `rebalance_every=0`.
+   Also, in a strongly jittered periodic box, np 2/4 lose 2–3 corner-wrap pairs. A missed contact is
+   an interpenetration.
 
 ## The user's decisions (2026-09-25, verbatim)
 

@@ -33,7 +33,7 @@ reading until they are settled.
 - **Allreduce diet: fuse mean-removal sum+count; 'fine' mean-removal scope as bench/pack default, 'all' stays solver default pending Snellius validation**.  <sub>parallel-scaling-study.md:81-86</sub>
 - **Anisotropic MG coarsening order: coarsen axis a iff H_a < 2·min H over coarsenable axes, engaged only under `aniso`**. **Rejected:** applying the anisotropic coarsening rule to the isotropic path (would change isotropic bits)  <sub>physical-units-phase2-aniso.md:47-51</sub>
 - **Anisotropic wall-gradient normal/foot-point convention (⚑B)**.  <sub>physical-units-phase2-aniso.md:52-54</sub>
-- **Block VoF: colliding markers — debris removal with exact return, a block-only curvature clip, a gated gas–gas capillary bound**. **Rejected:** union-colour force assembly (re-creates numerical coalescence); raising interfaceEps; unsized fragment deletion; discarding debris without return  <sub>flow</sub>
+- **Block VoF: colliding markers — debris removal with exact return, a block-only curvature clip, a gated gas–gas capillary bound**. **Rejected:** union-colour force assembly (statically unnecessary; re-creates numerical coalescence  <sub>flow</sub>
 - **Body-force ghost policy: Neumann copy, pinned to ρ's policy**.  <sub>vof-campaign.md:145-154</sub>
 - **Boiling scope addition did not resurrect transported-φ CLSVOF**. **Rejected:** transported-φ CLSVOF  <sub>vof-campaign.md:101-106</sub>
 - **Byte-identical gating is unmeasurable for atomic-add paths — gate against the path's own run-to-run spread instead**. **Rejected:** a byte-identical regression gate for atomic-add code paths  <sub>defect-correction-campaign.md:55-57</sub>
@@ -238,7 +238,7 @@ reading until they are settled.
 
 ## dem — XPBD, contacts, packing
 
-86 in force, 2 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
+87 in force, 3 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
 
 ### In force
 
@@ -260,6 +260,7 @@ reading until they are settled.
 - **DEM velocity solve: over-relaxed min(1, 2/count) average, not raw Jacobi sum — needed together with a resting-contact threshold**. **Rejected:** raw Jacobi sum of manifold impulses in the velocity solve; threshold alone  <sub>porous-cfddem-cuda-two-bugs.md:44</sub>
 - **Direction-aware (vector) orphan accounting is a measured negative result; scalar orphan stays production**. **Rejected:** direction-aware (vector) orphan accounting  <sub>dem-event-level-restitution.md:83</sub>
 - **Distributed (MPI) sleeping is out of scope for the first pass**. **Rejected:** implementing distributed sleeping in the first pass  <sub>dem-sweep-efficiency-plan.md:188</sub>
+- **Distributed XPBD contacts are owner-exclusive, with ghost→owner reverse accumulation at every sync**. **Rejected:** redundant two-owner solves; globally consistent colouring of interface contacts (a sync per colour); symmetric Jacobi for interface contacts (count-av  <sub>dem/docs/mpi_momentum_conservation.md</sub>
 - **Drum stick/slip is a position-channel Coulomb-bound carry problem, not missing elasticity**. **Rejected:** attributing the drum lag to missing Mindlin sustained-contact elasticity (the prior Hertz-control conclusion)  <sub>dem-dosta-benchmark.md:272</sub>
 - **During the CUDA→Kokkos migration, the velocity/position split must be ported faithfully; physical validation and the friction fix are separate post-migration tasks**. **Rejected:** changing numerics/friction behavior during the backend migration  <sub>packing-friction-followup.md:12</sub>
 - **Forward predicted position, not committed position, through ghost gather**. **Rejected:** gathering committed `d_pos`  <sub>suite-distributed-status.md:23-26</sub>
@@ -320,19 +321,20 @@ reading until they are settled.
 - **dem set_positions (N,4): w==0 does not mean fixed — invMass remap convention**. **Rejected:** assuming w==0 in set_positions means invMass=0 (fixed)  <sub>stale-build-mphys-trees.md:14</sub>
 - **dem set_positions resets every particle to shape 0 — set_shape_ids must be called after**.  <sub>sdf-scene-campaign.md:32</sub>
 - **dem.step() with no argument advances nothing**.  <sub>sdf-scene-campaign.md:19</sub>
-- **ghost_band_* ctests run on one host thread; contact order across threads stays unfixed**. **Rejected:** sorting contacts by gid pair after the narrow phase (changes numbers everywhere, one sort per substep; GPU nondeterminism is already accepted)  <sub>dem</sub>
 - **globalScale folded into effScaleA/effScaleB throughout body-body narrowphase**. **Rejected:** the prior narrowphase code that omitted globalScale from B's canonical remap  <sub>dem-global-scale-sphere-limitation.md:10-18</sub>
 - **packing broad-phase: ArborX replaces cuBQL**. **Rejected:** cuBQL (NVIDIA-only BVH)  <sub>cuda-kokkos-migration.md:82-86</sub>
 - **random-packed-bed example: use effective radius including growth_factor; use annealed pack.py protocol**. **Rejected:** baseRadius*scale alone (omitting growth_factor); phi_ref 0.66 crude-feedback protocol  <sub>peclet-examples-gallery.md:58-71</sub>
 - **set_restitution_model default is "newton", bit-identical to prior behaviour**. **Rejected:** making "poisson" the default  <sub>dem-event-level-restitution.md:11</sub>
 - **set_velocity_use_gs defaults to True; False reverts to legacy Jacobi**.  <sub>dem-colored-gauss-seidel-solver.md:13</sub>
 - **step(0.0) settling must skip the velocity solve, friction, and thermostat, and zero the growth velocity**. **Rejected:** running the full velocity pipeline during a dt==0 settle  <sub>packing-velocity-position-split.md:57</sub>
+- **step_mpi at np=1 on a periodic domain may change bitwise (wrap pairs were solved twice)**. **Rejected:** exempting np = 1 periodic from the ownership rule to keep it bitwise  <sub>dem/docs/mpi_momentum_conservation.md</sub>
 - **step_mpi stays on count-averaged Jacobi — distributed colouring across ghosts is a separate problem**.  <sub>dem-colored-gauss-seidel-solver.md:55-57</sub>
 
 ### Superseded — history, do not re-derive the old reading
 
 - Drum-lag "faceted-wall" geometry explanation was falsified; root cause is missing sustained-contact tangential elasticity.  <sub>dem-dosta-benchmark.md:251</sub>
 - Symmetric PGS alone cannot hold deep statics; one-sided alone breaks ballistic dynamics.  <sub>dem-dosta-benchmark.md:167</sub>
+- ghost_band_* ctests run on one host thread; contact order across threads stays unfixed.  <sub>dem</sub>
 
 ## voro — tessellation, ConvexCell, mesh optimizer
 

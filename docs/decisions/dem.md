@@ -1168,7 +1168,8 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: dem
 - source: dem c64e117
 - decided: 2026-09-25
-- status: settled
+- status: superseded
+- superseded-by: "Distributed XPBD contacts are owner-exclusive, with ghost→owner reverse accumulation at every sync" (dem 2f57b19 removed the pin; margin stable 8/8 at np 2/4, 8 threads)
 - quote: |
     The margin flake is thread order, not a missed contact: the narrow phase appends contacts in thread
     order, the rank-face Gauss–Seidel does not conserve momentum when the two owners sweep a shared
@@ -1182,7 +1183,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: dem
 - source: docs/HANDOFF_DEM_MPI_MOMENTUM.md; measured in the ghost_band margin scene (dem c64e117)
 - decided: 2026-09-25
-- status: settled (fix open, release-blocking)
+- status: settled (fixed 2026-09-25, dem 6f92b82..c771e07; see the owner-exclusive entry)
 - quote: |
     USER: "That momentum is not conserved is not acceptable. This should be solved."
 - rejected: accepting redundant two-owner solves of a cross-rank contact (each owner sweeps it from its own state, so the impulses are not equal and opposite; CoM of a 3-body chain moved 2.1e-2 in one step)
@@ -1200,3 +1201,37 @@ Do not reverse an entry here without recording a new decision that supersedes it
     architectures this is not an issue for me."
 - rejected: sorting contacts by gid pair every substep for bitwise thread/GPU reproducibility
 - why: costs a sort per substep and changes numbers everywhere for no physical gain; run-to-run bitwise reproducibility at one thread (canonical local order) is kept
+
+---
+
+### Distributed XPBD contacts are owner-exclusive, with ghost→owner reverse accumulation at every sync
+- area: dem
+- source: dem/docs/mpi_momentum_conservation.md (9fb8972); evidence dem/docs/momentum_evidence/{BEFORE,AFTER}.md; implementation dem 7074ee6..c771e07
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    Each contact is solved by exactly one rank -- the only owner that sees it, else the owner of
+    its lower-gid body -- and every ghost's accumulated velocity/position change is added onto its
+    owner (core ParticleHalo::reverse) before each forward refresh. Linear momentum and CoM are
+    conserved to round-off at any np, thread count and sync_every. Measured np 2/4/8: dP 3e-3..1.3e-2
+    -> 2e-9..1e-8, CoM 1e-2 R -> 2e-7 R; np 1 closed bitwise unchanged; cost within +-5 % noise.
+    The count-averaged Jacobi paths use rank-global per-body counts (ParticleHalo::syncContactCounts,
+    WO-3b; the GS fallback's activation is voted inside the existing stop Allreduce).
+- rejected: redundant two-owner solves; globally consistent colouring of interface contacts (a sync per colour); symmetric Jacobi for interface contacts (count-averaged physics at rank faces); lower-gid ownership alone (drops pairs only one owner sees -- band = max reach, zero slack); per-kernel reverse accumulators (baseline differencing is exact with no kernel change)
+- why: conservation by construction, not by coincidence of floating point; no new sync point; the sweep kernels stay the single-GPU ones
+- supersedes: dem/docs/mpi.md "EXACT variant rather than the reverse-reduction schemes B/C"; "ghost_band_* ctests run on one host thread"
+
+---
+
+### step_mpi at np=1 on a periodic domain may change bitwise (wrap pairs were solved twice)
+- area: dem
+- source: dem/docs/mpi_momentum_conservation.md Q1; session decision 2026-09-25
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    np = 1 under step_mpi on a periodic domain solved every wrap pair twice through its self-image
+    ghosts -- the same non-conservation (cluster_periodic np 1 dP 4.1e-3 -> 2.7e-9). "np 1 bitwise
+    unchanged" holds for closed domains and for single-rank demStep, not for periodic step_mpi.
+- rejected: exempting np = 1 periodic from the ownership rule to keep it bitwise
+- why: USER: conservation is required; a bitwise-preserved non-conservation is not worth keeping
+
