@@ -3181,3 +3181,26 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - why: the placement is a property of where the unknown lives, not of the time term; one rule
     (`Grid::atVelocity`) keeps the RHS target and the drag diagonal consistent and the body force
     second order on both grids
+
+### Block VoF: colliding markers — debris removal with exact return, a block-only curvature clip, a gated gas–gas capillary bound
+- area: flow
+- source: flow `f4b105e` (branch vof-overlap; `doc/vof_overlap_design.md` §5, §10–§15, `doc/vof_overlap_STATE.md` gates)
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    The overlapping-marker blow-up was garbage curvature on sub-cell DEBRIS one marker's WY advection
+    leaves inside another (|kappa| 273 and -428 per cell against a true 0.4 on channel_18), not the
+    SUM-force / MAX-colour pairing, which is statically balanced for constant kappa. Fix: after every
+    block advection, interfacial cells with no C > 1/2 in their 5^3 neighbourhood and sub-wispEps
+    residue are cleared and their volume returned to the SAME marker's attached interface, weighted
+    C(1-C), with fixed-order sums (every marker's volume to round-off; np 1/2/4 bitwise); a per-cell
+    |kappa| <= 1/Delta_min clip on the BLOCK path only; a capillary dt bound with the gas density
+    while markers overlap (max S > 1.01, switch diagnostics.set_vof_phantom_capillary_bound). Also
+    fixed on the way: the block face-velocity gather copied index 0 into the LOW non-periodic domain
+    face, so a marker with colour at a low wall leaked (bubble column: 3 % per marker by t = 84).
+- rejected: union-colour force assembly (statically unnecessary; re-creates numerical coalescence
+    through the rim crease); raising interfaceEps (moves the failure); TBFsolver's unsized fragment
+    deletion (deletes satellites and thin sheets); discarding debris without return (percent-level
+    loss over 20 turnovers); the clip on the structured path (fires in single-field gates)
+- why: the failure was a local estimator defect on non-interface data, so the fix removes that data
+    conservatively instead of changing the force assembly that was already balanced
