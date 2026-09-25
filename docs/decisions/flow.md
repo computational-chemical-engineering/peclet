@@ -3158,3 +3158,26 @@ Do not reverse an entry here without recording a new decision that supersedes it
     wrong order gives a wrong answer — `set_decomposition` raises after `init_mpi`)
 - why: a wrong call order produced a silently wrong distributed answer; an error at the call is the
     only outcome a user cannot mistake for a result
+
+### Volumetric forces at the velocity location; surface forces as control-volume face integrals
+- area: flow
+- source: flow `1fdee46` (`Grid::atVelocity`, `tests/python/test_cell_force_placement.py`); user refinement 2026-09-25
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    VOLUMETRIC forces go where the velocity is defined: a cell-centred volumetric force (force_x/y/z
+    — CFD-DEM drag feedback, Boussinesq, rho*g — and the implicit drag coefficient drag_beta, in the
+    RHS target AND the operator diagonal) is interpolated to the velocity location: the face mean
+    1/2(f(i)+f(i-s_c)) on the staggered grid, the cell value on the collocated grid. SURFACE forces
+    (pressure, viscous stress, surface tension, the eps*grad p / buoyancy part of a fluid-particle
+    force) take the finite-volume view: integrated over the surface of the velocity control volume as
+    face fluxes of a stress or pressure-like quantity — never a cell-centred divergence that is then
+    interpolated. Before 1fdee46 the constant-rho RHS used the cell value (first order on the MAC
+    grid: steady Taylor-Green error order 1.01 -> 2.00 after) and the non-porous drag diagonal the
+    cell beta while its variable-rho RHS target was face-averaged (max|u-U0|/U0 4.4e-2 -> 2.6e-13).
+- rejected: interpolating every force the same way (a surface force is a face integral, not a cell
+    value); choosing the placement by the density model or by porous_ (the old buildRhsForced /
+    buildRhsVar / addDragDiagonal split)
+- why: the placement is a property of where the unknown lives, not of the time term; one rule
+    (`Grid::atVelocity`) keeps the RHS target and the drag diagonal consistent and the body force
+    second order on both grids

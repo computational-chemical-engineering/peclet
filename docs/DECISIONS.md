@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-170 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+171 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -178,6 +178,7 @@ reading until they are settled.
 - **Velocity-diffusion MG rediscretization diverges; velocity RB-GS is the exact default**. **Rejected:** rediscretized velocity-diffusion multigrid coarse operator  <sub>suite-distributed-status.md:291-296</sub>
 - **Viscous term left plain (not epsilon-weighted) — a deliberate, documented scope choice**. **Rejected:** epsilon-weighting the viscous term  <sub>porous-eps-conservative-momentum.md:31</sub>
 - **VoF execution model: no new submodule, kernels live in flow/src/vof/**. **Rejected:** a new submodule for VoF  <sub>vof-campaign.md:491-496</sub>
+- **Volumetric forces at the velocity location; surface forces as control-volume face integrals**. **Rejected:** interpolating every force the same way (a surface force is a face integral, not a cell  <sub>flow</sub>
 - **WO-H fix: CutcellMG::applyNeumannGhost; PCG selector now throws (MG-PCG is the terminal fallback)**.  <sub>vof-campaign.md:236-251</sub>
 - **WY advection CFL default corrected to Weymouth's proven 3D bound 0.25**. **Rejected:** CFL<0.5 (Weymouth's 2D value, mistakenly applied to 3D)  <sub>vof-campaign.md:128-130</sub>
 - **Weak efficiency must be computed from per-GPU throughput, not raw step time**. **Rejected:** computing weak efficiency directly from step time when cells/GPU varies ±8%  <sub>channel-scaling-rebenchmark.md:208-209</sub>
