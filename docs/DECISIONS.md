@@ -603,7 +603,7 @@ reading until they are settled.
 
 ## suite-wide — naming, layout, provisioning
 
-30 in force, 1 superseded — full text in [`decisions/suite-wide.md`](decisions/suite-wide.md)
+31 in force, 1 superseded — full text in [`decisions/suite-wide.md`](decisions/suite-wide.md)
 
 ### In force
 
@@ -621,6 +621,7 @@ reading until they are settled.
 - **Every peclet numerical method must run fully on-device and be MPI-distributable; host paths are oracles/tests only**. **Rejected:** host-orchestration bottlenecks — per-iteration host↔device downloads, host assembly, host linear solves  <sub>device-first-mpi-design-principle.md:10</sub>
 - **Feature-completion option A: Kokkos takes canonical names only after full parity; no merge until then**. **Rejected:** other unnamed options (not detailed in note) — merging/renaming before parity was confirmed  <sub>cuda-kokkos-migration.md:290-292</sub>
 - **Host serial paths are permitted only as oracles/unit tests, never as the production path**. **Rejected:** any host serial path as a production code path  <sub>device-first-mpi-design-principle.md:18</sub>
+- **Iteration order follows storage: x fastest on every backend**. **Rejected:** relying on the backend default iteration (silently wrong-strided on host); per-site  <sub>flow</sub>
 - **KEPT exceptions to the device-naming ban: transfer verbs and prose**.  <sub>peclet-v0.1-release.md:87</sub>
 - **Kokkos device sources must be .cpp, not .cu**. **Rejected:** forcing LANGUAGE CUDA / .cu extension  <sub>cuda-kokkos-migration.md:109-112</sub>
 - **Kokkos migration requires C++20**. **Rejected:** staying on C++17  <sub>cuda-kokkos-migration.md:104-105</sub>

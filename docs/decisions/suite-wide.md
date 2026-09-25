@@ -432,3 +432,22 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - why: the directive exists so that a user states the PROBLEM physically and the discretization
     is derived; a solver threshold on the discrete grid is not part of the problem statement, and
     forcing it into a length would make it resolution-dependent
+
+### Iteration order follows storage: x fastest on every backend
+- area: suite-wide
+- source: flow `f981453` (`src/policy.hpp`, ctest `iteration_order`), coupling `412b067`, umbrella `a64fb65` (CONVENTIONS §1); USER DIRECTIVE 2026-09-25
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    Fields are x-fastest (I = x + y*nx + z*nx*ny, LayoutLeft, Fortran-order (nx,ny,nz) in Python,
+    x-fastest in VTI), so every multi-dimensional kernel iterates x fastest on EVERY backend,
+    through one project alias (flow `MDRange2/3<Exec>` = Rank<N, Iterate::Left, Iterate::Left>);
+    a bare `Kokkos::Rank<N>` is forbidden (a ctest greps for it). Kokkos' backend default is Left
+    on CUDA but Right (z fastest) on host backends, so every flow host kernel strode against
+    memory: 7-point stencil 9.87 ms (Right) vs 1.32 ms (Left) on 128x96x64, 1 thread; bubble
+    column 1x8 threads 471 -> 399 ms/step. GPU results bitwise unchanged; on host only MDRange
+    reductions change summation order (~1e-14 relative).
+- rejected: relying on the backend default iteration (silently wrong-strided on host); per-site
+    explicit policies without an alias and a guard (the default crept back in 283 sites)
+- why: USER DIRECTIVE "too silly — repair it": storage, kernel order, NumPy order and file-format
+    order are ONE convention, stated once in CONVENTIONS §1
