@@ -1175,3 +1175,28 @@ Do not reverse an entry here without recording a new decision that supersedes it
     contact in different states, and the p-q-s chain shifts rigidly by 0.0213.
 - rejected: sorting contacts by gid pair after the narrow phase (changes numbers everywhere, one sort per substep; GPU nondeterminism is already accepted)
 - why: the test checks contact detection, which is correct; thread-order reproducibility is a separate, unrequested change
+
+---
+
+### The distributed contact solve must conserve linear and angular momentum across rank boundaries
+- area: dem
+- source: docs/HANDOFF_DEM_MPI_MOMENTUM.md; measured in the ghost_band margin scene (dem c64e117)
+- decided: 2026-09-25
+- status: settled (fix open, release-blocking)
+- quote: |
+    USER: "That momentum is not conserved is not acceptable. This should be solved."
+- rejected: accepting redundant two-owner solves of a cross-rank contact (each owner sweeps it from its own state, so the impulses are not equal and opposite; CoM of a 3-body chain moved 2.1e-2 in one step)
+- why: conservation is physics, not a tolerance; "statistical" agreement with single-rank covers trajectories only
+
+---
+
+### Round-off-level nondeterminism across threads / GPU is acceptable in dem
+- area: dem
+- source: user, 2026-09-25
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    USER: "That DEM is not reproducible, on the level of roundoff errors, on multi threaded
+    architectures this is not an issue for me."
+- rejected: sorting contacts by gid pair every substep for bitwise thread/GPU reproducibility
+- why: costs a sort per substep and changes numbers everywhere for no physical gain; run-to-run bitwise reproducibility at one thread (canonical local order) is kept

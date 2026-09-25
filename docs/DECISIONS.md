@@ -237,7 +237,7 @@ reading until they are settled.
 
 ## dem — XPBD, contacts, packing
 
-84 in force, 2 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
+86 in force, 2 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
 
 ### In force
 
@@ -294,6 +294,7 @@ reading until they are settled.
 - **Phase-B stabilization budget of 2x is the shipped default**. **Rejected:** Phase-B budget 4x (over-stiffens to -0.075); 1x (fails the violent pour)  <sub>dem-dosta-benchmark.md:201</sub>
 - **Position solve is translation-only; overlap removal stays decoupled from velocity**.  <sub>dem-colored-gauss-seidel-solver.md:31-34</sub>
 - **Root cause of H100-only DEM corruption: Particles::ensureCapacity never resized materialId**.  <sub>porous-scaling-benchmark.md:85-96</sub>
+- **Round-off-level nondeterminism across threads / GPU is acceptable in dem**. **Rejected:** sorting contacts by gid pair every substep for bitwise thread/GPU reproducibility  <sub>user,</sub>
 - **Sleep hysteresis must use a wake threshold far above the jitter tail (40x vRest), not close to the sleep threshold**. **Rejected:** wakeScale=4 (causes 32%<->3% oscillation, no freeze); rule (b) contact-flicker wake enabled by default  <sub>dem-sweep-efficiency-plan.md:100</sub>
 - **Sleepers must carry finite (not exactly zero) inverse mass**. **Rejected:** exactly-zero inverse mass for sleepers (invMass=0) — "made EXACTLY immovable"; an earlier attempted fix ("overload-wake rule d + sleep-overlap gate vi  <sub>dem-sweep-efficiency-plan.md:133</sub>
 - **Sleeping default flipped ON**. **Rejected:** sleeping default OFF (the prior state)  <sub>dem-sweep-efficiency-plan.md:146</sub>
@@ -305,6 +306,7 @@ reading until they are settled.
 - **Symmetric release beats one-sided grounded release**. **Rejected:** one-sided grounded release  <sub>dem-event-level-restitution.md:45</sub>
 - **The MPI velocity/position solve reuses the single-GPU driver via a Hooks template, not a separate implementation**. **Rejected:** a rank-local adaptive-stop break under MPI  <sub>dem-mpi-solver-port-plan.md:15</sub>
 - **The correct fix, if needed, is proper sequential-impulse friction with an accumulated per-contact tangential impulse clamped to the total Coulomb bound**. **Rejected:** the current Jacobi count-averaged friction scheme, for quantitative frictional-packing studies  <sub>packing-friction-followup.md:26</sub>
+- **The distributed contact solve must conserve linear and angular momentum across rank boundaries**. **Rejected:** accepting redundant two-owner solves of a cross-rank contact (each owner sweeps it from its own state, so the impulses are not equal and opposite; CoM  <sub>docs/HANDOFF_DEM_MPI_MOMENTUM.md;</sub>
 - **The distributed step's local particle order is canonical (ascending source rank), never MPI arrival order**. **Rejected:** accepting arrival-order nondeterminism; changing core's NBX delivery order  <sub>dem</sub>
 - **The force engine was generalized into a Law/Hooks-templated driver per the device-first + MPI directive**. **Rejected:** a Hertz-only, non-generalized implementation  <sub>dem-mpi-solver-port-plan.md:40</sub>
 - **The multilevel-stabilizer rebound loss is an under-convergence artifact, not a momentum-sink effect — refuting the project's original premise**. **Rejected:** the mission brief's premise that a momentum-conserving stabilizer sink was deleting the rebound  <sub>dem-multilevel-contact-solver.md:42</sub>
