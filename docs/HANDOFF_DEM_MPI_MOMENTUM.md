@@ -8,7 +8,7 @@ re-measure (`run_perf_ab.sh`) is still owed.
 **STATE 2026-09-26 (resume here).** Framework design: `dem/docs/contact_solve_framework.md`
 (§1–§11, §12 session decisions S1–S18, §13 amendment; the evidence is in
 `dem/docs/contact_evidence/IMPL_A.md`). Worktree `suite/dem-contacts`, branch `contacts`, pushed to
-dem main at **5ffce63**.
+dem main at **4441c2e**.
 
 **Landed work orders:**
 
@@ -22,13 +22,13 @@ dem main at **5ffce63**.
 | WO-4b | ω_pos = 1, coarse mass | 8b4a5f3 |
 | WO-5 | rank-level mass splitting + a stop that includes consensus | 0ea32ba |
 | WO-5b | world-frame inverse inertia in legacy friction | 4665e0f |
+| WO-6 | rank-level X: the review's rank-face energy creation is gone, and 3-body KE is identical at np 1–8 | 4441c2e |
 
 The battery passes 201/201 (python_mpi run). np 2–8 converge to np 1 at the float floor, with the
 stops off. Conservation: dP ≤ 8e-7, ring dLvel ≤ 4e-8.
 
 **Next:**
-1. WO-6: rank-level X for the g = 0 one-shot. This also fixes the energy creation at rank faces
-   from c771e07; the 3-body scene at e = 0.8 must give np 2 = np 1 = 0.2459.
+1. (WO-6 done.)
 2. WO-7: drift vote / `migrateToBlocks` / band (D4a).
 3. WO-9: dem uses core `allImages` (D4b). Core efa9b0d is on core main; the 1.3.0 version bump
    7405577 sits on branch `images` in `suite/core-images`, and the PyPI publish is **awaiting USER
