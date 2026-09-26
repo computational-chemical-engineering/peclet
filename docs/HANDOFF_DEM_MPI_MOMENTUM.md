@@ -19,7 +19,11 @@ published. Evidence: `dem/docs/contact_evidence/AFTER.md` §1–§10.
   launcher beside mpicxx: ParaView's mpiexec on PATH had made every np ≥ 2 ctest run singletons.
 - **Coupling re-run** (dem 0520b21): host 22/22, nothing moved. The coupling tests never exercise
   the new contact solve (coverage gap). CUDA found a pre-existing race (coupling kernels on their
-  own stream, flow's halo exchange unfenced): **fix in flight** (coupling worktree `streamfence`).
+  own stream, flow's halo exchange unfenced): **fixed, coupling 63919cc** (a device-wide fence at
+  entry and exit of every coupling wrapper; 0/30 bad runs, cost +0.9 %). Open: only 3 of coupling's
+  ~10 test files are registered in ctest; flow raises `pressure_solve_failed()` when the PCG start
+  residual is round-off (1e-48–7e-12) in the porous Ergun test (`mac_cutcell_mg.hpp:1221`); CUDA
+  np 4 costs 480 ms/step against 13 at np 1 (probably 4 ranks sharing one GPU without MPS).
 - **Architect design** `dem/docs/contact_physics_followups.md`:
   - Q-A: rigid 6-DOF multilevel aggregates, ΔL = 0 exactly.
   - Q-B: keep the position phase translation-only, with the consistent diagonal invM_A + invM_B.
