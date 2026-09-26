@@ -33,9 +33,18 @@ published. Evidence: `dem/docs/contact_evidence/AFTER.md` §1–§10.
   - F2: one-way shell detection (open, R-B2).
   - Q-C: restitution-law options.
 
-**In flight (branches, not merged):** `mlrigid` (WO-A1, A2), `posdiag` (WO-B0, B1, B2), `restlaw`
-(WO-C1, Moreau as a diagnostics A/B; default Newton). Each is in its own sibling worktree. Merge
-order C, B, A; the register entries (note §5) go into `docs/decisions/dem.md` at merge.
+**Landed after (dem a96a14c, umbrella 1454d85, battery 291/291 host + CUDA):**
+- WO-A1/A2: rigid multilevel aggregates, `hub_ml` dLvel 3e-3 -> 6e-7 (gated 1e-6); +19-25 %
+  in opt-in multilevel mode.
+- WO-B0: tube/box circumscribed `baseRadius` (coax tubes 0 -> 203 contacts; `pack_rings` reaches
+  phi 0.342, where main reached 0.188), plus the Hertz sphere-radius fix it exposed.
+- WO-B1: translational position diagonal. WO-B2: `ring_collide` gate.
+- WO-C1: `sim.diagnostics.set_restitution_target('newton'|'moreau')`; the default stays Newton.
+  The evidence is in `dem/docs/contact_evidence/restitution_law_ab.md`: the Dosta impact rebound
+  moves -20 % under Moreau.
+- Register +7.
+- Worktrees removed. `dem-perfbase` (c771e07 plus a PERF_G patch, `build_pb`) is kept as the A/B
+  baseline, and `dem-contacts` is stale (branch `contacts`).
 
 **Waiting on the user:** the restitution law (Q-C; recommendation Moreau); R-B2 two-way shell
 detection (recommended next package).
