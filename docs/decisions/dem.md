@@ -1351,7 +1351,7 @@ for pre-separating contacts creates kinetic energy in dense random-velocity stat
 - area: dem
 - source: dem/docs/contact_solve_framework.md §13.1; evidence dem/docs/contact_evidence/IMPL_A.md (WO-4 Stop A)
 - decided: 2026-09-25
-- status: settled
+- status: superseded
 - quote: |
     The overlap projection applies -C/w only while C < 0 and never retracts (non-accumulated
     POCS). Over-relaxing it leaves a permanent gap (omega w/w~ - 1)|C|: omega_pos = 1.5 on
@@ -1455,3 +1455,21 @@ PSOR would have a unique least-displacement fixed point and legitimate over-rela
     Allreduce-MAX as the stop residual (no extra message).
 - rejected: gate relaxation to the plateau value; a stop on the fine residual alone
 - why: the fixed point is the coupled solution; the stop must not end before the copies agree
+
+---
+
+### The overlap projection is accumulated and retractable: projected SOR on each contact's net push, omega_pos = 1.5
+- area: dem
+- source: dem/docs/contact_solve_framework.md §13.5 WO-12 (architect, conditional on R-U4); USER 2026-09-26 "Yes, reduce the overlap correction, next"; dem deee04e; evidence dem/docs/contact_evidence/AFTER.md §9
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    Lambda' = max(0, Lambda - omega C / w~), apply d = Lambda' - Lambda (negative = a retraction),
+    omega = 1.5 everywhere (np 1 included); stop on max |d| w~ < 1e-4 R. The fixed point is the unique
+    least-displacement solution: converged positions agree across np to <= 4.7e-5 R (non-accumulated
+    POCS: 1e-2 R), gated position_agreement_np{2,4,8} at 1e-4 R; dense clusters converge in 34
+    iterations vs 97. Named change for every run with coupled contacts.
+- rejected: the non-accumulated POCS held at omega 1 (non-unique fixed point, cannot retract, 2.9x slower); omega 1.7 (hubs slower)
+- why: a unique, rank-independent answer and faster convergence; the user accepted the np 1 numerics change
+- supersedes: "The overlap projection is never over-relaxed: omega_pos = 1"
+

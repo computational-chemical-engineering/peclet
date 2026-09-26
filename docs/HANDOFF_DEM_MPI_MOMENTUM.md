@@ -5,38 +5,42 @@ implementation. Status: first fix landed (dem 7074ee6..c771e07, pushed); **REOPE
 numbers: `dem/docs/momentum_evidence/AFTER.md`. Performance was measured at host load 55–60; a quiet-host
 re-measure (`run_perf_ab.sh`) is still owed.
 
-**STATE 2026-09-26 evening (resume here): the framework is COMPLETE on dem main f8e4955**, apart
-from the performance gate.
+**STATE 2026-09-26 late (resume here): the framework and WO-12 are on dem main 0520b21, and core
+1.3.0 is PUBLISHED** (PyPI: peclet-halo and the peclet-core shell 1.3.0; dem `PECLET_CORE_TAG`
+v1.3.0; fresh-venv smoke test OK).
 - Design: `dem/docs/contact_solve_framework.md`, with §12 S1–S24 and §13.
-- Evidence summary: `dem/docs/contact_evidence/AFTER.md`; per work order: `IMPL_A.md`.
-- Core main 3e51d39: allImages, sendShift, the exact image prefilter. It is unreleased 1.3.0.
+- Evidence: `dem/docs/contact_evidence/AFTER.md` §1–§9.
 
-**What holds** (host np 1–8 × OMP 1/8, plus CUDA):
-- conservation dP ≤ 1e-8, 8e-7 under gravity;
+**What holds:**
+- conservation dP ≤ 1e-8 (8e-7 under gravity);
 - the review's 3-body KE at np 2–8 equals np 1 exactly;
-- every visibility oracle has missing = dup = 0, for closed, sheared and periodic scenes;
-- no colouring conflicts;
-- np 4/8 bitwise run-to-run;
-- 7 mutation controls, all detected;
-- battery 261/261 host, 63/63 CUDA subset.
+- visibility oracles: missing = dup = 0 in closed, sheared and periodic scenes;
+- WO-12: the accumulated, retractable overlap projection at ω 1.5 has a unique fixed point.
+  Converged positions agree across np to ≤ 4.7e-5 R (was 1e-2 R), and clusters converge in 2.9×
+  fewer position iterations;
+- 7 mutation controls detected;
+- battery 264/264 host, 59/59 CUDA subset.
 
-**Open, in priority order:**
-1. **PERFORMANCE: +15–23 % ms/step against c771e07; the 10 % gate is NOT met.** The same holds at
-   N = 157k, so it is not launch overhead. All of it is in `demSolveContacts`, about half kernels
-   and half MPI/host.
-   - Kernels: the position unit indirection +6 ms of 131 at np 4, PGS iterations from the S14 stop
-     +1.4, the M halo kernels +2.2, the drift vote +1.0.
-   - Fix list in AFTER.md §7:
-     - a singleton-unit fast path (must stay bitwise);
-     - fuse the vote into the radius reduction;
-     - fuse the M kernels;
-     - an O(N × P) host topology loop → the neighbour list.
-2. **USER DECISIONS:** R-U4 / WO-12, the retractable position projection; the core 1.3.0 publish,
-   then dem's `PECLET_CORE_TAG` (a dem MPI build against the 1.2 tag will not compile); and
-   whether the peclet-core shell warns at 1.3.0.
-3. **The multilevel coarse cycle's angular momentum** (S17): opt-in mode; needs rigid-body
-   aggregates.
-4. **Serial PGS energy gain on separating contacts;** `computeW`'s unused rotational term.
+**Cost against c771e07, after the easy wins:**
+- the wins: core image prefilter, candidate ranks, singleton units, fused vote, inline X gate;
+- ms/step +9 % to +12 % at zero gravity and +15 % to +19 % under gravity (20k particles, np 4/8);
+  the same order at 157k;
+- WO-12 is cost-neutral where the iteration cap binds.
+- The rest is not easy:
+  - the position kernel +15 % per contact, cause not isolated;
+  - more PGS iterations from the S14 consensus stop, which is principled;
+  - MPI/host time in the M syncs.
+
+  A dedicated performance package would need profiling on quiet cores (other sessions pin
+  processes on 8–23).
+
+**Open:**
+1. the performance package above;
+2. the multilevel coarse cycle's angular momentum (S17, opt-in mode);
+3. serial PGS energy gain on separating contacts;
+4. `computeW`'s unused rotational term, which is probably why `ring_mini` never converges its
+   overlap (0.2 R);
+5. coupling's MPI tests were not re-run after WO-12.
 
 **Status 2026-09-25 evening: REOPENED as a framework redesign** (USER: "It feels that we are trying to
 patch this issue while it needs a rigorous design. Think of a principled method ... implementation plan.

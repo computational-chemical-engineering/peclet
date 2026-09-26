@@ -243,7 +243,7 @@ reading until they are settled.
 
 ## dem — XPBD, contacts, packing
 
-98 in force, 6 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
+98 in force, 7 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
 
 ### In force
 
@@ -327,8 +327,8 @@ reading until they are settled.
 - **The distributed step's local particle order is canonical (ascending source rank), never MPI arrival order**. **Rejected:** accepting arrival-order nondeterminism; changing core's NBX delivery order  <sub>dem</sub>
 - **The force engine was generalized into a Law/Hooks-templated driver per the device-first + MPI directive**. **Rejected:** a Hertz-only, non-generalized implementation  <sub>dem-mpi-solver-port-plan.md:40</sub>
 - **The multilevel-stabilizer rebound loss is an under-convergence artifact, not a momentum-sink effect — refuting the project's original premise**. **Rejected:** the mission brief's premise that a momentum-conserving stabilizer sink was deleting the rebound  <sub>dem-multilevel-contact-solver.md:42</sub>
+- **The overlap projection is accumulated and retractable: projected SOR on each contact's net push, omega_pos = 1.5**. **Rejected:** the non-accumulated POCS held at omega 1 (non-unique fixed point, cannot retract, 2.9x slower); omega 1.7 (hubs slower)  <sub>dem/docs/contact_solve_framework.md</sub>
 - **The overlap projection is coloured and swept per contact pair, all points of a pair sequentially in one work item**. **Rejected:** per-point colouring with hub copies (20+ copies per ring)  <sub></sub>
-- **The overlap projection is never over-relaxed: omega_pos = 1**. **Rejected:** omega_pos = 1.5 on split slots (3 periodic tests failed; the faster hub convergence of  <sub>dem/docs/contact_solve_framework.md</sub>
 - **Uncapped grid is the default for the fused kernel launch**. **Rejected:** capping the launch grid to fewer blocks  <sub>dem-perf-campaign.md:31-32</sub>
 - **Verlet-cached broadphase gated to non-periodic single-GPU only**. **Rejected:** enabling the Verlet-cached pair list under periodic ghosts / MPI  <sub>dem-sweep-efficiency-plan.md:201</sub>
 - **Wall SDF resolution must be finer than the colliding cube, and seeded cubes must start axis-aligned**. **Rejected:** a coarser wall SDF than the cube size; random initial cube orientations at lattice spacing 2.1  <sub>dem-cubes-gpu-pyvista.md:25-28</sub>
@@ -352,6 +352,7 @@ reading until they are settled.
 - DEM velocity solve: over-relaxed min(1, 2/count) average, not raw Jacobi sum — needed together with a resting-contact threshold.  <sub>porous-cfddem-cuda-two-bugs.md:44</sub>
 - Drum-lag "faceted-wall" geometry explanation was falsified; root cause is missing sustained-contact tangential elasticity.  <sub>dem-dosta-benchmark.md:251</sub>
 - Symmetric PGS alone cannot hold deep statics; one-sided alone breaks ballistic dynamics.  <sub>dem-dosta-benchmark.md:167</sub>
+- The overlap projection is never over-relaxed: omega_pos = 1.  <sub>dem/docs/contact_solve_framework.md</sub>
 - ghost_band_* ctests run on one host thread; contact order across threads stays unfixed.  <sub>dem</sub>
 - step_mpi stays on count-averaged Jacobi — distributed colouring across ghosts is a separate problem.  <sub>dem-colored-gauss-seidel-solver.md:55-57</sub>
 

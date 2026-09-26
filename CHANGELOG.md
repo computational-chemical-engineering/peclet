@@ -4,6 +4,67 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## `peclet-halo` / `peclet-core` 1.3.0 — 2026-09-26 — every periodic image in the particle halo, and a faster halo build
+
+A core-only release (the family version is unchanged). One `v*` tag in `peclet-core` publishes
+`peclet-halo` and the `peclet-core` compatibility shell at the same number; the C++ headers are
+versioned by the same tag, which consumers pin as `PECLET_CORE_TAG`. No change to the `peclet.halo`
+Python API; the new capability is C++, for `peclet.dem`'s distributed contact solve. Design:
+`dem/docs/contact_solve_framework.md` §5.3 (WO-8); evidence `dem/docs/contact_evidence/FOLLOWUPS.md`
+§4b.
+
+#### Added
+
+- **`ParticleHaloTopology::build(pos, rcut, includePeriodicSelf = false, allImages = false)`** —
+  the new, opt-in `allImages` sends **every** periodic image of a particle within `rcut` of another
+  rank's block, one send entry per image, instead of only the image nearest that block. On a
+  periodic axis the ORB leaves undecomposed (a cube at np 2 and 4, a slab split along its length)
+  the nearest image is always the unshifted one, so a wrapped image inside the band was never sent
+  and a pair crossing a rank face while wrapping that axis was seen by neither owner (2–3 of 5754
+  pairs in dem's strong-jitter lattice at np 2 and 4). With the flag an owned index may repeat in
+  one rank's send list; a receiver identifies a ghost by (owner id, shift), each shift is exactly
+  0 or ±L per axis, and `forward`, `forwardPositions` and `reverse` (host and the Kokkos
+  `ParticleHalo`, whose atomic reverse sums repeated entries) work per entry. It also covers a
+  decomposed periodic axis whose block is narrower than twice the band.
+
+- **`FlatTopo::sendShift`**, parallel to `sendIdx`: the periodic image offset of each send entry.
+  A consumer can then identify an entry by (rank, image) without re-deriving core's image
+  enumeration. `peclet.dem`'s image-aware contact ownership reads it.
+
+#### Changed (faster; results unchanged)
+
+- **`ParticleMigrator::imagesWithinRcutOfBlock`** used to walk all 3^Dim shift combinations. It now
+  prefilters the candidates per axis: a combination can qualify only if each of its per-axis gaps
+  does. It returns the same set in the same order, with the same summation. This runs for every
+  owned particle × every rank at every topology build. With `allImages` it was the dominant host
+  cost of dem's distributed step: +19 % ms/step at np 8.
+- **`ParticleHaloTopology::build`** loops only over candidate ranks: those whose block comes within
+  `rcut` of the owned particles' bounding box, images included, tested by the new
+  `ParticleMigrator::boxWithinRcutOfBlock`. The candidates are a superset of every rank any particle
+  can qualify for, so the send lists (entries and order) are unchanged. The per-particle work drops
+  from O(numRanks) to O(neighbours).
+
+#### Unchanged
+
+- With `allImages` off (the default) the halo is byte-identical to 1.2.0: every existing ctest,
+  and a byte comparison of the full flattened topology, ghost positions, forwarded ids and reverse
+  sums for two all-periodic scenes at np 1, 2, 4 and 8 against a build of the 1.2.0 headers.
+
+#### Tests
+
+- `particle_halo_images_np{1,2,4,8}`: a slab periodic on every axis whose z the ORB never splits,
+  against a hand-enumerated 27-image oracle — received (id, image) set exact with no duplicate,
+  per-particle send-entry counts, bitwise ghost positions, reverse of image-coded values summing
+  every image, the default equal to an independent reimplementation of the one-image rule, and the
+  flag inert at np 1.
+- `particle_halo_exchange_np{1,2,4}` (Kokkos) also runs an `allImages` topology and requires repeated
+  send entries to occur and the device forward/reverse to match the host bit for bit.
+- dem's contact and momentum batteries, 264 ctests at np 1–8, are byte-identical across the
+  prefilter and the candidate-rank loop.
+
+The `peclet-core` compatibility shell does not yet emit DeprecationWarnings.
+`docs/CORE_BOUNDARY.md` ties those to the *family* 1.3.0; this is a core-only 1.3.0.
+
 ## `peclet-halo` / `peclet-core` 1.2.0 — 2026-09-24 — coarse-level multigrid stages, and an aligned weighted ORB
 
 A core-only release (the family version is unchanged). Its consumers adopted it before the tag
