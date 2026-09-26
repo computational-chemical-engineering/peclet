@@ -1578,3 +1578,23 @@ PSOR would have a unique least-displacement fixed point and legitimate over-rela
 - rejected: the PATH lookup; a hard-coded /usr/bin/mpirun fallback only when unset
 - why: the launcher must belong to the MPI the binaries link
 
+
+---
+
+### USER DIRECTIVE — XPBD is dem's efficiency engine; costly physics refinements are options, default off
+- area: dem
+- source: USER 2026-09-26 (session on the contact-solve follow-ups)
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    "It is nice to have both XPBD and Hertz in the code. My feeling is that some cases are less
+    suited for XPBD and actually Hertz should be used. However, to have a as good as possible XPBD is
+    nice. The mean advantage of XPBD could be computational compared to Hertz. For creating packings,
+    maybe larger timesteps can be used, and the fact that no energy is stored can help. [...] it
+    might be much more efficient for use in CFD-DEM for fluidized systems [...] Therefore things like
+    the Poisson heuristics would make the method more expensive where it not needed [...] Similar
+    thinks might hold for other things (like graph coloring). So therefore I think Poisson is better
+    as an option. For the two-way shell detection, it should be implemented, but maybe default off
+    with a clear documentation on when to include it."
+- rejected: making the Poisson restitution bank the default (per-step cost where it is not needed); two-way shell detection on by default
+- why: XPBD's reason to exist next to Hertz is cost (packings, fluidized CFD-DEM); a refinement that costs on every step is opt-in with a documented "when to use", and cases needing stored elastic energy use the Hertz engine
