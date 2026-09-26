@@ -1618,3 +1618,20 @@ PSOR would have a unique least-displacement fixed point and legitimate over-rela
     Poisson mode keeps its Newton targets (its bank deducts exactly those reflections).
 - rejected: Newton's target (creates energy); the sequential event one-shot + support solve (large implementation, the architect's option S); a user-facing A/B switch (removed, never released)
 - why: an impact law that cannot create energy, at zero cost
+
+---
+
+### Two-way shell detection is opt-in; the default stays one-way
+- area: dem
+- source: USER 2026-09-26 ("it should be implemented, but maybe default off with a clear documentation on when to include it"); dem 888bd5b, 38c9498; design note F2 / R-B2
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    set_shell_detection('one_way' | 'two_way'). Two-way also tests j's shell against i's SDF for
+    shell-shell pairs (a tube rim 0.02 into a box face: 0 one-way, 0.0200 two-way; a rim-first tube
+    falls through a box one-way, rests two-way). Reverse contacts carry the pair's canonical
+    orientation (one more point of the same pair downstream) and are not merged (no overshoot, e_eff
+    0.5000 either way). Cost on ring packings x1.6-1.9 per step. XPBD only; Hertz stays one-way;
+    walls/planes stay one-way (same defect class, out of scope).
+- rejected: two-way by default (per-step cost where not needed; USER efficiency directive); merging the two directions (no measured benefit)
+- why: fixes an invisible-penetration defect where it matters (thin walls, sharp edges, size disparity) without taxing the default path

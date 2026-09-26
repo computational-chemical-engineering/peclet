@@ -65,8 +65,8 @@ published. Evidence: `dem/docs/contact_evidence/AFTER.md` §1–§10.
 **Decided by the user (2026-09-26):**
 - Moreau is the restitution target (landed).
 - XPBD is the efficiency engine, so costly refinements are opt-in (register).
-- Two-way shell detection is to be implemented, default off with documented usage (in progress:
-  dem worktree `twoway`).
+- Two-way shell detection landed, opt-in: `set_shell_detection('two_way')`, dem 888bd5b/38c9498.
+  Open: wall/plane contacts remain one-way.
 
 **Performance left:**
 - the S14 extra velocity iterations (principled);

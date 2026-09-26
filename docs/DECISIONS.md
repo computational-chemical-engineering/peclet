@@ -243,7 +243,7 @@ reading until they are settled.
 
 ## dem — XPBD, contacts, packing
 
-107 in force, 7 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
+108 in force, 7 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
 
 ### In force
 
@@ -335,6 +335,7 @@ reading until they are settled.
 - **The overlap projection is accumulated and retractable: projected SOR on each contact's net push, omega_pos = 1.5**. **Rejected:** the non-accumulated POCS held at omega 1 (non-unique fixed point, cannot retract, 2.9x slower); omega 1.7 (hubs slower)  <sub>dem/docs/contact_solve_framework.md</sub>
 - **The overlap projection is coloured and swept per contact pair, all points of a pair sequentially in one work item**. **Rejected:** per-point colouring with hub copies (20+ copies per ring)  <sub></sub>
 - **The overlap projection's diagonal is the translational effective mass invM_A + invM_B**. **Rejected:** computeW's rotational term (a rotation never applied; world arm x body-frame inertia, not frame-indifferent; overstated the stop metric)  <sub>dem/docs/contact_physics_followups.md</sub>
+- **Two-way shell detection is opt-in; the default stays one-way**. **Rejected:** two-way by default (per-step cost where not needed; USER efficiency directive); merging the two directions (no measured benefit)  <sub>USER</sub>
 - **USER DIRECTIVE — XPBD is dem's efficiency engine; costly physics refinements are options, default off**. **Rejected:** making the Poisson restitution bank the default (per-step cost where it is not needed); two-way shell detection on by default  <sub>USER</sub>
 - **Uncapped grid is the default for the fused kernel launch**. **Rejected:** capping the launch grid to fewer blocks  <sub>dem-perf-campaign.md:31-32</sub>
 - **Verlet-cached broadphase gated to non-periodic single-GPU only**. **Rejected:** enabling the Verlet-cached pair list under periodic ghosts / MPI  <sub>dem-sweep-efficiency-plan.md:201</sub>
