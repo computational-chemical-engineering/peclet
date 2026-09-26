@@ -22,9 +22,6 @@ reading until they are settled.
 
 ### In force
 
-- **Collocated variable density (V8): the mass-adjoint ABC pair; the face-acceleration form is retired**. **Rejected:** face acceleration after the viscous solve (non-incremental; unstable with the rotational term); kappa = 0 (Chorin); arithmetic centre->face with the rho-weighted force  <sub>flow doc/collocated_varrho_forces.md</sub>
-- **The balanced-force projection is an option on both grids, default ON on collocated variable-rho (V8), OFF elsewhere**. **Rejected:** always-on; default off on V8 (loses constant-kappa CSF annihilation); lagged P_b  <sub>flow doc/collocated_varrho_forces.md §4.6-4.8</sub>
-- **On the collocated variable-density path set_body_force is a mean pressure gradient (face form)**. **Rejected:** f_const at the cell value (periodic hydrostatic box 20.5 vs 2.4e-13)  <sub>flow doc/collocated_varrho_forces.md §5</sub>
 - **"Hand the stopping level to GraphAMG" telescoping idea is retired**. **Rejected:** handing the MG-telescoping stopping level to GraphAMG  <sub>mg-decomposition-alignment.md:75</sub>
 - **(1,2) mixed closure order is the recommended default going forward**. **Rejected:** binary-M lagging (divergent, ρ=1.087) and linear-everywhere (1,1) (worse pointwise near the IB)  <sub>flow-ghost-projection.md:50</sub>
 - **A masked solid cell is not a fluid sample**.  <sub>sdf-scene-campaign.md:44</sub>
@@ -51,6 +48,7 @@ reading until they are settled.
 - **Coarse-level solve policy default stays "smoother", not "auto", because auto regresses the cut-cell IBM path**. **Rejected:** making "auto" the default coarse-level solve policy  <sub>mg-decomposition-alignment.md:28</sub>
 - **Collocated momentum advection uses the PROJECTED divergence-free face field, not the cell→face average**. **Rejected:** the un-projected cell→face average ½(u_i+u_j) as the collocated advecting velocity  <sub>flow/doc/uf_advection.md;</sub>
 - **Collocated pressure coupling is the ABC (MAC) approximate projection, NOT Rhie–Chow**. **Rejected:** Rhie–Chow interpolation as the collocated coupling  <sub>sdflow-collocated-solver.md:37-39</sub>
+- **Collocated variable density (V8): the mass-adjoint ABC pair; the face-acceleration form is retired**. **Rejected:** face acceleration after the viscous solve (non-incremental; unstable with the rotational  <sub>flow</sub>
 - **Container slab half-extent must equal L/2 + wall thickness, never more (periodic-image rule)**. **Rejected:** an oversized slab half-extent  <sub>advective-cutwall-flux-plan.md:57</sub>
 - **Correction: the raw field registry hands out internal (unconverted) arrays**.  <sub>physical-units-plan.md:28</sub>
 - **Coupling partial/cut+solid cells to the coarse grid fails regardless of coarsening depth — capping depth cannot fix it**. **Rejected:** capping coarsening depth as a fix for partial-cell coupling divergence  <sub>velocity-mg-design.md:118-135</sub>
@@ -125,6 +123,7 @@ reading until they are settled.
 - **Must re-mask solid velocity after grad(phi) correction**. **Rejected:** skipping the re-mask  <sub>cuda-kokkos-migration.md:354-355</sub>
 - **Non-incremental Chorin projection gives wrong steady Z&H drag — incremental-rotational required**. **Rejected:** non-incremental Chorin projection (−40% error, splitting-error); the warm-detector convergence protocol  <sub>embed-port-progress.md:21-22</sub>
 - **Old single-GPU CFDSolver reference retired; pnm_backend is pore-network extraction only**. **Rejected:** keeping the CFDSolver single-GPU reference implementation; pnm_backend carrying a CFD solver  <sub>sdflow-dt-divided-convention.md:29-38</sub>
+- **On the collocated variable-density path set_body_force is a mean pressure gradient (face form)**. **Rejected:** f_const at the cell value (periodic hydrostatic box: cell 20.5 after 30 steps at  <sub>flow</sub>
 - **Only upwind/dissipative advection schemes exist — no central/energy-conserving option**. **Rejected:** central/energy-conserving advection scheme (does not exist)  <sub>channel-dns-isotropic-grid.md:15</sub>
 - **Owner-boundary attribution fix: remove shared-cell pressure from both sides of cross-owner faces**. **Rejected:** leaving the shared-cell pressure flux attributed through owner mid-surfaces  <sub>sdf-scene-campaign.md:82</sub>
 - **P1 passed: double-diagonal fallback retired as measurably worse, not merely unnecessary**. **Rejected:** the double-diagonal fallback (converges to the float-face operator, not the true one)  <sub>defect-correction-campaign.md:33-38</sub>
@@ -169,6 +168,7 @@ reading until they are settled.
 - **Telescoping is default on for the pressure MG since 2026-09-02; the velocity solve does not need it**. **Rejected:** telescoping the velocity solve  <sub>momentum-solve-residual-stop.md:18</sub>
 - **Ten-Cate periodic-image bug: periodic images are a union, not independent slabs**. **Rejected:** the earlier CSG-slab-per-image geometry construction (implicitly non-union)  <sub>sdf-scene-campaign.md:131</sub>
 - **The agglomerated-bottom MG anomaly required a per-fluid-component null-space projector, a double row-sum, and a looser inner tolerance**. **Rejected:** projecting the all-cell mean (rather than per-connected-fluid-component); leaving MG coefficients in single-precision row sums uncorrected; an inner t  <sub>agglomerated-bottom-ibm-fix.md:15</sub>
+- **The balanced-force projection is an option on both grids, default ON on collocated variable-rho (V8), OFF elsewhere**. **Rejected:** always-on (the user asked for an option); default off on V8 (loses the settled  <sub>flow</sub>
 - **The defect-correction rule: Krylov matvec/residual must be the exact double operator in flux form; preconditioners below may stay float**.  <sub>defect-correction-campaign.md:14-17</sub>
 - **The momentum solver is chosen by the operator's CONDITION NUMBER, and the rule names no geometry**. **Rejected:** (a) selecting on whether an immersed solid is present — the rule as first landed; IBM  <sub>user</sub>
 - **The np>1 VoF colour parity gates gate conservation, not the pointwise field**. **Rejected:** (a) loosening 1e-11 to a number above today's 3.174e-09 — it would have been fitted to  <sub>tests/kokkos_mpi/test_vof_bc_mpi.cpp,</sub>
@@ -243,10 +243,13 @@ reading until they are settled.
 
 ## dem — XPBD, contacts, packing
 
-87 in force, 3 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
+98 in force, 6 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
 
 ### In force
 
+- **A body updated in several places is solved through copies: mass splitting for projection-form updates, exclusive holding for the one-shot restitution sweep**. **Rejected:** raw ghost-increment sums for the one-shot (tri e=0.8 KE 0.333 -> 0.555); mass  <sub>dem/docs/contact_solve_framework.md;</sub>
+- **A multilevel coarse vertex carries the mass of its folded copies, a*m/k**. **Rejected:** solve-view masses (non-conservative at a folded hub); fold after the coarse cycle  <sub>dem/docs/contact_solve_framework.md</sub>
+- **A periodic self-image contact is owned outright when its twin image is absent**. **Rejected:** the unconditional lower-gid rule for self-image pairs  <sub>dem/docs/contact_solve_framework.md</sub>
 - **Acceptance bar for solver-internals changes is run-scatter parity + gated defaults, not bit-identity**. **Rejected:** bit-identity as the acceptance bar  <sub>dem-sweep-efficiency-plan.md:246</sub>
 - **Adaptive multilevel stop uses the quasi-static (QS) residual, not the full fine residual or coarse-only**. **Rejected:** gating the adaptive stop on the full fine residual (over-converges flowing scenes); gating on coarse-only residual (statics degrade)  <sub>dem-multilevel-contact-solver.md:27</sub>
 - **Blanket persistent-contact e=0 is rejected; restitution is one-sided-only when grounded and not rising**. **Rejected:** blanket persistent-contact e=0 for all persistent contacts  <sub>packing-velocity-position-split.md:17</sub>
@@ -257,32 +260,35 @@ reading until they are settled.
 - **Bug fix: hertzCommitHistory must not wipe carried previous state on the post-migration sentinel**.  <sub>dem-mpi-solver-port-plan.md:50</sub>
 - **Cleared hypotheses during the H100 corruption investigation**. **Rejected:** pair-buffer capacity, sleeping, boundary/ghost-slab handling, compile-flag/toolchain differences, execution-mode (graph/fused/etc.) differences, color  <sub>porous-scaling-benchmark.md:60-84</sub>
 - **Collision solve moved from count-averaged Jacobi to graph-colored Gauss-Seidel**. **Rejected:** count-averaged Jacobi (min(1,2/count) velocity / 1/count position damping factors) as the primary over-relaxation fix  <sub>dem-colored-gauss-seidel-solver.md:10-23</sub>
-- **Colouring stall-break needs a filtered count-averaged-Jacobi fallback for uncolourable manifolds**. **Rejected:** silently skipping uncolourable manifolds/contacts (the pre-fix behaviour)  <sub>dem-colored-gauss-seidel-solver.md:64-67</sub>
 - **Contact/manifold buffer sizing must scale with per-particle shell point count**. **Rejected:** fixed capacity*16 sizing regardless of shell point count  <sub>dem-sdf-general-particles.md:65</sub>
 - **Core principle: velocity solve owns all dissipation, position solve only removes overlap, no back-coupling**. **Rejected:** back-coupling from the position correction into velocity  <sub>packing-velocity-position-split.md:27</sub>
 - **Cube-drum confinement requires a z-periodic barrel with no end caps — corner rounding does not work**. **Rejected:** rounding the cube corner to prevent tunneling at the barrel/cap join; a closed (capped) drum for cubes  <sub>dem-cubes-gpu-pyvista.md:20-24</sub>
 - **DEM particle radius/halo sizing must derive from baseRadius*scale*globalScale, not globalScale alone**. **Rejected:** sizing broadphase/halo/margin off globalScale alone; the prior workaround of forcing set_global_scale(rp)  <sub>multiphysics-framework-plan.md:376</sub>
-- **DEM velocity solve: over-relaxed min(1, 2/count) average, not raw Jacobi sum — needed together with a resting-contact threshold**. **Rejected:** raw Jacobi sum of manifold impulses in the velocity solve; threshold alone  <sub>porous-cfddem-cuda-two-bugs.md:44</sub>
 - **Direction-aware (vector) orphan accounting is a measured negative result; scalar orphan stays production**. **Rejected:** direction-aware (vector) orphan accounting  <sub>dem-event-level-restitution.md:83</sub>
 - **Distributed (MPI) sleeping is out of scope for the first pass**. **Rejected:** implementing distributed sleeping in the first pass  <sub>dem-sweep-efficiency-plan.md:188</sub>
 - **Distributed XPBD contacts are owner-exclusive, with ghost→owner reverse accumulation at every sync**. **Rejected:** redundant two-owner solves; globally consistent colouring of interface contacts (a sync per colour); symmetric Jacobi for interface contacts (count-av  <sub>dem/docs/mpi_momentum_conservation.md</sub>
+- **Distributed dead-pair Poisson credit is given only by the pair's owner**.  <sub></sub>
 - **Drum stick/slip is a position-channel Coulomb-bound carry problem, not missing elasticity**. **Rejected:** attributing the drum lag to missing Mindlin sustained-contact elasticity (the prior Hertz-control conclusion)  <sub>dem-dosta-benchmark.md:272</sub>
 - **During the CUDA→Kokkos migration, the velocity/position split must be ported faithfully; physical validation and the friction fix are separate post-migration tasks**. **Rejected:** changing numerics/friction behavior during the backend migration  <sub>packing-friction-followup.md:12</sub>
+- **Every pair within contact reach is visible to both owners: drift slack, vote-triggered migration, all periodic images**. **Rejected:** zero slack (pairs lost at 1.857 R drift, np >= 4); per-step migration (a host round  <sub></sub>
 - **Forward predicted position, not committed position, through ghost gather**. **Rejected:** gathering committed `d_pos`  <sub>suite-distributed-status.md:23-26</sub>
 - **Friction consolidated into one per-contact Coulomb friction in the velocity solve, replacing three overlapping patches**. **Rejected:** Fix A (manifold-only), Fix B (position-solve tangential friction), Fix C (velocity feedback from position solve's friction_lambda_n)  <sub>packing-velocity-position-split.md:41</sub>
 - **Friction stability fix: Jacobi count-averaging instead of Jacobi-summed impulses**. **Rejected:** Jacobi-summed per-contact friction impulses  <sub>packing-velocity-position-split.md:53</sub>
 - **Fused colour sweeps: CUDA-graph replay stays the solo default; fused auto-on only where capture is unavailable**. **Rejected:** making fused loop-kernels the universal default; a per-block-flag + block0-scan barrier variant (measured slower)  <sub>dem-perf-campaign.md:33-37</sub>
 - **Gallery fixes: dem OOB writes, wrong docstrings, opt-in reaction torque — root-caused, not worked around**.  <sub>peclet-examples-gallery.md:256-264</sub>
 - **General-particle shells must be voxel-decimated to a target point count**. **Rejected:** using the raw marching-cubes point count directly  <sub>dem-sdf-general-particles.md:60</sub>
+- **Ghost selection and the drift vote use the domain-clamped ownership coordinate on non-periodic axes**. **Rejected:** measuring visibility against the finite block box (a body outside an unwalled domain is silently never ghosted across a block face)  <sub>dem/docs/contact_solve_framework.md</sub>
 - **Grain-radius units remain an acceptable, but no longer required, convention**. **Rejected:** requiring grain-radius units (global_scale=1) as the only correct usage  <sub>dem-global-scale-sphere-limitation.md:23-26</sub>
 - **Grid-SDF particle data is flat and x-fastest**.  <sub>dem-sdf-general-particles.md:49</sub>
 - **Growth-view sizing bug: every maxContacts-sized view must be grown together, not just contacts+manifolds**. **Rejected:** growing only contacts+manifolds while leaving other maxContacts-sized views at the old size  <sub>dem-sdf-general-particles.md:69</sub>
 - **HCS benchmark contact-solver exonerated via the colored-GS A/B**. **Rejected:** the contact solver as the source of the residual factor-2 stage offset  <sub>hcs-mfix-benchmark-evidence.md:31-32</sub>
+- **Hertz pair lists are canonically oriented, lower gid first**. **Rejected:** carrying xi by gid without an orientation convention (latent for every mid-run migration, rebalance included); a larger carry cap (measured: not the c  <sub>dem/docs/contact_solve_framework.md</sub>
 - **Incremental colouring gated OFF under MPI, and position conflict detection avoids a host sync**. **Rejected:** enabling incremental colouring under MPI as-is; a host readback for conflict detection  <sub>dem-sweep-efficiency-plan.md:47</sub>
 - **Interim DEM back-coupling commit reverted on user instruction**. **Rejected:** the interim back-coupling commit 374565d  <sub>porous-cfddem-cuda-two-bugs.md:76-77</sub>
 - **Interim dx→dv back-coupling was reverted on explicit user instruction — the no-back-coupling clause stands absolutely**. **Rejected:** interim dx→dv back-coupling (commit 374565d)  <sub>packing-velocity-position-split.md:10</sub>
 - **Island sleeping shipped default-OFF, then found to explode statics to NaN, fixed and flipped to default-ON**. **Rejected:** making a sleeping body exactly immovable (invMass=0)  <sub>dem-perf-campaign.md:96-109</sub>
 - **Kinetic-separation unloading gate beats eager v0til<0 gate**. **Rejected:** eager v0til<0 unloading gate  <sub>dem-event-level-restitution.md:47</sub>
+- **Legacy friction applies +-J_t at one point, the contact midpoint**.  <sub></sub>
 - **Legacy one-shot friction cluster stays gated off on the PGS path**. **Rejected:** running the legacy one-shot friction cluster on the PGS path  <sub>dem-dosta-benchmark.md:154</sub>
 - **MPI drum geometry must use a rounded profile, not a sharp barrel+flat-cap min-SDF**. **Rejected:** a sharp barrel+flat-cap min-composited SDF for a drum under MPI  <sub>dem-sdf-walls-moving.md:33</sub>
 - **Mode "ordered" (level-ordered symmetric sweeps) is measured insufficient and kept only for A/B, not shipped as default**. **Rejected:** "ordered" mode as a production stabilization mode  <sub>dem-multilevel-contact-solver.md:67</sub>
@@ -311,12 +317,18 @@ reading until they are settled.
 - **Statics fix: persistent-contact tracking + grounded rise-gated inelastic shock; interim back-coupling reverted on user instruction**. **Rejected:** the interim back-coupling approach  <sub>dem-colored-gauss-seidel-solver.md:64-70</sub>
 - **Strategy B: build standalone Kokkos units, then one clean cut to flip demgpu**. **Rejected:** making cuBQL and Kokkos coexist incrementally in demgpu  <sub>cuda-kokkos-migration.md:143-146</sub>
 - **Symmetric release beats one-sided grounded release**. **Rejected:** one-sided grounded release  <sub>dem-event-level-restitution.md:45</sub>
+- **The 'jacobi' velocity solver diagnostic is mass-split Jacobi**.  <sub></sub>
+- **The Gauss-Seidel colourings are complete by construction: 64 colours, no forced colour, hub copies above 32 edges**. **Rejected:** forcing colour 62 (a same-colour race: CUDA dP 1e-2); leaving edges to the per-body  <sub>dem/docs/contact_solve_framework.md</sub>
 - **The MPI velocity/position solve reuses the single-GPU driver via a Hooks template, not a separate implementation**. **Rejected:** a rank-local adaptive-stop break under MPI  <sub>dem-mpi-solver-port-plan.md:15</sub>
+- **The adaptive stop of a phase with copies includes the consensus correction**. **Rejected:** gate relaxation to the plateau value; a stop on the fine residual alone  <sub>dem/docs/contact_solve_framework.md</sub>
 - **The correct fix, if needed, is proper sequential-impulse friction with an accumulated per-contact tangential impulse clamped to the total Coulomb bound**. **Rejected:** the current Jacobi count-averaged friction scheme, for quantitative frictional-packing studies  <sub>packing-friction-followup.md:26</sub>
 - **The distributed contact solve must conserve linear and angular momentum across rank boundaries**. **Rejected:** accepting redundant two-owner solves of a cross-rank contact (each owner sweeps it from its own state, so the impulses are not equal and opposite; CoM  <sub>docs/HANDOFF_DEM_MPI_MOMENTUM.md;</sub>
+- **The distributed rank colouring of policy X uses blocks within 2 band, not band + S**. **Rejected:** "blocks within band + S" (two ghost ranks of one body could share a colour and both write it in one interval)  <sub>dem/docs/contact_solve_framework.md</sub>
 - **The distributed step's local particle order is canonical (ascending source rank), never MPI arrival order**. **Rejected:** accepting arrival-order nondeterminism; changing core's NBX delivery order  <sub>dem</sub>
 - **The force engine was generalized into a Law/Hooks-templated driver per the device-first + MPI directive**. **Rejected:** a Hertz-only, non-generalized implementation  <sub>dem-mpi-solver-port-plan.md:40</sub>
 - **The multilevel-stabilizer rebound loss is an under-convergence artifact, not a momentum-sink effect — refuting the project's original premise**. **Rejected:** the mission brief's premise that a momentum-conserving stabilizer sink was deleting the rebound  <sub>dem-multilevel-contact-solver.md:42</sub>
+- **The overlap projection is coloured and swept per contact pair, all points of a pair sequentially in one work item**. **Rejected:** per-point colouring with hub copies (20+ copies per ring)  <sub></sub>
+- **The overlap projection is never over-relaxed: omega_pos = 1**. **Rejected:** omega_pos = 1.5 on split slots (3 periodic tests failed; the faster hub convergence of  <sub>dem/docs/contact_solve_framework.md</sub>
 - **Uncapped grid is the default for the fused kernel launch**. **Rejected:** capping the launch grid to fewer blocks  <sub>dem-perf-campaign.md:31-32</sub>
 - **Verlet-cached broadphase gated to non-periodic single-GPU only**. **Rejected:** enabling the Verlet-cached pair list under periodic ghosts / MPI  <sub>dem-sweep-efficiency-plan.md:201</sub>
 - **Wall SDF resolution must be finer than the colliding cube, and seeded cubes must start axis-aligned**. **Rejected:** a coarser wall SDF than the cube size; random initial cube orientations at lattice spacing 2.1  <sub>dem-cubes-gpu-pyvista.md:25-28</sub>
@@ -333,13 +345,15 @@ reading until they are settled.
 - **set_velocity_use_gs defaults to True; False reverts to legacy Jacobi**.  <sub>dem-colored-gauss-seidel-solver.md:13</sub>
 - **step(0.0) settling must skip the velocity solve, friction, and thermostat, and zero the growth velocity**. **Rejected:** running the full velocity pipeline during a dt==0 settle  <sub>packing-velocity-position-split.md:57</sub>
 - **step_mpi at np=1 on a periodic domain may change bitwise (wrap pairs were solved twice)**. **Rejected:** exempting np = 1 periodic from the ownership rule to keep it bitwise  <sub>dem/docs/mpi_momentum_conservation.md</sub>
-- **step_mpi stays on count-averaged Jacobi — distributed colouring across ghosts is a separate problem**.  <sub>dem-colored-gauss-seidel-solver.md:55-57</sub>
 
 ### Superseded — history, do not re-derive the old reading
 
+- Colouring stall-break needs a filtered count-averaged-Jacobi fallback for uncolourable manifolds.  <sub>dem-colored-gauss-seidel-solver.md:64-67</sub>
+- DEM velocity solve: over-relaxed min(1, 2/count) average, not raw Jacobi sum — needed together with a resting-contact threshold.  <sub>porous-cfddem-cuda-two-bugs.md:44</sub>
 - Drum-lag "faceted-wall" geometry explanation was falsified; root cause is missing sustained-contact tangential elasticity.  <sub>dem-dosta-benchmark.md:251</sub>
 - Symmetric PGS alone cannot hold deep statics; one-sided alone breaks ballistic dynamics.  <sub>dem-dosta-benchmark.md:167</sub>
 - ghost_band_* ctests run on one host thread; contact order across threads stays unfixed.  <sub>dem</sub>
+- step_mpi stays on count-averaged Jacobi — distributed colouring across ghosts is a separate problem.  <sub>dem-colored-gauss-seidel-solver.md:55-57</sub>
 
 ## voro — tessellation, ConvexCell, mesh optimizer
 
@@ -612,12 +626,12 @@ reading until they are settled.
 
 ### In force
 
-- **Collocated pressure and forces stay in the implicit predictor — never a face acceleration after the viscous solve**. **Rejected:** the Basilisk face-acceleration (centered.h) form on any collocated path; a text prohibition alone (already existed and was bypassed)  <sub>flow doc/collocated_varrho_forces.md §2, §7</sub>
 - **A host backend that does not size itself must be handed the thread budget**. **Rejected:** keeping the "say nothing on an unconstrained machine" policy for every backend (it is  <sub>RELEASE_PREP.md:11.3</sub>
 - **A solver's internal grid-count threshold is a count, not cell-unit API**. **Rejected:** a physical-length form (wrong: the same length means a different level count at a  <sub>amr</sub>
 - **All coupled methods must share one BlockDecomposer; static-only co-decomposition is rejected**. **Rejected:** "Static-only co-decomposition"  <sub>multiphysics-framework-plan.md:410</sub>
 - **CMake suite_require_nanobind must be a macro, not a function**. **Rejected:** implementing suite_require_nanobind as a CMake function  <sub>nanobind-zero-copy-migration.md:15</sub>
 - **Collocated default is AUTO ghost projection (in both flow and AMR), with documented fallbacks**.  <sub>collocated-attractor-campaign.md:53</sub>
+- **Collocated pressure and forces stay in the implicit predictor — never a face acceleration after the viscous solve**. **Rejected:** the Basilisk face-acceleration ("centered.h") form on any collocated path; a text  <sub>flow</sub>
 - **Convention going forward: never add cell-unit API surface; new setters take physical inputs**. **Rejected:** adding new cell-unit-only API surface  <sub>physical-units-plan.md:44</sub>
 - **Cross-backend gate for "ported"**.  <sub>cuda-kokkos-migration.md:94</sub>
 - **D1–D9: clean break at 1.0.0 — no aliases, two API tiers, no numerics-changing env vars, single version source, honest CI, AMR relocated**. **Rejected:** keeping compatibility aliases; letting env vars change numerics; multiple version sources; deleting AMR  <sub>suite-quality-plan-1-0-0.md:15-21</sub>

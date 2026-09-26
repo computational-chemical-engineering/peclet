@@ -158,7 +158,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: dem
 - source: dem-colored-gauss-seidel-solver.md:64-67
 - decided: 2026-07-16
-- status: settled
+- status: superseded
 - quote: |
     two robustness additions after the SI fluidized-bed crush:
     (1) colouring stall-break + leftover count (64-colour bitmask saturates at contact degree > 62) with
@@ -232,7 +232,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: dem
 - source: porous-cfddem-cuda-two-bugs.md:44
 - decided: 2026-07-09/10
-- status: settled
+- status: superseded
 - quote: |
     Two-part fix: (a) resting-contact threshold e:=0 below 2·g·dt (threshold alone insufficient!); (b) the velocity solve applied the RAW Jacobi sum of manifold impulses (position solve always count-averaged) — now `min(1, 2/count)`·sum (ω=2 over-relaxed average: binary collisions exact, piles converge). Threshold+averaging TOGETHER defuse it; either alone fails.
 - rejected: raw Jacobi sum of manifold impulses in the velocity solve; threshold alone
@@ -1140,7 +1140,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: dem
 - source: dem-colored-gauss-seidel-solver.md:55-57
 - decided: 2026-07-10
-- status: settled
+- status: superseded
 - quote: |
     **NOT done — `step_mpi` stays on count-averaged Jacobi.** Distributed colouring across rank ghosts is a
     separate problem and the 6 MPI parity ctests must be preserved.
@@ -1183,7 +1183,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: dem
 - source: docs/HANDOFF_DEM_MPI_MOMENTUM.md; measured in the ghost_band margin scene (dem c64e117)
 - decided: 2026-09-25
-- status: settled (fixed 2026-09-25, dem 6f92b82..c771e07; see the owner-exclusive entry)
+- status: settled (fixed: dem c771e07 owner-exclusive; completed by the contact-solve framework, dem 3e9a870..274f4bb, 2026-09-26)
 - quote: |
     USER: "That momentum is not conserved is not acceptable. This should be solved."
 - rejected: accepting redundant two-owner solves of a cross-rank contact (each owner sweeps it from its own state, so the impulses are not equal and opposite; CoM of a 3-body chain moved 2.1e-2 in one step)
@@ -1235,3 +1235,223 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - rejected: exempting np = 1 periodic from the ownership rule to keep it bitwise
 - why: USER: conservation is required; a bitwise-preserved non-conservation is not worth keeping
 
+---
+
+### A body updated in several places is solved through copies: mass splitting for projection-form updates, exclusive holding for the one-shot restitution sweep
+- area: dem
+- source: dem/docs/contact_solve_framework.md; evidence dem/docs/contact_evidence/{FOLLOWUPS,AFTER}.md
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    Every contact acts on one copy of each body; each impulse lives once in its owner's lambda.
+    Projection-form updates (PGS + cone + Poisson release, the overlap projection, every
+    stabilization mode, multilevel, Jacobi) mass-split the copies (m/k, I/k, exact active count k)
+    and reconcile by the mean -- conservative at every iterate, fixed point = the coupled solution.
+    The g = 0 one-shot restitution sweep is event-form: rank-shared bodies are held by one rank
+    per sync interval (rank colouring), so the distributed run is a legal serial Gauss-Seidel
+    order and each update stays an exact dissipative binary collision.
+- rejected: raw ghost-increment sums for the one-shot (tri e=0.8 KE 0.333 -> 0.555); mass
+  splitting for the one-shot (compounding restitution: -14 % KE per substep at np 8, e = 0.9;
+  never meets the stop); folding g = 0 into the current PGS form (creates energy at np 1: +6 % /
+  +16 % at e = 0.9 / 1.0); exclusive holding for PGS (3-3.5x iterations at small blocks); k = ranks
+  holding the body (3.4x iterations at np 8)
+- why: conservation by construction; the one-shot's outcome depends on update order, so only an
+  exact serial order preserves its energy behaviour; projection updates converge to the same
+  fixed point for any positive copy mass
+- supersedes: none (extends "Distributed XPBD contacts are owner-exclusive, with ghost->owner reverse accumulation")
+
+---
+
+### The Gauss-Seidel colourings are complete by construction: 64 colours, no forced colour, hub copies above 32 edges
+- area: dem
+- source: dem/docs/contact_solve_framework.md §4
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    The greedy takes the lowest free colour of 64 and never forces one. When a colouring fails, every
+    vertex above 32 edges is split into local mass-split copies (round-robin over its edges in
+    canonical order) and the phase is recoloured -- guaranteed to succeed. Coarse multilevel edges
+    without a free colour are skipped at that level. The count-averaged fallbacks are deleted.
+- rejected: forcing colour 62 (a same-colour race: CUDA dP 1e-2); leaving edges to the per-body
+  Jacobi fallback (non-conservative, D3); an unbounded palette (114-600 colours per sweep);
+  time-sliced hubs (heavy hubs converge s times slower)
+- why: race freedom from a counting lemma, cost confined to the hub
+- supersedes: "Colouring stall-break needs a filtered count-averaged-Jacobi fallback for uncolourable manifolds"
+
+---
+
+### The overlap projection is coloured and swept per contact pair, all points of a pair sequentially in one work item
+- area: dem
+- decided: 2026-09-25
+- status: settled
+- quote: Ring beds carried 79-613 contact points per particle (per-point graph above the palette at
+  every substep) but 5-20 pairs. Single-point pairs keep today's edge, key and arithmetic (bitwise).
+- rejected: per-point colouring with hub copies (20+ copies per ring)
+- why: exact GS inside a pair, colours per sweep from 63 (capped) to about 20
+
+---
+
+### Legacy friction applies +-J_t at one point, the contact midpoint
+- area: dem
+- decided: 2026-09-25
+- status: settled
+- quote: The two surface arms applied a couple dist*n x J_t (measured ratio 1.000; 62-79 % of friction
+  contacts are speculative). Changes every g = 0 run with body-body friction at np 1.
+- why: angular momentum conservation; the manifold path already used the midpoint
+
+---
+
+### The 'jacobi' velocity solver diagnostic is mass-split Jacobi
+- area: dem
+- decided: 2026-09-25
+- status: settled
+- quote: Each contact is solved against copies of mass m/count and the true-mass deltas are summed,
+  replacing min(1, 2/count_i) and 1/count_i per body (dP 9e-3 at np 1).
+- supersedes: "DEM velocity solve: over-relaxed min(1, 2/count) average, not raw Jacobi sum" (for the
+  diagnostic path; the production path is Gauss-Seidel since 2026-07-10)
+
+---
+
+### Every pair within contact reach is visible to both owners: drift slack, vote-triggered migration, all periodic images
+- area: dem
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    Ghost band = reach + S + P (S = 0.25 R_max drift slack; P = Verlet skin, else the substep's
+    predicted displacement). When any body's predicted position is more than S outside its owner's
+    block (vote folded into the existing radius Allreduce) the step migrates to the current blocks.
+    core's halo sends every periodic image within the band (allImages). Same for Hertz.
+- rejected: zero slack (pairs lost at 1.857 R drift, np >= 4); per-step migration (a host round
+  per substep); dem-side image completion
+- why: the ownership rule presupposes that both owners see every pair
+
+---
+
+### Distributed dead-pair Poisson credit is given only by the pair's owner
+- area: dem
+- decided: 2026-09-25
+- status: settled
+- quote: scatterOrphanBanks credits a dead ledger entry only on the rank that owns its lower-gid
+  endpoint; orphan balances are split B/k over mass-split copies.
+- why: the migration carry put entries on both endpoints' new owners (double credit); concurrent
+  draws overdrew
+```
+
+**Amend** the existing "Distributed XPBD contacts are owner-exclusive…" entry: add
+`see also: "A body updated in several places is solved through copies"`.
+
+**Finding for the register as an open issue, not a decision:** "dem's PGS restitution target of 0
+for pre-separating contacts creates kinetic energy in dense random-velocity states: +6.4 % /
++16 % at e = 0.9 / 1.0 in one converged substep (framework note, Appendix A). The Moreau target
+`−e·γ⁻` is dissipative. Unchanged pending a decision" (R-U1).
+
+---
+
+### The overlap projection is never over-relaxed: omega_pos = 1
+- area: dem
+- source: dem/docs/contact_solve_framework.md §13.1; evidence dem/docs/contact_evidence/IMPL_A.md (WO-4 Stop A)
+- decided: 2026-09-25
+- status: settled
+- quote: |
+    The overlap projection applies -C/w only while C < 0 and never retracts (non-accumulated
+    POCS). Over-relaxing it leaves a permanent gap (omega w/w~ - 1)|C|: omega_pos = 1.5 on
+    mass-split slots put an isolated periodic wrap pair 1.5 x its overlap apart and every leaf of a
+    split hub 0.5 x its overlap clear. Over-relaxation is legitimate only on an accumulated
+    multiplier with a retractable clamp (the PGS normal).
+- rejected: omega_pos = 1.5 on split slots (3 periodic tests failed; the faster hub convergence of
+  A.4 was over-separation); PSOR on split contacts only (no convergence proof for the mix, a second
+  stop metric); edge-count-weighted copy masses (1.2-1.5x more iterations at np 2)
+- why: a projection that cannot retract must not overshoot
+
+---
+
+### A multilevel coarse vertex carries the mass of its folded copies, a*m/k
+- area: dem
+- source: dem/docs/contact_solve_framework.md §13.2
+- decided: 2026-09-25
+- status: settled
+- quote: After the fold, the a active local copies at a vertex move together; the coarse cycle
+    treats them as one vertex of mass a*m/k (the true mass at np 1). Solve-view masses (m/k) at a
+    folded hub gained (1 - 1/s) m dV per coarse cycle.
+- rejected: solve-view masses (non-conservative at a folded hub); fold after the coarse cycle
+  (conservative, but the coarse problem sees a local hub at 1/s of its mass)
+```
+
+Open issue for the register (R-U4): "the overlap projection is non-accumulated POCS. Accumulated
+PSOR would have a unique least-displacement fixed point and legitimate over-relaxation (model:
+2.8–3.5× fewer iterations at np 1). Unchanged pending the user's decision."
+
+---
+
+### The distributed rank colouring of policy X uses blocks within 2 band, not band + S
+- area: dem
+- source: dem/docs/contact_solve_framework.md §12 S19; dem 4441c2e (WO-6)
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    A body is active on a rank only through a contact with a partner the rank owns, within the
+    contact reach of the body, so two ranks holding active copies of one body have blocks up to
+    2 (reach + drift) <= 2 band apart; "band + S" covered owner-ghost pairs but not two ghost ranks
+    of one body. A superset of the conflict graph is safe; its cost is only C.
+- rejected: "blocks within band + S" (two ghost ranks of one body could share a colour and both write it in one interval)
+- why: X1 (one writer per body per sync interval) must hold for every body; the review's 3-body scene now gives np 2-8 KE = np 1 exactly
+
+---
+
+### Ghost selection and the drift vote use the domain-clamped ownership coordinate on non-periodic axes
+- area: dem
+- source: dem/docs/contact_solve_framework.md §12 S20; dem aea487a (WO-7)
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    Ownership clamps a position outside a non-periodic domain onto the boundary cells (core cellOf),
+    so a boundary block owns the half-space beyond it; the halo topology is built from clamped
+    positions and blockBox() is semi-infinite there. Clamping is a projection onto a convex box and
+    never lengthens a distance. oracle_shear: 121 missing pairs at np 4/8 -> 0.
+- rejected: measuring visibility against the finite block box (a body outside an unwalled domain is silently never ghosted across a block face)
+- why: ghost selection must use the same coordinate as ownership, or the visibility proof has a hole at the domain boundary
+
+---
+
+### Hertz pair lists are canonically oriented, lower gid first
+- area: dem
+- source: dem/docs/contact_solve_framework.md §12 S21; dem aea487a (WO-7)
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    The Mindlin spring xi is the tangential displacement of pairs(idx,0) relative to pairs(idx,1)
+    and flips sign with the order. The two owners of a cross-rank pair store opposite orientations
+    (owned slots precede ghosts), so a gid-keyed history carry through any migration could hand a
+    rank the wrong sign: hertz_shear dP 9.1e-4 -> 3e-8 through 18 migrations. np 1 byte-identical.
+- rejected: carrying xi by gid without an orientation convention (latent for every mid-run migration, rebalance included); a larger carry cap (measured: not the cause)
+- why: a per-pair state that two ranks evaluate redundantly must have one meaning on both
+
+---
+
+### A periodic self-image contact is owned outright when its twin image is absent
+- area: dem
+- source: dem/docs/contact_solve_framework.md §12 S23; dem 4035ac2 (WO-9)
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    "Lower gid solves" assumed both twins (a, b-image) and (b, a-image) exist on the rank. Under the
+    drift slack a body owned from across a periodic face has only one orientation; the rule now
+    checks the self-image CSR, as the cross-rank rule checks the partner's copy list.
+    oracle_periodic missing 1/2 -> 0 at np 4/8.
+- rejected: the unconditional lower-gid rule for self-image pairs
+- why: exactly-once needs the same "only one sees it" branch for self images as for ranks
+
+---
+
+### The adaptive stop of a phase with copies includes the consensus correction
+- area: dem
+- source: dem/docs/contact_solve_framework.md §12 S14; docs/contact_evidence/INVESTIGATION_WO5.md
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    A solve has not converged while copies of one body disagree. With every stop off, np 2/4/8
+    converge to np 1 at the float floor (1.4e-7 at N >= 32); the 1.57e-3 plateau was the stop ending
+    with copies ~1e-3 apart. The largest consensus correction is folded into the same
+    Allreduce-MAX as the stop residual (no extra message).
+- rejected: gate relaxation to the plateau value; a stop on the fine residual alone
+- why: the fixed point is the coupled solution; the stop must not end before the copies agree
