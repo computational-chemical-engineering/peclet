@@ -46,6 +46,22 @@ published. Evidence: `dem/docs/contact_evidence/AFTER.md` §1–§10.
 - Worktrees removed. `dem-perfbase` (c771e07 plus a PERF_G patch, `build_pb`) is kept as the A/B
   baseline, and `dem-contacts` is stale (branch `contacts`).
 
+**Queued candidates (USER 2026-09-26, not started):**
+1. **Study: XPBD against Hertz for non-spherical collisions.** Drop cubes and tubes at several
+   orientations and impact speeds, then compare effective restitution with input e under both
+   engines.
+   - The expectation to test: XPBD imposes e per contact point with the full rotational effective
+     mass, so it returns e by construction. Hertz with shapes uses the translational m* in its
+     dashpot, a fixed contact curvature and shell-density-dependent stiffness. It therefore
+     over-dissipates eccentric impacts, like every mainstream code (multi-sphere, superquadric,
+     LS-DEM).
+   - This could be a small paper or gallery entry.
+   - Hertz itself stays "as everyone does" (USER); no change to it.
+2. **Walton–Braun hysteretic linear law** as a second law of the generalized `demStepForce` driver,
+   beside Hertz–Mindlin. Its restitution is e = sqrt(k_load / k_unload), independent of geometry
+   and mass for a single contact, which is why polyhedral codes use it. It needs a per-pair plastic
+   overlap history (a carried float, like the Mindlin history).
+
 **Waiting on the user:** the restitution law (Q-C; recommendation Moreau); R-B2 two-way shell
 detection (recommended next package).
 
