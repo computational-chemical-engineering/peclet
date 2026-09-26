@@ -5,43 +5,41 @@ implementation. Status: first fix landed (dem 7074ee6..c771e07, pushed); **REOPE
 numbers: `dem/docs/momentum_evidence/AFTER.md`. Performance was measured at host load 55–60; a quiet-host
 re-measure (`run_perf_ab.sh`) is still owed.
 
-**STATE 2026-09-26 late (resume here): the framework and WO-12 are on dem main 0520b21, and core
-1.3.0 is PUBLISHED** (PyPI: peclet-halo and the peclet-core shell 1.3.0; dem `PECLET_CORE_TAG`
-v1.3.0; fresh-venv smoke test OK).
-- Design: `dem/docs/contact_solve_framework.md`, with §12 S1–S24 and §13.
-- Evidence: `dem/docs/contact_evidence/AFTER.md` §1–§9.
+**STATE 2026-09-26 night (resume here).** dem main **77ba917** (pushed): the framework + WO-12
+(0520b21), then the performance package, CI repairs and the follow-ups design note. Core 1.3.0 is
+published. Evidence: `dem/docs/contact_evidence/AFTER.md` §1–§10.
 
-**What holds:**
-- conservation dP ≤ 1e-8 (8e-7 under gravity);
-- the review's 3-body KE at np 2–8 equals np 1 exactly;
-- visibility oracles: missing = dup = 0 in closed, sheared and periodic scenes;
-- WO-12: the accumulated, retractable overlap projection at ω 1.5 has a unique fixed point.
-  Converged positions agree across np to ≤ 4.7e-5 R (was 1e-2 R), and clusters converge in 2.9×
-  fewer position iterations;
-- 7 mutation controls detected;
-- battery 264/264 host, 59/59 CUDA subset.
+**Done this round.**
+- **Cost closed, bit for bit:** +9–17 % → **+2–6 %** against c771e07 (AFTER.md §10, `after12/`).
+  The cost was host work: a serial host sort of every contact key in the unit build, a host sort of
+  every gid in `mapVelocitySlots`, O(N_owned) owner kernels at every sync, and launch count.
+  Byte-equal dumps in 29 scenes × np 1–8; battery 264/264 host and CUDA.
+- **CI was red since f44fba7** (not only this work): clang-format (fixed, whitespace only) and core's
+  rename `peclet.core.mpi` → `peclet.halo` (CI + Python MPI drivers moved). dem now pins the ctest
+  launcher beside mpicxx: ParaView's mpiexec on PATH had made every np ≥ 2 ctest run singletons.
+- **Coupling re-run** (dem 0520b21): host 22/22, nothing moved. The coupling tests never exercise
+  the new contact solve (coverage gap). CUDA found a pre-existing race (coupling kernels on their
+  own stream, flow's halo exchange unfenced): **fix in flight** (coupling worktree `streamfence`).
+- **Architect design** `dem/docs/contact_physics_followups.md`:
+  - Q-A: rigid 6-DOF multilevel aggregates, ΔL = 0 exactly.
+  - Q-B: keep the position phase translation-only, with the consistent diagonal invM_A + invM_B.
+    `ring_mini` never converged because the scene starts tunnelled (85/106 pairs infeasible even
+    with rotation); new gate `ring_collide`.
+  - F1: tube/box broad phase used the radius, not the bounding radius; end contacts were missed.
+  - F2: one-way shell detection (open, R-B2).
+  - Q-C: restitution-law options.
 
-**Cost against c771e07, after the easy wins:**
-- the wins: core image prefilter, candidate ranks, singleton units, fused vote, inline X gate;
-- ms/step +9 % to +12 % at zero gravity and +15 % to +19 % under gravity (20k particles, np 4/8);
-  the same order at 157k;
-- WO-12 is cost-neutral where the iteration cap binds.
-- The rest is not easy:
-  - the position kernel +15 % per contact, cause not isolated;
-  - more PGS iterations from the S14 consensus stop, which is principled;
-  - MPI/host time in the M syncs.
+**In flight (branches, not merged):** `mlrigid` (WO-A1, A2), `posdiag` (WO-B0, B1, B2), `restlaw`
+(WO-C1, Moreau as a diagnostics A/B; default Newton). Each is in its own sibling worktree. Merge
+order C, B, A; the register entries (note §5) go into `docs/decisions/dem.md` at merge.
 
-  A dedicated performance package would need profiling on quiet cores (other sessions pin
-  processes on 8–23).
+**Waiting on the user:** the restitution law (Q-C; recommendation Moreau); R-B2 two-way shell
+detection (recommended next package).
 
-**Open:**
-1. the performance package above;
-2. the multilevel coarse cycle's angular momentum (S17, opt-in mode);
-3. serial PGS energy gain on separating contacts;
-4. `computeW`'s unused rotational term, which is probably why `ring_mini` never converges its
-   overlap (0.2 R);
-5. coupling's MPI tests were not re-run after WO-12.
-
+**Performance left:**
+- the S14 extra velocity iterations (principled);
+- the halo topology rebuilt every step at `verlet_skin = 0` (~2.5 ms/step at 157k np 4, host);
+- the drift vote.
 **Status 2026-09-25 evening: REOPENED as a framework redesign** (USER: "It feels that we are trying to
 patch this issue while it needs a rigorous design. Think of a principled method ... implementation plan.
 Take performance also into account. Test it well"). Documentation is on dem main e90caff:
