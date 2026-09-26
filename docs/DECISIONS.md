@@ -243,7 +243,7 @@ reading until they are settled.
 
 ## dem — XPBD, contacts, packing
 
-98 in force, 7 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
+105 in force, 7 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
 
 ### In force
 
@@ -252,6 +252,7 @@ reading until they are settled.
 - **A periodic self-image contact is owned outright when its twin image is absent**. **Rejected:** the unconditional lower-gid rule for self-image pairs  <sub>dem/docs/contact_solve_framework.md</sub>
 - **Acceptance bar for solver-internals changes is run-scatter parity + gated defaults, not bit-identity**. **Rejected:** bit-identity as the acceptance bar  <sub>dem-sweep-efficiency-plan.md:246</sub>
 - **Adaptive multilevel stop uses the quasi-static (QS) residual, not the full fine residual or coarse-only**. **Rejected:** gating the adaptive stop on the full fine residual (over-converges flowing scenes); gating on coarse-only residual (statics degrade)  <sub>dem-multilevel-contact-solver.md:27</sub>
+- **An analytic non-spherical shape's baseRadius is its circumscribed radius**. **Rejected:** the geometric radius (end and corner contacts invisible to the broad phase and the band)  <sub>dem/docs/contact_physics_followups.md</sub>
 - **Blanket persistent-contact e=0 is rejected; restitution is one-sided-only when grounded and not rising**. **Rejected:** blanket persistent-contact e=0 for all persistent contacts  <sub>packing-velocity-position-split.md:17</sub>
 - **Body-body friction accumulates normal impulse across velocity-solve iterations; plane/wall uses one-shot post-gravity load**. **Rejected:** a velocity-approach-only proxy for body-body; accumulating normal impulse for plane/wall contacts  <sub>packing-velocity-position-split.md:45</sub>
 - **Body-body multi-contact friction is quantitatively too weak (by ~coordination number Z); the fix is deferred sequential-impulse friction**. **Rejected:** dividing each contact's friction bound by the per-body contact count (Jacobi count-averaging) as adequate for multi-contact bulk friction  <sub>packing-friction-followup.md:17</sub>
@@ -283,6 +284,7 @@ reading until they are settled.
 - **Growth-view sizing bug: every maxContacts-sized view must be grown together, not just contacts+manifolds**. **Rejected:** growing only contacts+manifolds while leaving other maxContacts-sized views at the old size  <sub>dem-sdf-general-particles.md:69</sub>
 - **HCS benchmark contact-solver exonerated via the colored-GS A/B**. **Rejected:** the contact solver as the source of the residual factor-2 stage offset  <sub>hcs-mfix-benchmark-evidence.md:31-32</sub>
 - **Hertz pair lists are canonically oriented, lower gid first**. **Rejected:** carrying xi by gid without an orientation convention (latent for every mid-run migration, rebalance included); a larger carry cap (measured: not the c  <sub>dem/docs/contact_solve_framework.md</sub>
+- **Hertz sphere contacts use the sphere's own radius, never the reach radius**. **Rejected:** rad(i) as the contact radius (a sphere mixed with tubes read up to 1.8x its radius after WO-B0)  <sub>dem</sub>
 - **Incremental colouring gated OFF under MPI, and position conflict detection avoids a host sync**. **Rejected:** enabling incremental colouring under MPI as-is; a host readback for conflict detection  <sub>dem-sweep-efficiency-plan.md:47</sub>
 - **Interim DEM back-coupling commit reverted on user instruction**. **Rejected:** the interim back-coupling commit 374565d  <sub>porous-cfddem-cuda-two-bugs.md:76-77</sub>
 - **Interim dx→dv back-coupling was reverted on explicit user instruction — the no-back-coupling clause stands absolutely**. **Rejected:** interim dx→dv back-coupling (commit 374565d)  <sub>packing-velocity-position-split.md:10</sub>
@@ -292,6 +294,7 @@ reading until they are settled.
 - **Legacy one-shot friction cluster stays gated off on the PGS path**. **Rejected:** running the legacy one-shot friction cluster on the PGS path  <sub>dem-dosta-benchmark.md:154</sub>
 - **MPI drum geometry must use a rounded profile, not a sharp barrel+flat-cap min-SDF**. **Rejected:** a sharp barrel+flat-cap min-composited SDF for a drum under MPI  <sub>dem-sdf-walls-moving.md:33</sub>
 - **Mode "ordered" (level-ordered symmetric sweeps) is measured insufficient and kept only for A/B, not shipped as default**. **Rejected:** "ordered" mode as a production stabilization mode  <sub>dem-multilevel-contact-solver.md:67</sub>
+- **Multilevel coarse bodies are rigid 6-DOF aggregates (projection form, spins included)**. **Rejected:** translation-only aggregates (dL = (X_A - X_B) x J); a coarse impulse redirected through the centres (non-associated, breaks the ledger and KE); a spin  <sub>dem/docs/contact_physics_followups.md</sub>
 - **Multilevel slip gate ships at 8·g·dt, not ungated, persistent+cone, or 2·g·dt**. **Rejected:** ungated aggregation (fake bulk viscosity, silo 16.7); persistent+cone gate (pour CRUSH); slip @ 2 g dt (pour CRUSH)  <sub>dem-multilevel-contact-solver.md:52</sub>
 - **Never use get_max_overlap() as the sole packing-quality gate**. **Rejected:** using get_max_overlap() alone to validate packing quality  <sub>porous-scaling-benchmark.md:53-56,</sub>
 - **New per-pair/experimental features must default off and reduce bit-identically**.  <sub>dem-dosta-benchmark.md:107</sub>
@@ -320,6 +323,7 @@ reading until they are settled.
 - **The 'jacobi' velocity solver diagnostic is mass-split Jacobi**.  <sub></sub>
 - **The Gauss-Seidel colourings are complete by construction: 64 colours, no forced colour, hub copies above 32 edges**. **Rejected:** forcing colour 62 (a same-colour race: CUDA dP 1e-2); leaving edges to the per-body  <sub>dem/docs/contact_solve_framework.md</sub>
 - **The MPI velocity/position solve reuses the single-GPU driver via a Hooks template, not a separate implementation**. **Rejected:** a rank-local adaptive-stop break under MPI  <sub>dem-mpi-solver-port-plan.md:15</sub>
+- **The Moreau e = 1 energy gate runs at dt = 1e-4**. **Rejected:** widening the bound to 2e-4 at dt = 1e-2 (would hide a real law defect of that size)  <sub>session</sub>
 - **The adaptive stop of a phase with copies includes the consensus correction**. **Rejected:** gate relaxation to the plateau value; a stop on the fine residual alone  <sub>dem/docs/contact_solve_framework.md</sub>
 - **The correct fix, if needed, is proper sequential-impulse friction with an accumulated per-contact tangential impulse clamped to the total Coulomb bound**. **Rejected:** the current Jacobi count-averaged friction scheme, for quantitative frictional-packing studies  <sub>packing-friction-followup.md:26</sub>
 - **The distributed contact solve must conserve linear and angular momentum across rank boundaries**. **Rejected:** accepting redundant two-owner solves of a cross-rank contact (each owner sweeps it from its own state, so the impulses are not equal and opposite; CoM  <sub>docs/HANDOFF_DEM_MPI_MOMENTUM.md;</sub>
@@ -329,6 +333,7 @@ reading until they are settled.
 - **The multilevel-stabilizer rebound loss is an under-convergence artifact, not a momentum-sink effect — refuting the project's original premise**. **Rejected:** the mission brief's premise that a momentum-conserving stabilizer sink was deleting the rebound  <sub>dem-multilevel-contact-solver.md:42</sub>
 - **The overlap projection is accumulated and retractable: projected SOR on each contact's net push, omega_pos = 1.5**. **Rejected:** the non-accumulated POCS held at omega 1 (non-unique fixed point, cannot retract, 2.9x slower); omega 1.7 (hubs slower)  <sub>dem/docs/contact_solve_framework.md</sub>
 - **The overlap projection is coloured and swept per contact pair, all points of a pair sequentially in one work item**. **Rejected:** per-point colouring with hub copies (20+ copies per ring)  <sub></sub>
+- **The overlap projection's diagonal is the translational effective mass invM_A + invM_B**. **Rejected:** computeW's rotational term (a rotation never applied; world arm x body-frame inertia, not frame-indifferent; overstated the stop metric)  <sub>dem/docs/contact_physics_followups.md</sub>
 - **Uncapped grid is the default for the fused kernel launch**. **Rejected:** capping the launch grid to fewer blocks  <sub>dem-perf-campaign.md:31-32</sub>
 - **Verlet-cached broadphase gated to non-periodic single-GPU only**. **Rejected:** enabling the Verlet-cached pair list under periodic ghosts / MPI  <sub>dem-sweep-efficiency-plan.md:201</sub>
 - **Wall SDF resolution must be finer than the colliding cube, and seeded cubes must start axis-aligned**. **Rejected:** a coarser wall SDF than the cube size; random initial cube orientations at lattice spacing 2.1  <sub>dem-cubes-gpu-pyvista.md:25-28</sub>
@@ -337,10 +342,12 @@ reading until they are settled.
 - **WallSdf sign convention: positive in the void, negative inside the solid wall**.  <sub>dem-sdf-walls-moving.md:15</sub>
 - **dem set_positions (N,4): w==0 does not mean fixed — invMass remap convention**. **Rejected:** assuming w==0 in set_positions means invMass=0 (fixed)  <sub>stale-build-mphys-trees.md:14</sub>
 - **dem set_positions resets every particle to shape 0 — set_shape_ids must be called after**.  <sub>sdf-scene-campaign.md:32</sub>
+- **dem's ctest MPI launcher is pinned beside mpicxx**. **Rejected:** the PATH lookup; a hard-coded /usr/bin/mpirun fallback only when unset  <sub>dem</sub>
 - **dem.step() with no argument advances nothing**.  <sub>sdf-scene-campaign.md:19</sub>
 - **globalScale folded into effScaleA/effScaleB throughout body-body narrowphase**. **Rejected:** the prior narrowphase code that omitted globalScale from B's canonical remap  <sub>dem-global-scale-sphere-limitation.md:10-18</sub>
 - **packing broad-phase: ArborX replaces cuBQL**. **Rejected:** cuBQL (NVIDIA-only BVH)  <sub>cuda-kokkos-migration.md:82-86</sub>
 - **random-packed-bed example: use effective radius including growth_factor; use annealed pack.py protocol**. **Rejected:** baseRadius*scale alone (omitting growth_factor); phi_ref 0.66 crude-feedback protocol  <sub>peclet-examples-gallery.md:58-71</sub>
+- **ring_mini is a conservation scene; ring_collide is the ring convergence gate**. **Rejected:** chasing ring_mini's ovl with solver changes (computeW, rotation, more iterations)  <sub>dem/docs/contact_physics_followups.md</sub>
 - **set_restitution_model default is "newton", bit-identical to prior behaviour**. **Rejected:** making "poisson" the default  <sub>dem-event-level-restitution.md:11</sub>
 - **set_velocity_use_gs defaults to True; False reverts to legacy Jacobi**.  <sub>dem-colored-gauss-seidel-solver.md:13</sub>
 - **step(0.0) settling must skip the velocity solve, friction, and thermostat, and zero the growth velocity**. **Rejected:** running the full velocity pipeline during a dt==0 settle  <sub>packing-velocity-position-split.md:57</sub>

@@ -747,7 +747,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
     Position is translation-only (matches `applyUpdatesKokkos`, which drops
     `deltaQuat`; angular contact response lives in the velocity solve) and never writes velocity (overlap
     removal stays decoupled from velocity, per the design principle).
-- rejected: none stated
+- rejected: none stated at the time; 2026-09-26 (dem/docs/contact_physics_followups.md §3): rotation in the position phase -- it does not rescue tunnelled states (ring_mini: 84/106 pairs infeasible even with linearised rotation <= 3 rad), non-tunnelled tube scenes are translation-feasible (0 infeasible pairs over 40 steps), and it costs an orientation consensus, folds, lever-arm refresh and an L defect. Revisit trigger: a non-tunnelled packing with translation-infeasible pairs, or a measured density deficit against a 6-DOF reference (R-B4)
 - why: per the design principle that overlap removal is decoupled from the velocity solve
 
 ### Root cause of H100-only DEM corruption: Particles::ensureCapacity never resized materialId
@@ -1472,4 +1472,109 @@ PSOR would have a unique least-displacement fixed point and legitimate over-rela
 - rejected: the non-accumulated POCS held at omega 1 (non-unique fixed point, cannot retract, 2.9x slower); omega 1.7 (hubs slower)
 - why: a unique, rank-independent answer and faster convergence; the user accepted the np 1 numerics change
 - supersedes: "The overlap projection is never over-relaxed: omega_pos = 1"
+
+---
+
+### Multilevel coarse bodies are rigid 6-DOF aggregates (projection form, spins included)
+- area: dem
+- source: dem/docs/contact_physics_followups.md §2 (architect, 2026-09-26); WO-A1/A2 (dem mlrigid a2fd51f, 74b55a6)
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    The coarse state is the mass/inertia projection of the fine state onto rigid motions; coarse
+    impulses act at the contact point; prolongation is the rigid motion, spins included. hub_ml dLvel
+    3.0e-3 -> 6.0e-7 (np 1; <= 3e-7 at np 2..8, CUDA 5.7e-7), gated at 1e-6; spin KE 0.43 % of the
+    step's KE loss (under the 1 % R-A1 trigger). Cost +19-25 % on a 25k settled bed in the opt-in
+    multilevel mode only.
+- rejected: translation-only aggregates (dL = (X_A - X_B) x J); a coarse impulse redirected through the centres (non-associated, breaks the ledger and KE); a spin-only torque (tiny rotational inertia, spurious spins); orbital-only (singular for every level-1 sphere pair); residual/Galerkin evaluation (can create KE)
+- why: dL exact, KE non-increasing per coarse step, translation recovered as I_g^-1 -> 0; supersedes S17's "report dLvel only" (contact_solve_framework.md §12)
+
+---
+
+### The overlap projection's diagonal is the translational effective mass invM_A + invM_B
+- area: dem
+- source: dem/docs/contact_physics_followups.md §3.3 (architect, 2026-09-26); WO-B1
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    The position phase applies translation only, so its diagonal is the translational effective mass
+    of the solve views. The fixed point and omega_pos = 1.5 are unchanged (converged <= 5.1e-5 R of
+    the old); finite-iteration results change for non-spheres and spinning spheres; non-spinning
+    spheres byte-identical. ring_collide median position iterations 6.0 -> 8.5 (R-B3 ratio 1.42 < 1.5).
+- rejected: computeW's rotational term (a rotation never applied; world arm x body-frame inertia, not frame-indifferent; overstated the stop metric)
+- why: a consistent projection: the diagonal must be the one of the update actually applied
+
+---
+
+### An analytic non-spherical shape's baseRadius is its circumscribed radius
+- area: dem
+- source: dem/docs/contact_physics_followups.md F1 (architect, 2026-09-26); WO-B0
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    Tube sqrt(R^2 + (H/2)^2), box sqrt(3) R: every reader of baseRadius / rad is a reach use (broad
+    phase, margin, ghost band). Coaxial tubes overlapping by 0.3 went from 0 contacts to 203; pack_rings
+    reached phi 0.342 with ~4e-5 overlaps where main stalled at 0.188 with 5e-2. Inertia formulas keep
+    the geometric radius. Named change for every analytic tube and box run.
+- rejected: the geometric radius (end and corner contacts invisible to the broad phase and the band)
+- why: a missed contact is a correctness defect, not a tuning choice
+
+---
+
+### Hertz sphere contacts use the sphere's own radius, never the reach radius
+- area: dem
+- source: dem 98e3c65 (session, 2026-09-26, found by the WO-B0 reader audit)
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    rad(i) = scale * globalScale * the registry's LARGEST bounding radius is a reach radius. The Hertz
+    pair kernel (no shells) and the wall kernel's sphere branch take a SPHERE shape's own radius
+    (scale * globalScale * params.x, what the XPBD narrow phase probes with). Sphere-only runs
+    byte-identical.
+- rejected: rad(i) as the contact radius (a sphere mixed with tubes read up to 1.8x its radius after WO-B0)
+- why: contact geometry and search reach are different quantities
+
+---
+
+### ring_mini is a conservation scene; ring_collide is the ring convergence gate
+- area: dem
+- source: dem/docs/contact_physics_followups.md §3.2, §3.4 (architect, 2026-09-26); WO-B2
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    ring_mini starts tunnelled: 85/106 contacting pairs have an infeasible linearised overlap problem,
+    84 even with rotation <= 3 rad, so its ovl cannot converge under any solver (0.27-0.33 at 20, 200
+    and 2000 iterations). ring_collide starts overlap-free: committed overlap 2.1e-5, np 2/4/8 agree
+    to 1.9e-6 R, conservation dP <= 1.7e-8.
+- rejected: chasing ring_mini's ovl with solver changes (computeW, rotation, more iterations)
+- why: a gate must be feasible to mean anything
+
+---
+
+### The Moreau e = 1 energy gate runs at dt = 1e-4
+- area: dem
+- source: session 2026-09-26 (WO-C1 stop, reported by the implementer)
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    At dt = 1e-2 the resting threshold 2 dt |g| holds sub-threshold contacts at e = 0, a bounded
+    creation channel (R-C3): KE1/KE0 = 1 + 1.26e-4 under Moreau at e = 1; it scales with dt (1 + 3e-9
+    at dt = 1e-4). The e = 0.5 / 0.9 gates stay at the scene dt.
+- rejected: widening the bound to 2e-4 at dt = 1e-2 (would hide a real law defect of that size)
+- why: gate the law where the threshold channel is negligible; the channel itself is recorded
+
+---
+
+### dem's ctest MPI launcher is pinned beside mpicxx
+- area: dem
+- source: dem d14769f (session 2026-09-26); core's cmake/PecletCorePinMpiexec.cmake
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    FindMPI searched MPIEXEC_EXECUTABLE on PATH and took ParaView's MPICH mpiexec: every np >= 2
+    ctest ran singletons, found when the mutation controls 1, 2, 4, 5 went undetected.
+    cmake/PecletDemPinMpiexec.cmake uses the launcher beside mpicxx (-DPECLET_DEM_PIN_MPIEXEC=OFF for
+    srun sites).
+- rejected: the PATH lookup; a hard-coded /usr/bin/mpirun fallback only when unset
+- why: the launcher must belong to the MPI the binaries link
 
