@@ -5,6 +5,12 @@ implementation. Status: first fix landed (dem 7074ee6..c771e07, pushed); **REOPE
 numbers: `dem/docs/momentum_evidence/AFTER.md`. Performance was measured at host load 55–60; a quiet-host
 re-measure (`run_perf_ab.sh`) is still owed.
 
+**CLOSED 2026-09-27 (USER: "dem is okay; further extensions and optimizations can be done
+later").** dem main 28e0c98 is pushed, CI green through a96a14c. What's left is parked: the queued
+candidates below (Walton–Braun law, the non-spherical restitution study = docs/PAPER_IDEAS.md #1),
+the "Performance left" list, and wall/plane contacts that are still one-way under two-way
+detection.
+
 **STATE 2026-09-26 night (resume here).** dem main **77ba917** (pushed): the framework + WO-12
 (0520b21), then the performance package, CI repairs and the follow-ups design note. Core 1.3.0 is
 published. Evidence: `dem/docs/contact_evidence/AFTER.md` §1–§10.
@@ -66,7 +72,7 @@ published. Evidence: `dem/docs/contact_evidence/AFTER.md` §1–§10.
 - Moreau is the restitution target (landed).
 - XPBD is the efficiency engine, so costly refinements are opt-in (register).
 - Two-way shell detection landed, opt-in: `set_shell_detection('two_way')`, dem 888bd5b/38c9498.
-  Open: wall/plane contacts remain one-way.
+  Reverse normals rotate with their own body (28e0c98). Open: wall/plane contacts remain one-way.
 
 **Performance left:**
 - the S14 extra velocity iterations (principled);
