@@ -56,6 +56,9 @@ The design contract lives in `docs/`:
   Snellius/LUMI site packages, Zenodo, gallery re-check) with the current cycle's state and decisions in
   [docs/RELEASE_PREP.md](docs/RELEASE_PREP.md); pre-flight + audits in `tools/release/`, site scripts in
   `tools/hpc/`. **Read before bumping a version or tagging anything.**
+- [docs/PAPER_IDEAS.md](docs/PAPER_IDEAS.md) — the living register of **scientific paper ideas**
+  that use the suite (claim, why peclet, existing evidence, missing experiments, status). Add an idea
+  when one comes up; rewrite entries in place.
 - [docs/archive/](docs/archive/README.md) — dated design notes and campaign records (AMR, analytic SDF,
   VoF, Voronoi methods, multiphysics, defect correction, MG telescoping, device residency, the CUDA
   wheel prototype). Superseded by the code and the reference docs above — history, not contract.
