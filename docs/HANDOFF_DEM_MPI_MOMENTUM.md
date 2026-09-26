@@ -5,6 +5,49 @@ implementation. Status: first fix landed (dem 7074ee6..c771e07, pushed); **REOPE
 numbers: `dem/docs/momentum_evidence/AFTER.md`. Performance was measured at host load 55–60; a quiet-host
 re-measure (`run_perf_ab.sh`) is still owed.
 
+**STATE 2026-09-26 (resume here).** Framework design: `dem/docs/contact_solve_framework.md`
+(§1–§11, §12 session decisions S1–S18, §13 amendment; the evidence is in
+`dem/docs/contact_evidence/IMPL_A.md`). Worktree `suite/dem-contacts`, branch `contacts`, pushed to
+dem main at **5ffce63**.
+
+**Landed work orders:**
+
+| work order | content | commit |
+|---|---|---|
+| WO-0 | instrumentation | 3e9a870 |
+| WO-1 | midpoint friction | 07114fb |
+| WO-2 | mass-split Jacobi | 5c91df9 |
+| WO-3 | per-pair position units + wall ids | 785d984 |
+| WO-4 | complete colouring + hub copies (fixes the production colour race) | ca32026 |
+| WO-4b | ω_pos = 1, coarse mass | 8b4a5f3 |
+| WO-5 | rank-level mass splitting + a stop that includes consensus | 0ea32ba |
+| WO-5b | world-frame inverse inertia in legacy friction | 4665e0f |
+
+The battery passes 201/201 (python_mpi run). np 2–8 converge to np 1 at the float floor, with the
+stops off. Conservation: dP ≤ 8e-7, ring dLvel ≤ 4e-8.
+
+**Next:**
+1. WO-6: rank-level X for the g = 0 one-shot. This also fixes the energy creation at rank faces
+   from c771e07; the 3-body scene at e = 0.8 must give np 2 = np 1 = 0.2459.
+2. WO-7: drift vote / `migrateToBlocks` / band (D4a).
+3. WO-9: dem uses core `allImages` (D4b). Core efa9b0d is on core main; the 1.3.0 version bump
+   7405577 sits on branch `images` in `suite/core-images`, and the PyPI publish is **awaiting USER
+   OK**.
+4. WO-10: gates, mutations, docs.
+5. WO-11: evidence + perf. Then register entries (§10, §13.7), DECISIONS.md, pointer.
+
+**Open for the user:**
+- R-U4 (WO-12): an accumulated, retractable position projection. It changes every np 1 run with
+  coupled contacts. np ≥ 2 residual overlap is 1.7–2.5 × np 1 at the adaptive stop.
+- The core 1.3.0 publish, and the peclet-core shell's DeprecationWarning wording.
+
+**Deferred follow-ups:**
+- S17: the multilevel coarse cycle is translation-only, so angular momentum is lost (np 1 too;
+  opt-in mode). It needs a rigid-body aggregate design.
+- The serial PGS restitution target of 0 on separating contacts creates energy (+6 % at e = 0.9).
+- The position-phase effective mass uses body-frame rotational terms although the rotation is never
+  applied (`solver_position.hpp` `computeW`). Found 2026-09-26; not investigated.
+
 **Status 2026-09-25 evening: REOPENED as a framework redesign** (USER: "It feels that we are trying to
 patch this issue while it needs a rigorous design. Think of a principled method ... implementation plan.
 Take performance also into account. Test it well"). Documentation is on dem main e90caff:
