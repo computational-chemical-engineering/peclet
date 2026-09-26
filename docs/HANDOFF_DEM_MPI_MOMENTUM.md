@@ -39,7 +39,7 @@ published. Evidence: `dem/docs/contact_evidence/AFTER.md` §1–§10.
 - WO-B0: tube/box circumscribed `baseRadius` (coax tubes 0 -> 203 contacts; `pack_rings` reaches
   phi 0.342, where main reached 0.188), plus the Hertz sphere-radius fix it exposed.
 - WO-B1: translational position diagonal. WO-B2: `ring_collide` gate.
-- WO-C1: `sim.diagnostics.set_restitution_target('newton'|'moreau')`; the default stays Newton.
+- WO-C1/C2: Moreau is the PGS restitution target (USER; dem cabd0cf; the A/B switch removed).
   The evidence is in `dem/docs/contact_evidence/restitution_law_ab.md`: the Dosta impact rebound
   moves -20 % under Moreau.
 - Register +7.
@@ -62,8 +62,11 @@ published. Evidence: `dem/docs/contact_evidence/AFTER.md` §1–§10.
    and mass for a single contact, which is why polyhedral codes use it. It needs a per-pair plastic
    overlap history (a carried float, like the Mindlin history).
 
-**Waiting on the user:** the restitution law (Q-C; recommendation Moreau); R-B2 two-way shell
-detection (recommended next package).
+**Decided by the user (2026-09-26):**
+- Moreau is the restitution target (landed).
+- XPBD is the efficiency engine, so costly refinements are opt-in (register).
+- Two-way shell detection is to be implemented, default off with documented usage (in progress:
+  dem worktree `twoway`).
 
 **Performance left:**
 - the S14 extra velocity iterations (principled);

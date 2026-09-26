@@ -1598,3 +1598,23 @@ PSOR would have a unique least-displacement fixed point and legitimate over-rela
     with a clear documentation on when to include it."
 - rejected: making the Poisson restitution bank the default (per-step cost where it is not needed); two-way shell detection on by default
 - why: XPBD's reason to exist next to Hertz is cost (packings, fluidized CFD-DEM); a refinement that costs on every step is opt-in with a documented "when to use", and cases needing stored elastic energy use the Hertz engine
+
+---
+
+### The PGS restitution target is Moreau's: -e u- on every closed contact above the resting threshold
+- area: dem
+- source: USER 2026-09-26 ("Switch to Moreau"); dem/docs/contact_physics_followups.md §4 (architect); WO-C1 3a1fbc5 (A/B) + WO-C2 cabd0cf (the only law); evidence dem/docs/contact_evidence/restitution_law_ab.md
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    Newton's target 0 for a contact separating before the solve acts as a rigid stop; when
+    neighbours drive the pair together it pushes back with impulse no approach paid for: +13 % KE in
+    one step of a dense e = 1 cluster (harness), +30 % (model). Moreau's target -e u- on every closed
+    contact with |u-| >= v_rest = 2 dt |g| cannot create energy for uniform e (e = 1: KE1/KE0 =
+    1 + 3e-9 at dt = 1e-4; the resting-threshold channel is 1.3e-4 at the harness's coarse dt = 1e-2).
+    Single contacts and the g = 0 one-shot are bitwise unchanged. Dosta 25k impact (CUDA, 5 runs):
+    rebound 0.0343 +- 0.005 (Newton) vs 0.0354 +- 0.005 (Moreau) -- equal within scatter (WO-C1's
+    single-run -20 % was chaotic scatter). The statics column settles faster (mean |vz| 0.026 -> 0.004).
+    Poisson mode keeps its Newton targets (its bank deducts exactly those reflections).
+- rejected: Newton's target (creates energy); the sequential event one-shot + support solve (large implementation, the architect's option S); a user-facing A/B switch (removed, never released)
+- why: an impact law that cannot create energy, at zero cost

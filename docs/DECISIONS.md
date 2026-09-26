@@ -243,7 +243,7 @@ reading until they are settled.
 
 ## dem — XPBD, contacts, packing
 
-106 in force, 7 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
+107 in force, 7 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
 
 ### In force
 
@@ -324,6 +324,7 @@ reading until they are settled.
 - **The Gauss-Seidel colourings are complete by construction: 64 colours, no forced colour, hub copies above 32 edges**. **Rejected:** forcing colour 62 (a same-colour race: CUDA dP 1e-2); leaving edges to the per-body  <sub>dem/docs/contact_solve_framework.md</sub>
 - **The MPI velocity/position solve reuses the single-GPU driver via a Hooks template, not a separate implementation**. **Rejected:** a rank-local adaptive-stop break under MPI  <sub>dem-mpi-solver-port-plan.md:15</sub>
 - **The Moreau e = 1 energy gate runs at dt = 1e-4**. **Rejected:** widening the bound to 2e-4 at dt = 1e-2 (would hide a real law defect of that size)  <sub>session</sub>
+- **The PGS restitution target is Moreau's: -e u- on every closed contact above the resting threshold**. **Rejected:** Newton's target (creates energy); the sequential event one-shot + support solve (large implementation, the architect's option S); a user-facing A/B sw  <sub>USER</sub>
 - **The adaptive stop of a phase with copies includes the consensus correction**. **Rejected:** gate relaxation to the plateau value; a stop on the fine residual alone  <sub>dem/docs/contact_solve_framework.md</sub>
 - **The correct fix, if needed, is proper sequential-impulse friction with an accumulated per-contact tangential impulse clamped to the total Coulomb bound**. **Rejected:** the current Jacobi count-averaged friction scheme, for quantitative frictional-packing studies  <sub>packing-friction-followup.md:26</sub>
 - **The distributed contact solve must conserve linear and angular momentum across rank boundaries**. **Rejected:** accepting redundant two-owner solves of a cross-rank contact (each owner sweeps it from its own state, so the impulses are not equal and opposite; CoM  <sub>docs/HANDOFF_DEM_MPI_MOMENTUM.md;</sub>
