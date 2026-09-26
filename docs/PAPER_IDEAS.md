@@ -46,6 +46,15 @@ notes; check each one's evidence before building on it.
   - Then a bulk consequence: packing density or a rotating drum of tubes, to see whether the
     single-contact differences matter in bulk.
   - Wall time per simulated second for each law, at the time step each allows.
+- **Parameter mapping** (so the comparison is like for like):
+  - XPBD takes Walton's (1993) three-parameter impact law: e, μ, and the tangential restitution β₀.
+  - Walton–Braun takes k_load/k_unload = e², μ, and the tangential k_t/k_n. In soft models β₀
+    *emerges* from k_t/k_n and the tangential damping; for Hertz–Mindlin k_t/k_n = 2(1−ν)/(2−ν).
+  - Comparing the emergent β₀ with XPBD's imposed β₀ on oblique impacts (spin reversal) is part of
+    the result.
+  - Walton–Braun is implemented in its common-practice form: hysteretic normal, plus the Mindlin
+    history spring with a Coulomb clamp and a single μ. The original softening-tangential form and a
+    separate μ_s/μ_k are optional variants.
 - **Prerequisites:**
   - the Walton–Braun law;
   - optionally the effective-mass dashpot for Hertz, as a variant, not a default;
