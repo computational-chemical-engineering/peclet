@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-182 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+183 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -176,6 +176,7 @@ reading until they are settled.
 - **The defect-correction rule: Krylov matvec/residual must be the exact double operator in flux form; preconditioners below may stay float**.  <sub>defect-correction-campaign.md:14-17</sub>
 - **The momentum solver is chosen by the operator's CONDITION NUMBER, and the rule names no geometry**. **Rejected:** (a) selecting on whether an immersed solid is present — the rule as first landed; IBM  <sub>user</sub>
 - **The np>1 VoF colour parity gates gate conservation, not the pointwise field**. **Rejected:** (a) loosening 1e-11 to a number above today's 3.174e-09 — it would have been fitted to  <sub>tests/kokkos_mpi/test_vof_bc_mpi.cpp,</sub>
+- **The porous "non-finite preconditioner" was a 0/0 in the bottom CG, not float storage (evidence correction)**. **Rejected:** attributing the porous non-finite preconditioner to float operator storage (the evidence cited in "Double operator storage is the DEFAULT", QUALITY_PL  <sub>flow</sub>
 - **The rotational (Timmermans) pressure update must be restored, not the non-rotational Goda form substituted**. **Rejected:** non-rotational Goda pressure update form; diagonal-preconditioned CG in place of geometric MG/MG-PCG; double-precision pressure operator storage  <sub>migration-faithful-port.md:61</sub>
 - **The standalone V-cycle pressure driver does not honor set_pressure_solver_params(n) and is ~30x slower at small grids**.  <sub>flow-thermal-convection-validated.md:25</sub>
 - **UCX_RNDV_THRESH tuning is falsified as an explanation for the np8 anomaly — leave UCX defaults**. **Rejected:** tuning UCX_RNDV_THRESH=256k  <sub>comm-scaling-plan.md:57</sub>

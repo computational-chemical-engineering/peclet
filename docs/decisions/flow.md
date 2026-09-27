@@ -3402,3 +3402,17 @@ Do not reverse an entry here without recording a new decision that supersedes it
     rebalance would return. `weights=None` output is unchanged.
 - rejected: a new public function for the alignment (unapproved name); an extra column in every row (breaks the existing output)
 - why: the name `weights=` is user-approved (2026-09-25) and matches core/flow/dem; the return shape was the only open choice and changes nothing for existing callers
+
+---
+
+### The porous "non-finite preconditioner" was a 0/0 in the bottom CG, not float storage (evidence correction)
+- area: flow
+- source: flow f903d27 (CutcellMG::pcgAmg breakdown guard; pcg_breakdown regression case)
+- decided: 2026-09-27
+- status: settled
+- quote: |
+    On a uniform periodic bed the coarse RHS is round-off on a constant (the periodic operator's null
+    space); the AMG maps it to z = 0, so r·z = p·Ap = 0 and the unguarded CG step was 0/0 = NaN. It
+    happens at DOUBLE storage too. Fix: stop when !(p·Ap > 0), as core's GraphAMG PCG does.
+- rejected: attributing the porous non-finite preconditioner to float operator storage (the evidence cited in "Double operator storage is the DEFAULT", QUALITY_PLAN.md:371)
+- why: that decision still stands on its own P1 evidence (RCP bed: float CAPPED, div 4.51e-06 vs double 9.51e-12); only this one piece of its evidence was misattributed

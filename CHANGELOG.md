@@ -6,16 +6,13 @@ All notable changes to the peclet suite are documented here. The format is based
 
 ## [1.3.0] — 2026-09-27 — one partition for fluid and particles, and a distributed DEM that conserves momentum
 
-`peclet-flow` 1.2.0 (**provisional**, see below) · `peclet-dem` 1.1.0 · `peclet-coupling` 1.1.0 ·
+`peclet-flow` 1.2.0 · `peclet-dem` 1.1.0 · `peclet-coupling` 1.1.0 ·
 `peclet-amr` 0.2.0 · `peclet-pnm` / `peclet-voro` 1.0.3 · `peclet-morton` 1.0.2 · `peclet-geom`
 1.0.1 · metapackages `peclet` and `peclet-cu13` 1.3.0. `peclet-halo` / `peclet-core` 1.3.0 was
 released on its own on 2026-09-26 (section below) and every member now pins it
 (`PECLET_CORE_TAG v1.3.0`); `peclet[mpi]` installs it.
 
-### `peclet-flow` 1.2.0 — PROVISIONAL
-
-This subsection is written ahead of the flow release, which is on hold while a multigrid
-preconditioner investigation may add a fix; it will be completed when the hold clears.
+### `peclet-flow` 1.2.0
 
 #### Changed (named numerics changes)
 
@@ -77,6 +74,13 @@ preconditioner investigation may add a fix; it will be completed when the hold c
   saw dε/dt = ε/dt (pressure off by 2e2 in coupling's rebalance test).
 - VoF markers touching a low no-slip wall no longer gain or lose volume through it (per-marker
   volume drift 3.9e-3 → 7.7e-15 over 3000 steps).
+- **The pressure solve no longer discards its correction on a uniform periodic bed.** When the
+  right-hand side is round-off on a constant (the null space of the periodic pressure operator), the
+  bottom-level CG divided 0 by 0; the NaN made the multigrid preconditioner report a non-finite
+  value, and the solver zeroed the whole correction and marked the step CAPPED. The bottom CG now
+  stops when p·Ap = 0, as core's GraphAMG PCG already did. Paths with p·Ap > 0 are bitwise
+  unchanged; the porous fixed-bed Ergun case goes from 63 CAPPED warnings to none. Double operator
+  storage had been credited with curing this; it did not.
 - Pinned to core v1.3.0.
 
 ### `peclet-dem` 1.1.0
