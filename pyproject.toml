@@ -55,7 +55,7 @@ dependencies = [
   "peclet-flow==1.2.0",
   "peclet-pnm==1.0.3",
   "peclet-dem==1.1.0",
-  "peclet-voro==1.0.3",
+  "peclet-voro==1.0.4",
 ]
 
 [project.optional-dependencies]

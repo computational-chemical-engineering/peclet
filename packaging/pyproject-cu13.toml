@@ -59,7 +59,7 @@ dependencies = [
   "peclet-flow-cu13==1.2.0",
   "peclet-pnm-cu13==1.0.3",
   "peclet-dem-cu13==1.1.0",
-  "peclet-voro-cu13==1.0.3",
+  "peclet-voro-cu13==1.0.4",
 ]
 
 [project.optional-dependencies]

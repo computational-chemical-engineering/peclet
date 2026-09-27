@@ -7,7 +7,7 @@ All notable changes to the peclet suite are documented here. The format is based
 ## [1.3.0] — 2026-09-27 — one partition for fluid and particles, and a distributed DEM that conserves momentum
 
 `peclet-flow` 1.2.0 · `peclet-dem` 1.1.0 · `peclet-coupling` 1.1.0 ·
-`peclet-amr` 0.2.0 · `peclet-pnm` / `peclet-voro` 1.0.3 · `peclet-morton` 1.0.2 · `peclet-geom`
+`peclet-amr` 0.2.0 · `peclet-pnm` 1.0.3 · `peclet-voro` 1.0.4 · `peclet-morton` 1.0.2 · `peclet-geom`
 1.0.1 · metapackages `peclet` and `peclet-cu13` 1.3.0. `peclet-halo` / `peclet-core` 1.3.0 was
 released on its own on 2026-09-26 (section below) and every member now pins its C++ headers
 (`PECLET_CORE_TAG v1.3.0`); `peclet[mpi]` installs 1.3.1, which adds only the promised
@@ -185,18 +185,23 @@ released on its own on 2026-09-26 (section below) and every member now pins its 
 - `Flow.set_pressure_tolerance(rtol)` and `Flow.set_momentum_tolerance(rtol)` (defaults are the
   previously hard-coded values).
 
-### `peclet-pnm` 1.0.3 · `peclet-voro` 1.0.3 · `peclet-morton` 1.0.2 · `peclet-geom` 1.0.1
+### `peclet-pnm` 1.0.3 · `peclet-voro` 1.0.4 · `peclet-morton` 1.0.2 · `peclet-geom` 1.0.1
 
 No change to results or Python API.
+
+- **voro 1.0.3 was tagged but never published**: its CUDA wheel build ran the hosted runner out of
+  memory (two `nvcc` threads on one large translation unit; the runner itself was killed, so the
+  fallback to one thread never ran). 1.0.4 is the same code, built at one `nvcc` thread.
 
 - PyPI metadata: keywords, real classifiers, project links, and a `Changelog` URL pointing at this
   file; one citable author identity with the ORCID.
 - READMEs (the PyPI pages) name the CUDA distribution and how to install either; voro's code sample
   calls `peclet.geom`, not `peclet.core.geom`. Every tag is gated on its landing page not naming a
   retired spelling.
-- The `peclet-voro-cu13` wheel builds 3.1x faster (`nvcc --threads`; 2268 s → 735 s on four
-  cores). The sources are split into one translation unit per subsystem for development, and the
-  wheel keeps a unity build so the split costs it nothing.
+- The `peclet-voro-cu13` wheel can build 3.1x faster with `nvcc --threads` (2268 s → 735 s on four
+  cores, given the memory); the hosted release runner is capped at one thread (above). The sources
+  are split into one translation unit per subsystem for development, and the wheel keeps a unity
+  build so the split costs it nothing.
 - pnm, voro and geom pin core v1.3.0 (geom's vendored headers are byte-identical).
 
 ## `peclet-halo` / `peclet-core` 1.3.1 — 2026-09-27 — the promised DeprecationWarning
