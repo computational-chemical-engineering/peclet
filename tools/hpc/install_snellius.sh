@@ -115,7 +115,7 @@ ls -la "$WHEELS"
 
 # --- 5. import check (backend needs a GPU; on a login node the wheels are still valid) --------
 python - <<'PY' || echo "(import check skipped/failed here — run smoke_snellius.slurm on a GPU node)"
-import peclet.flow as f, peclet.dem as d, peclet.voro as v, peclet.pnm as p, peclet.morton, peclet.core.mpi
+import peclet.flow as f, peclet.dem as d, peclet.voro as v, peclet.pnm as p, peclet.morton, peclet.halo
 print("flow", f.execution_space, "has_mpi", f.has_mpi)
 print("dem", d.execution_space, "| voro", v.execution_space, "| pnm", p.execution_space)
 PY

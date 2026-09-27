@@ -70,7 +70,7 @@ nav:
       - peclet.voro: python/voro.md
       - peclet.pnm: python/pnm.md
       - peclet.coupling: python/coupling.md
-      - peclet.core: python/core.md
+      - peclet.halo / peclet.geom: python/core.md
       - peclet.amr: python/amr.md
       - peclet.morton: python/morton.md
   - Design:

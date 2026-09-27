@@ -221,7 +221,9 @@ for MPI-ABI, GPU-aware-MPI, and arch details.
 | `peclet-dem` | `import peclet.dem` | `Simulation(capacity)` — initialize_shape, set_domain, set_material_params, set_positions, SDF walls, scene particles, step / step_hertz, get_positions, get_sdf_grid; MPI: `init_mpi`, `enable_mpi_step`, `step_mpi`, `step_hertz_mpi`, `rebalance` |
 | `peclet-voro` | `import peclet.voro` | `Tessellation`, `Simulation` (moving-cell Voronoi + dynamics), `FlowSolver` (Navier–Stokes on the Voronoi mesh); MPI: `VoronoiHalo` |
 | `peclet-coupling` | `import peclet.coupling` | `CfdDem` (unresolved, volume-averaged) and `ResolvedCfdDem` (cut-cell) two-way coupling drivers over `flow` + `dem` |
-| `peclet-core` | `from peclet.core import mpi, amr, geom` | MPI particle halo (`mpi.Migrator`, `mpi.Halo`), Kokkos AMR octree (`amr.Flow`, `amr.DistributedOctree`), analytic-SDF scene authoring (`geom.SceneBuilder`) |
+| `peclet-geom` | `from peclet import geom` | analytic-SDF scene authoring + rigid-body mass properties (`geom.SceneBuilder`) |
+| `peclet-halo` | `from peclet import halo` | MPI particle halo (`halo.ParticleMigrator`, `halo.ParticleHalo`); the `peclet-core` shell keeps the deprecated `peclet.core.mpi` / `peclet.core.geom` spellings until 2.0.0 |
+| `peclet-amr` | `import peclet.amr` | Kokkos block-octree AMR (`Octree`, `DistributedOctree`) and its cut-cell solver (`Flow`) |
 | `peclet-morton` | `from peclet.morton import encode, decode, shift, box_zorder` | vectorised NumPy Morton ops |
 
 Every binding method carries a docstring (`help(peclet.flow.Solver.step)`); the

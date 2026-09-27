@@ -17,7 +17,7 @@ import importlib, inspect, json, re, sys
 # 2026-09-10 (QUALITY_PLAN G.2/D6). Auditing the old path meant amr's public API was audited by
 # nothing at all -- the import failed, and the eighth package went unchecked.
 MODULES = ["peclet.flow", "peclet.pnm", "peclet.dem", "peclet.voro", "peclet.morton",
-           "peclet.core.mpi", "peclet.core.geom", "peclet.amr", "peclet.coupling"]
+           "peclet.halo", "peclet.geom", "peclet.amr", "peclet.coupling"]
 STALE = re.compile(r"\b(sdflow|vorflow|tpx_|demgpu|peclet\.flow\.pnm|tests/kokkos_mpi suite|CUDA-API alias|TODO|FIXME)\b", re.I)
 
 

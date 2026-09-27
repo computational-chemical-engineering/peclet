@@ -31,7 +31,7 @@ PY="$SUITE/.venv/bin/python"
 
 echo "== 1. imports / backends"
 srun --mpi=pmix --ntasks=1 $GPUOPT "$PY" - <<'PY'
-import peclet.flow as f, peclet.dem as d, peclet.voro as v, peclet.pnm as p, peclet.morton, peclet.core.mpi
+import peclet.flow as f, peclet.dem as d, peclet.voro as v, peclet.pnm as p, peclet.morton, peclet.halo
 import importlib; c = importlib.util.find_spec("peclet.coupling") is not None
 print(f"flow {f.execution_space} has_mpi={f.has_mpi} | dem {d.execution_space} step_mpi={hasattr(d.Simulation,'step_mpi')} "
       f"| voro {v.execution_space} VoronoiHalo={hasattr(v,'VoronoiHalo')} | pnm {p.execution_space} mpi={hasattr(p,'extract_pore_network_mpi')} | coupling={c}")

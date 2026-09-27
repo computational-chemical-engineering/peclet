@@ -43,12 +43,18 @@ PAGES = [
     ("morton.md", "peclet.morton — Morton/Z-order arithmetic",
      "Vectorised Morton (Z-order) codes with O(1) arithmetic directly in Morton space.",
      [("peclet.morton", [])]),
-    ("core.md", "peclet.core — shared infrastructure (MPI halo, geometry)",
-     "The Lagrangian particle halo (`peclet.core.mpi`) and the analytic-SDF scene authoring + "
-     "rigid-body mass properties (`peclet.core.geom`). The AMR octree and its solver are the separate "
+    # The page keeps its file name (mkdocs nav, links), but documents the canonical modules:
+    # `peclet.core.mpi` / `peclet.core.geom` are deprecated re-exports since peclet-core 1.3.1
+    # (suite/docs/CORE_BOUNDARY.md), and importing them here would trip their DeprecationWarning.
+    ("core.md", "peclet.halo and peclet.geom — the particle halo and analytic-SDF geometry",
+     "The Lagrangian particle halo (`peclet.halo`, package `peclet-halo`, `pip install peclet[mpi]`) "
+     "and the analytic-SDF scene authoring + rigid-body mass properties (`peclet.geom`, package "
+     "`peclet-geom`, in plain `pip install peclet`). Until peclet 1.2.0 these were `peclet.core.mpi` "
+     "and `peclet.core.geom`; those spellings still import (the same objects) with a "
+     "`DeprecationWarning`, and are removed in 2.0.0. The AMR octree and its solver are the separate "
      "`peclet.amr` package since 2026-09-10 (QUALITY_PLAN G.2).",
-     [("peclet.core.mpi", ["ParticleMigrator", "ParticleHalo"]),
-      ("peclet.core.geom", ["SceneBuilder"])]),
+     [("peclet.halo", ["ParticleMigrator", "ParticleHalo"]),
+      ("peclet.geom", ["SceneBuilder"])]),
     ("amr.md", "peclet.amr — block-octree AMR and its collocated cut-cell Navier–Stokes solver",
      "The block-local-Morton AMR octree (`Octree`, distributed `DistributedOctree`), the AMR Poisson "
      "solve and the collocated cut-cell Navier–Stokes solver on it (`Flow`; developer instruments on "
