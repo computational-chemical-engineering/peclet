@@ -3388,3 +3388,17 @@ Do not reverse an entry here without recording a new decision that supersedes it
     np 1/2/4/8.
 - rejected: per-block CUDA streams; a pooled atlas of all blocks; atomics in the force scatter (order)
 - why: per-block launches and host reads made the container launch- and sync-bound (16 markers)
+
+---
+
+### predict_hierarchy(weights=) returns (rows, align) when weights are given; rows alone otherwise
+- area: flow
+- source: flow 05ce151; docs/NAMING.md change log 2026-09-27
+- decided: 2026-09-27
+- status: settled (pending user confirmation of the return shape)
+- quote: |
+    `flow.predict_hierarchy(..., weights=None)` takes the flat x-fastest per-cell list that
+    `rebalance_by_weights` takes; with weights it returns `(rows, align)`, align = the 2^a the
+    rebalance would return. `weights=None` output is unchanged.
+- rejected: a new public function for the alignment (unapproved name); an extra column in every row (breaks the existing output)
+- why: the name `weights=` is user-approved (2026-09-25) and matches core/flow/dem; the return shape was the only open choice and changes nothing for existing callers

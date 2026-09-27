@@ -276,7 +276,9 @@ identity — `peclet::core`, `peclet/core/...`, the repo and its tags — does *
   flow hands the value over as the RETURN of `diagnostics.rebalance_by_weights` (it returned None),
   which adds no name. `weights=` on flow's `predict_hierarchy` (for
   `check_decomposition.py --predict` to log the alignment): name APPROVED by the user 2026-09-25 —
-  the same word as core's `init(…, weights, align)` and flow's `rebalance_by_weights`; not yet added.
+  the same word as core's `init(…, weights, align)` and flow's `rebalance_by_weights`; **added
+  2026-09-27** (flow `05ce151`). ADDITIVE: `weights=None` returns the rows exactly as before; with
+  weights the return is `(rows, align)`, `align` the `2^a` that `rebalance_by_weights` returns.
 - 2026-09-07 — file created. Canon fixed; `smooth_length` (coupling) is the first entry landed under
   it, together with flow's already-shipped `spacing`/`cells`/`extent`/`origin` quartet.
 - 2026-09-16 — **flow gains `diagnostics.set_velocity_solver('auto'|'gauss_seidel'|'multigrid'|'chebyshev')`**
