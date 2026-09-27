@@ -190,8 +190,11 @@ released on its own on 2026-09-26 (section below) and every member now pins its 
 No change to results or Python API.
 
 - **voro 1.0.3 was tagged but never published**: its CUDA wheel build ran the hosted runner out of
-  memory (two `nvcc` threads on one large translation unit; the runner itself was killed, so the
-  fallback to one thread never ran). 1.0.4 is the same code, built at one `nvcc` thread.
+  memory (the runner itself was killed, so the fallback to fewer `nvcc` threads never ran). The
+  CUDA wheel compiles voro's split per-subsystem sources, and the build ran six of them at once,
+  each compiler peaking at up to 6.2 GB. 1.0.4 is the same code, with the CUDA wheel built from the
+  split sources one compilation at a time, at one `nvcc` thread (identical results to the unity
+  build the CPU wheels use).
 
 - PyPI metadata: keywords, real classifiers, project links, and a `Changelog` URL pointing at this
   file; one citable author identity with the ORCID.
