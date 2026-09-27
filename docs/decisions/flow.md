@@ -3395,7 +3395,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: flow 05ce151; docs/NAMING.md change log 2026-09-27
 - decided: 2026-09-27
-- status: settled (pending user confirmation of the return shape)
+- status: settled (USER approved 2026-09-27)
 - quote: |
     `flow.predict_hierarchy(..., weights=None)` takes the flat x-fastest per-cell list that
     `rebalance_by_weights` takes; with weights it returns `(rows, align)`, align = the 2^a the
