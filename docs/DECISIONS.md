@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-177 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+181 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -33,6 +33,7 @@ reading until they are settled.
 - **Allreduce diet: fuse mean-removal sum+count; 'fine' mean-removal scope as bench/pack default, 'all' stays solver default pending Snellius validation**.  <sub>parallel-scaling-study.md:81-86</sub>
 - **Anisotropic MG coarsening order: coarsen axis a iff H_a < 2·min H over coarsenable axes, engaged only under `aniso`**. **Rejected:** applying the anisotropic coarsening rule to the isotropic path (would change isotropic bits)  <sub>physical-units-phase2-aniso.md:47-51</sub>
 - **Anisotropic wall-gradient normal/foot-point convention (⚑B)**.  <sub>physical-units-phase2-aniso.md:52-54</sub>
+- **Block VoF container stages batched: one launch per stage for all markers, block-ordered force gather**. **Rejected:** per-block CUDA streams; a pooled atlas of all blocks; atomics in the force scatter (order)  <sub>flow</sub>
 - **Block VoF: colliding markers — debris removal with exact return, a block-only curvature clip, a gated gas–gas capillary bound**. **Rejected:** union-colour force assembly (statically unnecessary; re-creates numerical coalescence  <sub>flow</sub>
 - **Body-force ghost policy: Neumann copy, pinned to ρ's policy**.  <sub>vof-campaign.md:145-154</sub>
 - **Boiling scope addition did not resurrect transported-φ CLSVOF**. **Rejected:** transported-φ CLSVOF  <sub>vof-campaign.md:101-106</sub>
@@ -82,6 +83,7 @@ reading until they are settled.
 - **Fragmentation guard: BFS-isolated pockets are treated as solid for the projection only**.  <sub>flow-ghost-projection.md:81</sub>
 - **Free-variable fix: pin phi=0 at decoupled cells after the solve**. **Rejected:** leaving free variables (solid-centered / BC_ONLY rows) unpinned after the Krylov solve  <sub>flow-ghost-projection-mpi-plan.md:19</sub>
 - **Fresh (newly-uncovered) cells must be seeded with the local wall velocity, not inherit the solid value**. **Rejected:** inheriting the solid's prior value in a freshly-uncovered cell  <sub>sdf-scene-campaign.md:97</sub>
+- **Fused periodic wrap in smoother / residual / matvec; device-resident Krylov scalars; no copies around the preconditioner**. **Rejected:** fill-then-sweep with CUDA graph capture; lagged stop checks (not bitwise)  <sub>flow</sub>
 - **GPU binding must let SLURM cgroup-isolate; manual CUDA_VISIBLE_DEVICES remap fights SLURM**. **Rejected:** PECLET_BIND_GPU=1 manual remap  <sub>channel-dns-isotropic-grid.md:45</sub>
 - **GPU-aware MPI is not the shipped default on Snellius 2024a due to a toolchain conflict**. **Rejected:** building the solver against the GPU-aware-validated CUDA 12.1.1 stack  <sub>channel-dns-isotropic-grid.md:44</sub>
 - **Geometric const-coeff + masking are the validated defaults; Galerkin/CG is opt-in**. **Rejected:** making Galerkin/CG the default  <sub>suite-distributed-status.md:98-100</sub>
@@ -92,6 +94,7 @@ reading until they are settled.
 - **Grid-convergence studies must report dimensionless permeability k* = k/N², not dimensional k**. **Rejected:** reporting dimensional k_cells directly as a convergence metric  <sub>sdflow-regression-suite.md:20-22</sub>
 - **Grid-dimension convention: MG per-axis coarsening depends on factors of two; always check halvings before proposing a grid**. **Rejected:** choosing benchmark grid dimensions without checking per-axis halving depth (led to a "WORSE" refine ladder caught before burning GPU hours)  <sub>channel-scaling-rebenchmark.md:182-200</sub>
 - **Guidance: ghost for resolved/smooth IBM geometry, cutcell aperture for tight-throat porous media**. **Rejected:** using ghost projection for under-resolved tight-throat porous media  <sub>flow-ghost-projection.md:86</sub>
+- **Host launch rule: pencils on host, MDRange on device, one cell body; -ffp-contract=off on host, -march opt-in**. **Rejected:** host MDRange in hot paths (2.4x); rebuilding the shared Kokkos prefix with Kokkos_ARCH  <sub>flow</sub>
 - **Host-serial-kernel threshold lever kept despite measuring as marginal at the fat-rank size**. **Rejected:** cutting reductions over to serial-below-threshold execution; a larger serial-cutoff (131072)  <sub>cpu-fat-rank-optimization.md:43-49</sub>
 - **How to apply: staggered recommended for accuracy-critical drag/permeability; collocated for structural wins, at the cost of first order at curved walls**.  <sub>sdflow-collocated-solver.md:202-207</sub>
 - **IBM overlay needs no separate scaling change — linear in the base stencil**.  <sub>sdflow-dt-divided-convention.md:24-26</sub>
@@ -138,6 +141,7 @@ reading until they are settled.
 - **Port production physics onto the distributed solver rather than retrofit MPI into production kernels**. **Rejected:** retrofit MPI into the production kernels  <sub>suite-distributed-status.md:101-104</sub>
 - **Pre-fix porous coefficient pair kept for A/B only, never for publishable results**. **Rejected:** publishing results computed with the pre-fix (buildPorousCoeffDrag) pair  <sub>porous-eps-conservative-momentum.md:38-39</sub>
 - **Precision policy rule: identity-bearing quantities stored in the precision the identity is asserted; ship double-diagonal, not fp64 default**. **Rejected:** full fp64 default operator storage  <sub>vof-campaign.md:307-312</sub>
+- **Pressure MG operator stored in face form {AC, AFX, AFY, AFZ} with the band sign**. **Rejected:** seven bands (bytes); AC recomputed on the fly (not provably bitwise under FMA  <sub>flow</sub>
 - **Pressure solve must be PCG (Krylov), not RB-GS, for cut-cell IBM**. **Rejected:** RB-GS for pressure; rotational pressure-update variant  <sub>cuda-kokkos-migration.md:352-358</sub>
 - **Public API renames: pressure_potential() → pressure() (returns physical pressure)**. **Rejected:** the name pressure_potential() for the physical-pressure accessor  <sub>sdflow-dt-divided-convention.md:36-38</sub>
 - **Published parallel-scaling iteration count is 4.0, not the earlier 12.2**. **Rejected:** the e861010 figures (12.2), which predate the stale-ghost V-cycle residual fix  <sub>parallel-scaling-study.md:119</sub>

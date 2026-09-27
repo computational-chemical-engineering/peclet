@@ -3323,3 +3323,68 @@ Do not reverse an entry here without recording a new decision that supersedes it
     ratio 1000, against 2.4e-13); the force-aware reconstruction for per-cell forces (places
     1/4(1,2,1) f)
 - why: exact balance of the only uniform drives two-phase users apply; matches the staggered semantics
+
+### Pressure MG operator stored in face form {AC, AFX, AFY, AFZ} with the band sign
+- area: flow
+- source: flow `a07d787` (WO-3), `doc/vof_step_performance_design.md` §4.2, §5.3 + the WO-3 note; `doc/vof_step_performance_log.md`
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    The cut-cell pressure operator stores the diagonal AC and ONE off-diagonal coefficient per face
+    (AFX/AFY/AFZ = the low-face coefficient, i.e. the old AW/AS/AB band values; the high-face one is
+    the neighbour's), not seven bands: same bytes per cell as four arrays, ~45 % fewer operator bytes
+    per V-cycle. The coefficient is stored WITH THE BAND SIGN (-o*gf): the design's +o*gf with a
+    negation in every consumer was 8.8e-15 off on CUDA (nvcc contracts a different product into
+    the FMA); the band sign keeps every consumer's expression literally the old one — bitwise on
+    host, CUDA and float.
+- rejected: seven bands (bytes); AC recomputed on the fly (not provably bitwise under FMA
+    contraction); +o*gf storage with negated consumers (not bitwise on CUDA)
+- why: a structural change must be bitwise at the old configuration; the storage sign is internal
+
+### Host launch rule: pencils on host, MDRange on device, one cell body; -ffp-contract=off on host, -march opt-in
+- area: flow
+- source: flow `363ed6e`, `e4fb9b2` (WO-1), `26d1d7a` (WO-2); design §4.5, §5.1, §5.2
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    A hot kernel has ONE cell body (a KOKKOS_INLINE_FUNCTION of the cell index) launched as x-row
+    pencils (`ccFor3`) on host backends and as an x-fastest MDRange on the device. Host builds
+    always compile with -ffp-contract=off (so vectorised and scalar host builds stay bitwise);
+    -march is opt-in via PECLET_FLOW_HOST_ARCH (site/dev builds, never the PyPI wheels). Measured:
+    host MDRange tile loop 2.4x a flat x loop (7-point stencil, 1 thread); cc_residual 97 -> 44
+    ms/step at 1x8.
+- rejected: host MDRange in hot paths (2.4x); rebuilding the shared Kokkos prefix with Kokkos_ARCH
+    (changes other repos' bits); -march in the wheels (portability)
+- why: host performance without a second copy of every stencil, and without giving up bitwise host
+    reproducibility
+
+### Fused periodic wrap in smoother / residual / matvec; device-resident Krylov scalars; no copies around the preconditioner
+- area: flow
+- source: flow `afc3a35` (WO-4), `d6ad233` (WO-5a), `e840912` (WO-5b); design §4.3, §4.4, §5.4-§5.6
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    On single-rank, even-dimension MG levels the periodic ghost wrap is folded into the smoother,
+    residual and matvec index arithmetic (mg_pfill3 416 -> 19 launches/step); the single-rank MG-PCG
+    keeps its scalars on the device and reads the host once per iteration (projection host reads
+    15/step at 13 iterations); the preconditioner works in place (device full-field copies 37 -> 11
+    per step). All bitwise (CUDA, host, float; state_hash 12 cases + np2; bubble column 50 steps).
+    The distributed branches, FCG's scalars and BiCGStab's copies are unchanged.
+- rejected: fill-then-sweep with CUDA graph capture; lagged stop checks (not bitwise)
+- why: launch- and sync-bound coarse levels dominated the host projection; each change is inert in
+    bits and removes launches, copies or host round trips
+
+### Block VoF container stages batched: one launch per stage for all markers, block-ordered force gather
+- area: flow
+- source: flow `8cfa6e0`..`f6dd038` (WO-8a-d, `035121a` on main); design §4.6, §5.9
+- decided: 2026-09-26
+- status: settled
+- quote: |
+    The block container runs each stage (advection sweeps, debris/residue pass, box update, curvature
+    cascade, CSF force) as ONE launch over all markers through raw-pointer job tables, with at most
+    three host reads per container step; the per-marker CSF force is gathered into the union field in
+    block order instead of scattered. Bitwise to the per-block path (VofBlockSet::batched = false
+    keeps it verbatim for the A/B ctest) on the state, every marker volume and ledger field, MPI
+    np 1/2/4/8.
+- rejected: per-block CUDA streams; a pooled atlas of all blocks; atomics in the force scatter (order)
+- why: per-block launches and host reads made the container launch- and sync-bound (16 markers)
