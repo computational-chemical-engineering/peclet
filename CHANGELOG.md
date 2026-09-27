@@ -4,6 +4,196 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] — 2026-09-27 — one partition for fluid and particles, and a distributed DEM that conserves momentum
+
+`peclet-flow` 1.2.0 (**provisional**, see below) · `peclet-dem` 1.1.0 · `peclet-coupling` 1.1.0 ·
+`peclet-amr` 0.2.0 · `peclet-pnm` / `peclet-voro` 1.0.3 · `peclet-morton` 1.0.2 · `peclet-geom`
+1.0.1 · metapackages `peclet` and `peclet-cu13` 1.3.0. `peclet-halo` / `peclet-core` 1.3.0 was
+released on its own on 2026-09-26 (section below) and every member now pins it
+(`PECLET_CORE_TAG v1.3.0`); `peclet[mpi]` installs it.
+
+### `peclet-flow` 1.2.0 — PROVISIONAL
+
+This subsection is written ahead of the flow release, which is on hold while a multigrid
+preconditioner investigation may add a fix; it will be completed when the hold clears.
+
+#### Changed (named numerics changes)
+
+- **Volumetric forces are applied where the velocity lives.** A per-cell body force
+  (`enable_cell_force`: the CFD-DEM feedback, Boussinesq buoyancy) and the drag coefficient
+  (`enable_drag`) are now evaluated at the velocity unknown's position by one rule for every
+  equation: on the staggered grid the mean of the two cells sharing the face, on the collocated grid
+  the cell value. Before, the constant-density path applied the cell value half a cell off the face
+  (first order), and on the variable-density, non-porous path the drag's right-hand side and its
+  implicit diagonal used different values. Surface forces (pressure, viscous stress, surface
+  tension) are unchanged: they are integrals over the control volume's faces, not interpolated
+  cell values.
+- **Variable viscosity on the staggered grid is taken on the velocity control volume's own faces.**
+  Each velocity component used to see the viscosity half a cell shifted. A mirror-symmetric pair of
+  runs now stays symmetric to round-off (asymmetry 1e-2…3e-2 → 1e-14); in the bubble column the
+  bubbles had collected at one wall.
+- **Collocated variable density and surface tension.** The pressure, surface-tension and body
+  forces enter the implicit momentum predictor instead of a face-acceleration kick after it, and a
+  balanced-force pre-projection (`set_balanced_force_projection`) is on by default in that
+  configuration (off, with a one-time notice, when the domain has an inflow or outflow face): a
+  fluid at rest under gravity with a density jump stays at rest to ~1e-12.
+- **Collocated advection uses the projected, divergence-free face velocity** (the
+  Almgren–Bell–Colella prescription) instead of the average of the two cell velocities, so the
+  advective flux is conservative. This was the last uniform-grid difference from `peclet.amr`.
+
+#### Changed (API)
+
+- `diagnostics.rebalance_by_weights(w)` builds a weighted partition whose cuts sit on multiples of
+  `2^a` — so the pressure multigrid can coarsen `a` levels in place before any redistribution —
+  and **returns that alignment**. A code that co-decomposes with flow must build its partition from
+  the same weights *and* this alignment (dem's `migrate_to_weights(w, align=)`).
+- `predict_hierarchy(..., weights=)` forecasts the multigrid ladder after such a rebalance and then
+  returns `(rows, align)`; without `weights` it returns the rows alone, exactly as before.
+- **`init_mpi` must precede the geometry**, and now raises otherwise. A geometry built first left
+  each rank with a pressure hierarchy for its own block as if it were a periodic domain: every solve
+  converged, but the projected velocity kept each block's divergence (max |div u| 7.5e-2 at np 2).
+- A variable viscosity with an explicitly requested velocity multigrid raises `ValueError` (the
+  V-cycle takes a constant viscosity and used to ignore the closure silently).
+- `set_superficial_velocity(enabled, axis, velocity)` holds the mixture superficial velocity along
+  a periodic axis.
+
+#### Added
+
+- **Coarse-level multigrid stages** from core 1.2.0: the telescope's stage policy and field movement
+  are core's, and a weighted level-0 partition takes a Repartition stage instead of collapsing onto
+  few ranks.
+- VoF marker blocks: a curvature admissibility clip (|κ| ≤ 1/Δ_min), removal of sub-grid debris
+  with its volume returned exactly to the interface, and a capillary time-step bound that
+  accounts for overlapping (gas–gas) interfaces (`diagnostics.set_vof_phantom_capillary_bound`,
+  default on). The overlap failure of colliding bubbles traced to debris curvature.
+- A faster VoF step with identical results: face-form pressure-operator storage (32 instead of 56
+  bytes per cell per read), fused periodic wraps, device-resident Krylov scalars, and batched
+  kernels across all local marker blocks.
+
+#### Fixed
+
+- **ε^n survives a rebalance.** A redistribution whose blocks changed size reset the previous
+  porosity to zero before the migrated field arrived, so the first porous projection after the move
+  saw dε/dt = ε/dt (pressure off by 2e2 in coupling's rebalance test).
+- VoF markers touching a low no-slip wall no longer gain or lose volume through it (per-marker
+  volume drift 3.9e-3 → 7.7e-15 over 3000 steps).
+- Pinned to core v1.3.0.
+
+### `peclet-dem` 1.1.0
+
+#### Changed — the distributed step
+
+- **Momentum is conserved across rank boundaries.** Each contact now has exactly one owning rank,
+  and ghost contributions are summed back onto their owners at every synchronisation, so a contact
+  across a block face is resolved once rather than twice or not at all. Energy created at rank faces
+  is gone (a restitution test gives the single-rank kinetic energy at np 2, 4 and 8), the tangential
+  (Mindlin) spring no longer flips sign when a particle migrates (momentum drift 9e-4 → 3e-8 through
+  18 migrations), and the multilevel coarse cycle treats aggregates as rigid bodies, conserving
+  angular momentum to ~1e-7 (was 3e-3).
+- **Run-to-run reproducible at every rank count.** The local particle order is canonical (by
+  sending rank) instead of MPI message-arrival order, which at np ≥ 4 changed the contact
+  colouring and hence the result from run to run.
+- **No contact is missed across a rank face or a periodic wrap.** The ghost band is the global
+  contact reach, 2.1 × the largest radius anywhere (was the rank's own largest radius); with core
+  1.3.0 every periodic image of a particle within the band is exchanged (13–27 missed periodic pairs
+  → 0 at np 2–8).
+- **The overlap projection converges to one answer.** Positions are corrected by an accumulated,
+  retractable push per contact: converged positions agree across rank counts to 5e-5 R (was
+  1e-2 R), and clusters converge in about 3x fewer iterations.
+- The cost of all this over the previous distributed step is +2–6 % per step.
+
+#### Changed — contact physics (named numerics changes)
+
+- **Restitution follows Moreau's law**: every closed contact approaching faster than the resting
+  threshold targets a separation velocity of −e times its approach velocity. The previous rule gave
+  a pre-separating contact the target zero, which created energy (+13 % in one step of a dense
+  e = 1 cluster). The `'poisson'` restitution model is unchanged.
+- **Tubes and boxes are found by their circumscribed radius**, so end and corner contacts are
+  detected (two coaxial tubes overlapping by 0.3 used to produce no contact at all).
+- In the Hertz engine, a sphere's contact radius is its own radius, not the largest radius in the
+  shape registry (in a mixture with tubes a sphere read up to 1.8x its size).
+- The overlap projection weights each contact by the translational effective mass only, matching the
+  translation-only correction it applies. Spheres without spin are unchanged; non-spherical bodies
+  and spinning spheres change within the solver tolerance.
+
+#### Added
+
+- **`migrate_to_weights(w, align=)`**: rebuilds exactly the aligned weighted partition flow's
+  `rebalance_by_weights` returns, so particles and fluid own the same blocks. `align=1` (default) is
+  the previous weighted partition.
+- **Opt-in two-way shell detection**, `set_shell_detection('one_way' | 'two_way')` (XPBD engine): a
+  thin rim or edge of one body pressed into a flat face of another, between its surface sample
+  points, is seen (a tube dropped on a box falls through with `'one_way'` and rests with
+  `'two_way'`). The default `'one_way'` is byte-identical to before.
+
+#### Fixed
+
+- Two deadlocks of the distributed step at np ≥ 2–4: a rank that received no ghosts skipped the
+  ghosts it owed its neighbour, and the Verlet-skin rebuild was decided per rank while the rebuild is
+  collective. An empty rank no longer forces a halo rebuild on every step.
+- An explicit ghost band below the contact reach is raised to it.
+- README and PyPI page: the MPI tests run on `peclet.halo`; the CUDA distribution is named.
+
+### `peclet-coupling` 1.1.0
+
+- **One partition for fluid and particles from construction on.** `CfdDem` builds its first
+  partition from the combined CFD + DEM cost and re-balances onto the same combined weights, with
+  dem following flow's *aligned* partition (`migrate_to_weights(w, align=)`); co-location is
+  asserted after every co-rebalance and at the first moving step. Before, flow and dem started on
+  different partitions (48³ at np 4 put 11107 particles outside their rank's flow block). Fixed
+  beds are not re-partitioned. **Requires `peclet-flow` 1.2.0 and
+  `peclet-dem` 1.1.0.**
+- **Particle radii follow their particles through every migration.** Multi-rank, the driver kept
+  the construction-time radius array in the pre-migration order, so after a rebalance particles
+  were handed another particle's radius — wrong drag in any polydisperse moving run. The radii are
+  now re-derived from dem's migrated per-particle scales.
+- Every kernel is ordered against flow's and dem's CUDA streams; the smoothing kernel iterates
+  x fastest on every backend.
+- The PyPI page names the distribution it ships; pinned to core v1.3.0.
+
+### `peclet-amr` 0.2.0
+
+#### Changed
+
+- **Public names follow `peclet.flow`**: `Flow.set_pressure_bottom(mode=)`,
+  `Flow.set_pressure_bottom_extent(cells=)`, `Flow.pressure_bottom_extent`, `predict_hierarchy`
+  (none shipped in 0.1.1, so no aliases), and the pressure driver is `Flow.set_pressure_pcg(on)`.
+- **Coarse-level multigrid stages are on by default.** Where the distributed pressure ladder can no
+  longer coarsen in place, a level merges onto sibling ranks or is repartitioned (core 1.2.0),
+  falling back to a replicated tail only where nothing lifts; the coarsest level of a badly factored
+  mesh is solved exactly (AMG-preconditioned CG) instead of smoothed. The multigrid now continues
+  below the root brick.
+- **The quadratic coarse/fine flux (`cf=1`) is the default** on graded meshes: the solver is second
+  order across a 2:1 interface. `set_cf_scheme(0)` reproduces pre-0.2.0 graded results (and, like
+  `cf=1`, must precede `set_solid`).
+- At a 2:1 seam the convective flux reconstructs from the upwind side with level-aware samples.
+
+#### Fixed
+
+- **A cut-cell wall at a coarse octree level was 4^L too stiff** (an effective viscosity μ·4^L in
+  the wall cells): plane Poiseuille came out as the exact parabola shifted bodily by up to 1.4.
+- The advecting face velocity is conservative again on graded meshes (a coarse/fine correction had
+  re-introduced a divergence of 7e-3).
+
+#### Added
+
+- `Flow.set_pressure_tolerance(rtol)` and `Flow.set_momentum_tolerance(rtol)` (defaults are the
+  previously hard-coded values).
+
+### `peclet-pnm` 1.0.3 · `peclet-voro` 1.0.3 · `peclet-morton` 1.0.2 · `peclet-geom` 1.0.1
+
+No change to results or Python API.
+
+- PyPI metadata: keywords, real classifiers, project links, and a `Changelog` URL pointing at this
+  file; one citable author identity with the ORCID.
+- READMEs (the PyPI pages) name the CUDA distribution and how to install either; voro's code sample
+  calls `peclet.geom`, not `peclet.core.geom`. Every tag is gated on its landing page not naming a
+  retired spelling.
+- The `peclet-voro-cu13` wheel builds 3.1x faster (`nvcc --threads`; 2268 s → 735 s on four
+  cores). The sources are split into one translation unit per subsystem for development, and the
+  wheel keeps a unity build so the split costs it nothing.
+- pnm, voro and geom pin core v1.3.0 (geom's vendored headers are byte-identical).
+
 ## `peclet-halo` / `peclet-core` 1.3.0 — 2026-09-26 — every periodic image in the particle halo, and a faster halo build
 
 A core-only release (the family version is unchanged). One `v*` tag in `peclet-core` publishes
