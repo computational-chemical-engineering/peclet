@@ -9,8 +9,9 @@ All notable changes to the peclet suite are documented here. The format is based
 `peclet-flow` 1.2.0 · `peclet-dem` 1.1.0 · `peclet-coupling` 1.1.0 ·
 `peclet-amr` 0.2.0 · `peclet-pnm` / `peclet-voro` 1.0.3 · `peclet-morton` 1.0.2 · `peclet-geom`
 1.0.1 · metapackages `peclet` and `peclet-cu13` 1.3.0. `peclet-halo` / `peclet-core` 1.3.0 was
-released on its own on 2026-09-26 (section below) and every member now pins it
-(`PECLET_CORE_TAG v1.3.0`); `peclet[mpi]` installs it.
+released on its own on 2026-09-26 (section below) and every member now pins its C++ headers
+(`PECLET_CORE_TAG v1.3.0`); `peclet[mpi]` installs 1.3.1, which adds only the promised
+`DeprecationWarning` on the old `peclet.core.*` spellings (section below; headers identical).
 
 ### `peclet-flow` 1.2.0
 
@@ -198,6 +199,36 @@ No change to results or Python API.
   wheel keeps a unity build so the split costs it nothing.
 - pnm, voro and geom pin core v1.3.0 (geom's vendored headers are byte-identical).
 
+## `peclet-halo` / `peclet-core` 1.3.1 — 2026-09-27 — the promised DeprecationWarning
+
+A core-only patch released with family 1.3.0. One `v*` tag in `peclet-core` publishes
+`peclet-halo` and the `peclet-core` compatibility shell at the same number. The C++ headers are
+byte-identical to 1.3.0 (`git diff v1.3.0 v1.3.1 -- include/` is empty), so consumers keep
+`PECLET_CORE_TAG v1.3.0`; `peclet-halo` is re-released only to keep the pair at one version.
+
+#### Deprecated
+
+- **`import peclet.core.geom` and `import peclet.core.mpi` now warn** — step 2 of the ladder in
+  `docs/CORE_BOUNDARY.md`, which 1.3.0 shipped without:
+
+  > DeprecationWarning: peclet.core.geom is peclet.geom since peclet 1.2.0 — use
+  > `from peclet import geom`. peclet.core is removed in peclet 2.0.0.
+
+  and the same for `peclet.core.mpi` → `peclet.halo`. The objects are unchanged (still the same
+  objects as `peclet.geom` / `peclet.halo`); only the import warns. `import peclet.core` alone does
+  not. The shell's pins move to `peclet-geom>=1.0,<2`, `peclet-halo>=1.2,<2`.
+
+#### Tests
+
+- `python_shell_deprecation_{geom,mpi}`: `python -W error::DeprecationWarning -c "import
+  peclet.core.<old>"` exits non-zero with the shell's message (an ImportError cannot pass for it),
+  the default filters show the warning, and the canonical `peclet.geom` / `peclet.halo` imports are
+  silent under `-W error`. Against the 1.3.0 shell both tests fail. Core CI now installs
+  `peclet-geom` so the geom half runs rather than skipping.
+- The suite's own callers (flow's study gates, voro's MPI validation drivers and docs, dem's
+  `scene_particle` docs, the quick-start notebook) use the canonical names, so no suite test sees
+  the warning.
+
 ## `peclet-halo` / `peclet-core` 1.3.0 — 2026-09-26 — every periodic image in the particle halo, and a faster halo build
 
 A core-only release (the family version is unchanged). One `v*` tag in `peclet-core` publishes
@@ -257,7 +288,8 @@ Python API; the new capability is C++, for `peclet.dem`'s distributed contact so
   prefilter and the candidate-rank loop.
 
 The `peclet-core` compatibility shell does not yet emit DeprecationWarnings.
-`docs/CORE_BOUNDARY.md` ties those to the *family* 1.3.0; this is a core-only 1.3.0.
+`docs/CORE_BOUNDARY.md` ties those to the *family* 1.3.0; this is a core-only 1.3.0. (They
+arrived in 1.3.1, above.)
 
 ## `peclet-halo` / `peclet-core` 1.2.0 — 2026-09-24 — coarse-level multigrid stages, and an aligned weighted ORB
 

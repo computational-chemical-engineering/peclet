@@ -207,6 +207,9 @@ spelling; the CHANGELOG entry reads:
 
 ### Step 2 (family 1.3.0) — warn on the old spelling
 
+**Status: landed in core 1.3.1 (2026-09-27)**, released with family 1.3.0 — core 1.3.0 had shipped
+without it. The in-suite callers were moved to the canonical names in the same pass.
+
 Core 1.2.0: the two shell modules gain, at import,
 
 ```python
