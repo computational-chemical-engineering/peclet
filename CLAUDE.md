@@ -56,9 +56,14 @@ The design contract lives in `docs/`:
   Snellius/LUMI site packages, Zenodo, gallery re-check) with the current cycle's state and decisions in
   [docs/RELEASE_PREP.md](docs/RELEASE_PREP.md); pre-flight + audits in `tools/release/`, site scripts in
   `tools/hpc/`. **Read before bumping a version or tagging anything.**
-- [docs/PAPER_IDEAS.md](docs/PAPER_IDEAS.md) — the living register of **scientific paper ideas**
-  that use the suite (claim, why peclet, existing evidence, missing experiments, status). Add an idea
-  when one comes up; rewrite entries in place.
+- **Papers** live in the private hub `computational-chemical-engineering/peclet-papers`
+  (checkout `~/Codes/peclet-papers`, since 2026-09-29). It holds the publication plan (`PLAN.md`),
+  the idea register (`REGISTER.md`, which replaces `docs/PAPER_IDEAS.md`), the central bibliography,
+  and the paper agents.
+  - Each paper has an Overleaf manuscript and a public study repo `peclet-study-<ID>-<slug>`, and
+    its data goes to 4TU.
+  - Add an idea to `REGISTER.md` when one comes up.
+  - The JOSS paper itself stays in `docs/paper/`.
 - [docs/archive/](docs/archive/README.md) — dated design notes and campaign records (AMR, analytic SDF,
   VoF, Voronoi methods, multiphysics, defect correction, MG telescoping, device residency, the CUDA
   wheel prototype). Superseded by the code and the reference docs above — history, not contract.
