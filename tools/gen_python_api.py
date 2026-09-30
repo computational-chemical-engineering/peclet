@@ -1,5 +1,13 @@
-"""Generate static Markdown Python-API reference pages from the installed peclet modules' docstrings."""
-import importlib, inspect, os, sys, textwrap
+"""Generate static Markdown Python-API reference pages from the installed peclet modules' docstrings.
+
+    python3 tools/gen_python_api.py [--strict] docs/python
+
+The Site workflow runs this at build time inside the released peclet-cpu container image (MPI-enabled
+builds of the whole family), so the pages are not committed; tools/gen_api_local.sh does the same for a
+local `mkdocs serve`. A PAGES module that does not import, or reports `has_mpi` False, gets a stub on its
+page and a warning; --strict turns those into exit status 1.
+"""
+import argparse, importlib, inspect, os, sys, textwrap
 
 # (page-file, title, blurb, [ (import_path, [class names] or None for free-functions) ... ])
 PAGES = [
@@ -119,9 +127,10 @@ def emit_functions(mod, w, skip):
         w("```\n" + (clean(f.__doc__) or "(no docstring)") + "\n```\n\n")
 
 
-def render_page(title, blurb, specs):
-    """Markdown of one page. Importable: tools/release/check_api_pages.py regenerates every page
-    with it and diffs against docs/python/."""
+def render_page(title, blurb, specs, problems=None):
+    """Markdown of one page. A module that does not import, or reports `has_mpi` False (the pages
+    document the distributed API), is appended to `problems` when a list is given."""
+    problems = [] if problems is None else problems
     lines = []
     w = lines.append
     w(f"# {title}\n\n{blurb}\n\n")
@@ -132,7 +141,10 @@ def render_page(title, blurb, specs):
             mod = importlib.import_module(path)
         except Exception as e:
             w(f"## `{path}`\n\n*(not importable in this environment: {e})*\n\n")
+            problems.append(f"{path}: not importable ({type(e).__name__}: {e})")
             continue
+        if getattr(mod, "has_mpi", True) is False:
+            problems.append(f"{path}: has_mpi is False -- the pages must come from MPI-enabled builds")
         w(f"## `{path}`\n\n")
         mdoc = clean(getattr(mod, "__doc__", ""))
         if mdoc:
@@ -144,12 +156,29 @@ def render_page(title, blurb, specs):
 
 
 def generate(out):
+    """Write every page into `out`; return the problems found (see render_page)."""
     os.makedirs(out, exist_ok=True)
+    problems = []
     for fname, title, blurb, specs in PAGES:
         with open(os.path.join(out, fname), "w") as fh:
-            fh.write(render_page(title, blurb, specs))
+            fh.write(render_page(title, blurb, specs, problems))
         print("wrote", fname)
+    return problems
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("out", help="output directory (docs/python)")
+    ap.add_argument("--strict", action="store_true",
+                    help="exit 1 if a PAGES module does not import or reports has_mpi False")
+    a = ap.parse_args()
+    problems = generate(a.out)
+    # In GitHub Actions a ::warning:: line becomes an annotation on the run summary.
+    tag = "::warning::" if os.environ.get("GITHUB_ACTIONS") == "true" else "WARNING: "
+    for pr in problems:
+        print(tag + pr, file=sys.stderr)
+    return 1 if (problems and a.strict) else 0
 
 
 if __name__ == "__main__":
-    generate(sys.argv[1])
+    sys.exit(main())
