@@ -154,6 +154,7 @@ Status: **removed 1.0.0** = the non-canonical spelling was deleted in the clean-
 | 125 developer members (`*_diagnostics/_stats/_census/_budget/_ledger/_probe/_timing`, `last_*`, solver tuning beyond selection, ablation switches, `field_view`, `exchange_field*`, `rebalance_by_weights`, `bcast_from_root`, …; the list is flow `853816f`) | `solver.diagnostics.<same>` (`SolverDiagnostics`) | **removed 1.0.0** (F) |
 | `set_body_force(fx, fy, fz)`; `set_domain_bc(face, type, vx, vy, vz)` | `set_body_force((fx, fy, fz))`; `set_domain_bc(face, type, velocity=(vx, vy, vz))` — one 3-sequence, as dem and voro | **removed 1.0.0** (F, 2026-09-11, flow `a0a8c27`) |
 | `predict_hierarchy(gnx, gny, gnz, np, levels, …, min_extent)` | `cells=(nx, ny, nz)`, `num_ranks=` (§1.1, §1.3); the bottom threshold as amr's `bottom_extent` | **OPEN divergence** (found 2026-09-24): amr's forecast follows the canon, flow's predates it. Fix at flow's next breaking change, through §0's ladder. |
+| `hydro_force_torque()` — the reconstructed TRACTION integral under the name a user reaches for as "the force on my particles" (~30 % low at any resolution) | the force and torque on the bodies: `hydro_force_torque_reaction()` (shipped, unchanged); the traction and its pressure/viscous split: `diagnostics.hydro_force_torque_traction()` (the `hydro_force_torque_<method>` pattern of the shipped reaction name, and coupling's `force_method=`) | **deprecated, warns** from the first release after flow 1.2.0 (2026-09-30, USER-approved; returns the same array; removal needs a major, D9). Warns at once, not one release later — §4 2026-09-30 says why. Register: coupling "The public force API returns the reaction". |
 | call-order docstrings ("call BEFORE set_solid / init_mpi") | state checks: `set_domain_bc(_profile)`, `set_aperture_order`, `set_fluid_only_constraint`, `set_exact_crossings`, `set_openness_override`, `set_ghost_projection`/`'ghost'` RAISE after geometry; `set_decomposition`, `set_comm_avoiding` RAISE after `init_mpi`; late `set_rho`/`set_mu` now dirty the stencil (were silently wrong); `set_domain_bc(_profile)` after geometry is ALLOWED for a VALUE update on a face whose type is unchanged (a ramped inflow or lid — the tangential fold is refreshed) and raises only on a type change | **canon** (F) |
 
 ### peclet.dem
@@ -270,6 +271,18 @@ identity — `peclet::core`, `peclet/core/...`, the repo and its tags — does *
 
 ## 4. History
 
+- 2026-09-30 — **flow `hydro_force_torque()` deprecated** (USER-approved; flow branch `force-api`).
+  It returned the traction integral, a diagnostic that under-reads the drag by ~30 % at any
+  resolution, under the natural name for the force. Two canon-conforming moves were available and
+  one was not: changing what the shipped name returns (the reaction) would change its meaning AND
+  its shape ((4, n, 3) → (2, n, 3)) — a break, so a major under QUALITY_PLAN D9; renaming is
+  additive. So the traction gains the diagnostic name `diagnostics.hydro_force_torque_traction()`,
+  `hydro_force_torque_reaction()` stays the force API, and the old name keeps returning the traction.
+  **It warns from the release that adds the new name**, not one release later as §0 has it: §0's
+  silent release is for a respelling, whose old name is harmless; this old name is the hazard (a
+  silently wrong force), so a silent release would ship exactly the failure the change removes.
+  The warning is its own commit in flow, revertible to restore §0's schedule. Not a precedent for
+  respellings.
 - 2026-09-24 — **dem `migrate_to_weights(weights, align=1)`**, user-approved. ADDITIVE (a new
   keyword with the old behaviour as its default), so no alias ladder is owed. `align` is the word
   core already uses for the same concept (`BlockDecomposer::init(…, weights, align)`, `align_`), and

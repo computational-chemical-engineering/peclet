@@ -4,6 +4,33 @@ All notable changes to the peclet suite are documented here. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### `peclet-flow`
+
+#### Deprecated
+
+- **`Solver.hydro_force_torque()` is deprecated and warns: it is not the force on the bodies.**
+  It returns the reconstructed surface-traction integral, which under-reads the drag by ~30 % at
+  every resolution (traction / reaction 0.685–0.730 over φ 0.008–0.45 and N 24–128; the central
+  difference spans the wall, so the deficit is in the viscous part) and a spinning sphere's torque
+  by 28–41 %. The force and torque on the bodies is **`hydro_force_torque_reaction()`** — the
+  discrete momentum reaction, exactly conservative; its torque reads 1.019–1.027 of the exact
+  periodic-array value at 6–12 cells per radius. The traction, with its pressure/viscous split,
+  is **`diagnostics.hydro_force_torque_traction()`**. The old name returns the same array as before
+  and raises a `DeprecationWarning` naming both; it goes at the next major release. A consistent
+  traction (from the momentum operator's small-cell-robust wall reconstruction) is planned.
+
+#### Fixed
+
+- `hydro_force_torque()` (the traction) applied the index → physical conversion twice under a
+  physical domain: 0.019× the reaction at `extent` 1, 3e-8× at 7.3. Cell units were unaffected.
+
+### `peclet-coupling`
+
+- `ResolvedCfdDem(force_method="traction")` reads flow's `diagnostics.hydro_force_torque_traction()`
+  (needs the flow release that carries it). The default `"reaction"` is unchanged.
+
 ## [1.3.0] — 2026-09-27 — one partition for fluid and particles, and a distributed DEM that conserves momentum
 
 `peclet-flow` 1.2.0 · `peclet-dem` 1.1.0 · `peclet-coupling` 1.1.0 ·

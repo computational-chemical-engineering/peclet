@@ -161,8 +161,9 @@ apply_torque : bool, default False
 force_method : {"reaction", "traction"}, default "reaction"
     `"reaction"` uses the discrete momentum-reaction force (`flow.hydro_force_torque_reaction()`),
     exactly conservative. `"traction"` uses the reconstructed surface-traction integral
-    (`flow.hydro_force_torque()`), kept as a diagnostic; it under-reads the drag by a measured,
-    resolution-independent ~29%.
+    (`flow.diagnostics.hydro_force_torque_traction()`), kept as a diagnostic; it under-reads
+    the drag by a measured, resolution-independent ~30 % (traction / reaction 0.685-0.730),
+    and its torque by 28-41 %.
 
 Raises
 ------
