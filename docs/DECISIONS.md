@@ -597,7 +597,7 @@ reading until they are settled.
 
 ## coupling — CFD-DEM
 
-18 in force, 1 superseded — full text in [`decisions/coupling.md`](decisions/coupling.md)
+19 in force, 1 superseded — full text in [`decisions/coupling.md`](decisions/coupling.md)
 
 ### In force
 
@@ -615,6 +615,7 @@ reading until they are settled.
 - **Rebuild all three mphys host trees before diagnosing a coupling test failure**.  <sub>stale-build-mphys-trees.md:10</sub>
 - **The CFD-DEM coupling force is the discrete reaction (route b), not the traction integral**. **Rejected:** hydro_force_torque (the traction integral) as the production coupling force  <sub>sdf-scene-campaign.md:18</sub>
 - **The cross-module CUDA porous-CFD-DEM crash was an async stream race, not a GraphAMG bug**. **Rejected:** "NOT graphAMG (my initial guess was WRONG)"  <sub>multiphysics-framework-plan.md:382</sub>
+- **The public force API returns the reaction; the traction is a named diagnostic**. **Rejected:** leaving the traction under the natural name `hydro_force_torque()` (a user asking for "the force on my particles" got one ~30 % low with no signal); m  <sub>USER</sub>
 - **USER DIRECTIVE: porous=True (volume-averaged NS) is the default for CFD-DEM**. **Rejected:** porous=False (plain incompressible NS with ε only in the drag closure) as the default  <sub>cfddem-porous-default-directive.md:10</sub>
 - **Volume-averaged gas momentum must be epsilon-weighted with a matched projection pair**. **Rejected:** the old plain-u momentum path with epsilon only in drag/constraint/coefficients  <sub>porous-eps-conservative-momentum.md:10-31</sub>
 - **porous=False is NOT "Model B" — terminology correction**. **Rejected:** calling porous=False "Model B"  <sub>porous-cfddem-cuda-two-bugs.md:22</sub>

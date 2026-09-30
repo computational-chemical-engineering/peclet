@@ -165,7 +165,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: coupling
 - source: sdf-scene-campaign.md:18
 - decided: undated
-- status: settled
+- status: settled (refined 2026-09-30 by "The public force API returns the reaction; the traction is a named diagnostic": the traction's Python name is now `diagnostics.hydro_force_torque_traction()`, and `hydro_force_torque()` is deprecated)
 - quote: |
     Layer 4 = resolved
     CFD-DEM; **the coupling force is `hydro_force_torque_reaction` (route b)** — the discrete
@@ -175,6 +175,37 @@ Do not reverse an entry here without recording a new decision that supersedes it
     independent).
 - rejected: hydro_force_torque (the traction integral) as the production coupling force
 - why: "the traction integral (hydro_force_torque) is a DIAGNOSTIC only (29% low, resolution independent)"
+
+### The public force API returns the reaction; the traction is a named diagnostic
+- area: coupling (flow's public force/torque API)
+- source: USER decision 2026-09-30 (relayed in the force-api brief); flow branch `force-api` 749ca03 (names), ed1f27a (the warning), 90ddeca (callers); coupling branch `force-api` e41410f
+- decided: 2026-09-30
+- status: settled (USER approved 2026-09-30)
+- quote: |
+    1. The public "force on the particles" API must return the reaction.
+    2. The traction integral stays available, under an explicit diagnostic name, documented as
+       under-reading the viscous part by ~30 %.
+    3. A consistent traction, i.e. the wall shear from the momentum operator's small-cell-robust
+       reconstruction, is a planned item, not part of this change.
+- rejected: leaving the traction under the natural name `hydro_force_torque()` (a user asking for "the force on my particles" got one ~30 % low with no signal); making `hydro_force_torque()` return the reaction in place (changes a shipped name's meaning and shape (4,n,3) → (2,n,3): a break, so a major under QUALITY_PLAN D9 — and the reaction refuses collocated / porous / variable-property / domain-BC runs, where the traction is the only estimate); the one-silent-release schedule of NAMING §0 for the old name (a silent release would ship the very error being removed)
+- why: the traction differences the velocity across the wall with a central difference and under-reads the viscous part at every resolution — traction/reaction 0.685–0.730 over φ 0.008–0.45 and N 24–128 (flow 25a0e7c, 2026-09-30). The canon's additive path fixes the hazard without a break: `hydro_force_torque_reaction()` is THE force API (shipped, documented with its accuracy); the traction is `diagnostics.hydro_force_torque_traction()` (D2 tier; the `hydro_force_torque_<method>` pattern of the shipped reaction name and of coupling's `force_method=`); `hydro_force_torque()` returns the same traction array but raises a DeprecationWarning naming both, and goes at the next major. `ResolvedCfdDem(force_method="traction")` reads the new name.
+- evidence: |
+    TORQUE, measured before the public docs claim it (steady Stokes, periodic cube; reference
+    8πμa³Ω/(1−φ), under which φ 0.008 and 0.027 agree to 3e-4 at equal R/h):
+      spinning sphere, φ 0.027, R/h 6 / 9 / 12:  reaction 1.0275 / 1.0252 / 1.0193,
+                                                  traction 0.593 / 0.653 / 0.723
+      (φ 0.008, R/h 6 / 9: reaction 1.0270 / 1.0248, traction 0.596 / 0.655;
+       φ 0.216, R/h 9 / 12 / 18: reaction 1.0451 / 1.0377 / 1.0290, traction 0.636 / 0.697 / 0.608)
+      translating sphere, true torque 0, |T|/(|F|R): on the cell vertex reaction ≤ 1.6e-15
+      (traction 1.4e-15); off it (+0.31, 0.17, 0.43 h) reaction 1.1e-3 / 6.4e-4 (φ 0.027, R/h 6 / 9)
+      and 2.6e-4 / 6.4e-5 / 4.9e-5 (φ 0.216, R/h 9 / 12 / 18), traction 2.8e-3 … 5.0e-3.
+    So the reaction torque is accurate in magnitude (~+2 %, falling with resolution, against the
+    traction's −28 … −41 %) and the public getter returns it. The 3.2e-7 spurious torque in "Reaction
+    torque coupling stays off by default" was not reproduced on these cases (≤ 1.6e-15 on the
+    vertex); that entry's reason for the default — dem's default inverse inertia — is unaffected.
+    Gate: flow `tests/python/test_hydro_force_units.py` (ctest `hydro_force_units`).
+- note: PLANNED — a consistent wall traction from the Robust-Scaled (small-cell-robust) wall reconstruction of the momentum operator, so that traction → reaction under refinement; unlocks wall-shear maps, the pressure/viscous split of the accurate force and local surface fluxes; a candidate section of the M3 method paper (peclet-papers PLAN.md D8; flow CLAUDE.md "Open items"). Known dead end: the one-sided difference to the wall over the crossing distance θ — 1/θ unbounded on small cut cells, drag 17× too large.
+- supersedes: none (refines "The CFD-DEM coupling force is the discrete reaction (route b), not the traction integral")
 
 ### The cross-module CUDA porous-CFD-DEM crash was an async stream race, not a GraphAMG bug
 - area: coupling
