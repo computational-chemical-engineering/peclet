@@ -3,6 +3,15 @@ name: Site
 # Build the umbrella MkDocs (Material) site — the suite's front door: the design docs + the
 # install/deployment guide, with links out to each submodule's Doxygen API site — and publish it to
 # this repo's GitHub Pages. Requires Pages enabled with "Source: GitHub Actions" (Settings -> Pages).
+#
+# The Python API pages (docs/python/<pkg>.md, not committed) are generated here, by
+# tools/gen_python_api.py run inside the RELEASED peclet-cpu container image, so they describe the
+# released API. Two triggers:
+#   - a docs push builds against peclet-cpu:latest (the newest release);
+#   - a release: containers.yml dispatches this workflow once the peclet-cpu image for the tag is
+#     pushed, passing the PINNED version tag. That is the race guard: the release build never reads
+#     `latest`, so it cannot pick up the previous release's image, and any docs-push run that starts
+#     after the dispatch reads a `latest` that containers.yml has already moved.
 
 on:
   push:
@@ -11,8 +20,14 @@ on:
       - 'docs/**'
       - 'mkdocs.yml'
       - 'requirements-docs.txt'
+      - 'tools/gen_python_api.py'
       - '.github/workflows/site.yml'
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "peclet-cpu image tag to generate the Python API pages from (a release version X.Y.Z, or latest)"
+        type: string
+        default: latest
 
 permissions:
   contents: read
@@ -33,6 +48,25 @@ jobs:
           python-version: "3.12"
       - name: Install MkDocs Material
         run: pip install -r requirements-docs.txt
+      - name: Set up Apptainer
+        # the images are Apptainer SIFs pushed as ORAS artifacts, not Docker images
+        uses: eWaterCycle/setup-apptainer@v2
+        with:
+          apptainer-version: 1.3.6
+      - name: Generate the Python API pages from the released image
+        env:
+          IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
+        run: |
+          image="oras://ghcr.io/computational-chemical-engineering/peclet-cpu:${IMAGE_TAG}"
+          echo ">> $image"
+          # A pinned release tag must document every PAGES module from an MPI build (--strict: a
+          # missing or non-MPI module fails the run). `latest` on a docs push only warns, so a module
+          # added on main ahead of its first release does not block the site.
+          if [ "$IMAGE_TAG" = latest ]; then strict=""; else strict="--strict"; fi
+          # apptainer runs as the invoking user and binds $PWD, so the pages are owned by the runner.
+          apptainer exec "$image" python3 -c \
+            "import importlib.metadata as m; print('peclet-flow', m.version('peclet-flow'), 'in the image')"
+          apptainer exec "$image" python3 tools/gen_python_api.py $strict docs/python
       - name: Build site (strict — fail on broken links/nav)
         run: mkdocs build --strict --site-dir site
       - name: Upload Pages artifact

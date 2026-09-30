@@ -29,6 +29,7 @@ on:
 permissions:
   contents: read
   packages: write
+  actions: write   # the cpu leg dispatches the Site workflow after a release (see the last step)
 
 concurrency:
   # per-subset group so cpu / cuda / hip dispatches run in parallel instead of cancelling each other
@@ -113,3 +114,15 @@ jobs:
             echo ">> pushing ${{ matrix.image }}:${tag}"
             apptainer push "${{ matrix.image }}.sif" "oras://ghcr.io/${owner}/${{ matrix.image }}:${tag}"
           done
+
+      - name: Rebuild the docs site from this release's image
+        # The site's Python API pages are generated from peclet-cpu (site.yml). Only the cpu leg, only on
+        # a release tag, and only after its push above succeeded; the PINNED version tag is passed, so
+        # the site never reads a `latest` that has not moved yet. A workflow_dispatch made with
+        # GITHUB_TOKEN does start a run (unlike most GITHUB_TOKEN events).
+        if: steps.gate.outputs.run == 'true' && matrix.name == 'cpu' && github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run site.yml --repo "${{ github.repository }}" --ref main \
+            -f image_tag="${{ steps.ver.outputs.version }}"

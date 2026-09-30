@@ -30,3 +30,8 @@
 # Python bytecode from the release tooling (tools/release/*.py are run in place)
 __pycache__/
 *.pyc
+
+# Python API pages: generated at site build time from the released peclet-cpu image
+# (.github/workflows/site.yml; locally tools/gen_api_local.sh). Only the overview is hand-written.
+/docs/python/*.md
+!/docs/python/index.md

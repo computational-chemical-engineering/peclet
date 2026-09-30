@@ -18,9 +18,10 @@ individual `pip install peclet-<name>`). Worked, runnable examples for every mod
 
 Every Kokkos-backed module exposes `execution_space` (`OpenMP` / `Cuda` / `HIP` / `Serial`) so you can
 confirm which build you imported, and `finalize()` for a deterministic teardown (also run at interpreter
-exit). The pages here are generated from the modules' own docstrings by `tools/gen_python_api.py` at each
-release, from an MPI-enabled build, so the distributed entry points are included; the full **C++** API is
-on each code's Doxygen site (linked from the home page).
+exit). The package pages are generated from the modules' own docstrings each time this site is built,
+inside the released `peclet-cpu` container image, so they describe the **latest release** (not `main`) and
+include the distributed entry points; the full **C++** API is on each code's Doxygen site (linked from the
+home page).
 
 !!! tip "GPU & multi-rank"
     `pip install peclet` gives the multicore-CPU (OpenMP) build and `pip install peclet-cu13` the
