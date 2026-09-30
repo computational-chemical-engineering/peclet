@@ -172,6 +172,17 @@ say "== landing pages (PyPI descriptions) vs the retired spellings in docs/NAMIN
 _lp=".venv/bin/python"; [ -x "$_lp" ] || _lp=python3   # PY above is scoped to the online block
 if "$_lp" tools/release/check_landing_pages.py; then :; else fail=1; fi
 say ""
+# The generated Python API pages and the docstrings they are generated from (RELEASE.md §5.1). Both need
+# the whole family importable from MPI-enabled builds (PYTHONPATH); with it absent they FAIL, they do not
+# skip: a release cut without them is exactly how the pages went stale at 1.3.0.
+say "== Python API pages (docs/python) vs the built modules, and package coverage"
+if "$_lp" tools/release/check_api_pages.py; then :; else fail=1; fi
+say ""
+say "== docstring audit (a bound callable without a docstring is a failure)"
+_ad=$("$_lp" tools/release/audit_docstrings.py --strict 2>&1); _rc=$?
+printf '%s\n' "$_ad" | grep -E 'undocumented|stale|not importable|^total' | sed 's/^/  /'
+[ "$_rc" = 0 ] || { bad "docstring audit failed (exit $_rc: unimportable module or undocumented callable)"; }
+say ""
 say "== untracked scratch in the umbrella (not part of any release):"
 git status --porcelain --ignored=no | grep '^??' | sed 's/^/  /'
 [ "$CI" = 1 ] && exit $fail

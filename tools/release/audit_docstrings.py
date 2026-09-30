@@ -8,8 +8,9 @@ a docstring, plus docstrings that still carry retired names. Run with the family
     PYTHONPATH=flow/build:dem/build:voro/build_dev:pnm/build:core/python/build_geom \
         python tools/release/audit_docstrings.py [--json out.json]
 
-Exit status is the number of modules that failed to import (so a CI step can fail loudly), the
-undocumented count is printed, not enforced — the release checklist decides what is acceptable.
+Exit status is the number of modules that failed to import (so a CI step can fail loudly). The
+undocumented count is printed; with --strict it is enforced too (the release pre-flight runs it so):
+exit status is then failed imports + 1 if any bound callable lacks a docstring.
 """
 import importlib, inspect, json, re, sys
 
@@ -89,6 +90,8 @@ def main():
             print(f"  stale ({w})  {n}")
     if "--json" in sys.argv:
         json.dump(out, open(sys.argv[sys.argv.index("--json") + 1], "w"), indent=1)
+    if "--strict" in sys.argv and und:
+        failed += 1
     sys.exit(failed)
 
 

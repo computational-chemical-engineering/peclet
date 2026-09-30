@@ -1,9 +1,6 @@
 """Generate static Markdown Python-API reference pages from the installed peclet modules' docstrings."""
 import importlib, inspect, os, sys, textwrap
 
-OUT = sys.argv[1]
-os.makedirs(OUT, exist_ok=True)
-
 # (page-file, title, blurb, [ (import_path, [class names] or None for free-functions) ... ])
 PAGES = [
     ("flow.md", "peclet.flow — Eulerian Navier–Stokes solver",
@@ -122,13 +119,14 @@ def emit_functions(mod, w, skip):
         w("```\n" + (clean(f.__doc__) or "(no docstring)") + "\n```\n\n")
 
 
-for fname, title, blurb, specs in PAGES:
+def render_page(title, blurb, specs):
+    """Markdown of one page. Importable: tools/release/check_api_pages.py regenerates every page
+    with it and diffs against docs/python/."""
     lines = []
     w = lines.append
     w(f"# {title}\n\n{blurb}\n\n")
     w("!!! note\n    Auto-generated from the installed module docstrings. "
       "Drive simulations from Python; the full C++ API is on each repo's Doxygen site.\n\n")
-    ok = True
     for path, cnames in specs:
         try:
             mod = importlib.import_module(path)
@@ -142,6 +140,16 @@ for fname, title, blurb, specs in PAGES:
         for c in cnames:
             emit_class(mod, c, w)
         emit_functions(mod, w, skip=set(cnames))
-    with open(os.path.join(OUT, fname), "w") as fh:
-        fh.write("".join(lines))
-    print("wrote", fname)
+    return "".join(lines)
+
+
+def generate(out):
+    os.makedirs(out, exist_ok=True)
+    for fname, title, blurb, specs in PAGES:
+        with open(os.path.join(out, fname), "w") as fh:
+            fh.write(render_page(title, blurb, specs))
+        print("wrote", fname)
+
+
+if __name__ == "__main__":
+    generate(sys.argv[1])

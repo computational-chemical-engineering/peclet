@@ -192,14 +192,18 @@ visible before tagging.
 
 ### 5.1 Docstrings and generated API pages
 
-1. Build the whole family (host prefix is enough) and run
-   `tools/release/audit_docstrings.py` — it imports every `peclet.*` module and lists bound
-   callables without a docstring, plus docstrings that still say `sdflow`/`vorflow`/`tpx`/
-   `peclet.flow.pnm`. Fix in the binding TUs (`<sub>/src/*_bindings.cpp`, `core/python/*_bindings.cpp`).
-2. Regenerate the Python API pages: `python tools/gen_python_api.py docs/python` with the family on
-   `PYTHONPATH`. Check that `PAGES` in that script still lists every module (it lacked `peclet.pnm`
-   at one point, and lacks `peclet.coupling` and `peclet.core.geom` today) and that `mkdocs.yml`
-   nav has a page for each.
+1. Build the whole family from **MPI-enabled** builds (host prefix is enough) and put every build tree
+   on `PYTHONPATH`. Fix docstring findings in the binding TUs (`<sub>/src/*_bindings.cpp`,
+   `core/python/*_bindings.cpp`); `tools/release/audit_docstrings.py --strict` lists bound callables
+   without a docstring (a failure) and docstrings that still say `sdflow`/`vorflow`/`tpx`/
+   `peclet.flow.pnm`.
+2. Regenerate the Python API pages: `python tools/release/check_api_pages.py --update`, review the
+   diff, commit. **This is now enforced:** `check_release_state.sh` runs `check_api_pages.py`, which
+   fails on a stale page, a `PAGES` module that does not import or reports `has_mpi` False, and any
+   package pinned by the metapackage (`pyproject.toml`) that lacks a `PAGES` entry in
+   `tools/gen_python_api.py` or a `mkdocs.yml` nav entry. `PAGES` covers every shipped package
+   (`peclet.flow/pnm/dem/voro/coupling/amr/morton`, `peclet.halo` + `peclet.geom` on `core.md`;
+   `peclet-core` is the deprecated shell and is covered by `peclet.halo`).
 3. `mkdocs build --strict` must pass (the Site workflow runs exactly that).
 
 ### 5.2 Prose
