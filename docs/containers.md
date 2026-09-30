@@ -7,7 +7,8 @@ Pre-built images are published to the **GitHub Container Registry (GHCR)** by CI
 ([`containers.yml`](https://github.com/computational-chemical-engineering/peclet/blob/main/.github/workflows/containers.yml)),
 and you can also build your own from the [`containers/`](https://github.com/computational-chemical-engineering/peclet/tree/main/containers)
 definition files. Every image bakes the Kokkos/ArborX toolchain and the full `peclet.*` family
-(flow, pnm, dem, voro, coupling, core, morton) with the distributed (MPI) API compiled in.
+(flow, pnm, dem, voro, coupling, core, geom, morton; `peclet-cpu` also amr) with the distributed (MPI) API
+compiled in.
 
 ## 1. Pull a pre-built image (recommended)
 

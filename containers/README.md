@@ -1,7 +1,7 @@
 # Containers
 
 Apptainer (Singularity) definition files that bake the toolchain + a bootstrapped Kokkos/ArborX prefix
-and pip-install the full `peclet.*` family (flow, pnm, dem, voro, coupling, core, morton). Apptainer is the de-facto
+and pip-install the full `peclet.*` family (flow, pnm, dem, voro, coupling, core, geom, morton; amr in the CPU image). Apptainer is the de-facto
 container runtime on HPC (both **Snellius** and **LUMI** use it; Docker is not permitted on the compute
 nodes).
 

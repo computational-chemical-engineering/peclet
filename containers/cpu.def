@@ -61,6 +61,10 @@ From: ubuntu:24.04
     CMAKE_PREFIX_PATH=$PREFIX $PIP /opt/peclet/core
     CMAKE_PREFIX_PATH=$PREFIX $PIP /opt/peclet/coupling   # CFD-DEM glue (Kokkos kernels + pure-Python driver); needs flow + dem installed
     $PIP /opt/peclet/morton
+    $PIP /opt/peclet/geom     # analytic-SDF scene authoring (host-only: no Kokkos, no MPI)
+    # block-octree AMR + its solver (Kokkos + MPI; after morton, which it depends on). CPU image only
+    # for now: the GPU images have not been tried with it.
+    CMAKE_PREFIX_PATH=$PREFIX $PIP /opt/peclet/amr
 
 %environment
     export OMP_PROC_BIND=spread

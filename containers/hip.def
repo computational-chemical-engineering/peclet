@@ -64,6 +64,7 @@ From: rocm/dev-ubuntu-22.04:6.2.4-complete
     CMAKE_PREFIX_PATH=$PREFIX CXX=hipcc $PIP /opt/peclet/core
     CMAKE_PREFIX_PATH=$PREFIX CXX=hipcc $PIP /opt/peclet/coupling   # CFD-DEM glue (Kokkos kernels + pure-Python driver); needs flow + dem installed
     $PIP /opt/peclet/morton
+    $PIP /opt/peclet/geom     # analytic-SDF scene authoring (host-only: no Kokkos, no MPI)
 
 %environment
     export PATH=/opt/rocm/bin:$PATH
