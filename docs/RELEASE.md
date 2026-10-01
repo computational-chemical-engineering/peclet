@@ -100,7 +100,8 @@ configured against a retired venv fails with "Cannot run the interpreter".
 | Project | Suite | Command (host prefix `extern/install/host-openmp`; repeat with `nvidia-cuda`) | Expect |
 |---|---|---|---|
 | core | serial + MPI halo, migration, load balancing | `cmake -S core -B core/build_rel -DCMAKE_PREFIX_PATH=$P && cmake --build core/build_rel -j && ctest --test-dir core/build_rel --output-on-failure` | all pass, np 1–8 |
-| core | Kokkos halo + AMR | `cmake -S core -B core/build_rel_k -DPECLET_CORE_KOKKOS=ON ...` per `core/CLAUDE.md` | all pass |
+| core | Kokkos device halo | `cmake -S core -B core/build_rel_k -DPECLET_CORE_ENABLE_KOKKOS=ON ...` per `core/CLAUDE.md` | all pass |
+| amr | octree, AMR NS, MPI (np 1–8) | `cmake -S amr -B amr/build_rel -DCMAKE_PREFIX_PATH=$P && ... ctest` per `amr/CLAUDE.md` | all pass |
 | morton | doctest + Kokkos + pytest | `ctest --test-dir morton/build_rel`; `python -m pytest morton/bindings/python/tests -q` | all pass; non-BMI2 binary PDEP/PEXT-free |
 | flow | kernel unit tests | `cmake -S flow/tests/kokkos -B flow/build_rel_kokkos -DCMAKE_PREFIX_PATH=$P && ... ctest` | all pass |
 | flow | distributed (`PECLET_FLOW_MPI`) | `cmake -S flow/tests/kokkos_mpi -B flow/build_rel_kmpi -DMPIEXEC_EXECUTABLE=/usr/bin/mpirun ...` | np 1,2,4 all pass, np=1 bit-exact |

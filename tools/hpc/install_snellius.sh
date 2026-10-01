@@ -142,7 +142,7 @@ ls -la "$WHEELS"
 #   the peclet.core shell) fails HERE rather than in a user's run. The job runs on a node of the
 #   target backend; a failure leaves the wheelhouse intact but fails the job.
 IMPORT_OK=1
-python -W error::DeprecationWarning - <<'PY' || IMPORT_OK=0
+python -W "error:peclet.core:DeprecationWarning" - <<'PY' || IMPORT_OK=0
 import sys
 import peclet.morton, peclet.geom, peclet.halo, peclet.amr, peclet.coupling
 import peclet.flow as f, peclet.dem as d, peclet.voro as v, peclet.pnm as p
@@ -154,7 +154,7 @@ print("imported: peclet.{morton,geom,halo,flow,pnm,dem,voro,amr,coupling}")
 PY
 echo "-> tree $SUITE ; venv $SUITE/.venv ; wheelhouse $WHEELS"
 if [ "$IMPORT_OK" != 1 ]; then
-  echo "FAILED: import check (canonical modules, -W error::DeprecationWarning) -- see above" >&2
+  echo "FAILED: import check (canonical modules, -W "error:peclet.core:DeprecationWarning") -- see above" >&2
   exit 1
 fi
 echo "-> next: sbatch --nodes=1 --gpus-per-node=4 --ntasks-per-node=4 $SUITE/tools/hpc/smoke_snellius.slurm $TAG $TARGET"

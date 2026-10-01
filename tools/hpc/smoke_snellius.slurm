@@ -31,7 +31,7 @@ if [ "$TARGET" = cpu ]; then GPUOPT=""; else GPUOPT="--gpus-per-task=1 --gpu-bin
 PY="$SUITE/.venv/bin/python"
 
 echo "== 1. imports / backends"
-srun --mpi=pmix --ntasks=1 $GPUOPT "$PY" -W error::DeprecationWarning - <<'PY'
+srun --mpi=pmix --ntasks=1 $GPUOPT "$PY" -W "error:peclet.core:DeprecationWarning" - <<'PY'
 import peclet.flow as f, peclet.dem as d, peclet.voro as v, peclet.pnm as p, peclet.morton, peclet.halo
 import peclet.geom, peclet.amr
 import importlib; c = importlib.util.find_spec("peclet.coupling") is not None

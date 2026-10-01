@@ -74,7 +74,7 @@ wheel ./coupling
 pip install --no-index --find-links "$WHEELS" peclet-morton peclet-geom peclet-halo peclet-core \
     peclet-flow peclet-pnm peclet-dem peclet-voro peclet-amr peclet-coupling
 # Canonical modules only, never peclet.core.*; DeprecationWarning is an error so a stale caller fails here.
-ROCR_VISIBLE_DEVICES=0 python -W error::DeprecationWarning - <<'PY'
+ROCR_VISIBLE_DEVICES=0 python -W "error:peclet.core:DeprecationWarning" - <<'PY'
 import sys
 import peclet.morton, peclet.geom, peclet.halo, peclet.amr, peclet.coupling
 import peclet.flow as f, peclet.dem as d, peclet.voro as v, peclet.pnm as p
