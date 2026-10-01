@@ -379,7 +379,8 @@ What "a release for Snellius" means, in decreasing order of user convenience:
 2. **A site-built install** in the project space, from the release tag, with the validated 2024a
    toolchain (`docs/SNELLIUS.md`): `tools/hpc/install_snellius.sh <tag> h100|a100|cpu`. It clones
    the umbrella at the tag, bootstraps Kokkos for the backend, and pip-installs the whole family
-   (`PECLET_*_MPI=ON`) into `$SUITE/.venv`, leaving a **wheelhouse** at
+   (`PECLET_*_MPI=ON`; distributions `peclet-morton peclet-geom peclet-halo peclet-core peclet-flow
+   peclet-pnm peclet-dem peclet-voro peclet-amr peclet-coupling`) into `$SUITE/.venv`, leaving a **wheelhouse** at
    `/projects/0/prjs1022/peclet/wheelhouse/<tag>-<backend>/` so project members can
    `pip install --no-index --find-links <wheelhouse> peclet-flow` into their own venv without
    rebuilding. Wheels built on Snellius are **site-specific** (linked against the module OpenMPI,

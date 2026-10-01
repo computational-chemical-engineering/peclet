@@ -67,14 +67,22 @@ if [ ! -d "$SUITE/.git" ]; then
   git clone --branch "$TAG" --recurse-submodules https://github.com/computational-chemical-engineering/peclet.git "$SUITE"
 fi
 cd "$SUITE"
+# A tree left by an earlier run may sit at another commit: put it ON the tag, then sync + init so
+# submodules added since that clone (geom and amr, family 1.2.0+) are registered and checked out too.
+git rev-parse -q --verify "refs/tags/$TAG" >/dev/null || git fetch --tags origin
+git -c advice.detachedHead=false checkout --quiet "$TAG"
+git submodule sync --recursive
 git submodule update --init --recursive
+for _s in morton geom core flow pnm dem voro amr coupling; do
+  [ -f "$_s/pyproject.toml" ] || { echo "FATAL: submodule $_s not checked out at $TAG" >&2; exit 1; }
+done
 echo "== suite $(git describe --tags --always) ; $(git submodule status | awk '{print $2":"substr($1,1,8)}' | tr '\n' ' ')"
 
 # --- 2. venv --------------------------------------------------------------------------------
 python3 -c 'import sys; assert sys.version_info[:2]>=(3,10), sys.version'
 python3 -m venv --clear .venv
 source .venv/bin/activate
-pip install -U pip wheel nanobind numpy scipy mpi4py matplotlib scikit-build-core
+pip install -U pip wheel nanobind numpy scipy mpi4py matplotlib scikit-build-core hatchling
 [ "$TARGET" = cpu ] || pip install cupy-cuda12x
 
 # --- 3. Kokkos (+ArborX) prefix for the backend ---------------------------------------------
@@ -93,6 +101,11 @@ fi
 PREFIX="$SUITE/extern/install/$BACKEND"
 
 # --- 4. build wheels for the family, in dependency order, then install them -----------------
+# The distributions since family 1.2.0 (docs/CORE_BOUNDARY.md): core's pyproject.toml builds
+# peclet-halo (peclet.halo, host-only MPI, no Kokkos); peclet-core is only a pure-Python
+# compatibility shell over peclet.geom + peclet.halo (warns since core 1.3.1, gone in 2.0.0); geom
+# (peclet-geom) needs neither Kokkos nor MPI; amr (peclet-amr) always links MPI + Kokkos -- it has
+# no switch for either, so it takes no define here.
 #   A venv has no Python.h: pass the base interpreter's include dir (INCLUDEPY is right from a venv).
 PYINC=$(python3 -c 'import sysconfig; print(sysconfig.get_config_var("INCLUDEPY"))')
 export CMAKE_PREFIX_PATH="$PREFIX"
@@ -101,23 +114,47 @@ mkdir -p "$WHEELS"
 wheel() {  # <dir> [extra --config-settings ...]
   local d="$1"; shift
   echo "== pip wheel $d $*"
-  pip wheel --no-deps --no-build-isolation -w "$WHEELS" "$@" "./$d"
+  pip wheel --no-deps --no-build-isolation -w "$WHEELS" "$@" "$d"
 }
-wheel morton
-wheel core     --config-settings=cmake.define.PECLET_CORE_KOKKOS=ON
-wheel flow     --config-settings=cmake.define.PECLET_FLOW_MPI=ON
-wheel pnm      --config-settings=cmake.define.PECLET_PNM_MPI=ON
-wheel dem      --config-settings=cmake.define.PECLET_DEM_MPI=ON
-wheel voro     --config-settings=cmake.define.PECLET_VORO_KOKKOS=ON --config-settings=cmake.define.PECLET_VORO_BUILD_PYTHON=ON --config-settings=cmake.define.PECLET_VORO_MPI=ON
-wheel coupling
-pip install --no-index --find-links "$WHEELS" peclet-morton peclet-core peclet-flow peclet-pnm peclet-dem peclet-voro peclet-coupling
+wheel ./morton
+wheel ./geom
+wheel ./core                                                  # -> peclet-halo
+# The peclet-core shell is core/packaging/pyproject-core.toml copied over pyproject.toml (the pattern
+# of core/.github/workflows/release.yml). Copy into a STAGING dir, never in the tree: a run that died
+# between the copy and a restore would build the shell under ./core's name on every rerun.
+CORE_SHELL=$(mktemp -d)
+cp -r core/packaging core/README.md core/LICENSE "$CORE_SHELL/"
+cp core/packaging/pyproject-core.toml "$CORE_SHELL/pyproject.toml"
+wheel "$CORE_SHELL"                                           # -> peclet-core (pure Python)
+rm -rf "$CORE_SHELL"
+wheel ./flow     --config-settings=cmake.define.PECLET_FLOW_MPI=ON
+wheel ./pnm      --config-settings=cmake.define.PECLET_PNM_MPI=ON
+wheel ./dem      --config-settings=cmake.define.PECLET_DEM_MPI=ON
+wheel ./voro     --config-settings=cmake.define.PECLET_VORO_KOKKOS=ON --config-settings=cmake.define.PECLET_VORO_BUILD_PYTHON=ON --config-settings=cmake.define.PECLET_VORO_MPI=ON
+wheel ./amr
+wheel ./coupling
+pip install --no-index --find-links "$WHEELS" peclet-morton peclet-geom peclet-halo peclet-core \
+    peclet-flow peclet-pnm peclet-dem peclet-voro peclet-amr peclet-coupling
 ls -la "$WHEELS"
 
-# --- 5. import check (backend needs a GPU; on a login node the wheels are still valid) --------
-python - <<'PY' || echo "(import check skipped/failed here — run smoke_snellius.slurm on a GPU node)"
-import peclet.flow as f, peclet.dem as d, peclet.voro as v, peclet.pnm as p, peclet.morton, peclet.halo
+# --- 5. import check: every package by its CANONICAL module, never peclet.core.* -------------------
+#   DeprecationWarning is an error, so a caller still on a retired spelling (e.g. one that reaches
+#   the peclet.core shell) fails HERE rather than in a user's run. The job runs on a node of the
+#   target backend; a failure leaves the wheelhouse intact but fails the job.
+IMPORT_OK=1
+python -W error::DeprecationWarning - <<'PY' || IMPORT_OK=0
+import sys
+import peclet.morton, peclet.geom, peclet.halo, peclet.amr, peclet.coupling
+import peclet.flow as f, peclet.dem as d, peclet.voro as v, peclet.pnm as p
+shell = sorted(m for m in sys.modules if m == "peclet.core" or m.startswith("peclet.core."))
+assert not shell, f"a canonical module imported the retired peclet.core shell: {shell}"
 print("flow", f.execution_space, "has_mpi", f.has_mpi)
 print("dem", d.execution_space, "| voro", v.execution_space, "| pnm", p.execution_space)
+print("imported: peclet.{morton,geom,halo,flow,pnm,dem,voro,amr,coupling}")
 PY
 echo "-> tree $SUITE ; venv $SUITE/.venv ; wheelhouse $WHEELS"
+if [ "$IMPORT_OK" != 1 ]; then
+  echo "FAILED: import check (canonical modules, -W error::DeprecationWarning) -- see above" >&2
+  exit 1
+fi
 echo "-> next: sbatch --nodes=1 --gpus-per-node=4 --ntasks-per-node=4 $SUITE/tools/hpc/smoke_snellius.slurm $TAG $TARGET"

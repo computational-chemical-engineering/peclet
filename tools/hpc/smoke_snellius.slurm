@@ -4,7 +4,8 @@
 #   * flow/scripts/verify_mpi_spheres_sdflow.py — distributed periodic sphere-packing permeability,
 #     run at np=1 and np=N; the printed k must agree to all digits (bit-exact distributed solve).
 #   * benchmarks/profile_mpi_flow.py — the weak-scaling comm-overhead tile (has_mpi + mpi_block).
-#   * import checks for dem / voro / pnm / core.mpi / coupling (backend + MPI surface present).
+#   * import checks for every member by its canonical module (peclet.halo, peclet.geom, peclet.amr,
+#     ... -- never the retired peclet.core shell), DeprecationWarning an error; backend + MPI present.
 #
 #   sbatch --nodes=1 --gpus-per-node=4 --ntasks-per-node=4 tools/hpc/smoke_snellius.slurm v0.7.0 h100
 #   sbatch -p gpu_a100 --nodes=1 --gpus-per-node=4 --ntasks-per-node=4 tools/hpc/smoke_snellius.slurm v0.7.0 a100
@@ -30,8 +31,9 @@ if [ "$TARGET" = cpu ]; then GPUOPT=""; else GPUOPT="--gpus-per-task=1 --gpu-bin
 PY="$SUITE/.venv/bin/python"
 
 echo "== 1. imports / backends"
-srun --mpi=pmix --ntasks=1 $GPUOPT "$PY" - <<'PY'
+srun --mpi=pmix --ntasks=1 $GPUOPT "$PY" -W error::DeprecationWarning - <<'PY'
 import peclet.flow as f, peclet.dem as d, peclet.voro as v, peclet.pnm as p, peclet.morton, peclet.halo
+import peclet.geom, peclet.amr
 import importlib; c = importlib.util.find_spec("peclet.coupling") is not None
 print(f"flow {f.execution_space} has_mpi={f.has_mpi} | dem {d.execution_space} step_mpi={hasattr(d.Simulation,'step_mpi')} "
       f"| voro {v.execution_space} VoronoiHalo={hasattr(v,'VoronoiHalo')} | pnm {p.execution_space} mpi={hasattr(p,'extract_pore_network_mpi')} | coupling={c}")

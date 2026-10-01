@@ -39,7 +39,8 @@ Facts to verify on day one: the exact `LUMI/` stack and `rocm` version (`module 
 Mirrors `install_snellius.sh`: clone the umbrella at the release tag into its own tree, `python -m venv
 --system-site-packages` (to inherit `cray-python`'s mpi4py rather than rebuilding it), bootstrap
 Kokkos for `lumi-hip` (`KOKKOS_ARCH=AMD_GFX90A`, `CXX=hipcc`), then `pip wheel` the family in
-dependency order with `PECLET_*_MPI=ON` into `wheelhouse/<tag>-lumi-hip/` and install from there.
+dependency order (morton, geom, core → `peclet-halo`, the `peclet-core` shell, flow, pnm, dem, voro,
+amr, coupling) with `PECLET_*_MPI=ON` into `wheelhouse/<tag>-lumi-hip/` and install from there.
 
 ```bash
 cd /project/project_46XXXXXXX/peclet

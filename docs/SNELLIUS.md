@@ -41,7 +41,10 @@ whatever `mpicc` is on `PATH`. Never mix module stacks between build and run.
 
 For a *released* family, use the site-install script instead of the campaign tree: it clones the
 umbrella at the tag into its own tree + venv, bootstraps Kokkos for the backend and builds every
-package with `PECLET_*_MPI=ON`, leaving a site-specific wheelhouse other project members can
+package with `PECLET_*_MPI=ON` — `peclet-morton`, `peclet-geom`, `peclet-halo` (built by `core/`),
+the pure-Python `peclet-core` compatibility shell, `peclet-flow`, `-pnm`, `-dem`, `-voro`, `peclet-amr`
+and `peclet-coupling` — then import-checks the canonical modules under
+`-W error::DeprecationWarning`. It leaves a site-specific wheelhouse other project members can
 `pip install --no-index --find-links` from (never upload those wheels to PyPI — they link the
 module OpenMPI and CUDA):
 
