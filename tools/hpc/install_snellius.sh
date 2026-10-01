@@ -154,7 +154,7 @@ print("imported: peclet.{morton,geom,halo,flow,pnm,dem,voro,amr,coupling}")
 PY
 echo "-> tree $SUITE ; venv $SUITE/.venv ; wheelhouse $WHEELS"
 if [ "$IMPORT_OK" != 1 ]; then
-  echo "FAILED: import check (canonical modules, -W "error:peclet.core:DeprecationWarning") -- see above" >&2
+  echo "FAILED: import check (canonical modules; a peclet.core import is an error) -- see above" >&2
   exit 1
 fi
 echo "-> next: sbatch --nodes=1 --gpus-per-node=4 --ntasks-per-node=4 $SUITE/tools/hpc/smoke_snellius.slurm $TAG $TARGET"
