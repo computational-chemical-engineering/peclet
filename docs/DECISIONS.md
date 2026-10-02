@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-183 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+187 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -167,6 +167,9 @@ reading until they are settled.
 - **Staircase coarse operator (binary classification, no volume-fraction coefficients) is the DEFAULT for the IBM volfrac path, removing the dt ceiling**. **Rejected:** the volume-fraction-weighted (area-fraction) coarse operator as coefficients; the plain const-coeff coarse op without staircase classification  <sub>velocity-mg-design.md:77-98</sub>
 - **Staircase is consolidated as the ONLY IBM velocity-MG coarse op — const and area-fraction paths removed from the code**. **Rejected:** geometry-blind const-coarse (setDiffusionCoarse) and area-fraction (setVelocityVolfracCoarse) IBM coarse operators — both deleted from the code  <sub>velocity-mg-design.md:100-116</sub>
 - **Star half fix: phibar mean was not bitwise-annihilating even in double — replaced by flux form**. **Rejected:** the phibar=Sum(a*x)/Sum(a) formulation  <sub>defect-correction-campaign.md:52-54</sub>
+- **Steady acceleration scope: staggered and collocated-ghost only; everything else refused with a named error**. **Rejected:** accelerating gauge-exact collocated (a family of fixed points); saving the history in checkpoints (~14x larger)  <sub>flow</sub>
+- **Steady marches are accelerated by type-II Anderson on the full march state, in a new `march_to_steady` — never inside `step()`**. **Rejected:** velocity-only state (measured stall at 1.9e-4 error); an `enable_*` switch that changes `step()`; an environment variable; a pure-Python/CuPy data pat  <sub>flow</sub>
+- **Steady state is certified by the unchanged stop instrument on PLAIN steps after acceleration**. **Rejected:** applying the stop instrument to the accelerated sequence  <sub>flow</sub>
 - **Strict staggered bit-identical guard must be held through every change; AMR must work for both velocity placements or be explicitly scoped**.  <sub>sdflow-octree-amr-next.md:19-20</sub>
 - **TRAP: -DPECLET_FLOW_MREAL_DOUBLE=ON on the cmake command line silently builds float**. **Rejected:** passing -DPECLET_FLOW_MREAL_DOUBLE=ON as a normal cmake cache variable  <sub>defect-correction-campaign.md:45-46</sub>
 - **Telescoping is default on for the pressure MG since 2026-09-02; the velocity solve does not need it**. **Rejected:** telescoping the velocity solve  <sub>momentum-solve-residual-stop.md:18</sub>
@@ -194,6 +197,7 @@ reading until they are settled.
 - **WY advection CFL default corrected to Weymouth's proven 3D bound 0.25**. **Rejected:** CFL<0.5 (Weymouth's 2D value, mistakenly applied to 3D)  <sub>vof-campaign.md:128-130</sub>
 - **Weak efficiency must be computed from per-GPU throughput, not raw step time**. **Rejected:** computing weak efficiency directly from step time when cells/GPU varies ±8%  <sub>channel-scaling-rebenchmark.md:208-209</sub>
 - **What was disproved in the agglomerated-bottom investigation**. **Rejected:** solid-rhs deposit contamination, sliver-row threshold mismatch, and multi-component pockets as causes for THIS case  <sub>agglomerated-bottom-ibm-fix.md:29</sub>
+- **`march_to_steady(accelerate=)` default is set by a pre-registered measurement rule**. **Rejected:** fixing the default now (True, the architect's proposal; or False)  <sub>flow</sub>
 - **bcStencilPath() and implicitAdv() must agree with the actual solver in use**.  <sub>momentum-solve-residual-stop.md:21</sub>
 - **cylinder-vortex-street dropped from the gallery; confirmed flow bug pins the fix location**. **Rejected:** shipping a sub-resolution "steady" wake result (would misrepresent physics)  <sub>peclet-examples-gallery.md:106-118</sub>
 - **fillPorousEpsGhosts: mirror-around-1 at inflow/outflow, zero-gradient at walls — one policy for RHS/coeffs/residual**. **Rejected:** reading eps ghosts in three different states across RHS/coeffs/residual  <sub>porous-cfddem-cuda-two-bugs.md:36</sub>
@@ -556,12 +560,13 @@ reading until they are settled.
 
 ## core — decomposition, halo, rebalance
 
-30 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
+31 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
 
 ### In force
 
 - **A core header is on the MPI side iff it includes `common/mpi.hpp`, held by a CI manifest gate**. **Rejected:** leaving the MPI boundary implicit  <sub>docs/CORE_BOUNDARY.md</sub>
 - **AMR PCG must mask solid AND project onto the fluid range (mask + fluid-only mean), not just deflate the constant mode**. **Rejected:** deflating only the constant/all-cell mean without masking solid cells  <sub>device-naming-retirement.md:89-95</sub>
+- **Anderson acceleration (`AndersonCore`) lives in core `peclet::core::solver` from the start**. **Rejected:** flow-local first, promoted when amr adopts it  <sub>core</sub>
 - **Anisotropic coarse-grid partitioning requires cellExtent, not raw cell-count kLargest**. **Rejected:** partitioning by raw cell-count kLargest on an anisotropic coarse grid  <sub>mg-decomposition-alignment.md:43</sub>
 - **Coarse-level redistribution lives in core; the hierarchies stay in the methods**. **Rejected:** per-method private implementations (three were forming); a core "multigrid stage" that owns the continued hierarchy below the stage point (core cannot  <sub>amr/docs/amr_mg_core_boundary.md</sub>
 - **Convention: keep NBX tag families >= 64 apart**.  <sub>nbx-round-tag-race.md:28</sub>

@@ -461,3 +461,15 @@ Do not reverse an entry here without recording a new decision that supersedes it
     last 1.x with a `<2` ceiling at 2.0.0.
 - rejected: a code-free 2.0.0 depending on the new packages
 - why: "a loud resolver error beats a silent import failure"
+
+### Anderson acceleration (`AndersonCore`) lives in core `peclet::core::solver` from the start
+- area: core
+- source: flow `f6b89fe` doc/steady_acceleration.md §1 D13
+- decided: 2026-10-02
+- status: settled (USER approved 2026-10-02; design — implementation pending)
+- quote: |
+    The grid-agnostic AndersonCore (state views + roles + mask + metric weight + gauge flag + comm)
+    is core/include/peclet/core/solver/anderson.hpp; flow keeps only the adapter, marchState() and
+    the Python driver. core is tagged and published before flow ships it.
+- rejected: flow-local first, promoted when amr adopts it
+- why: a later move is a second port with its own bit-identity proof; the core is grid-agnostic and amr's lmax = 0 march has the same (u, P) structure

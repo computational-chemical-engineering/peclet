@@ -3416,3 +3416,62 @@ Do not reverse an entry here without recording a new decision that supersedes it
     happens at DOUBLE storage too. Fix: stop when !(p·Ap > 0), as core's GraphAMG PCG does.
 - rejected: attributing the porous non-finite preconditioner to float operator storage (the evidence cited in "Double operator storage is the DEFAULT", QUALITY_PLAN.md:371)
 - why: that decision still stands on its own P1 evidence (RCP bed: float CAPPED, div 4.51e-06 vs double 9.51e-12); only this one piece of its evidence was misattributed
+
+---
+
+### Steady marches are accelerated by type-II Anderson on the full march state, in a new `march_to_steady` — never inside `step()`
+- area: flow
+- source: flow `f6b89fe` doc/steady_acceleration.md §1 D1, D2, D4, D7, D8, D11
+- decided: 2026-10-02
+- status: settled (USER approved 2026-10-02; design — implementation pending)
+- quote: |
+    Type-II Anderson, window m = 5 (cap 8), no damping, on exactly what step() reads between steps:
+    velocity + accumulated pressure P (+ the collocated face field under face advection), metric
+    weighted c_P = h/(mu + rho h^2/dt), gauge removed. Data path C++/Kokkos (core AndersonCore + flow
+    AndersonAccelerator<Grid>), control path pure Python `peclet.flow.march_to_steady`. step() is
+    untouched. History in double; np = 1 bit-identical to serial, np > 1 to tolerance.
+- rejected: velocity-only state (measured stall at 1.9e-4 error); an `enable_*` switch that changes `step()`; an environment variable; a pure-Python/CuPy data path (not HIP/OpenMP-portable, cannot see the face field); float history (by default)
+- why: the slow mode lives in P (collocated (pi,0,0) checkerboard, 0.996/step); prototype 315 -> 27 steps to 1e-4 error at N = 16, same fixed point to 4e-9
+
+---
+
+### Steady state is certified by the unchanged stop instrument on PLAIN steps after acceleration
+- area: flow
+- source: flow `f6b89fe` doc/steady_acceleration.md §1 D6, §7
+- decided: 2026-10-02
+- status: settled (USER approved 2026-10-02; design — implementation pending)
+- quote: |
+    Accelerate until the residual reaches (1 - 0.997)*rtol, then certify with the unchanged study
+    instrument (slow_rate 0.997, check_every 5, num_passes 3) on consecutive plain steps within a
+    budget; tighten x0.1 and resume if the budget runs out; fall back to the plain march if the plain
+    steps grow. The reported state is a plain-march state.
+- rejected: applying the stop instrument to the accelerated sequence
+- why: it can stop falsely where Anderson stagnates; certifying plain steps keeps the plain march's guarantee
+
+---
+
+### Steady acceleration scope: staggered and collocated-ghost only; everything else refused with a named error
+- area: flow
+- source: flow `f6b89fe` doc/steady_acceleration.md §1 D9, D10
+- decided: 2026-10-02
+- status: settled (USER approved 2026-10-02; design — implementation pending)
+- quote: |
+    Refused: gauge-exact, plain and embed collocated schemes; VoF; phase change; scalars; porous;
+    variable properties; drag; cell forces; moving scenes; superficial velocity; pressure warm start;
+    balanced-force projection. The Anderson history is not checkpointed.
+- rejected: accelerating gauge-exact collocated (a family of fixed points); saving the history in checkpoints (~14x larger)
+- why: the accelerated iteration must converge to the unique fixed point of the unaccelerated scheme
+
+---
+
+### `march_to_steady(accelerate=)` default is set by a pre-registered measurement rule
+- area: flow
+- source: flow `f6b89fe` doc/steady_acceleration.md §1 D11, §10 Q1
+- decided: 2026-10-02
+- status: settled (USER approved 2026-10-02; design — implementation pending)
+- quote: |
+    Measured at gate G2 on the dense random bed (production build, wall time incl. accelerator
+    overhead): default True iff the accelerated march is >= 1.5x faster in wall time; otherwise
+    False and acceleration is opt-in (symmetric/collocated cases).
+- rejected: fixing the default now (True, the architect's proposal; or False)
+- why: the large gain is the symmetric-geometry checkerboard, which random beds do not excite; the dense-bed gain (expected 2-4x, possibly ~1.5x) is unmeasured, while the cost is ~4 % per step + ~25 % memory
