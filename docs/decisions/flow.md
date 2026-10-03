@@ -3209,7 +3209,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: USER DECISION 2026-09-25 on `flow/doc/vof_step_performance_design.md` §10 option E2(a); Snellius same-node measurement (TBFsolver 45 ms/step vs peclet 187 ms/step on 24 cores, projection 67 %)
 - decided: 2026-09-25
-- status: settled
+- status: superseded (2026-10-03: parked — see "Constant-coefficient pressure driver PARKED")
 - quote: |
     The user's standing directive (on par with or better than SOTA on every case peclet handles)
     makes CPU parity with TBFsolver a goal, and the performance design shows no variable-coefficient
@@ -3600,3 +3600,26 @@ Do not reverse an entry here without recording a new decision that supersedes it
     or single-cell pin for the singular operator
 - why: USER DIRECTIVE: no GPU<->host transfers in the step; the plane structure makes an exact
     factor cheap, and keeping the convergence check in FP64 keeps the float-storage failure mode out
+
+### Constant-coefficient (Dodd–Ferrante) pressure driver PARKED: fails the static-balance gate
+- area: flow
+- source: USER DECISION 2026-10-03; flow branches `vof-e2` (ab1f2bc: E2.0–E2.2 structure + log/handoff) and `vof-e2-e23-stopped2` (60655dd: the WO-E2.3 candidate) on origin; design `doc/vof_step_performance_design.md` §12, §12.13 (on vof-e2)
+- decided: 2026-10-03
+- status: settled
+- quote: |
+    The opt-in Dodd–Ferrante driver (E2(a): constant-coefficient pressure on the existing MG-PCG)
+    is parked, not merged. With the corrected D-E2.8' (rotational term on div(u*)) it is stable
+    for any dt and viscosity and the bubble column runs (max|p| 577.7 vs 576.5, max|w| 16.39 vs
+    16.43, PCG 8.00 vs 13.32 iterations/step), but it FAILS the static-balance gate: drop at
+    mu = 0.1, density ratio 50, 1000 steps — spurious velocity 2.6e-4 vs 5.5e-8 for the exact
+    projection (ratio 1/50: 7.9e-6 vs 1.7e-7); the split–exact difference decays 7–20x slower than
+    the Dodd–Ferrante model (hypotheses: a non-gradient explicit term at interface faces; feedback
+    through the moving interface). The first design (div(u**)) was unstable with viscosity
+    (mu_r dt kappa/rho0 > rho0/(rho_max - rho0)). Payoff while stable: ~40 % fewer pressure
+    iterations; CPU parity with TBFsolver would still need the FFT solver (E2(b)).
+- rejected: merging it as opt-in despite the failed gate; a third design round (uncertain, the
+    payoff modest); TBFsolver's non-incremental form (dt-dependent steady state with implicit
+    viscosity, a mu·dt·sigma·kappa spurious force)
+- why: the user's approval (2026-09-25) was conditional on the accuracy gates; the measured static
+    balance is ~5000x worse than the exact projection — exactly the register's original objection
+    (error ~ sigma·kappa). Re-opening needs a design that addresses the non-gradient term first.

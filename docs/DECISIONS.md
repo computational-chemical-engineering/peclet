@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-192 in force, 40 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+192 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -51,6 +51,7 @@ reading until they are settled.
 - **Collocated momentum advection uses the PROJECTED divergence-free face field, not the cell→face average**. **Rejected:** the un-projected cell→face average ½(u_i+u_j) as the collocated advecting velocity  <sub>flow/doc/uf_advection.md;</sub>
 - **Collocated pressure coupling is the ABC (MAC) approximate projection, NOT Rhie–Chow**. **Rejected:** Rhie–Chow interpolation as the collocated coupling  <sub>sdflow-collocated-solver.md:37-39</sub>
 - **Collocated variable density (V8): the mass-adjoint ABC pair; the face-acceleration form is retired**. **Rejected:** face acceleration after the viscous solve (non-incremental; unstable with the rotational  <sub>flow</sub>
+- **Constant-coefficient (Dodd–Ferrante) pressure driver PARKED: fails the static-balance gate**. **Rejected:** merging it as opt-in despite the failed gate; a third design round (uncertain, the  <sub>USER</sub>
 - **Container slab half-extent must equal L/2 + wall thickness, never more (periodic-image rule)**. **Rejected:** an oversized slab half-extent  <sub>advective-cutwall-flux-plan.md:57</sub>
 - **Correction: the raw field registry hands out internal (unconverted) arrays**.  <sub>physical-units-plan.md:28</sub>
 - **Coupling partial/cut+solid cells to the coarse grid fails regardless of coarsening depth — capping depth cannot fix it**. **Rejected:** capping coarsening depth as a fix for partial-cell coupling divergence  <sub>velocity-mg-design.md:118-135</sub>
@@ -158,7 +159,6 @@ reading until they are settled.
 - **Rung 3 fix: openness-weighted centered gradient replaces plain ½(g⁻+g⁺) projection correction for embed mode**. **Rejected:** plain projectCorrectCenter's ½(g⁻+g⁺) correction (with closed faces zeroed) for the embed-momentum mode  <sub>embed-port-progress.md:24-25</sub>
 - **S-ladder plan; Dodd–Ferrante splitting rejected for the pressure driver**. **Rejected:** Dodd–Ferrante splitting for the pressure driver  <sub>vof-campaign.md:473-479</sub>
 - **S3 coarsening indefiniteness is real, but coarsenOpenAvg must NOT switch to harmonic**. **Rejected:** switching coarsenOpenAvg's face-coefficient averaging to harmonic  <sub>vof-campaign.md:253-260</sub>
-- **Scoped constant-coefficient (Dodd–Ferrante) pressure driver: opt-in, solid-free boxes, accuracy-gated**. **Rejected:** making the splitting the default (its error ~ (1/rho - 1/rho0) grad(p^{n+1} - p_hat)  <sub>USER</sub>
 - **SdflowIbm MPI requires constructing each rank with local ORB block dims (ctor refactor, not a gated add-on)**.  <sub>cuda-kokkos-migration.md:558-570</sub>
 - **Sequencing: "VoF vs multiphysics first" dissolves — VoF is the next multiphysics phase**.  <sub>vof-campaign.md:480-484</sub>
 - **Sign convention: closed divergence of the corrected field equals Aφ − b = −residual**.  <sub>flow-ghost-projection.md:43</sub>
@@ -240,6 +240,7 @@ reading until they are settled.
 - Plain incompressible continuity with ε only in drag is the WRONG constraint for a porous bed; volume-averaged (Model-A) continuity is required.  <sub>multiphysics-framework-plan.md:379</sub>
 - Ring convergence failure was a solver-tolerance artifact, not a cut-cell/geometry limitation.  <sub>ibm-accuracy-sphere-validation.md:14-30</sub>
 - Ring-bed k convergence slowness is intrinsic dense-packing near-contact Stokes stiffness, not a thin-wall/cut-cell IBM defect.  <sub>ringbed-cfd-surrogate.md:33</sub>
+- Scoped constant-coefficient (Dodd–Ferrante) pressure driver: opt-in, solid-free boxes, accuracy-gated.  <sub>USER</sub>
 - Stale-ghost pressure V-cycle bug invalidated the entire published parallel-scaling page's peclet numbers.  <sub>parallel-scaling-study.md:206-213</sub>
 - Steady marches are accelerated by type-II Anderson on the full march state, in a new `march_to_steady` — never inside `step()`.  <sub>flow</sub>
 - Steady state is certified by the unchanged stop instrument on PLAIN steps after acceleration.  <sub>flow</sub>
