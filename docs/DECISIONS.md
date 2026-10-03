@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-188 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+191 in force, 40 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -31,6 +31,7 @@ reading until they are settled.
 - **Agreement across configurations sharing a floor is not proof of convergence**. **Rejected:** treating cross-config agreement alone as sufficient evidence of convergence  <sub>defect-correction-campaign.md:65-70</sub>
 - **All level-0 partitioning must go through one shared factory; never hand-build a BlockDecomposer for the solver**. **Rejected:** hand-building a separate BlockDecomposer at any of the three call sites  <sub>mg-decomposition-alignment.md:56</sub>
 - **Allreduce diet: fuse mean-removal sum+count; 'fine' mean-removal scope as bench/pack default, 'all' stays solver default pending Snellius validation**.  <sub>parallel-scaling-study.md:81-86</sub>
+- **An Anderson restart restores the last kept map output; the state never holds a rejected evaluation (review R2)**. **Rejected:** "Restart keeps Rprev/Gprev (step 6 still commits)" — the fifth restart then left the state at the rejected output  <sub>flow</sub>
 - **Anisotropic MG coarsening order: coarsen axis a iff H_a < 2·min H over coarsenable axes, engaged only under `aniso`**. **Rejected:** applying the anisotropic coarsening rule to the isotropic path (would change isotropic bits)  <sub>physical-units-phase2-aniso.md:47-51</sub>
 - **Anisotropic wall-gradient normal/foot-point convention (⚑B)**.  <sub>physical-units-phase2-aniso.md:52-54</sub>
 - **Block VoF container stages batched: one launch per stage for all markers, block-ordered force gather**. **Rejected:** per-block CUDA streams; a pooled atlas of all blocks; atomics in the force scatter (order)  <sub>flow</sub>
@@ -169,12 +170,13 @@ reading until they are settled.
 - **Staircase is consolidated as the ONLY IBM velocity-MG coarse op — const and area-fraction paths removed from the code**. **Rejected:** geometry-blind const-coarse (setDiffusionCoarse) and area-fraction (setVelocityVolfracCoarse) IBM coarse operators — both deleted from the code  <sub>velocity-mg-design.md:100-116</sub>
 - **Star half fix: phibar mean was not bitwise-annihilating even in double — replaced by flux form**. **Rejected:** the phibar=Sum(a*x)/Sum(a) formulation  <sub>defect-correction-campaign.md:52-54</sub>
 - **Steady acceleration scope: staggered and collocated-ghost only; everything else refused with a named error**. **Rejected:** accelerating gauge-exact collocated (a family of fixed points); saving the history in checkpoints (~14x larger)  <sub>flow</sub>
-- **Steady marches are accelerated by type-II Anderson on the full march state, in a new `march_to_steady` — never inside `step()`**. **Rejected:** velocity-only state (measured stall at 1.9e-4 error); an `enable_*` switch that changes `step()`; an environment variable; a pure-Python/CuPy data pat  <sub>flow</sub>
-- **Steady state is certified by the unchanged stop instrument on PLAIN steps after acceleration**. **Rejected:** applying the stop instrument to the accelerated sequence  <sub>flow</sub>
+- **Steady marches are accelerated by type-II Anderson in `march_to_steady`, measured on the velocity alone; P and the collocated face field are carried (rev 1)**. **Rejected:** the c_P-weighted, gauge-centred pressure term (rev 0); per-pocket gauge removal; the unweighted Euclidean norm of (u, P); a metric on the face gradien  <sub>flow</sub>
+- **Steady state after acceleration: velocity-residual handover, a 12-block certification budget with an early slow exit, and a stagnation fallback (rev 1 + review R1)**. **Rejected:** applying the stop instrument to the accelerated sequence; the 6-block budget (staggered N24 m8: 214 steps vs 135 plain; 74 at 12 blocks); no budget; h  <sub>flow</sub>
 - **Strict staggered bit-identical guard must be held through every change; AMR must work for both velocity placements or be explicitly scoped**.  <sub>sdflow-octree-amr-next.md:19-20</sub>
 - **TRAP: -DPECLET_FLOW_MREAL_DOUBLE=ON on the cmake command line silently builds float**. **Rejected:** passing -DPECLET_FLOW_MREAL_DOUBLE=ON as a normal cmake cache variable  <sub>defect-correction-campaign.md:45-46</sub>
 - **Telescoping is default on for the pressure MG since 2026-09-02; the velocity solve does not need it**. **Rejected:** telescoping the velocity solve  <sub>momentum-solve-residual-stop.md:18</sub>
 - **Ten-Cate periodic-image bug: periodic images are a union, not independent slabs**. **Rejected:** the earlier CSG-slab-per-image geometry construction (implicitly non-union)  <sub>sdf-scene-campaign.md:131</sub>
+- **The Anderson steady-march accelerator has no instability guard; stability evidence comes only from plain steps (rev 2)**. **Rejected:** a Ritz-radius guard with a higher floor, a higher threshold, a longer consecutive count; the fall-back-to-plain consequence; a diagnostic-only radius;  <sub>flow</sub>
 - **The agglomerated-bottom MG anomaly required a per-fluid-component null-space projector, a double row-sum, and a looser inner tolerance**. **Rejected:** projecting the all-cell mean (rather than per-connected-fluid-component); leaving MG coefficients in single-precision row sums uncorrected; an inner t  <sub>agglomerated-bottom-ibm-fix.md:15</sub>
 - **The balanced-force projection is an option on both grids, default ON on collocated variable-rho (V8), OFF elsewhere**. **Rejected:** always-on (the user asked for an option); default off on V8 (loses the settled  <sub>flow</sub>
 - **The defect-correction rule: Krylov matvec/residual must be the exact double operator in flux form; preconditioners below may stay float**.  <sub>defect-correction-campaign.md:14-17</sub>
@@ -199,6 +201,7 @@ reading until they are settled.
 - **Weak efficiency must be computed from per-GPU throughput, not raw step time**. **Rejected:** computing weak efficiency directly from step time when cells/GPU varies ±8%  <sub>channel-scaling-rebenchmark.md:208-209</sub>
 - **What was disproved in the agglomerated-bottom investigation**. **Rejected:** solid-rhs deposit contamination, sliver-row threshold mismatch, and multi-component pockets as causes for THIS case  <sub>agglomerated-bottom-ibm-fix.md:29</sub>
 - **`march_to_steady(accelerate=)` default is set by a pre-registered measurement rule**. **Rejected:** fixing the default now (True, the architect's proposal; or False)  <sub>flow</sub>
+- **`march_to_steady(accelerate=)` defaults to True — the pre-registered rule, measured**. **Rejected:** False (opt-in acceleration)  <sub>flow</sub>
 - **bcStencilPath() and implicitAdv() must agree with the actual solver in use**.  <sub>momentum-solve-residual-stop.md:21</sub>
 - **cylinder-vortex-street dropped from the gallery; confirmed flow bug pins the fix location**. **Rejected:** shipping a sub-resolution "steady" wake result (would misrepresent physics)  <sub>peclet-examples-gallery.md:106-118</sub>
 - **fillPorousEpsGhosts: mirror-around-1 at inflow/outflow, zero-gradient at walls — one policy for RHS/coeffs/residual**. **Rejected:** reading eps ghosts in three different states across RHS/coeffs/residual  <sub>porous-cfddem-cuda-two-bugs.md:36</sub>
@@ -237,6 +240,8 @@ reading until they are settled.
 - Ring convergence failure was a solver-tolerance artifact, not a cut-cell/geometry limitation.  <sub>ibm-accuracy-sphere-validation.md:14-30</sub>
 - Ring-bed k convergence slowness is intrinsic dense-packing near-contact Stokes stiffness, not a thin-wall/cut-cell IBM defect.  <sub>ringbed-cfd-surrogate.md:33</sub>
 - Stale-ghost pressure V-cycle bug invalidated the entire published parallel-scaling page's peclet numbers.  <sub>parallel-scaling-study.md:206-213</sub>
+- Steady marches are accelerated by type-II Anderson on the full march state, in a new `march_to_steady` — never inside `step()`.  <sub>flow</sub>
+- Steady state is certified by the unchanged stop instrument on PLAIN steps after acceleration.  <sub>flow</sub>
 - Success criterion for any A·1=0 repair: match the full-double floor, never demand rtol 1e-8.  <sub>vof-campaign.md:413-427</sub>
 - Superseded same-day decision: residual stop default was fixed at 1e-5.  <sub>momentum-solve-residual-stop.md:32</sub>
 - The 47%-at-8-GPU "reduction tax" diagnosis is stale, superseded by 2026-08 solver fixes.  <sub>snellius-parallel-benchmark-campaign.md:25-27</sub>
@@ -561,7 +566,7 @@ reading until they are settled.
 
 ## core — decomposition, halo, rebalance
 
-31 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
+32 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
 
 ### In force
 
@@ -591,6 +596,7 @@ reading until they are settled.
 - **Treat nvcc warnings #20013/#20015 as errors, not style noise**. **Rejected:** treating #20013/#20015 as benign style warnings  <sub>kokkos-cuda-constexpr-required.md:26-27</sub>
 - **Weighted ORB dynamic load balancing is one shared primitive that lives in the core layer**. **Rejected:** implementing separate load-balancing logic per consumer (AMR, dem)  <sub>dynamic-load-balancing.md:18</sub>
 - **Weighted ORB split boundary must remain on integer cell boundaries**.  <sub>dynamic-load-balancing.md:65</sub>
+- **`AndersonState` is views + roles (Velocity / Carried) + extent + ghost + comm; no pressure metric, no `innerTolerance`, no Gram blocks GG/GR (rev 1 WO-3b, rev 2 WO-3c)**. **Rejected:** keeping the unused pressure metric or innerTolerance / GG / GR until after the tag (a breaking change then)  <sub>flow</sub>
 - **`peclet-core` becomes a pure-Python compatibility shell, frozen at its last 1.x with a `<2` ceiling**. **Rejected:** a code-free 2.0.0 depending on the new packages  <sub>docs/CORE_BOUNDARY.md</sub>
 - **block_decomposer retired/archived, replaced by transport-core (core)**.  <sub>cuda-kokkos-migration.md:57-58</sub>
 - **coarsenAlignment bug: natural-max alignment over-constrains ORB; cap alignment at 2^4**. **Rejected:** natural-max alignment for ORB decomposition snapping  <sub>parallel-scaling-study.md:60-64</sub>

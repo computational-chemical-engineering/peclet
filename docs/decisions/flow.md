@@ -3423,7 +3423,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: flow `f6b89fe` doc/steady_acceleration.md §1 D1, D2, D4, D7, D8, D11
 - decided: 2026-10-02
-- status: settled (USER approved 2026-10-02; design — implementation pending)
+- status: superseded (2026-10-03) by "Steady marches are accelerated by type-II Anderson in `march_to_steady`, measured on the velocity alone; P and the collocated face field are carried (rev 1)" — the c_P-weighted pressure metric was dropped in revision 1
 - quote: |
     Type-II Anderson, window m = 5 (cap 8), no damping, on exactly what step() reads between steps:
     velocity + accumulated pressure P (+ the collocated face field under face advection), metric
@@ -3439,7 +3439,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: flow `f6b89fe` doc/steady_acceleration.md §1 D6, §7
 - decided: 2026-10-02
-- status: settled (USER approved 2026-10-02; design — implementation pending)
+- status: superseded (2026-10-03) by "Steady state after acceleration: velocity-residual handover, a 12-block certification budget with an early slow exit, and a stagnation fallback (rev 1 + review R1)" — the instrument and the plain-step rule stand; the handover residual, the budget, the early exit and the stagnation rule changed
 - quote: |
     Accelerate until the residual reaches (1 - 0.997)*rtol, then certify with the unchanged study
     instrument (slow_rate 0.997, check_every 5, num_passes 3) on consecutive plain steps within a
@@ -3494,3 +3494,83 @@ Do not reverse an entry here without recording a new decision that supersedes it
   host (breaks WO-8's <= 3 host reads)
 - why: the fallback was latency-bound (one thread fitting a 5^3 paraboloid per cell); parallel
   terms + serial canonical accumulation removes the latency without moving a bit
+
+---
+
+### Steady marches are accelerated by type-II Anderson in `march_to_steady`, measured on the velocity alone; P and the collocated face field are carried (rev 1)
+- area: flow
+- source: flow doc/steady_acceleration.md "Revision 1" R1, D3 (rev 1), §1.2, §3.2; log WO-5 §1.3
+- decided: 2026-10-02
+- status: settled (architect rev 1; implemented flow 15e3026 + core 9ff3bd2, released core v1.4.0)
+- supersedes: "Steady marches are accelerated by type-II Anderson on the full march state…" — its metric clause ("weighted c_P = h/(mu + rho h^2/dt), gauge removed"); the rest is restated here unchanged
+- quote: |
+    Type-II Anderson, window m = 5 (cap 8), no damping, in a new march_to_steady; step() is
+    untouched. The state stays (u, P [, u_f]); P and u_f are mixed, stored and differenced but not
+    measured. The residual is the relative velocity residual ||g_u - x_u|| / ||g_u||. Data path
+    C++/Kokkos (core AndersonCore + flow AndersonAccelerator<Grid>), control path pure Python.
+- rejected: the c_P-weighted, gauge-centred pressure term (rev 0); per-pocket gauge removal; the unweighted Euclidean norm of (u, P); a metric on the face gradient of P; a velocity-only STATE (the 1.9e-4 stall — P stays in the state, it is only unmeasured); an `enable_*` switch that changes `step()`; an environment variable; a pure-Python/CuPy data path
+- why: on the dense bed 99.97 % of the rev-0 residual was pressure in sealed / near-contact pockets that moves no velocity (rev-0 bed gain 1.26x in steps); a pressure error is measured by the velocity it drives. Measured on the C++ build: dense bed 3.49x (staggered) / 2.29x (collocated) in steps, 4.44x on the collocated sphere
+
+---
+
+### Steady state after acceleration: velocity-residual handover, a 12-block certification budget with an early slow exit, and a stagnation fallback (rev 1 + review R1)
+- area: flow
+- source: flow doc/steady_acceleration.md "Revision 1" R2, R4, D6 (rev 1), §7; review fix R1 (2026-10-03)
+- decided: 2026-10-03
+- status: settled (architect rev 1, orchestrator review fix R1; implemented flow 15e3026, c1983cc). Q18 — whether converged=True must also promise that a plain march would reach the state — is OPEN with the user; until ruled, the documented default below holds
+- supersedes: "Steady state is certified by the unchanged stop instrument on PLAIN steps after acceleration" — its handover residual (now the velocity residual), its budget (was num_passes + 3, no early exit), and the stagnation rule (was a halving of the best residual)
+- quote: |
+    Phase A hands over at (1 - slow_rate) rtol on the relative velocity residual; phase B
+    certifies with the unchanged instrument on consecutive PLAIN steps within 2 (num_passes + 3)
+    = 12 blocks; a block failing on the remainder bound with R in [slow_rate^check_every, 1)
+    resumes acceleration at once ("slow"); budget or slow exit: target x 0.1, resume with the
+    history. Phase A stagnates after 10·window calls without the residual falling below
+    slow_rate^(10·window) times its best; stagnation or growth (> 10x) disables acceleration and
+    the plain march finishes. converged=True certifies stationarity at this dt over the
+    certification's plain steps — not that a plain march from the initial state arrives there.
+- rejected: applying the stop instrument to the accelerated sequence; the 6-block budget (staggered N24 m8: 214 steps vs 135 plain; 74 at 12 blocks); no budget; handing over on the monitor's own changes along the accelerated sequence; stagnation as "no halving in 10·window calls" (review R1: a slow but real tail was declared stagnant)
+- why: after an Anderson iterate the monitor's block changes start near zero and change sign or grow for up to five blocks before the slow tail emerges; certifying plain steps keeps the plain march's guarantee; in the supported scope the fixed point is unique (§2.3), so a stationarity certificate names the discrete steady solution
+
+---
+
+### The Anderson steady-march accelerator has no instability guard; stability evidence comes only from plain steps (rev 2)
+- area: flow, core
+- source: flow doc/steady_acceleration.md "Revision 2", D5, §2.4, §4.6, §7; log "Revision 2" R2-1 … R2-6
+- decided: 2026-10-02
+- status: settled (architect rev 2; implemented core f9956ed, flow a9e11c0; released core v1.4.0)
+- supersedes: the rev-0 / rev-1 Ritz guard (D5) and D5's "Rejected: no instability guard" — this entry reverses that rejection
+- quote: |
+    AndersonCore makes no stability judgement: no Ritz estimate, no status "unstable", no
+    MarchResult reason "unstable". An unstable plain map shows only on plain steps — the
+    certification's growth exit, R >= 1 never passes, budget/slow resume, stagnation fallback.
+- rejected: a Ritz-radius guard with a higher floor, a higher threshold, a longer consecutive count; the fall-back-to-plain consequence; a diagnostic-only radius; a Ritz-pair residual test
+- why: the radius is a Rayleigh-Ritz value of a non-normal map in an oblique (velocity-only) metric, bounded by the numerical range, not the spectrum. Exact STABLE synthetic maps (rho = 0.99) tripped the rev-1 guard in 12 calls with radii 1.013-1.035, above U4's true positive 1.0105; the WO-5 tight false alarms reproduce across backends. Without the guard G7a still ends not-converged at m = 3, 5, 8, both false alarms converge (2.5e-10, 6.2e-10 vs plain K), and production is unchanged (42/42 step counts)
+
+---
+
+### An Anderson restart restores the last kept map output; the state never holds a rejected evaluation (review R2)
+- area: flow, core
+- source: flow doc/steady_acceleration.md §4.3 "Restart (amended 2026-10-03, review R2)"; core unit test U11
+- decided: 2026-10-03
+- status: settled (orchestrator review fix R2; implemented core 868938f, released core v1.4.0)
+- quote: |
+    After the broadcast (every rank acts on rank 0's decision) buf := Gprev and step 6 is skipped:
+    Rprev/Gprev stay those of the last kept output, the rejected evaluation's rho does not enter
+    rho_min, and residual keeps the restored output's value. The next call is a plain step from the
+    restored output. Cost: one evaluation per restart; "too many restarts" leaves the last good one.
+- rejected: "Restart keeps Rprev/Gprev (step 6 still commits)" — the fifth restart then left the state at the rejected output
+- why: WO-8's G3 Δt-60 run reached 2.7e-12 and ended at 9.0e-5 on a rejected output; the K "4e-7 off" was sampled at that iterate
+
+---
+
+### `march_to_steady(accelerate=)` defaults to True — the pre-registered rule, measured
+- area: flow
+- source: flow doc/steady_acceleration.md D11, §1.3; log WO-5 G2
+- decided: 2026-10-02 (by the user's pre-registered rule, Q1 / Q13)
+- status: settled
+- quote: |
+    Staggered dense bed (phi 0.6, N 64), production, window 5, wall time incl. the accelerator:
+    plain / accelerated = 3.38-3.45x on host-openmp, 3.55-3.87x on CUDA (>= 1.5) -> True.
+    Collocated bed beside it: 2.48-2.53x / 2.38-2.73x. Steps 325 -> 93 (staggered).
+- rejected: False (opt-in acceleration)
+- why: the rule's threshold is met by more than 2x on both backends

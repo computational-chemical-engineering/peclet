@@ -234,6 +234,25 @@ No change to results or Python API.
   build so the split costs it nothing.
 - pnm, voro and geom pin core v1.3.0 (geom's vendored headers are byte-identical).
 
+## `peclet-halo` / `peclet-core` 1.4.0 — 2026-10-03 — Anderson acceleration of steady marches
+
+A core-only minor release. One `v*` tag in `peclet-core` publishes `peclet-halo` and the
+`peclet-core` compatibility shell at 1.4.0. It carries everything in 1.3.2 plus the C++ header below;
+the Python surface (`peclet.halo`) is unchanged.
+
+#### Added
+
+- **`peclet::core::solver::AndersonCore`** (`solver/anderson.hpp`) — type-II Anderson acceleration of
+  a steady march, grid-agnostic and on device. The caller owns the fixed-point map (one time step)
+  and describes its state with an `AndersonState` (padded views, roles Velocity / Carried, ghost
+  width); the metric is the velocity alone. It has no instability guard: stability evidence comes
+  from the caller's plain steps (design: flow `doc/steady_acceleration.md`, revision 2). A restart
+  restores the last map output, so the state never holds a rejected evaluation. MPI-free; its two
+  collectives come from `solver/anderson_mpi.hpp` (`andersonComm(MPI_Comm)`), and np = 1 is
+  bit-identical to serial (ctests `anderson`, `anderson_mpi` np 1/2/4). Built for flow's
+  `march_to_steady`, which reaches steady state on a dense staggered bed in 93 steps instead of 325
+  (3.4–3.9× less wall time); flow pins `PECLET_CORE_TAG v1.4.0`.
+
 ## `peclet-halo` / `peclet-core` 1.3.2 — 2026-10-03 — the PV-fit split
 
 A core-only patch. One `v*` tag in `peclet-core` publishes `peclet-halo` and the `peclet-core`

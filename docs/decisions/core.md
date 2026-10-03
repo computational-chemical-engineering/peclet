@@ -473,3 +473,16 @@ Do not reverse an entry here without recording a new decision that supersedes it
     the Python driver. core is tagged and published before flow ships it.
 - rejected: flow-local first, promoted when amr adopts it
 - why: a later move is a second port with its own bit-identity proof; the core is grid-agnostic and amr's lmax = 0 march has the same (u, P) structure
+
+### `AndersonState` is views + roles (Velocity / Carried) + extent + ghost + comm; no pressure metric, no `innerTolerance`, no Gram blocks GG/GR (rev 1 WO-3b, rev 2 WO-3c)
+- area: core
+- source: flow doc/steady_acceleration.md "Revision 1" §9 WO-3b, Q14; "Revision 2" §6.1, §9 WO-3c; core 9ff3bd2, f9956ed
+- decided: 2026-10-02
+- status: settled (released core v1.4.0)
+- supersedes: the descriptor list "(state views + roles + mask + metric weight + gauge flag + comm)" in "Anderson acceleration (`AndersonCore`) lives in core…" — that entry's placement decision stands
+- quote: |
+    AndersonState = padded state views + roles (Velocity = 0, Carried = 2) + extent + ghost +
+    AndersonComm. The Pressure role, sdf, cP, gauged, pass 1 and innerTolerance are deleted; pass 2
+    reduces RR(s,j) and b_j only (2 mk + 2 doubles); no reduction reads dG.
+- rejected: keeping the unused pressure metric or innerTolerance / GG / GR until after the tag (a breaking change then)
+- why: no consumer uses them after rev 1 / rev 2; removes one collective per step and the sdf dependency; the branch was untagged, so this was the cheap moment
