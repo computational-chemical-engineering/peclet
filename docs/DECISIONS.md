@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-193 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+194 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -38,6 +38,7 @@ reading until they are settled.
 - **Block VoF: colliding markers — debris removal with exact return, a block-only curvature clip, a gated gas–gas capillary bound**. **Rejected:** union-colour force assembly (statically unnecessary; re-creates numerical coalescence  <sub>flow</sub>
 - **Body-force ghost policy: Neumann copy, pinned to ρ's policy**.  <sub>vof-campaign.md:145-154</sub>
 - **Boiling scope addition did not resurrect transported-φ CLSVOF**. **Rejected:** transported-φ CLSVOF  <sub>vof-campaign.md:101-106</sub>
+- **Bubble-column benchmark case runs at pressure rtol 1e-8; the solver default stays 1e-10**. **Rejected:** 1e-6 (iterations 7.49, but a systematic gas-volume drift 1.5e-9 per 2000 steps —  <sub>USER</sub>
 - **Byte-identical gating is unmeasurable for atomic-add paths — gate against the path's own run-to-run spread instead**. **Rejected:** a byte-identical regression gate for atomic-add code paths  <sub>defect-correction-campaign.md:55-57</sub>
 - **CA (event-halving) smoothing ships default ON with an env kill switch**.  <sub>comm-scaling-plan.md:23</sub>
 - **CSF force is exact; curvature error is the real budget — improve κ, never the force**. **Rejected:** arithmetic cell-force interpolation (set_csf_mode(1)); improving the force term to chase lower Ca  <sub>vof-campaign.md:430-444</sub>

@@ -3637,3 +3637,20 @@ Do not reverse an entry here without recording a new decision that supersedes it
     bit-identical, per-body reaction -1.8e-3 = exactly the body force f·h^3 on the masked points.
 - rejected: masking every velocity point whose projection aperture is 0 (option iv); NaN for sealed-pocket cells in get_p() (poisons np.mean silently)
 - why: the points hold real fluid in near-contact gaps; forced fluid that cannot flow passes its body force to the enclosing walls, so counting it keeps sum F = f·V_fluid; K does not move. Side effect kept: pocket pressure leaks into those points' velocity (~3e-4 of max|u| at realistic pocket pressures); reaction forces and K see <= 1e-7
+
+### Bubble-column benchmark case runs at pressure rtol 1e-8; the solver default stays 1e-10
+- area: flow
+- source: USER DECISION 2026-10-03; flow D1 tolerance study (`doc/vof_step_performance_log.md` WO-13; rerun on main a0afc9b, raw data /home/frankp/Codes/bubble_column_perf/d1_main/); peclet-examples `benchmarks/bubble-column/scripts/run_peclet.py`
+- decided: 2026-10-03
+- status: settled
+- quote: |
+    The published bubble-column case solves the pressure to rtol 1e-8 (case script only; the
+    solver's default stays 1e-10, per the "tolerance changes in case scripts only" default). On
+    current main: pressure iterations 13.93 -> 10.55 per step (-24 %), total gas-volume drift
+    5.2e-12 per 2000 steps (2.5e-14 at 1e-10), static drop and Hysing unchanged to <= 2e-11.
+- rejected: 1e-6 (iterations 7.49, but a systematic gas-volume drift 1.5e-9 per 2000 steps —
+    ~1e-7 over a production window, against the multiple-marker container's round-off
+    conservation); keeping 1e-10 (24 % more pressure work for differences far below the
+    statistical uncertainty of the swarm)
+- why: the swarm statistics are uncertain at the 10-15 % level from near-contact treatment; the
+    projection tolerance only has to keep conservation near round-off, which 1e-8 does
