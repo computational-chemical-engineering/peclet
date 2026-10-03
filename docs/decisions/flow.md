@@ -3574,3 +3574,29 @@ Do not reverse an entry here without recording a new decision that supersedes it
     Collocated bed beside it: 2.48-2.53x / 2.38-2.73x. Steps 325 -> 93 (staggered).
 - rejected: False (opt-in acceleration)
 - why: the rule's threshold is met by more than 2x on both backends
+
+### Device pressure bottom: block-tridiagonal FP32 direct factor preconditioning FP64 FCG ('direct', the GPU default)
+- area: flow
+- source: flow `9c791f7`..`23a3631` (WO-6/WO-11 B1, §13 WO-D0..D4); design `doc/vof_step_performance_design.md` §4.1, §13; log `doc/vof_step_performance_log.md`
+- decided: 2026-10-03
+- status: settled
+- quote: |
+    On GPU backends the pressure multigrid's bottom (bubble column: 16x12x8 = 1536 cells) is solved
+    on the device: an FP32 block-tridiagonal factor with explicit Schur-complement inverses, plane by
+    plane along the slow axis, preconditions an FP64 FCG to tau = 1e-5; one factor launch per
+    operator change, one solve launch per V-cycle. A·1 = 0, the mean projection and the stopping
+    residual stay FP64 (a float factor inside an FP64-verified iteration is admissible; an unrefined
+    float bottom is not). The singular operator is handled exactly by a rank-1 term per fluid
+    component on its last-eliminated plane. Results are bitwise independent of team size. Bubble
+    column, quiet RTX 5080: step 42.6 -> 36.1-37.4 ms, projection 23.7 -> 17.2-17.8 ms; 50-step
+    difference to the host GraphAMG bottom 2.7e-14 with identical outer iterations; inner iterations
+    max 2 (mean 1.02); bulk device<->host transfers in the projection 0. Misses the design target
+    (projection <= 12.5 ms): the factor's dependent chains are L2-latency-bound (~4 us per phase vs
+    the 1 us assumed). Host backends keep GraphAMG, bitwise; the distributed path keeps GraphAMG.
+- rejected: B1's single-team V-cycle preconditioner (measured +5.3 ms/step, ~1250 dependent phases
+    per solve; retired, code in 9c791f7/4ce0cfb); a dense 1536^2 Cholesky / inverse (memory traffic,
+    a vendor-solver dependency); all-SM Krylov (launch-bound); Chebyshev to tau (~240 applications);
+    a deeper / factor-3 bottom (+8.5 outer iterations); an unrefined FP32 bottom; a diagonal shift
+    or single-cell pin for the singular operator
+- why: USER DIRECTIVE: no GPU<->host transfers in the step; the plane structure makes an exact
+    factor cheap, and keeping the convergence check in FP64 keeps the float-storage failure mode out

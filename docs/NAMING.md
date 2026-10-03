@@ -271,6 +271,10 @@ identity — `peclet::core`, `peclet/core/...`, the repo and its tags — does *
 
 ## 4. History
 
+- 2026-10-03 — **flow `diagnostics.set_pressure_bottom_solver('auto' | 'direct' | 'algebraic')`**
+  (developer tier): selects the pressure multigrid's bottom engine — `'direct'` the device-resident
+  block-tridiagonal FP32 factor preconditioning an FP64 FCG, `'algebraic'` the host GraphAMG.
+  `'direct'` replaced the never-released `'geometric'` before it shipped; additive, no alias owed.
 - 2026-09-30 — **flow `hydro_force_torque()` deprecated** (USER-approved; flow branch `force-api`).
   It returned the traction integral, a diagnostic that under-reads the drag by ~30 % at any
   resolution, under the natural name for the force. Two canon-conforming moves were available and

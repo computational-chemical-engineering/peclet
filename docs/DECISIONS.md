@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-191 in force, 40 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+192 in force, 40 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -58,6 +58,7 @@ reading until they are settled.
 - **Cut-cell C convention: liquid fraction of fluid volume, openness-weighted**.  <sub>vof-campaign.md:98-100</sub>
 - **Deferred correction is not viable as an undamped fallback**. **Rejected:** undamped deferred correction as the C/F / ghost solve fallback  <sub>flow-ghost-projection.md:29</sub>
 - **Design constraints for any collocated-plateau fix**. **Rejected:** Basilisk's dt·a face event and both embed-note salvage approaches (ruled out by C2); any fix that fragments the CG graph (ruled out by C4)  <sub>collocated-second-order-verdict.md:51-55</sub>
+- **Device pressure bottom: block-tridiagonal FP32 direct factor preconditioning FP64 FCG ('direct', the GPU default)**. **Rejected:** B1's single-team V-cycle preconditioner (measured +5.3 ms/step, ~1250 dependent phases  <sub>flow</sub>
 - **Distributed cut-cell MG coarse levels must be nested, not independently re-decomposed**. **Rejected:** independent per-level BlockDecomposer ORB for MG coarse levels  <sub>channel-dns-isotropic-grid.md:52</sub>
 - **DistributedNS declared canonical; clean API; periodic BCs only; MPI a true build option**. **Rejected:** keeping pnm_backend API compatibility; a halo-BC system for future boundary conditions  <sub>suite-distributed-status.md:247-251</sub>
 - **DistributedNS solves in physical units (ρ, dynamic μ, force/volume), not kinematic ν**. **Rejected:** the kinematic (ρ≡1, single-ν) formulation as the solved system  <sub>sdflow-dt-divided-convention.md:46-59</sub>
