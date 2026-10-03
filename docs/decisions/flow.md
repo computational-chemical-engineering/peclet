@@ -3517,7 +3517,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: flow doc/steady_acceleration.md "Revision 1" R2, R4, D6 (rev 1), §7; review fix R1 (2026-10-03)
 - decided: 2026-10-03
-- status: settled (architect rev 1, orchestrator review fix R1; implemented flow 5538616, b8a96c8). Q18 — whether converged=True must also promise that a plain march would reach the state — is OPEN with the user; until ruled, the documented default below holds
+- status: settled (architect rev 1, orchestrator review fix R1; implemented flow 5538616, b8a96c8). Q18 — whether converged=True must also promise that a plain march would reach the state — DECIDED by the user 2026-10-03: stationarity only, with the caveats documented in MarchResult (uniqueness is a Stokes result; with advection an unstable steady branch can be certified; slow tails under-read)
 - supersedes: "Steady state is certified by the unchanged stop instrument on PLAIN steps after acceleration" — its handover residual (now the velocity residual), its budget (was num_passes + 3, no early exit), and the stagnation rule (was a halving of the best residual)
 - quote: |
     Phase A hands over at (1 - slow_rate) rtol on the relative velocity residual; phase B
@@ -3528,7 +3528,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
     slow_rate^(10·window) times its best; stagnation or growth (> 10x) disables acceleration and
     the plain march finishes. converged=True certifies stationarity at this dt over the
     certification's plain steps — not that a plain march from the initial state arrives there.
-- rejected: applying the stop instrument to the accelerated sequence; the 6-block budget (staggered N24 m8: 214 steps vs 135 plain; 74 at 12 blocks); no budget; handing over on the monitor's own changes along the accelerated sequence; stagnation as "no halving in 10·window calls" (review R1: a slow but real tail was declared stagnant)
+- rejected: requiring plain-march reachability as well (Q18: a plain verification tail costs plain steps exactly where acceleration matters — the dense bed at dt 60 does not certify plainly in 20 000 steps); applying the stop instrument to the accelerated sequence; the 6-block budget (staggered N24 m8: 214 steps vs 135 plain; 74 at 12 blocks); no budget; handing over on the monitor's own changes along the accelerated sequence; stagnation as "no halving in 10·window calls" (review R1: a slow but real tail was declared stagnant)
 - why: after an Anderson iterate the monitor's block changes start near zero and change sign or grow for up to five blocks before the slow tail emerges; certifying plain steps keeps the plain march's guarantee; in the supported scope the fixed point is unique (§2.3), so a stationarity certificate names the discrete steady solution
 
 ---
