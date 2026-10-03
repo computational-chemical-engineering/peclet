@@ -234,6 +234,20 @@ No change to results or Python API.
   build so the split costs it nothing.
 - pnm, voro and geom pin core v1.3.0 (geom's vendored headers are byte-identical).
 
+## `peclet-halo` / `peclet-core` 1.3.2 — 2026-10-03 — the PV-fit split
+
+A core-only patch. One `v*` tag in `peclet-core` publishes `peclet-halo` and the `peclet-core`
+compatibility shell at 1.3.2. Cut from `cb4c7ba`, not from core main's tip, which carries
+unreleased Anderson-acceleration work; the release commit is merged back into main.
+
+#### Added
+
+- **`peclet::core::vof::pvFitTerm` / `pvFitAccum`** — `pvFitAdd` split into the per-neighbour term
+  and its accumulation, with the arithmetic unchanged; `pvFitAdd` is their composition (ctest
+  `vof_pvfit`: bitwise on 1e5 random cases including rejected ones, host and CUDA). Every existing
+  caller is bit-identical. flow's team-per-target PV curvature fallback needs it, so flow pins
+  `PECLET_CORE_TAG v1.3.2`.
+
 ## `peclet-halo` / `peclet-core` 1.3.1 — 2026-09-27 — the promised DeprecationWarning
 
 A core-only patch released with family 1.3.0. One `v*` tag in `peclet-core` publishes
