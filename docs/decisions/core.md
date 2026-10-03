@@ -431,7 +431,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: core
 - source: docs/CORE_BOUNDARY.md §2.1
 - decided: 2026-09-21
-- status: settled
+- status: settled (the gate was claimed but absent until core 2e44f6b, 2026-10-03: `tools/check_mpi_manifest.sh`, `quality.yml` job `mpi-manifest`; the manifest had drifted from 9 to 13 headers, all legitimately MPI-side)
 - quote: |
     The MPI boundary is explicit and gated, because it had already drifted:
     `decomp/grid_redistribute.hpp:23` pulls the shim and `halo/nbx.hpp` while sitting in an

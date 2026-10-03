@@ -41,7 +41,7 @@ Every occurrence below is final, not provisional.
 | repo, tags, DOI | `core`, `v1.0.2`, `10.5281/zenodo.21132435` | unchanged | six repos pin `PECLET_CORE_TAG`; `check_release_state.sh` checks every consumer include against that tag; a rename buys a user nothing |
 | namespace, header path | `peclet::core`, `peclet/core/...` | unchanged | build-time only; the layering is already expressed by directory (`halo/`) and target (`peclet::halo`) |
 | CMake targets | `peclet::core` (header-only, MPI-free), `peclet::halo` (`peclet::core` + `MPI::MPI_CXX`, or the stub) | unchanged | this *is* the C++ boundary and it is already right |
-| MPI manifest | implicit — whichever headers happen to include `common/mpi.hpp` | **explicit and gated**: the set is `halo/*.hpp` (8) + `decomp/grid_redistribute.hpp`; a `quality.yml` grep step fails if a header outside the manifest includes `common/mpi.hpp` or `<mpi.h>`, or if a manifest header stops including it | the boundary drifted once already (`grid_redistribute.hpp` lives under `decomp/`, and the brief counted it MPI-free); a gate is cheaper than the next audit |
+| MPI manifest | implicit — whichever headers happen to include `common/mpi.hpp` | **explicit and gated**: the set is `halo/*.hpp` (8) + `decomp/grid_redistribute.hpp` (as of 2026-09-21; 13 headers since 2026-10-03, see §2.1); core's `tools/check_mpi_manifest.sh`, the `mpi-manifest` job in `quality.yml` (core `2e44f6b` — the gate was documented here but did not exist until then), fails if a header outside the manifest includes `common/mpi.hpp` or `<mpi.h>`, or if a manifest header stops including it | the boundary drifted once already (`grid_redistribute.hpp` lives under `decomp/`, and the brief counted it MPI-free); a gate is cheaper than the next audit |
 | geom closure | implicit | **gated**: `geom/{primitives,scene,scene_builder,scene_query,quadrature,body_properties}.hpp` + `common/{types,portable}.hpp` compile with no Kokkos and no MPI on the include path — `peclet-geom`'s CI proves this by construction (§1.2) | this closure is what makes the wheel trivial; a `#include <Kokkos_Core.hpp>` creeping into `scene_builder.hpp` would silently make it a Kokkos wheel |
 | `grid_redistribute.hpp` location | `decomp/` | leave in place, listed in the manifest | flow includes it at the current path (`flow/src/mac_cutcell_mg.hpp`); a forwarding header across a tag boundary is more machinery than the tidy is worth |
 | Kokkos + no-MPI | `amr/CLAUDE.md:19-20` says it was never a valid core configuration; nothing records it | **recorded as unsupported** (DECISIONS entry, §6) — `mpi_stub.hpp` covers the host halo, the Kokkos `GridHalo` is untested against it and CI's `no-mpi` job has no Kokkos | out of scope to fix; in scope to stop a future session "fixing" the stub to cover it without deciding to |
@@ -103,8 +103,11 @@ is through arrays, and it should remain so.
 
 That is the shim's whole purpose (`mpi.hpp:1-4`: "Include this instead of `<mpi.h>`"). It gives a
 mechanical, greppable definition of the boundary, which is why the manifest gate in §1.1 is a
-five-line CI step and not a judgement. Applied today it yields: `halo/` (8 headers) plus
-`grid_redistribute.hpp` — nine headers of forty-seven. The layering the manifest expresses:
+CI step and not a judgement. On 2026-09-21 it yielded `halo/` (8 headers) plus
+`grid_redistribute.hpp` — nine headers of forty-seven. On 2026-10-03 (core v1.4.0) it is thirteen of
+fifty-three: the same nine, the coarse-level stage headers `decomp/{gather_by_global_id,
+redistribute_topology,stage_comm}.hpp` (host-staged, MPI only) and `solver/anderson_mpi.hpp` (the MPI
+side of the Anderson accelerator). The list lives in core's `tools/check_mpi_manifest.sh`. The layering the manifest expresses:
 
 ```
 common/{types,portable}                        ← C++17-clean, Kokkos-optional, MPI-free
