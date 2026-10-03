@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-192 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+193 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -201,6 +201,7 @@ reading until they are settled.
 - **WY advection CFL default corrected to Weymouth's proven 3D bound 0.25**. **Rejected:** CFL<0.5 (Weymouth's 2D value, mistakenly applied to 3D)  <sub>vof-campaign.md:128-130</sub>
 - **Weak efficiency must be computed from per-GPU throughput, not raw step time**. **Rejected:** computing weak efficiency directly from step time when cells/GPU varies ±8%  <sub>channel-scaling-rebenchmark.md:208-209</sub>
 - **What was disproved in the agglomerated-bottom investigation**. **Rejected:** solid-rhs deposit contamination, sliver-row threshold mismatch, and multi-component pockets as causes for THIS case  <sub>agglomerated-bottom-ibm-fix.md:29</sub>
+- **Zero-aperture staggered velocity points stay live in the momentum solve (not masked)**. **Rejected:** masking every velocity point whose projection aperture is 0 (option iv); NaN for sealed-pocket cells in get_p() (poisons np.mean silently)  <sub>flow</sub>
 - **`march_to_steady(accelerate=)` default is set by a pre-registered measurement rule**. **Rejected:** fixing the default now (True, the architect's proposal; or False)  <sub>flow</sub>
 - **`march_to_steady(accelerate=)` defaults to True — the pre-registered rule, measured**. **Rejected:** False (opt-in acceleration)  <sub>flow</sub>
 - **bcStencilPath() and implicitAdv() must agree with the actual solver in use**.  <sub>momentum-solve-residual-stop.md:21</sub>

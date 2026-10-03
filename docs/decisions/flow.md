@@ -3623,3 +3623,17 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - why: the user's approval (2026-09-25) was conditional on the accuracy gates; the measured static
     balance is ~5000x worse than the exact projection — exactly the register's original objection
     (error ~ sigma·kappa). Re-opening needs a design that addresses the non-gradient term first.
+
+---
+
+### Zero-aperture staggered velocity points stay live in the momentum solve (not masked)
+- area: flow
+- source: flow doc/steady_acceleration_log.md "2026-10-03 — Pocket pressure" + "Coordinator ruling on option (iv)"; probe tests/study/pocket_mask_probe.py + pocket_mask_closed.patch
+- decided: 2026-10-03
+- status: settled (coordinator; measured)
+- quote: |
+    A1 bed (phi 0.6, N 64): 41 velocity points are live in the momentum mask (sdf > 0 at the face)
+    while their projection aperture is exactly 0. Masking them: |dK/K| 2.0e-8 (tight), Z&H
+    bit-identical, per-body reaction -1.8e-3 = exactly the body force f·h^3 on the masked points.
+- rejected: masking every velocity point whose projection aperture is 0 (option iv); NaN for sealed-pocket cells in get_p() (poisons np.mean silently)
+- why: the points hold real fluid in near-contact gaps; forced fluid that cannot flow passes its body force to the enclosing walls, so counting it keeps sum F = f·V_fluid; K does not move. Side effect kept: pocket pressure leaks into those points' velocity (~3e-4 of max|u| at realistic pocket pressures); reaction forces and K see <= 1e-7
