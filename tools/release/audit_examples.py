@@ -21,10 +21,16 @@ SUITE = Path(__file__).resolve().parents[2]
 BINDINGS = {
     "flow": ["src/flow_bindings.cpp", "packaging/flow_init.py"],
     "dem": ["src/dem_bindings.cpp", "packaging/dem_init.py", "packaging/particle_builder.py", "packaging/scene_particle.py"],
-    "voro": ["src/voro_bindings.cpp", "packaging/voro_init.py", "packaging/voro_scenes.py",
+    # voro's bindings are split per subsystem (voro 1.0.4): the module TU, its headers, and one
+    # source per bound class family.
+    "voro": ["src/voro_bindings.cpp", "src/voro_bindings_common.hpp", "src/voro_bindings_optim.hpp",
+             "src/voro_bindings_tess.hpp", "src/voro_flow.cpp", "src/voro_mpi.cpp",
+             "src/voro_optimizers.cpp", "src/voro_pore.cpp", "src/voro_simulation.cpp",
+             "src/voro_tessellation.cpp", "packaging/voro_init.py", "packaging/voro_scenes.py",
              "packaging/voro_pore_mesh.py"],
     "pnm": ["src/pnm_bindings.cpp", "packaging/pnm_init.py"],
-    "core": ["python/mpi_bindings.cpp", "python/geom_bindings.cpp"],
+    "core": ["python/halo_bindings.cpp", "python/packaging/halo_init.py"],  # peclet.halo since 1.2.0
+    "geom": ["python/geom_bindings.cpp", "python/packaging/geom_init.py"],  # its own repo since 1.2.0
     "amr": ["python/amr_bindings.cpp", "packaging/amr_init.py"],  # its own repo since G.2
     "coupling": ["src/coupling_bindings.cpp", "python/peclet_coupling/__init__.py",
                   "python/peclet_coupling/driver.py", "python/peclet_coupling/resolved.py"],
