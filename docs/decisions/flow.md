@@ -3475,3 +3475,22 @@ Do not reverse an entry here without recording a new decision that supersedes it
     False and acceleration is opt-in (symmetric/collocated cases).
 - rejected: fixing the default now (True, the architect's proposal; or False)
 - why: the large gain is the symmetric-geometry checkerboard, which random beds do not excite; the dense-bed gain (expected 2-4x, possibly ~1.5x) is unmeasured, while the cost is ~4 % per step + ~25 % memory
+
+### PV curvature fallback: one team per target cell, canonical-order accumulation (core pvFitTerm / pvFitAccum)
+- area: flow
+- source: core `cb4c7ba` (released v1.3.2), flow `f992f4d` (WO-7b), `d7d36bd` (WO-7c); design `doc/vof_step_performance_design.md` §4.7, §5.11
+- decided: 2026-10-03
+- status: settled
+- quote: |
+    The tier-3 PV paraboloid fallback runs on the device as one warp-team per target cell: the
+    team's lanes compute the 125 neighbour terms (core `pvFitTerm`) in parallel and ONE lane
+    accumulates them (`pvFitAccum`) in the canonical offset order, so the result is bitwise the
+    one-thread kernel. On the batched block container (WO-8) a fixed number of persistent teams,
+    min(concurrency/32, 65536), strides over the device-counted entries — no host read. Bitwise vs
+    main (CUDA + host, state_hash + bubble-column dumps, batteries 188/188); tier 3 on the column
+    14.8 -> 7.4 ms per call (shared GPU, indicative).
+- rejected: a warp reduction of the normal equations (changes the summation order); one team per
+  possible cell on the batched path (~2e5 mostly empty teams); reading the fallback counts to the
+  host (breaks WO-8's <= 3 host reads)
+- why: the fallback was latency-bound (one thread fitting a 5^3 paraboloid per cell); parallel
+  terms + serial canonical accumulation removes the latency without moving a bit

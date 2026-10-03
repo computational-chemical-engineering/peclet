@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-187 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+188 in force, 38 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -131,6 +131,7 @@ reading until they are settled.
 - **Owner-boundary attribution fix: remove shared-cell pressure from both sides of cross-owner faces**. **Rejected:** leaving the shared-cell pressure flux attributed through owner mid-surfaces  <sub>sdf-scene-campaign.md:82</sub>
 - **P1 passed: double-diagonal fallback retired as measurably worse, not merely unnecessary**. **Rejected:** the double-diagonal fallback (converges to the float-face operator, not the true one)  <sub>defect-correction-campaign.md:33-38</sub>
 - **PCG selector fixed; Chebyshev stays varRho/porous default (S0/S1 outcome)**. **Rejected:** PCG as the varRho/porous default driver  <sub>vof-campaign.md:172-201</sub>
+- **PV curvature fallback: one team per target cell, canonical-order accumulation (core pvFitTerm / pvFitAccum)**. **Rejected:** a warp reduction of the normal equations (changes the summation order); one team per  <sub>core</sub>
 - **Pairing lesson: stability needs (G,D) structural match, accuracy needs closure-value consistency — only the ghost architecture has both**. **Rejected:** Design B (star) — "SPD-but-scheme-unstable"; B+ gates ("dead")  <sub>collocated-attractor-campaign.md:35</sub>
 - **Part II phase-change architecture: Robin IHTR, PLIC plane-shift regression, transported-φ CLSVOF stays dead**. **Rejected:** hard T_sat interface condition; volume-source-in-C interface regression; transported-φ CLSVOF  <sub>vof-campaign.md:115-125</sub>
 - **Part III bubbly-flow container reuses V0–V4 kernels; Dodd–Ferrante FFT not needed**. **Rejected:** Dodd–Ferrante constant-coefficient FFT pressure solve  <sub>vof-campaign.md:107-114</sub>
@@ -566,7 +567,7 @@ reading until they are settled.
 
 - **A core header is on the MPI side iff it includes `common/mpi.hpp`, held by a CI manifest gate**. **Rejected:** leaving the MPI boundary implicit  <sub>docs/CORE_BOUNDARY.md</sub>
 - **AMR PCG must mask solid AND project onto the fluid range (mask + fluid-only mean), not just deflate the constant mode**. **Rejected:** deflating only the constant/all-cell mean without masking solid cells  <sub>device-naming-retirement.md:89-95</sub>
-- **Anderson acceleration (`AndersonCore`) lives in core `peclet::core::solver` from the start**. **Rejected:** flow-local first, promoted when amr adopts it  <sub>core</sub>
+- **Anderson acceleration (`AndersonCore`) lives in core `peclet::core::solver` from the start**. **Rejected:** flow-local first, promoted when amr adopts it  <sub>flow</sub>
 - **Anisotropic coarse-grid partitioning requires cellExtent, not raw cell-count kLargest**. **Rejected:** partitioning by raw cell-count kLargest on an anisotropic coarse grid  <sub>mg-decomposition-alignment.md:43</sub>
 - **Coarse-level redistribution lives in core; the hierarchies stay in the methods**. **Rejected:** per-method private implementations (three were forming); a core "multigrid stage" that owns the continued hierarchy below the stage point (core cannot  <sub>amr/docs/amr_mg_core_boundary.md</sub>
 - **Convention: keep NBX tag families >= 64 apart**.  <sub>nbx-round-tag-race.md:28</sub>
