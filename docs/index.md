@@ -141,7 +141,7 @@ validated notebooks) · **[Python API reference](python/index.md)** · **[Instal
 | [**flow**](https://github.com/computational-chemical-engineering/peclet-flow) | `peclet-flow` · `peclet.flow` | Incompressible Navier–Stokes for porous media (staggered MAC or collocated grid, cut-cell IBM, multigrid), geometric VoF two-phase flow, moving analytic geometry |
 | [**pnm**](https://github.com/computational-chemical-engineering/peclet-pnm) | `peclet-pnm` · `peclet.pnm` | Pore-network extraction from SDF geometry (pores, watershed segmentation, throat topology) and network flow data from a `flow` DNS |
 | [**dem**](https://github.com/computational-chemical-engineering/peclet-dem) | `peclet-dem` · `peclet.dem` | Discrete Element Method (XPBD and Hertz–Mindlin) with SDF point-shell collision for spheres and arbitrary SDF shapes |
-| [**voro**](https://github.com/computational-chemical-engineering/peclet-voro) | `peclet-voro` · `peclet.voro` | Dynamic 3D Voronoi tessellation of moving particles (periodic & Lees–Edwards), mesh generation, Navier–Stokes on a Voronoi mesh |
+| [**voro**](https://github.com/computational-chemical-engineering/peclet-voro) | `peclet-voro` · `peclet.voro` | Dynamic 3D Voronoi tessellation of moving particles (periodic boxes), mesh generation, Navier–Stokes on a Voronoi mesh |
 | [**coupling**](https://github.com/computational-chemical-engineering/peclet-coupling) | `peclet-coupling` · `peclet.coupling` | CFD-DEM: unresolved (volume-averaged drag) and resolved (cut-cell) two-way coupling of `flow` and `dem` |
 | [**morton**](https://github.com/computational-chemical-engineering/peclet-morton) | `peclet-morton` · `peclet.morton` | Morton/Z-order codes with arithmetic *in Morton space* — the spatial-index primitive |
 

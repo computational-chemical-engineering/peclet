@@ -52,7 +52,7 @@ git submodule update --init --recursive
 | `flow/` | Eulerian **Kokkos** incompressible Navier–Stokes (porous media; staggered MAC grid + cut-cell IBM). Complete, validated, MPI-optional distributed solver on `core`. |
 | `pnm/` | **Kokkos** pore-network extraction from SDF geometry (pores, watershed segmentation, throat topology). Split out of `flow`. |
 | `dem/` | Lagrangian **Kokkos + ArborX** DEM/XPBD particle packing. Full XPBD step with a validated distributed `step_mpi` (core particle halo). |
-| `voro/` | Mixed Lagrangian/Eulerian dynamic 3D Voronoi tessellation (**Kokkos** device tessellator; periodic & Lees–Edwards), mesh generator and Navier–Stokes on the Voronoi mesh. |
+| `voro/` | Mixed Lagrangian/Eulerian dynamic 3D Voronoi tessellation (**Kokkos** device tessellator; periodic boxes), mesh generator and Navier–Stokes on the Voronoi mesh. |
 | `coupling/` | **CFD-DEM coupling** of `flow` + `dem` (Kokkos kernels + Python drivers): unresolved volume-averaged drag and resolved cut-cell coupling. |
 | `morton/` | Morton/Z-order spatial-index primitive — arithmetic directly in Morton space (header-only C++17 + BMI2/AVX-512, Python). |
 
