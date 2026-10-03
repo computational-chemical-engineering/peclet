@@ -3501,7 +3501,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: flow doc/steady_acceleration.md "Revision 1" R1, D3 (rev 1), §1.2, §3.2; log WO-5 §1.3
 - decided: 2026-10-02
-- status: settled (architect rev 1; implemented flow 15e3026 + core 9ff3bd2, released core v1.4.0)
+- status: settled (architect rev 1; implemented flow 5538616 + core 9ff3bd2, released core v1.4.0)
 - supersedes: "Steady marches are accelerated by type-II Anderson on the full march state…" — its metric clause ("weighted c_P = h/(mu + rho h^2/dt), gauge removed"); the rest is restated here unchanged
 - quote: |
     Type-II Anderson, window m = 5 (cap 8), no damping, in a new march_to_steady; step() is
@@ -3517,7 +3517,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: flow doc/steady_acceleration.md "Revision 1" R2, R4, D6 (rev 1), §7; review fix R1 (2026-10-03)
 - decided: 2026-10-03
-- status: settled (architect rev 1, orchestrator review fix R1; implemented flow 15e3026, c1983cc). Q18 — whether converged=True must also promise that a plain march would reach the state — is OPEN with the user; until ruled, the documented default below holds
+- status: settled (architect rev 1, orchestrator review fix R1; implemented flow 5538616, b8a96c8). Q18 — whether converged=True must also promise that a plain march would reach the state — is OPEN with the user; until ruled, the documented default below holds
 - supersedes: "Steady state is certified by the unchanged stop instrument on PLAIN steps after acceleration" — its handover residual (now the velocity residual), its budget (was num_passes + 3, no early exit), and the stagnation rule (was a halving of the best residual)
 - quote: |
     Phase A hands over at (1 - slow_rate) rtol on the relative velocity residual; phase B
@@ -3537,7 +3537,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow, core
 - source: flow doc/steady_acceleration.md "Revision 2", D5, §2.4, §4.6, §7; log "Revision 2" R2-1 … R2-6
 - decided: 2026-10-02
-- status: settled (architect rev 2; implemented core f9956ed, flow a9e11c0; released core v1.4.0)
+- status: settled (architect rev 2; implemented core f9956ed, flow 46f94d5; released core v1.4.0)
 - supersedes: the rev-0 / rev-1 Ritz guard (D5) and D5's "Rejected: no instability guard" — this entry reverses that rejection
 - quote: |
     AndersonCore makes no stability judgement: no Ritz estimate, no status "unstable", no
