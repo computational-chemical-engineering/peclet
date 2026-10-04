@@ -271,6 +271,9 @@ identity — `peclet::core`, `peclet/core/...`, the repo and its tags — does *
 
 ## 4. History
 
+- 2026-10-04 — **flow `diagnostics.num_pressure_chebyshev_restarts`** (developer tier, `num_*` count
+  per §1.3): how many times the Chebyshev driver's warm spectral-bound estimate was rejected by its
+  guard and redone cold (WO-12). New name, additive.
 - 2026-10-03 — **flow `diagnostics.set_pressure_bottom_solver('auto' | 'direct' | 'algebraic')`**
   (developer tier): selects the pressure multigrid's bottom engine — `'direct'` the device-resident
   block-tridiagonal FP32 factor preconditioning an FP64 FCG, `'algebraic'` the host GraphAMG.

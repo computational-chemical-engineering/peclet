@@ -3669,3 +3669,40 @@ Do not reverse an entry here without recording a new decision that supersedes it
     (docstrings, CHANGELOG known limitation); 2.0.0 unifies on origin + (i + 1/2) h in every entry path.
 - rejected: changing either convention in a 1.x release (silently moves every cell-unit scene or SDF script: a numerics change and a semantic break the alias ladder cannot express); a runtime warning on cell-unit set_scene (noise for scripts that are correct under their own convention)
 - why: QUALITY_PLAN D9 — a break costs a major; the physical-domain path, the recommended one, is consistent
+
+### Chebyshev pressure bounds re-estimated from a warm start after a coefficient rebuild (D3)
+- area: flow
+- source: flow `3819fd0`, follow-ups `9498c5d`, `110b560` (WO-12); design `doc/vof_step_performance_design.md` §5.13; log 2026-10-04
+- decided: 2026-10-04
+- status: settled
+- quote: |
+    After a variable-density coefficient rebuild the Chebyshev driver re-estimates its spectral
+    bounds with 5 + 5 power iterations seeded from the previous NON-DEGENERATE estimate's kept
+    v_max / v_min (masked, mean-removed, normalised) instead of a cold 15 + 15 from the right-hand
+    side. Guard: if the solve hits the cap, or its residual after 3 iterations exceeds r0, re-estimate
+    cold and redo (counted in diagnostics.num_pressure_chebyshev_restarts). redistribute carries the
+    kept iterates (cross-step state). Bubble column, Chebyshev at rtol 1e-10: V-cycles/step
+    44.15 -> 24.05, projection 172 -> 97 ms (shared GPU); 2000 steps, 0 guard firings; static drop
+    and Hysing equal to ~1e-12. Accepted with two literal misses of the note's gates (50-step V-cycle
+    total +2.7 % vs ±2 %; 6/50 steps' residual > 2x main's, run maximum below main's).
+- rejected: the cold 15 + 15 estimate every step (30 of 44 V-cycles per step); warm-starting from a
+    degenerate (zero-RHS) estimate (gave bounds [0,0] and NaN pressure)
+- why: the variable-density default driver spent two-thirds of its V-cycles re-estimating bounds
+    that barely change between steps
+
+### Block-container statistics in one team-per-block launch, read back deferred (C2); host MG reductions in pencil order (B2)
+- area: flow
+- source: flow `91bd16c` (WO-9), `1e8ae47` (WO-10); design §5.10, §5.8
+- decided: 2026-10-04
+- status: settled
+- quote: |
+    C2: per-block volume, area, centroid, moments and velocity in one launch (team per block); values
+    reach the host at the next container step's read or on demand; diagnostics only (feed no state),
+    so their summation order is the team reduction's (velocity is a difference quotient: centroid
+    round-off ~4e-16 amplified ~5e4). 48 reduction launches + syncs per step -> 1.
+    B2: host pressure-MG sum reductions (dot, ccReduce3, removeMean) run over (y, z) rows on
+    ccFor3's static partition, x ascending and scalar, partials joined in thread order; never serial
+    below the cutoff. Host results move by ~2.5e-14 (11 of 12 host hashes re-baselined); CUDA bitwise.
+- rejected: C2 — three fenced per-block reductions per statistic; B2 — host MDRange reductions with
+    an implementation-defined order, an omp-simd reduction whose order depends on the ISA
+- why: launch and sync count on the container; an ISA- and thread-count-independent host order

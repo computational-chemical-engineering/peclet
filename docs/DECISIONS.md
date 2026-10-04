@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-195 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+197 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -36,6 +36,7 @@ reading until they are settled.
 - **Anisotropic wall-gradient normal/foot-point convention (⚑B)**.  <sub>physical-units-phase2-aniso.md:52-54</sub>
 - **Block VoF container stages batched: one launch per stage for all markers, block-ordered force gather**. **Rejected:** per-block CUDA streams; a pooled atlas of all blocks; atomics in the force scatter (order)  <sub>flow</sub>
 - **Block VoF: colliding markers — debris removal with exact return, a block-only curvature clip, a gated gas–gas capillary bound**. **Rejected:** union-colour force assembly (statically unnecessary; re-creates numerical coalescence  <sub>flow</sub>
+- **Block-container statistics in one team-per-block launch, read back deferred (C2); host MG reductions in pencil order (B2)**. **Rejected:** C2 — three fenced per-block reductions per statistic; B2 — host MDRange reductions with  <sub>flow</sub>
 - **Body-force ghost policy: Neumann copy, pinned to ρ's policy**.  <sub>vof-campaign.md:145-154</sub>
 - **Boiling scope addition did not resurrect transported-φ CLSVOF**. **Rejected:** transported-φ CLSVOF  <sub>vof-campaign.md:101-106</sub>
 - **Bubble-column benchmark case runs at pressure rtol 1e-8; the solver default stays 1e-10**. **Rejected:** 1e-6 (iterations 7.49, but a systematic gas-volume drift 1.5e-9 per 2000 steps —  <sub>USER</sub>
@@ -45,6 +46,7 @@ reading until they are settled.
 - **CUDA wheel dependency name: nvidia-cuda-runtime, not the deprecated -cu13 suffix**. **Rejected:** depending on the `nvidia-cuda-runtime-cu13` package name  <sub>peclet-cuda-wheel-feasible.md:28-30</sub>
 - **Cell-average IBM scheme, not point-value, for Poiseuille validation**. **Rejected:** point-value scheme (ibmFillEntry<0>)  <sub>cuda-kokkos-migration.md:285-287</sub>
 - **Channel DNS IC must seed streamwise rolls/streaks in wall units, not cold random noise**. **Rejected:** cold random-noise initial condition; perturbation cutoff specified in cycles/cell  <sub>channel-dns-isotropic-grid.md:46</sub>
+- **Chebyshev pressure bounds re-estimated from a warm start after a coefficient rebuild (D3)**. **Rejected:** the cold 15 + 15 estimate every step (30 of 44 V-cycles per step); warm-starting from a  <sub>flow</sub>
 - **Chebyshev pressure driver's apparent win was a placement artifact, not a real gain**. **Rejected:** adopting the Chebyshev pressure driver based on the uncontrolled 36% win  <sub>momentum-solve-residual-stop.md:39</sub>
 - **Clean-fluid-interior mask required on both restriction and prolongation for IBM velocity-MG correctness**. **Rejected:** θ-weighting the diagonal's identity (I) term; coupling the coarse grid at cut/solid cells (masking cut cells only, not solid cells, was tried and stil  <sub>velocity-mg-design.md:54-64</sub>
 - **Coarse-first decomposition ships opt-in, legacy remains the default**. **Rejected:** making coarse-first decomposition the default  <sub>mg-decomposition-alignment.md:22</sub>
