@@ -6,7 +6,47 @@ All notable changes to the peclet suite are documented here. The format is based
 
 ## [Unreleased]
 
-### `peclet-flow`
+## [1.4.0] — 2026-10-03 — steady states in a third of the steps, and the force on a body by its name
+
+`peclet-flow` 1.3.0 · `peclet-coupling` 1.1.1 · metapackages `peclet` and `peclet-cu13` 1.4.0.
+Unchanged and still pinned: `peclet-dem` 1.1.0, `peclet-pnm` 1.0.3, `peclet-voro` 1.0.4,
+`peclet-morton` 1.0.2, `peclet-geom` 1.0.1, `peclet-amr` 0.2.0 (their commits since their tags touch
+docs, scripts or packaging metadata only). `peclet-halo` / `peclet-core` 1.4.0 was released on its
+own earlier the same day (section below); flow and coupling pin its headers (`PECLET_CORE_TAG
+v1.4.0`) and `peclet[mpi]` now installs it.
+
+### `peclet-flow` 1.3.0
+
+#### Added
+
+- **`peclet.flow.march_to_steady(solver, monitor, ...)`** marches a solver to its steady state and
+  returns a `MarchResult` (`converged`, `steps`, `accelerated_steps`, `reason`, `num_restarts`,
+  `monitor`). By default the march is Anderson-accelerated (type II, on the device, through core's
+  `AndersonCore`); `accelerate=False` is the plain march with the same stop test. On a dense
+  staggered bed (φ 0.6, N = 64) it certifies in 93 steps instead of 325, 3.4–3.9× less wall time.
+  Staggered `Solver`, and `SolverColocated` with the `'ghost'` scheme; configurations the
+  accelerator cannot take (VoF, variable ρ/μ, moving scenes, cell forces, …) raise with the reason
+  and point at `accelerate=False`.
+- `diagnostics.set_pressure_bottom_solver('auto' | 'direct' | 'algebraic')` (developer tier)
+  selects the engine of the agglomerated pressure bottom.
+
+#### Changed (named numerics changes)
+
+- **On GPU backends the pressure multigrid's bottom is solved on the device** (`'auto'`, the
+  default, selects `'direct'` where eligible: single rank, a bottom of at most 8192 cells with at
+  most 64 fluid components, solids allowed): an FP64 flexible CG to 1e-5, preconditioned by an
+  FP32 block-tridiagonal direct factor refactored once per operator change, with no host transfer.
+  It replaces the host GraphAMG bottom there. Bubble column on an RTX 5080: 42.6 → 36.1–37.4 ms
+  per step; over 50 steps the fields differ from the GraphAMG bottom by at most 2.7e-14 (relative)
+  with identical outer iterations on every step. Host backends and the distributed path keep
+  GraphAMG and are bitwise unchanged; `'algebraic'` restores the previous engine on a GPU.
+
+#### Changed
+
+- A faster VoF step with identical results (bitwise on CUDA and host): the parabolic-fit
+  curvature fallback runs one GPU team per target cell (core 1.3.2's `pvFitTerm` / `pvFitAccum`
+  split), and the batched marker-block container's last tier runs on persistent warp teams
+  (14.8 → 7.4 ms per call on the bubble column).
 
 #### Deprecated
 
@@ -25,11 +65,67 @@ All notable changes to the peclet suite are documented here. The format is based
 
 - `hydro_force_torque()` (the traction) applied the index → physical conversion twice under a
   physical domain: 0.019× the reaction at `extent` 1, 3e-8× at 7.3. Cell units were unaffected.
+- `enable_vof_momentum` together with the VoF marker-block container now raises (in either
+  order). Momentum-consistent transport skips the step that advects the markers, so with both on
+  every marker stayed frozen while the momentum moved.
+- Pinned to core v1.4.0.
 
-### `peclet-coupling`
+#### Known limitations
 
-- `ResolvedCfdDem(force_method="traction")` reads flow's `diagnostics.hydro_force_torque_traction()`
-  (needs the flow release that carries it). The default `"reaction"` is unchanged.
+- **`march_to_steady`'s `converged=True` certifies stationarity at the given dt**: the state passed
+  the stop test on consecutive plain steps. It does not certify that a plain march from the initial
+  state would reach it. Without advection (Stokes) the steady state is unique. With advection,
+  above a flow instability (a wake past its Hopf point) Anderson can converge to an *unstable*
+  steady branch that a time march would never show; check such cases with `accelerate=False` or by
+  stepping on from the result. The stop test assumes no mode decays slower than `slow_rate` per
+  step; where one does it under-reads the remainder (dense bed at rtol 1e-10: ~1.4e-8 from the
+  steady state), so treat certificates below ~1e-8 on such geometries as approximate.
+- **The pressure in sealed fluid pockets is arbitrary.** Fluid cells that no open face connects to
+  the rest of the flow are out of reach of the pressure projection, so their pressure level is
+  undetermined (a dense sphere bed, φ 0.6 at N 64, has 126 such cells in 115 pockets). The force on
+  each body and the permeability, from `hydro_force_torque_reaction()`, are unaffected: they move
+  by at most 1e-7. The surface-traction diagnostic `diagnostics.hydro_force_torque_traction()` is
+  affected: per-body forces by about 2e-4 of the force, and on the collocated grid the bed-total
+  traction is biased as well. Averages of `get_p()` that include pocket cells shift by 1e-3 to 4e-3
+  of the pressure range for each pressure range by which the pockets are offset. A pocket mask and
+  a corrected traction are planned after this release.
+- **In cell units, `cell_centers()` and an analytic scene disagree by half a cell.** Without an
+  `extent`, `cell_centers()` returns `i + 1/2` (origin 0, spacing 1), while `set_scene` places cell
+  (i, j, k)'s centre at (i, j, k). An SDF sampled on `cell_centers()` for `set_solid` and the same
+  body given to `set_scene` are therefore offset by half a cell. With a physical domain (`extent=`)
+  both use `origin + (i + 1/2) h` and agree. The docstrings now say so; unifying the cell-unit
+  convention changes results and is deferred to 2.0.0.
+
+### `peclet-coupling` 1.1.1
+
+- `ResolvedCfdDem(force_method="traction")` reads flow's `diagnostics.hydro_force_torque_traction()`,
+  and falls back to `hydro_force_torque()` on flow 1.2.0 and older (no `diagnostics` namespace).
+  The default `"reaction"` is unchanged.
+- Pinned to core v1.4.0.
+
+### Metapackages `peclet` / `peclet-cu13` 1.4.0
+
+- Pins `peclet-flow` 1.3.0 / `peclet-flow-cu13` 1.3.0 and `peclet-coupling` 1.1.1; `[mpi]` installs
+  `peclet-core` 1.4.0.
+- The PyPI page no longer claims Lees–Edwards boxes for `peclet.voro`: they existed only in the
+  retired half-edge engine.
+- The containers install `peclet.geom` in every image and `peclet.amr` in `peclet-cpu`, so the
+  images carry the family the container docs describe; the documentation site generates its Python
+  API pages from the released `peclet-cpu` image.
+
+### Tested
+
+On the workstation (RTX 5080), 2026-10-03/04, against the host-openmp and nvidia-cuda prefixes with
+MPI on:
+
+- `peclet-flow` 1.3.0: 194 of 194 ctests on each backend (kernel tests, the distributed suite at
+  np 1, 2, 4 and one np 8 rung, and the Python tests; the two `bench` instruments excluded). The
+  analytic verifications pass: periodic spheres (exact no-slip Stokes) and the developing channel
+  on both backends, the backward-facing step on the host.
+- `peclet-coupling` 1.1.1: 3 of 3 on each backend; `force_method="traction"` runs on flow 1.3.0
+  without a `DeprecationWarning` and fills the pressure/viscous split.
+- The quick start on `README.md`, `docs/index.md` and the Colab notebook executes against flow
+  1.3.0 (N = 32: k = 1.2410e-01), and every peclet call on the doc pages and member READMEs exists.
 
 ## [1.3.0] — 2026-09-27 — one partition for fluid and particles, and a distributed DEM that conserves momentum
 
