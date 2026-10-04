@@ -18,7 +18,7 @@ reading until they are settled.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-194 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+195 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -206,6 +206,7 @@ reading until they are settled.
 - **`march_to_steady(accelerate=)` default is set by a pre-registered measurement rule**. **Rejected:** fixing the default now (True, the architect's proposal; or False)  <sub>flow</sub>
 - **`march_to_steady(accelerate=)` defaults to True — the pre-registered rule, measured**. **Rejected:** False (opt-in acceleration)  <sub>flow</sub>
 - **bcStencilPath() and implicitAdv() must agree with the actual solver in use**.  <sub>momentum-solve-residual-stop.md:21</sub>
+- **cell_centers() vs analytic-scene placement in cell units: documented, the fix deferred to 2.0.0**. **Rejected:** changing either convention in a 1.x release (silently moves every cell-unit scene or SDF script: a numerics change and a semantic break the alias ladd  <sub>RELEASE_PREP</sub>
 - **cylinder-vortex-street dropped from the gallery; confirmed flow bug pins the fix location**. **Rejected:** shipping a sub-resolution "steady" wake result (would misrepresent physics)  <sub>peclet-examples-gallery.md:106-118</sub>
 - **fillPorousEpsGhosts: mirror-around-1 at inflow/outflow, zero-gradient at walls — one policy for RHS/coeffs/residual**. **Rejected:** reading eps ghosts in three different states across RHS/coeffs/residual  <sub>porous-cfddem-cuda-two-bugs.md:36</sub>
 - **flow's grid is isotropic unit spacing with no wall-normal stretching**. **Rejected:** wall-normal grid stretching  <sub>channel-dns-isotropic-grid.md:14</sub>

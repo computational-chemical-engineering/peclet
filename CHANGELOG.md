@@ -6,7 +6,7 @@ All notable changes to the peclet suite are documented here. The format is based
 
 ## [Unreleased]
 
-## [1.4.0] — 2026-10-03 — steady states in a third of the steps, and the force on a body by its name
+## [1.4.0] — 2026-10-04 — steady states in a third of the steps, and the force on a body by its name
 
 `peclet-flow` 1.3.0 · `peclet-coupling` 1.1.1 · metapackages `peclet` and `peclet-cu13` 1.4.0.
 Unchanged and still pinned: `peclet-dem` 1.1.0, `peclet-pnm` 1.0.3, `peclet-voro` 1.0.4,

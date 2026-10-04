@@ -3654,3 +3654,18 @@ Do not reverse an entry here without recording a new decision that supersedes it
     statistical uncertainty of the swarm)
 - why: the swarm statistics are uncertain at the 10-15 % level from near-contact treatment; the
     projection tolerance only has to keep conservation near round-off, which 1e-8 does
+
+---
+
+### cell_centers() vs analytic-scene placement in cell units: documented, the fix deferred to 2.0.0
+- area: flow
+- source: RELEASE_PREP §12.5 item 3; flow fc4db2c (docstrings); measured 2026-10-03: blocked-face centroid offset (0.5,0.5,0.5) cells at N 24 in cell units, 0 with extent=
+- decided: 2026-10-04
+- status: settled (coordinator, released with family 1.4.0; the 2.0.0 fix itself is not yet designed)
+- quote: |
+    Without an extent, cell_centers() returns i + 1/2 while set_scene places cell (i,j,k)'s centre at (i,j,k),
+    so the same body given as an SDF sampled on cell_centers() and as a scene lands half a cell apart. With a
+    physical domain both use origin + (i + 1/2) h. Through 1.x both conventions stay and are documented
+    (docstrings, CHANGELOG known limitation); 2.0.0 unifies on origin + (i + 1/2) h in every entry path.
+- rejected: changing either convention in a 1.x release (silently moves every cell-unit scene or SDF script: a numerics change and a semantic break the alias ladder cannot express); a runtime warning on cell-unit set_scene (noise for scripts that are correct under their own convention)
+- why: QUALITY_PLAN D9 — a break costs a major; the physical-domain path, the recommended one, is consistent
