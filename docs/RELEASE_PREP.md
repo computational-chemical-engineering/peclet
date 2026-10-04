@@ -1059,3 +1059,110 @@ Two consequences worth planning around:
    dependency-only, so a patch release is one sdist and one pure-Python wheel with no compilation
    and no per-interpreter matrix. Worth doing on its own if the front page matters before the next
    feature release; the component packages can wait for theirs.
+
+## 12. CYCLE — family 1.4.0 (opened 2026-10-03)
+
+Prepared up to, not including, any outward step (no push, tag, publish, GitHub release or workflow
+dispatch). Every change sits on a local branch `rel-1.4.0` in a sibling worktree, ready for
+`git merge --ff-only`. The coordinator publishes on the user's go.
+
+### 12.1 Versions (RELEASE.md §4.1)
+
+| Package | Old → new | Why |
+|---|---|---|
+| peclet-halo / peclet-core | 1.4.0 (released alone today) | not re-released; flow and coupling pin `v1.4.0` |
+| peclet-flow (+ `-cu13`) | 1.2.0 → **1.3.0** | minor: `march_to_steady`, `set_pressure_bottom_solver`, the force API (`hydro_force_torque()` deprecated), the GPU device bottom (a named numerics change) |
+| peclet-coupling | 1.1.0 → **1.1.1** | patch: the traction reader + fallback, core pin |
+| peclet / peclet-cu13 | 1.3.0 → **1.4.0** | pins changed; the LE claim removed from the page; `[mpi]` → peclet-core 1.4.0 |
+| peclet-voro (+ `-cu13`) | 1.0.4 (kept) | the one commit since `v1.0.4` removes three stale scripts under `mpi/` and edits docs; the README (its PyPI page) never carried the Lees–Edwards or "14–17 M cells/s" claims (checked at `v1.0.4` and `main`); LE lived in the umbrella README/`docs/index.md`, fixed there. **Open question Q1.** |
+| peclet-morton | 1.0.2 (kept) | one commit: the vcpkg port file (not in any wheel) |
+| peclet-geom | 1.0.1 (kept) | one commit: a module docstring date (`peclet-core 1.3.1`, not 1.3.0); its vendored core `geom/*.hpp` are byte-identical v1.3.0 → v1.4.0 (`git diff --quiet`) |
+| peclet-amr | 0.2.0 (kept) | one commit: a design-note pointer |
+| peclet-pnm, peclet-dem | kept | no commits since their tags |
+
+### 12.2 Branches (worktrees left in place)
+
+- flow `rel-1.4.0` (`suite/flow-rel140`): version bump, cell-unit trap docstrings, README capabilities;
+  rebased onto flow main `b63402d` after the battery. The tested tree (`ff6402c`) and the release head
+  differ only under `doc/` and `tests/study/` (`git diff --stat` outside those: empty).
+- coupling `rel-1.4.0` (`suite/coupling-rel140`): core pin v1.4.0, version bump.
+- voro `rel-1.4.0` (`suite/voro-rel140`): core pin v1.4.0, 1.0.5 bump — **prepared but not pinned
+  by the metapackage** (Q1); publish only if Q1 is answered "release".
+- umbrella `rel-1.4.0` (`.claude/worktrees/rel140`): api-autogen (rebased: `f4ccf80`, `f203911`,
+  `f6295e7` cherry-picked cleanly onto origin/main 5251d49), the LE fix, the metapackage pins, the
+  release-tooling binding map, this section, the CHANGELOG, and the submodule gitlinks.
+- dem `suite/dem-rel140` (detached at origin/main): build trees for the coupling tests only.
+
+### 12.3 Checklist
+
+- [x] A: state pre-flight; worktree branches of flow/core/dem/voro/amr are campaign branches, not in this release (parked by scope).
+- [x] B: test matrix (§12.4).
+- [x] C: versions (§12.1), `PECLET_CORE_TAG v1.4.0` in coupling (and voro's prepared branch).
+- [x] D: landing pages (flow README gains steady states + forces; umbrella README loses LE), `check_landing_pages.py`, `check_docs_snippets.py --ref origin/main --run` (§12.5), `mkdocs build --strict` with generated pages.
+- [ ] E: publish (coordinator, after the user's go) — §12.6.
+- [ ] H: containers (now with geom + amr), Site dispatch, GitHub Releases, Zenodo.
+
+### 12.4 Test matrix (2026-10-03, host-openmp and nvidia-cuda prefixes, MPI on, `--bind-to none`)
+
+| Repo | host-openmp | nvidia-cuda | Notes |
+|---|---|---|---|
+| flow `rel-1.4.0` | **194/194** (`-LE bench`) | **194/194** | host first pass at 4 threads/rank, `-j4`, load 57–75: 96 passed, then `velocitymg_bc_mpi_np4`, `sdflow_mpi_np4`, `sdflow_colocated_mpi_np4` hit the 3600 s timeout (OpenMP spin under oversubscription, the flow/CLAUDE.md trap). Stopped and re-ran the remaining 98 at 2 threads/rank, `-j3`: 98/98, those three in 7.8 s, 14.9 s and 430 s. Not a code failure. |
+| flow verify scripts | PASS ×3 | PASS ×2; BFS: no verdict yet | `verify_periodic_spheres_sdflow`, `verify_channel_sdflow`, `verify_bfs_sdflow` (poiseuille, lid cavity, regression are ctests above). CUDA BFS: the first run hit its 3600 s timeout with the GPU shared by another session (the process sat in `cudaDeviceSynchronize`, i.e. GPU-bound); re-run with a 9000 s budget in progress at commit time. The host BFS took ~45 min at 8 threads |
+| coupling `rel-1.4.0` | **3/3** | **3/3** | against flow `rel-1.4.0` + dem origin/main build trees (`PECLET_FLOW_BUILD` / `PECLET_DEM_BUILD` set); traction smoke: no DeprecationWarning, split filled |
+| voro `rel-1.4.0` (prepared, Q1) | **42/42** | **42/42** | CUDA first pass 41/42: `repair_sdf_mpi_np4` failed to allocate 4.6 MiB on the GPU while the flow CUDA battery shared it; re-run alone: PASS (7.6 s) |
+| docs | — | — | `check_docs_snippets.py --ref origin/main --run` (with the fixed binding map): NAMES PASS; RUN PASS ×3 (README, index, notebook; k = 1.2410e-01); `mkdocs build --strict` PASS with pages generated from the MPI build trees |
+| geom, amr wheels | built | — | `pip wheel ./geom`, `pip wheel ./amr` against host-openmp: both build and import (`peclet.amr` OpenMP) — de-risks the new `cpu.def` lines (the Apptainer image itself is built only in CI) |
+
+### 12.5 Pre-tag checks
+
+1. **dem: dense periodic growth of an elongated grid-SDF particle — does not reproduce.** The
+   2026-07-04 crash (position → inf → segfault at scale ~0.85) was reproduced by protocol on dem
+   main (`2b0aebd` = v1.1.0, no commits since): a `build_particle` spherocylinder (L/D 3.2, 288 shell
+   points), fully periodic cube, forced linear scale ramp 0.3 → 1.0 (no overlap gate) over 1400
+   steps + 600 settle. CUDA N 200 φ 0.50: PASS, positions finite throughout, max overlap 5.6 % of
+   the particle length; host-openmp, same case: PASS, 1.3 %; CUDA N 400 φ 0.60: PASS through scale
+   0.85–0.875 and to the end, finite — but the forced ramp past jamming ends at max overlap 0.82 of
+   the length (expected for an un-gated ramp, not a crash). Consistent with dem `7b5d1b8` having
+   fixed the OOB writes. Script: `dem_elongated_periodic_growth.py` (session scratchpad; recorded in
+   the coordinator report).
+2. **CUDA teardown abort — not reproduced on the CUDA build tree.** `peclet.flow` (nvidia-cuda
+   prefix, flow `rel-1.4.0`): N 32 sphere, 5 steps, interpreter exit with the Solver alive → exit
+   0; same with a `diagnostics.field_view` capsule held past exit → exit 0. The fix is flow
+   `3035320` (Releasable solver + capsule, atexit release-then-finalize), shipped since flow
+   0.5.0; the open-item note was stale. The `peclet-flow-cu13` *wheel* itself was not built locally (its CI cuda-wheel
+   job builds it at the tag; `gh workflow run release.yml` would dry-run it but is a workflow
+   trigger, outside this preparation).
+3. **`cell_centers()` vs analytic scene, cell units — confirmed and documented.** Without an
+   extent `cell_centers()` = i + 1/2; `set_scene` places cell i's centre at i. The same sphere
+   installed through `set_solid(SDF sampled on cell_centers())` and through `set_scene` differs in
+   its blocked x-face centroid by (0.5, 0.5, 0.5) cells (N 24); with `extent=` the difference is
+   0. Docstrings of `cell_centers` and `set_scene` now say so (flow `4cf66df`); CHANGELOG known
+   limitation; a register entry deferring the API fix to 2.0.0 is DRAFTED for the user (not
+   committed).
+
+### 12.6 Before publishing — user actions, then the sequence
+
+**User actions before publishing:**
+
+1. The go for the release (scope: flow 1.3.0, coupling 1.1.1, metapackages 1.4.0; Q1 voro).
+2. `gh auth refresh -s workflow` — the umbrella branch changes `.github/workflows/containers.yml`
+   and `site.yml`; a push without the `workflow` scope is refused.
+3. Answer or accept the defaults of the open questions (§ coordinator report): Q1 voro, Q2 the
+   cell-centers register entry.
+
+**Sequence** (RELEASE.md §6; each member's `release.yml` runs `landing-pages` before `publish`):
+
+1. **flow**: if `origin/main` moved, `git -C flow-rel140 rebase origin/main` (only doc commits so
+   far) — then `git -C flow-rel140 push origin rel-1.4.0:main`; `git -C flow-rel140 tag v1.3.0 &&
+   git -C flow-rel140 push origin v1.3.0`; watch Release (CPU wheels + cuda-wheel, ~90 min); confirm
+   `pip index versions peclet-flow` and `peclet-flow-cu13` show 1.3.0.
+2. **coupling**: same with `coupling-rel140`, tag `v1.1.1`; confirm `peclet-coupling` 1.1.1.
+3. **umbrella**: re-point the gitlinks if flow or coupling were rebased
+   (`git update-index --cacheinfo 160000,<sha>,flow` in `.claude/worktrees/rel140`, amend the pointer
+   commit), then `git push origin rel-1.4.0:main`, `git tag v1.4.0`, push the tag → Release
+   (landing-pages, the two metapackages, quickstart) and Containers (cpu/cuda/hip; the cpu leg
+   dispatches Site with `image_tag=1.4.0`).
+4. GitHub Releases: flow `v1.3.0`, coupling `v1.1.1`, umbrella `v1.4.0`, body = the CHANGELOG
+   sections → Zenodo version DOIs.
+5. Smoke in a fresh venv: `pip install peclet==1.4.0` (+ `peclet-cu13` on the GPU box, +
+   `peclet[mpi,cfd-dem]`), `check_docs_snippets.py --installed --run`.
