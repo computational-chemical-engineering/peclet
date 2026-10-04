@@ -120,8 +120,9 @@ MPI on:
 
 - `peclet-flow` 1.3.0: 194 of 194 ctests on each backend (kernel tests, the distributed suite at
   np 1, 2, 4 and one np 8 rung, and the Python tests; the two `bench` instruments excluded). The
-  analytic verifications pass: periodic spheres (exact no-slip Stokes) and the developing channel
-  on both backends, the backward-facing step on the host.
+  analytic verifications pass on both: periodic spheres (exact no-slip Stokes), the developing
+  channel, and the backward-facing step (reattachment x_r/S = 5.26 and 8.16 at Re_S 100 and 200,
+  identical on the two backends).
 - `peclet-coupling` 1.1.1: 3 of 3 on each backend; `force_method="traction"` runs on flow 1.3.0
   without a `DeprecationWarning` and fills the pressure/viscous split.
 - The quick start on `README.md`, `docs/index.md` and the Colab notebook executes against flow
