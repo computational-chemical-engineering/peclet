@@ -1166,3 +1166,20 @@ dispatch). Every change sits on a local branch `rel-1.4.0` in a sibling worktree
    sections → Zenodo version DOIs.
 5. Smoke in a fresh venv: `pip install peclet==1.4.0` (+ `peclet-cu13` on the GPU box, +
    `peclet[mpi,cfd-dem]`), `check_docs_snippets.py --installed --run`.
+
+### 12.9 PUBLISHED — family 1.4.0, 2026-10-04 (user go 2026-10-03)
+
+- **PyPI:** peclet-flow + peclet-flow-cu13 1.3.0 (tag v1.3.0 on 7c95c20; 13/13 Release jobs, CUDA wheels cp310–cp314),
+  peclet-coupling 1.1.1 (v1.1.1 on 485ca1f), peclet + peclet-cu13 1.4.0 (umbrella v1.4.0 on 00078fb; Release
+  incl. landing-page and quickstart jobs green). peclet-halo / peclet-core 1.4.0 the day before (core v1.4.0 on c656ccb).
+- **Not re-released:** voro 1.0.4 (§12 Q1: the stale claims were on the umbrella page, fixed), dem, pnm, morton, geom, amr.
+- **Containers:** cpu, cuda-sm80, cuda-sm90 AND hip-gfx90a all green. The CPU leg dispatched Site with the 1.4.0 image:
+  the API pages for flow (march_to_steady), amr and halo/geom are generated, none a "not importable" stub.
+- **GitHub Releases / Zenodo:** core v1.3.2 and v1.4.0 (neither had one), flow v1.3.0, coupling v1.1.1, umbrella v1.4.0.
+- **Smoke:** fresh venv `peclet==1.4.0` and `peclet-cu13==1.4.0` import (versions as pinned; `march_to_steady` present);
+  `check_docs_snippets.py --installed --run` PASS on README, index and quickstart notebook (k = 1.2410e-01, N 32)
+  once matplotlib is installed (the snippets plot; not a peclet dependency).
+- **Tag type:** flow v1.3.0 and core v1.4.0 are lightweight (convention: annotated); `describe --tags` tooling unaffected.
+- **NOT done (need the user: billed cluster time):** Phase F Snellius package, Phase G LUMI; gallery re-check (§10).
+- **Follow-ups:** quiet-GPU compare of the CUDA backward-facing step against v1.2.0 (0.18–0.25 s/step vs 0.13–0.14 s on
+  8 host threads, unattributed); pocket mask for get_p + pocket cells out of the traction (CHANGELOG known limitation).
