@@ -20,7 +20,7 @@ jobs:
     name: landing pages are not stale
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive     # the check reads each member's README
       - uses: actions/setup-python@v6
