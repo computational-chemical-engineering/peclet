@@ -24,7 +24,7 @@ is authoritative.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-218 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+224 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -40,6 +40,7 @@ is authoritative.
 - **An Anderson restart restores the last kept map output; the state never holds a rejected evaluation (review R2)**. **Rejected:** "Restart keeps Rprev/Gprev (step 6 still commits)" — the fifth restart then left the state at the rejected output  <sub>flow</sub>
 - **Anisotropic MG coarsening order: coarsen axis a iff H_a < 2·min H over coarsenable axes, engaged only under `aniso`**. **Rejected:** applying the anisotropic coarsening rule to the isotropic path (would change isotropic bits)  <sub>physical-units-phase2-aniso.md:47-51</sub>
 - **Anisotropic wall-gradient normal/foot-point convention (⚑B)**.  <sub>physical-units-phase2-aniso.md:52-54</sub>
+- **Benchmark layouts on Zen never straddle an L3 (CCD) with one rank**. **Rejected:** 8x3 on contiguous cores 0-23 (ranks straddling CCDs)  <sub>design</sub>
 - **Block VoF container stages batched: one launch per stage for all markers, block-ordered force gather**. **Rejected:** per-block CUDA streams; a pooled atlas of all blocks; atomics in the force scatter (order)  <sub>flow</sub>
 - **Block VoF: colliding markers — debris removal with exact return, a block-only curvature clip, a gated gas–gas capillary bound**. **Rejected:** union-colour force assembly (statically unnecessary; re-creates numerical coalescence  <sub>flow</sub>
 - **Block-container statistics in one team-per-block launch, read back deferred (C2); host MG reductions in pencil order (B2)**. **Rejected:** C2 — three fenced per-block reductions per statistic; B2 — host MDRange reductions with  <sub>flow</sub>
@@ -112,7 +113,9 @@ is authoritative.
 - **Grid-convergence studies must report dimensionless permeability k* = k/N², not dimensional k**. **Rejected:** reporting dimensional k_cells directly as a convergence metric  <sub>sdflow-regression-suite.md:20-22</sub>
 - **Grid-dimension convention: MG per-axis coarsening depends on factors of two; always check halvings before proposing a grid**. **Rejected:** choosing benchmark grid dimensions without checking per-axis halving depth (led to a "WORSE" refine ladder caught before burning GPU hours)  <sub>channel-scaling-rebenchmark.md:182-200</sub>
 - **Guidance: ghost for resolved/smooth IBM geometry, cutcell aperture for tight-throat porous media**. **Rejected:** using ghost projection for under-resolved tight-throat porous media  <sub>flow-ghost-projection.md:86</sub>
+- **Host backends use the 'direct' pressure bottom where eligible (reverses §13 D-5's host clause and Q-D6's default)**. **Rejected:** GraphAMG kept for host bitwise; GraphAMG at tau = 1e-5; GraphAMG setup reuse  <sub>flow</sub>
 - **Host launch rule: pencils on host, MDRange on device, one cell body; -ffp-contract=off on host, -march opt-in**. **Rejected:** host MDRange in hot paths (2.4x); rebuilding the shared Kokkos prefix with Kokkos_ARCH  <sub>flow</sub>
+- **Host list-driven batch kernels launch over exact counts with a dynamic schedule; host region kernels iterate rows**. **Rejected:** upper-bound launches under GCC's contiguous static schedule (idle threads on the  <sub>flow</sub>
 - **Host-serial-kernel threshold lever kept despite measuring as marginal at the fat-rank size**. **Rejected:** cutting reductions over to serial-below-threshold execution; a larger serial-cutoff (131072)  <sub>cpu-fat-rank-optimization.md:43-49</sub>
 - **How to apply: staggered recommended for accuracy-critical drag/permeability; collocated for structural wins, at the cost of first order at curved walls**.  <sub>sdflow-collocated-solver.md:202-207</sub>
 - **IBM overlay needs no separate scaling change — linear in the base stencil**.  <sub>sdflow-dt-divided-convention.md:24-26</sub>
@@ -145,7 +148,9 @@ is authoritative.
 - **Must re-mask solid velocity after grad(phi) correction**. **Rejected:** skipping the re-mask  <sub>cuda-kokkos-migration.md:354-355</sub>
 - **Non-incremental Chorin projection gives wrong steady Z&H drag — incremental-rotational required**. **Rejected:** non-incremental Chorin projection (−40% error, splitting-error); the warm-detector convergence protocol  <sub>embed-port-progress.md:21-22</sub>
 - **Old single-GPU CFDSolver reference retired; pnm_backend is pore-network extraction only**. **Rejected:** keeping the CFDSolver single-GPU reference implementation; pnm_backend carrying a CFD solver  <sub>sdflow-dt-divided-convention.md:29-38</sub>
+- **On host, the 'direct' bottom FCG's reductions are single-lane in index order (bits independent of T_host and of the thread count)**. **Rejected:** team reductions on host (order depends on the team size)  <sub>flow</sub>
 - **On the collocated variable-density path set_body_force is a mean pressure gradient (face form)**. **Rejected:** f_const at the cell value (periodic hydrostatic box: cell 20.5 after 30 steps at  <sub>flow</sub>
+- **One-rank benchmarks run without init_mpi; init_mpi at size 1 stays on the distributed path**. **Rejected:** a silent single-rank switch inside init_mpi  <sub>flow</sub>
 - **Only upwind/dissipative advection schemes exist — no central/energy-conserving option**. **Rejected:** central/energy-conserving advection scheme (does not exist)  <sub>channel-dns-isotropic-grid.md:15</sub>
 - **Owner-boundary attribution fix: remove shared-cell pressure from both sides of cross-owner faces**. **Rejected:** leaving the shared-cell pressure flux attributed through owner mid-surfaces  <sub>sdf-scene-campaign.md:82</sub>
 - **P1 passed: double-diagonal fallback retired as measurably worse, not merely unnecessary**. **Rejected:** the double-diagonal fallback (converges to the float-face operator, not the true one)  <sub>defect-correction-campaign.md:33-38</sub>
@@ -205,6 +210,7 @@ is authoritative.
 - **The agglomerated-bottom MG anomaly required a per-fluid-component null-space projector, a double row-sum, and a looser inner tolerance**. **Rejected:** projecting the all-cell mean (rather than per-connected-fluid-component); leaving MG coefficients in single-precision row sums uncorrected; an inner t  <sub>agglomerated-bottom-ibm-fix.md:15</sub>
 - **The balanced-force projection is an option on both grids, default ON on collocated variable-rho (V8), OFF elsewhere**. **Rejected:** always-on (the user asked for an option); default off on V8 (loses the settled  <sub>flow</sub>
 - **The defect-correction rule: Krylov matvec/residual must be the exact double operator in flux form; preconditioners below may stay float**.  <sub>defect-correction-campaign.md:14-17</sub>
+- **The distributed host 'direct' bottom runs redundantly on every rank, from the allgathered bottom openness (WO-H6, designed, not yet implemented)**. **Rejected:** a rank-0 solve plus broadcast; GraphAMG  <sub>design</sub>
 - **The immersed scalar wall flux is never a two-point / series-resistance flux over the cut cell's centroid distance**. **Rejected:** the centroid two-point wall flux and the series-resistance (GFM, Liu–Fedkiw–Kang) wall and interface flux (first order; at the Maxwell disc, d/h = 128  <sub>flow</sub>
 - **The momentum solver is chosen by the operator's CONDITION NUMBER, and the rule names no geometry**. **Rejected:** (a) selecting on whether an immersed solid is present — the rule as first landed; IBM  <sub>user</sub>
 - **The np>1 VoF colour parity gates gate conservation, not the pointwise field**. **Rejected:** (a) loosening 1e-11 to a number above today's 3.174e-09 — it would have been fitted to  <sub>tests/kokkos_mpi/test_vof_bc_mpi.cpp,</sub>

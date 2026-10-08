@@ -3580,7 +3580,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: flow `9c791f7`..`23a3631` (WO-6/WO-11 B1, §13 WO-D0..D4); design `doc/vof_step_performance_design.md` §4.1, §13; log `doc/vof_step_performance_log.md`
 - decided: 2026-10-03
-- status: settled
+- status: settled (its host clause "Host backends keep GraphAMG, bitwise" superseded 2026-10-08 by "Host backends use the 'direct' pressure bottom where eligible"; the distributed clause stands until WO-H6)
 - quote: |
     On GPU backends the pressure multigrid's bottom (bubble column: 16x12x8 = 1536 cells) is solved
     on the device: an FP32 block-tridiagonal factor with explicit Schur-complement inverses, plane by
@@ -3724,6 +3724,100 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - rejected: C2 — three fenced per-block reductions per statistic; B2 — host MDRange reductions with
     an implementation-defined order, an omp-simd reduction whose order depends on the ISA
 - why: launch and sync count on the container; an ISA- and thread-count-independent host order
+
+### Host backends use the 'direct' pressure bottom where eligible (reverses §13 D-5's host clause and Q-D6's default)
+- area: flow
+- source: flow `93c92ba` (WO-H1); design `doc/vof_step_performance_design.md` §14.3 H-1, §14.7 Q-H1, §14.8 entry 1; log "§14 WO-H0 … WO-H3" and "Snellius S-1" (jobs 27770798, 27770799; raw /home/frankp/Codes/bubble_column_perf/s1/)
+- decided: 2026-10-08 (design 2026-10-04; held on branch cpu14-h4 until S-1; orchestrator decision on the S-1 numbers)
+- status: settled
+- quote: |
+    On host (OpenMP) backends set_pressure_bottom_solver('auto') resolves to the FP32
+    block-tridiagonal 'direct' factor + FP64 FCG wherever §13.4.6 admits it (single rank, <= 64
+    components, b <= 192, n <= 8192); otherwise GraphAMG runs, unchanged. A recorded numerics
+    change: host G-NUM-H replaces host bitwise to GraphAMG (50-step difference 3.3e-14, pressure
+    iterations identical, 300-step FCG max 2 / mean 1.02 / restarts 0, static drop and Hysing
+    unchanged). Snellius genoa, bubble column, rtol 1e-8, 300 steps, ms/step direct vs algebraic:
+    1x24 contiguous 93.10 vs 95.81, OMP_WAIT_POLICY=active 94.86 vs 96.22, spread over 12 CCDs
+    83.81 vs 89.38 — faster at every single-rank layout. Revert = restore the kHostMemory line in
+    directBottomIneligible().
+- rejected: GraphAMG kept for host bitwise; GraphAMG at tau = 1e-5; GraphAMG setup reuse
+- why: the host GraphAMG bottom (incl. its per-step buildAmg) cost 1.50 ms per V-cycle, ≈ 20
+    ms/step at 13.5 V-cycles — nearly all of the 22.4 ms/step the 2026-10 Snellius profile spent
+    outside kernels; the plane-structured factor keeps the FP64 convergence check
+- supersedes: the host clause ("Host backends keep GraphAMG, bitwise") of "Device pressure bottom: block-tridiagonal FP32 direct factor preconditioning FP64 FCG ('direct', the GPU default)"; the distributed clause stands until WO-H6
+
+### On host, the 'direct' bottom FCG's reductions are single-lane in index order (bits independent of T_host and of the thread count)
+- area: flow
+- source: flow `93c92ba` (WO-H1); design §14.3 H-1, §14.8 entry 2
+- decided: 2026-10-04
+- status: settled
+- quote: |
+    The host bottom FCG reduces in one lane in index order, so its result is bitwise independent
+    of T_host and of OMP_NUM_THREADS (U3 on OpenMP: factor + M and the whole FCG bitwise for
+    T in {1, 2, 4, 8}); T_host = 8 lanes affect speed only.
+- rejected: team reductions on host (order depends on the team size)
+- why: a thread-count-independent host result, matching the register's host reduction-order rule (B2)
+
+### The distributed host 'direct' bottom runs redundantly on every rank, from the allgathered bottom openness (WO-H6, designed, not yet implemented)
+- area: flow
+- source: design `doc/vof_step_performance_design.md` §14.3 H-6, §14.8 entry 3
+- decided: 2026-10-04
+- status: settled (design; until WO-H6 lands the distributed path keeps GraphAMG — S-1 6x4/3x8/8x3 ran 'algebraic')
+- quote: |
+    Under MPI the host 'direct' bottom is factored and solved redundantly on every rank from the
+    allgathered bottom openness; no rank-0 solve and broadcast.
+- rejected: a rank-0 solve plus broadcast; GraphAMG
+- why: with the single-lane host reductions the redundant solve equals the single-rank 'direct'
+    result bitwise at any thread count (given the gathered openness equals single-rank's); the
+    gather reuses GraphAMG's global map and gatherv, and the per-V-cycle rhs allgatherv GraphAMG
+    already pays
+
+### One-rank benchmarks run without init_mpi; init_mpi at size 1 stays on the distributed path
+- area: flow
+- source: flow `637ccfe` (WO-H0: `tests/study/vof_perf/run_mpi.py`, `bench_cpu.sh`); design §14.3 H-0, §14.7 Q-H2, §14.8 entry 4
+- decided: 2026-10-04
+- status: settled
+- quote: |
+    A one-rank benchmark skips mpi_block / init_mpi and runs the single-rank engines (np 1 kernel
+    listing: selfCopy 0, cc_smooth_box 0; dump bitwise to prof.py at the same rtol). init_mpi at
+    communicator size 1 keeps the distributed engines, because the np = 1 gate needs them. The old
+    published 24-core number (144 ms) used the distributed path at np 1 and rtol 1e-10; under H-0
+    and rtol 1e-8 the same 1x24 case measures 93.1 ms (S-1, with the rest of §14).
+- rejected: a silent single-rank switch inside init_mpi
+- why: the np = 1 distributed run is the serial<->parallel equivalence gate; the benchmark is a
+    protocol choice, not a code path
+
+### Host list-driven batch kernels launch over exact counts with a dynamic schedule; host region kernels iterate rows
+- area: flow
+- source: flow `05332a0`..`7a4ba2d` (WO-H4 (a)-(e)); design §14.3 H-4, §14.8 entry 5
+- decided: 2026-10-04
+- status: settled
+- quote: |
+    On host backends the VoF block container's list-driven batch kernels launch over the exact
+    work count with a dynamic schedule, and its region kernels (bbox, compaction scans, movePiece
+    copies) iterate rows with the x run inside; bitwise to the previous host kernels. Container
+    kernels 132.9 -> 23.8 ms/step at 8 threads [workstation]. The device keeps its kernels.
+- rejected: upper-bound launches under GCC's contiguous static schedule (idle threads on the
+    short tail); per-cell div/mod index maps
+- why: GCC compiles Kokkos' static RangePolicy to schedule(static) without a chunk; a block's
+    active entries (~10 % of its upper-bound range) sit at its head and land on one thread, so
+    with 16 blocks on 24 threads at least 8 idle; the region kernels paid three 64-bit div/mod per
+    cell plus a job search
+
+### Benchmark layouts on Zen never straddle an L3 (CCD) with one rank
+- area: flow
+- source: design §14.2, §14.7 Q-H5/Q-H9, §14.8 entry 6; S-1 placement audit (bubble_column_perf/s1/summary_main.txt)
+- decided: 2026-10-04
+- status: settled
+- quote: |
+    On AMD Zen nodes every MPI rank of a benchmark layout is bound inside one L3 (CCD): 6x4, 3x8
+    and 8x3 per-CCD masks, audited per run. S-1 (genoa): 8x3 one rank per CCD 90.72 ms, 6x4 106.53,
+    3x8 107.87 (algebraic bottom). Single-rank spread placement (24 threads over 12 CCDs) is 10 %
+    faster than contiguous (83.81 vs 93.10, memory bandwidth); the published comparison stays on
+    contiguous cores and TBFsolver is not rerun at spread — the spread number is recorded alongside.
+- rejected: 8x3 on contiguous cores 0-23 (ranks straddling CCDs)
+- why: 8x3 on contiguous cores gives two ranks cores that straddle two L3s; measured on Snellius
+    they took 122.9 and 124.4 ms kernel time against 98.0-101.7 for the others, which waited in MPI
 
 ---
 
