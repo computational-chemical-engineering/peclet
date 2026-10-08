@@ -1,5 +1,5 @@
 import re, pathlib
-OUT = pathlib.Path("/home/frankp/Codes/suite/docs")
+OUT = pathlib.Path(__file__).resolve().parent.parent   # docs/ of this checkout (worktree-safe)
 AREAS = [("flow","flow — Navier-Stokes, IBM, pressure/velocity solve"),
          ("dem","dem — XPBD, contacts, packing"),
          ("voro","voro — tessellation, ConvexCell, mesh optimizer"),
@@ -24,6 +24,12 @@ verbatim quotes, provenance and supersession chains live in `docs/decisions/<are
 
 Entries marked ⚠️ are unresolved contradictions found during the harvest — do not rely on either
 reading until they are settled.
+
+**Provenance.** A bare `<note>.md:<line>` source names a note in the maintainer's Claude memory
+(`~/.claude/projects/-home-frankp-Codes-suite/memory/`). Since the 2026-10-08 memory clean-up most of
+those notes live in its `archive/` subdirectory, and trimmed notes may have shifted line numbers —
+grep for the quoted text rather than trusting the line. A source that names a commit or a repo path
+is authoritative.
 
 """
 lines=[hdr]

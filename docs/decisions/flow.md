@@ -1466,7 +1466,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - rejected: mode 4 as shipped (face-centre flux placement retained on the 6 axis faces)
 - why: "only the WALL flux got centroid placement; the o_f open-FACE fluxes... still use the SAME O(h) sub-cell placement error"
 
-### Mode-10 quadrature, Seo-Mittal pressure-only split, and ghost-as-production are all dead ends
+### Mode-10 quadrature, Seo-Mittal pressure-only split, and ghost-as-production are all dead ends (ghost part superseded 2026-08-25: AUTO collocated default = ghost)
 - area: flow
 - source: collocated-second-order-verdict.md:40-41
 - decided: undated
@@ -1476,6 +1476,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
     constraint), Seo–Mittal pressure-only split, ghost as production.
 - rejected: mode 10 quadrature; Seo-Mittal pressure-only split; ghost scheme as the production path
 - why: mode 10 quadrature breaks D/G adjointness (conservation is the binding constraint)
+- conflict: scope annotation 2026-10-08 — the "ghost as production" verdict rests on the 2026-08-18 A/B that made gauge-exact the collocated default; five days later the collocated-attractor campaign made ghost the AUTO default in both flow and AMR (flow `c672014`, core `7472306`). See "Collocated AUTO default = ghost projection (2026-08-25), superseding 'ghost as production is a dead end'". Mode 10 and the Seo–Mittal split stay dead.
 
 ---
 
@@ -3991,3 +3992,25 @@ Do not reverse an entry here without recording a new decision that supersedes it
     flux carries an implicit rho c_p of one internal unit.
 - rejected: documenting the scalar/energy surface as internal (cell) units — "silently wrong" is the failure class U3's four missed setters already showed; converting fields set before the scales are pinned with whatever scale was current (silently wrong if set_rho/set_dt come later); interpreting the constant-D operator mdot's implicit rho c_p as "1 in the caller's units" (unit-system dependent physics)
 - why: the plan's contract is one consistent physical system in and out; gates units_scalar_scale_invariance (9.6e-16), units_scalar_sine_decay (exact BE amplitude to 8e-14, order 1.98 on cubic and box cells), units_phase_change_scale_invariance (<= 1.7e-13 incl. 12 full sucking-interface steps); cell units bit-identical (12/12 state hashes)
+
+---
+
+### Collocated AUTO default = ghost projection (2026-08-25), superseding "ghost as production is a dead end"
+- area: flow
+- source: flow `c672014`, core `7472306` (commit messages); memory `archive/collocated-attractor-campaign.md:53`
+- decided: 2026-08-25 (user decision; recorded in the register 2026-10-08)
+- status: settled
+- quote: |
+    [flow c672014:] DEFAULT SWITCH: collocated scheme AUTO = ghost (user decision 2026-08-25)
+    SolverColocated resolves its scheme at set_solid: AUTO (the new default) selects the GHOST
+    fluid-only projection -- family-free, unconditionally stable, protocol-independent
+    (doc/collocated_invisible_subspace.md; clean ladders both beds, Z&H anchor) -- and falls back
+    to gauge-exact with a stderr notice on the configurations ghost v1 does not support (porous /
+    variable-rho / domain-BC / Chebyshev / analytic overrides / fluid-only instruments). Any explicit
+    set_collocated_scheme / set_face_interp / set_ghost_projection / set_fluid_only_constraint call
+    disables AUTO, so every existing explicit configuration is unchanged.
+    [core 7472306:] AmrFlow AUTO = ghost projection [...] with an aperture fallback + stderr notice
+    when the finest band is too thin for the overlay.
+- rejected: gauge-exact (ex mode 9) as the unconditional collocated default, chosen by the 2026-08-18 A/B; the 2026-08-20 verdict's "ghost as production" dead end
+- why: the collocated-attractor campaign (flow `doc/collocated_invisible_subspace.md`) found ghost family-free, unconditionally stable and protocol-independent, with clean convergence ladders on both beds and the Z&H anchor; validation: AUTO == archived ghost trajectory digit-for-digit, explicit gauge-exact == its record, regression ×3 green, 33/33 MPI ctests, AMR ctests CUDA + OpenMP
+- supersedes: the "ghost-as-production" part of "Mode-10 quadrature, Seo-Mittal pressure-only split, and ghost-as-production are all dead ends" (mode 10 and Seo–Mittal stand)

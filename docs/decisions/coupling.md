@@ -114,7 +114,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - rejected: Deen/Kuipers synchronous eps-update ordering
 - why: "did NOT change stability... the pump was the DEM leak, not the eps lag"
 
-### Model-B drag conversion: β_B = β_A/ε; CfdDem defaults changed (advection=True, eps_min 0.4)
+### Model-B drag conversion: β_B = β_A/ε; CfdDem defaults changed (advection=True; eps_min 0.4, a floor since superseded — now 0.25)
 - area: coupling
 - source: porous-cfddem-cuda-two-bugs.md:25-26
 - decided: 2026-07-06
@@ -123,13 +123,14 @@ Do not reverse an entry here without recording a new decision that supersedes it
     **Model-B drag conversion**: drag.hpp closures are literature Model-A forms; porous mode now divides the per-particle force by local eps in the kernels (`model_b` flag, driver passes `porous`) — β_B=β_A/ε. [...] **CfdDem defaults**: `advection=True` (driver sets flow.set_advection+set_implicit_advection — implicit FOU + deferred TVD, stable at coupled dt); `eps_min` 0.2→**0.4** (≈ RCP voidage; at 0.3 the porous bed diverges — Ergun β with 1/ε powers explodes below a physical packing; 0.4 stable).
 - rejected: eps_min=0.2 or 0.3
 - why: "at 0.3 the porous bed diverges — Ergun β with 1/ε powers explodes below a physical packing"
-- conflict: eps_min later changed again to 0.05 with smoothing (session 2026-07-10), see below
+- conflict: eps_min later changed again to 0.05 with smoothing (session 2026-07-10), see below, and then to 0.25 (coupling `dfafc54`, 2026-07-16) — see "Void-fraction floor eps_min = 0.25". The Model-B conversion and `advection=True` stand.
 
 ### Porosity clip changed from a 0.4 floor to [0,1]-only, per user directive; MFIX-faithful smoothing/drag law added instead
 - area: coupling
 - source: porous-cfddem-cuda-two-bugs.md:59-62
 - decided: 2026-07-10
-- status: settled
+- status: superseded
+- superseded-by: "Void-fraction floor eps_min = 0.25: a physical regularisation at the random-close-packing limit" (coupling `dfafc54`, 2026-07-16) — the floor is no longer [0,1]-only; the superficial-velocity rule and the MFIX smoothing stand
 - quote: |
     User directive: impose SUPERFICIAL velocity always (already done — fillPorousEpsGhosts face-eps≡1); clip porosity to [0,1] only (no 0.4 floor — small physical ε OK, change the drag law if it misbehaves, don't clamp); do EXACTLY what MFIX does for bidisperse; look up + implement MFIX's coarse-grid deposition.
     [...] **SHIPPED (coupling `9827523`)**: `smoothField()` = volume-conserving diffusive smoothing of deposited solidvol [...] default `eps_min` 0.4→0.05.
@@ -211,7 +212,8 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: coupling
 - source: multiphysics-framework-plan.md:382
 - decided: 2026-07-06
-- status: settled
+- status: superseded
+- superseded-by: "The July porous CFD-DEM CUDA crash was three real bugs, not a stream race; a genuine cross-module stream race exists and is fenced by HandOff" (2026-10-08 correction)
 - quote: |
     NEW ISSUE FOUND + FULLY DIAGNOSED + DOCUMENTED (2026-07-06, coupling `645752f`): porous CFD-DEM
     crashes on CUDA (illegal address, ~step 3 ...; OpenMP fine). ROOT CAUSE = a cross-module ASYNC
@@ -286,3 +288,37 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - why: a coupled run's cost per rank is fluid work plus particle work, so the partition that balances it is the weighted ORB of the combined field `1 + gamma × particles per cell` (gamma = 1 until calibrated), not flow's equal-cell split; copying flow's partition would co-locate the codes but leave the DEM load, usually the dominant cost, unbalanced from the first step. Doing it at construction, through the same path as `rebalance()` (flow `rebalance_by_weights` → alignment → dem `migrate_to_weights(w, align)` → co-location assertion), also closes the start-up mismatch (48³ at np = 4: flow 32|16 vs dem 24|24) without user action. Fixed beds (`move_particles=False`) are exempt: dem never migrates there, so particles stay in flow's `init_mpi` block.
 
 ---
+
+### Void-fraction floor eps_min = 0.25: a physical regularisation at the random-close-packing limit
+- area: coupling
+- source: coupling `dfafc54` (commit message); `coupling/README.md` (void fraction); flow `doc/porous_drag_scheme.md` §4 table
+- decided: 2026-07-16 (recorded in the register 2026-10-08)
+- status: settled
+- quote: |
+    eps_min default 0.05 -> 0.25: a physical regularisation (voidage below wide-bidisperse
+    RCP can only be interpenetration/deposit artifacts) — the eps-conservative projection
+    amplifies interstitial velocity by 1/eps, so artifact eps must never reach the fluid.
+    [README:] The older 0.4 floor under-predicted dense-bed drag ~3x; the interim 0.05 guard let
+    interpenetration artefacts detonate a bed.
+- rejected: the 0.4 floor (clamps real dense-bed voidage ~0.28 and under-predicts the Ergun 1/ε³ drag ~3×, so a coarse dense bidisperse bed would not fluidize); the [0,1]-only clip with a 0.05 division guard (interpenetration/deposit artefacts reach the volume-averaged fluid, whose projection amplifies the interstitial velocity by 1/ε)
+- why: real voidage bottoms out near random close packing (~0.36 monodisperse, ~0.25 for wide bidisperse mixes), so a 0.25 floor clamps only unphysical ε; the code default is `CfdDem(eps_min=0.25)` (`python/peclet_coupling/driver.py`) and the same 0.25 is the kernel default of `_coupling.compute_void_fraction`. Fixed-bed tests pass `eps_min=0.05` explicitly (their uniform lattice never clamps).
+- supersedes: "Porosity clip changed from a 0.4 floor to [0,1]-only…" (the floor part; its superficial-velocity rule and MFIX smoothing stand) and the eps_min 0.4 of "Model-B drag conversion…"
+- note: the 2026-07-10 user directive read "clip porosity to [0,1] only … small physical ε OK, change the drag law if it misbehaves, don't clamp". 0.25 is meant to keep that intent — it clamps only ε no packing can physically reach — but no record of the user explicitly approving the 0.25 floor was found; confirm with the user before treating it as directive-level.
+
+### The July porous CFD-DEM CUDA crash was three real bugs, not a stream race; a genuine cross-module stream race exists and is fenced by HandOff
+- area: coupling
+- source: memory `archive/porous-cfddem-cuda-two-bugs.md:10-17` (fix record); coupling `7daf324` (HandOff, commit message)
+- decided: 2026-07 (bugs fixed); 2026-09-26 (HandOff); recorded 2026-10-08
+- status: settled
+- quote: |
+    The `coupling/doc/porous_cuda_async_race.md` "cross-stream race" diagnosis was wrong. Actual
+    defects, found by staged bisection on a synthetic hand-set bed: 1. DEM broadphase pair-buffer OOB
+    (illegal-address crash) [dem d4d4093] 2. GraphAMG bottom ∧ domain-BC diverges [flow 6823dc0]
+    3. Drag never in the momentum operator on the all-fluid domain-BC path.
+    [coupling 7daf324, 2026-09-26:] flow, dem and coupling each statically link their own Kokkos,
+    hence their own CUDA/HIP streams, so nothing ordered a coupling kernel against the next flow/dem
+    kernel on the same zero-copy arrays. [...] every wrapper that touches arrays shared with flow/dem
+    opens with a HandOff guard that calls the global Kokkos::fence() on entry and on exit.
+- rejected: the 2026-07-06 reading that the illegal-address crash was a cross-stream race (it was the DEM pair-buffer overflow plus two flow solver defects; "CUDA-only" was the 50-iteration pressure cap truncating a diverging solve at backend-dependent points); leaving coupling kernels unordered against flow/dem kernels on shared zero-copy arrays
+- why: the race the July note hypothesised is real but was not what crashed: it surfaced on 2026-09-26 as stale eps ghosts (`update_void_fraction` on coupling's stream, then flow's `exchange_field("eps")` on flow's), failing `mpi_polydisperse_moving` np=4 on CUDA with rel-err up to 4.9e-3 in ~10–30 % of runs. With HandOff: 0/30 failures (max rel-err 3.75e-8); host-openmp bit-identical; CUDA cost 13.37 → 13.49 ms per coupled step.
+- supersedes: "The cross-module CUDA porous-CFD-DEM crash was an async stream race, not a GraphAMG bug" (its "NOT graphAMG" was half right — GraphAMG∧BC was one of the three bugs, not the crash)

@@ -15,10 +15,16 @@ verbatim quotes, provenance and supersession chains live in `docs/decisions/<are
 Entries marked ⚠️ are unresolved contradictions found during the harvest — do not rely on either
 reading until they are settled.
 
+**Provenance.** A bare `<note>.md:<line>` source names a note in the maintainer's Claude memory
+(`~/.claude/projects/-home-frankp-Codes-suite/memory/`). Since the 2026-10-08 memory clean-up most of
+those notes live in its `archive/` subdirectory, and trimmed notes may have shifted line numbers —
+grep for the quoted text rather than trusting the line. A source that names a commit or a repo path
+is authoritative.
+
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-197 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+217 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -51,15 +57,19 @@ reading until they are settled.
 - **Clean-fluid-interior mask required on both restriction and prolongation for IBM velocity-MG correctness**. **Rejected:** θ-weighting the diagonal's identity (I) term; coupling the coarse grid at cut/solid cells (masking cut cells only, not solid cells, was tried and stil  <sub>velocity-mg-design.md:54-64</sub>
 - **Coarse-first decomposition ships opt-in, legacy remains the default**. **Rejected:** making coarse-first decomposition the default  <sub>mg-decomposition-alignment.md:22</sub>
 - **Coarse-level solve policy default stays "smoother", not "auto", because auto regresses the cut-cell IBM path**. **Rejected:** making "auto" the default coarse-level solve policy  <sub>mg-decomposition-alignment.md:28</sub>
+- **Collocated AUTO default = ghost projection (2026-08-25), superseding "ghost as production is a dead end"**. **Rejected:** gauge-exact (ex mode 9) as the unconditional collocated default, chosen by the 2026-08-18 A/B; the 2026-08-20 verdict's "ghost as production" dead end  <sub>flow</sub>
 - **Collocated momentum advection uses the PROJECTED divergence-free face field, not the cell→face average**. **Rejected:** the un-projected cell→face average ½(u_i+u_j) as the collocated advecting velocity  <sub>flow/doc/uf_advection.md;</sub>
 - **Collocated pressure coupling is the ABC (MAC) approximate projection, NOT Rhie–Chow**. **Rejected:** Rhie–Chow interpolation as the collocated coupling  <sub>sdflow-collocated-solver.md:37-39</sub>
 - **Collocated variable density (V8): the mass-adjoint ABC pair; the face-acceleration form is retired**. **Rejected:** face acceleration after the viscous solve (non-incremental; unstable with the rotational  <sub>flow</sub>
+- **Conjugate scalar transport is two fields on one grid in ψ = c/K, with the series-resistance 2×2 elimination at the fluid and solid probes (P2F)**. **Rejected:** Peters' directional one-field scheme (min-curvature T_ξ; Maxwell disc at d/h = 128, L1/L∞: DIRc 6.7e-5/6.0e-3, 5.7e-6/4.0e-4, 7.9e-6/4.3e-4, 1.9e-4/8.  <sub>flow</sub>
 - **Constant-coefficient (Dodd–Ferrante) pressure driver PARKED: fails the static-balance gate**. **Rejected:** merging it as opt-in despite the failed gate; a third design round (uncertain, the  <sub>USER</sub>
 - **Container slab half-extent must equal L/2 + wall thickness, never more (periodic-image rule)**. **Rejected:** an oversized slab half-extent  <sub>advective-cutwall-flux-plan.md:57</sub>
 - **Correction: the raw field registry hands out internal (unconverted) arrays**.  <sub>physical-units-plan.md:28</sub>
 - **Coupling partial/cut+solid cells to the coarse grid fails regardless of coarsening depth — capping depth cannot fix it**. **Rejected:** capping coarsening depth as a fix for partial-cell coupling divergence  <sub>velocity-mg-design.md:118-135</sub>
 - **Crank-Nicolson ported then reverted; backward-Euler is the right default**. **Rejected:** Crank-Nicolson (θ=0.5) time integration with the plain explicit Laplacian  <sub>suite-distributed-status.md:320-324</sub>
 - **Cut-cell C convention: liquid fraction of fluid volume, openness-weighted**.  <sub>vof-campaign.md:98-100</sub>
+- **Cut-cell scalar transport stores κ (the fluid fraction) in storage and sources**. **Rejected:** unit storage, i.e. the legacy scalar's (first order; the Neumann eigenvalue 11 % off at 32 cells per diameter; 2–12 % mass loss under advection)  <sub>flow</sub>
+- **Cut-cell scalars refuse the ghost projection (collocated 'ghost', staggered set_ghost_projection) and, for now, collocated open faces**. **Rejected:** advecting with the ghost projection's face field under its binary openness `oxb_` (divergence 4.3e-2 of max|F|) or the geometric `ox_` (2.0e-2): a con  <sub>rulings</sub>
 - **Deferred correction is not viable as an undamped fallback**. **Rejected:** undamped deferred correction as the C/F / ghost solve fallback  <sub>flow-ghost-projection.md:29</sub>
 - **Design constraints for any collocated-plateau fix**. **Rejected:** Basilisk's dt·a face event and both embed-note salvage approaches (ruled out by C2); any fix that fragments the CG graph (ruled out by C4)  <sub>collocated-second-order-verdict.md:51-55</sub>
 - **Device pressure bottom: block-tridiagonal FP32 direct factor preconditioning FP64 FCG ('direct', the GPU default)**. **Rejected:** B1's single-team V-cycle preconditioner (measured +5.3 ms/step, ~1250 dependent phases  <sub>flow</sub>
@@ -79,6 +89,7 @@ reading until they are settled.
 - **Embed momentum + mode-3 projection (mode 5) does not converge — over-drags**. **Rejected:** mode 5 (embed momentum + mode-3 projection) as a viable configuration  <sub>embed-port-progress.md:23</sub>
 - **Escalation rule: a twice-failed gate stops the work order, never gets its numerics tweaked to pass**. **Rejected:** tweaking numerics to force a failing gate to pass  <sub>vof-campaign.md:495-496</sub>
 - **Every VoF consumer is TOLD what a pure cell is; none decides on its own**. **Rejected:** |  <sub>this</sub>
+- **Every κ > 0 scalar cell with an open face is its own unknown; slivers are never merged or linked**. **Rejected:** cell merging or linking of slivers (the H-k / Hf-1 link schemes: Neumann limit −4.2e-3 at order 1.0, against −6.2e-5 at order 2.0 for κ-FV with every   <sub>flow</sub>
 - **Exact-crossing openness overrides must be masked to 0 at solid velocity points**. **Rejected:** unmasked exact apertures at solid-velocity-point faces  <sub>flow-ghost-projection.md:61</sub>
 - **FV viscous operator confirmed 2nd-order-consistent — "face-flux placement" hypothesis refuted; barrier is the pressure coupling**. **Rejected:** the "face-flux placement" hypothesis; the wall-pressure-term-on-momentum-force fix (both signs)  <sub>sdflow-collocated-solver.md:152-166</sub>
 - **Face-primary uf reconstruction (mode 8) attempted and reverted — incompatible with flow's divided time convention**. **Rejected:** mode 8 (face-primary uf via Basilisk's acceleration-event reconstruction) under flow's current divided momentum-operator convention  <sub>embed-port-progress.md:33</sub>
@@ -106,6 +117,7 @@ reading until they are settled.
 - **IBM overlay needs no separate scaling change — linear in the base stencil**.  <sub>sdflow-dt-divided-convention.md:24-26</sub>
 - **IBM velocity-MG must NEVER un-scale the residual by 1/D_rescale**. **Rejected:** un-scaling the restricted residual by 1/D_rescale to fix the +2-4% Z&H drag bias  <sub>velocity-mg-design.md:24-35</sub>
 - **If a pressure method clearly wins at scale, make it the default**.  <sub>parallel-scaling-study.md:11-17</sub>
+- **Immersed scalar walls use probe-flux: one probe on the facet normal, the BC eliminated per facet**. **Rejected:** flow's per-cell Dirichlet mask (order 0.7–1); the Gibou linear ghost alone; Papac/Gibou symmetric Robin (order 1.4–1.7, its Dirichlet limit a mask); t  <sub>flow</sub>
 - **Incremental (rotational) pressure now default ON in C++ DistributedNS, matching the Python binding**. **Rejected:** classical (non-rotational) pressure as the C++ default  <sub>sdflow-dt-divided-convention.md:40-44</sub>
 - **Incremental-rotational pressure default ON in sdflow, OFF in DistributedNS**.  <sub>suite-distributed-status.md:325-332</sub>
 - **Instability fix: a wall-banded rotational-term blend, not the full rotational update everywhere**. **Rejected:** the unblended full rotational update on the cell-centered approximate projection (unstable, PM-II instability)  <sub>collocated-attractor-campaign.md:14</sub>
@@ -124,7 +136,7 @@ reading until they are settled.
 - **Mixed ghost widths require CutcellMG::parityOg to correct red-black colour parity**.  <sub>comm-scaling-plan.md:33</sub>
 - **Mode 10 (open-centroid quadrature) is dead — worse on Z&H and diverges on RCP slivers**. **Rejected:** mode 10 open-centroid quadrature constraint  <sub>flow-ghost-projection.md:119</sub>
 - **Mode 4 (fully-FV via defect correction) implemented and is a negative milestone — not 2nd order**. **Rejected:** mode 4 as shipped (face-centre flux placement retained on the 6 axis faces)  <sub>sdflow-collocated-solver.md:133-150</sub>
-- **Mode-10 quadrature, Seo-Mittal pressure-only split, and ghost-as-production are all dead ends**. **Rejected:** mode 10 quadrature; Seo-Mittal pressure-only split; ghost scheme as the production path  <sub>collocated-second-order-verdict.md:40-41</sub>
+- **Mode-10 quadrature, Seo-Mittal pressure-only split, and ghost-as-production are all dead ends (ghost part superseded 2026-08-25: AUTO collocated default = ghost)**. **Rejected:** mode 10 quadrature; Seo-Mittal pressure-only split; ghost scheme as the production path  <sub>collocated-second-order-verdict.md:40-41</sub>
 - **Momentum solve uses the divided (1/dt-scaled) convention, replacing the dt-multiplied form**. **Rejected:** the dt-multiplied form `I - nu*dt*Lap`  <sub>sdflow-dt-divided-convention.md:10-16</sub>
 - **Momentum tolerance-stop: adaptive tolerance instead of a fixed sweep cap**. **Rejected:** a fixed sweep cap of 5 (user's own suggestion)  <sub>parallel-scaling-study.md:74-77</sub>
 - **Momentum-advection kernels must use the actual wall velocity field, not maskVelocity's solid zeros**. **Rejected:** reading maskVelocity's solid-zero convention as the wall velocity for a moving wall  <sub>advective-cutwall-flux-plan.md:15</sub>
@@ -162,7 +174,14 @@ reading until they are settled.
 - **Rung 3 fix: openness-weighted centered gradient replaces plain ½(g⁻+g⁺) projection correction for embed mode**. **Rejected:** plain projectCorrectCenter's ½(g⁻+g⁺) correction (with closed faces zeroed) for the embed-momentum mode  <sub>embed-port-progress.md:24-25</sub>
 - **S-ladder plan; Dodd–Ferrante splitting rejected for the pressure driver**. **Rejected:** Dodd–Ferrante splitting for the pressure driver  <sub>vof-campaign.md:473-479</sub>
 - **S3 coarsening indefiniteness is real, but coarsenOpenAvg must NOT switch to harmonic**. **Rejected:** switching coarsenOpenAvg's face-coefficient averaging to harmonic  <sub>vof-campaign.md:253-260</sub>
+- **Scalar advection uses the projection's own constrained face flux; the scalar apertures weight diffusion only**. **Rejected:** the scalar apertures for advection (not the projection's constraint, so Σ F ≠ 0 per cell and constants are not preserved)  <sub>flow</sub>
+- **Scalar conservation is exact in the discretization; the solver residual is reported as a defect, never fixed up**. **Rejected:** a post-solve uniform mass correction  <sub>flow</sub>
+- **Scalar cut-cell geometry is the fan-tetrahedron PL model on the marching-squares samples; the scalar apertures are ungated and snapped at both ends**. **Rejected:** plane-cube `plicVolume(n, φ_c)` for SDF sources (inconsistent with the apertures on curved walls, edges and gaps); 4³ subsampling (`cs_`, quantized to  <sub>flow</sub>
+- **Scalar faces carry the plain aperture two-point flux**. **Rejected:** Johansen–Colella face-centroid interpolation (no measurable change; costs symmetry and compactness)  <sub>flow</sub>
+- **Scalar small cells under advection: a dynamic implicit-FOU split relative to the bulk Courant number**.  <sub>flow</sub>
+- **ScalarMG coarsens the surrogate with rediscretized coarse FACES and variational coarse WALL terms: the plain average of the level-0 terms at the FINE probe distance (Amendment A1)**. **Rejected:** wall terms at the level's own probe distance s_L, the original design (stand-alone contraction 0.79 at the finest G1 and 3.1, divergent, on a periodic  <sub>flow</sub>
 - **SdflowIbm MPI requires constructing each rank with local ORB block dims (ctor refactor, not a gated add-on)**.  <sub>cuda-kokkos-migration.md:558-570</sub>
+- **Sealed scalar cells (fluid or solid) are not unknowns; they are gated on their VOLUME, not their count**. **Rejected:** a "0 sealed" count gate (impossible: the corner slivers whose faces all snap to 0 at the 1e-3 floor grow like (R/h)², 0–11 / 38–46 / 154–159 at R/h 8   <sub>flow</sub>
 - **Sequencing: "VoF vs multiphysics first" dissolves — VoF is the next multiphysics phase**.  <sub>vof-campaign.md:480-484</sub>
 - **Sign convention: closed divergence of the corrected field equals Aφ − b = −residual**.  <sub>flow-ghost-projection.md:43</sub>
 - **Sliver mask must pin only cells with cs<1e-6, not every cell with sdf(center)<0**. **Rejected:** the mode-0-style mask (zero every cell with sdf(center)<0, including solid-centred cut cells) for embed mode  <sub>embed-port-progress.md:27</sub>
@@ -175,6 +194,7 @@ reading until they are settled.
 - **Star half fix: phibar mean was not bitwise-annihilating even in double — replaced by flux form**. **Rejected:** the phibar=Sum(a*x)/Sum(a) formulation  <sub>defect-correction-campaign.md:52-54</sub>
 - **Steady acceleration scope: staggered and collocated-ghost only; everything else refused with a named error**. **Rejected:** accelerating gauge-exact collocated (a family of fixed points); saving the history in checkpoints (~14x larger)  <sub>flow</sub>
 - **Steady marches are accelerated by type-II Anderson in `march_to_steady`, measured on the velocity alone; P and the collocated face field are carried (rev 1)**. **Rejected:** the c_P-weighted, gauge-centred pressure term (rev 0); per-pocket gauge removal; the unweighted Euclidean norm of (u, P); a metric on the face gradien  <sub>flow</sub>
+- **Steady scalar advection is preconditioned by a V-cycle on the ADVECTIVE surrogate (Amendment A2)**. **Rejected:** the symmetric lumped surrogate for steady advection (preconditioned spread β ≈ Pe_h N/2π; 3-D 13 → 40 → 89 iterations at Pe_h 0 / 0.1 / 0.3 and no con  <sub>flow</sub>
 - **Steady state after acceleration: velocity-residual handover, a 12-block certification budget with an early slow exit, and a stagnation fallback (rev 1 + review R1)**. **Rejected:** requiring plain-march reachability as well (Q18: a plain verification tail costs plain steps exactly where acceleration matters — the dense bed at dt   <sub>flow</sub>
 - **Strict staggered bit-identical guard must be held through every change; AMR must work for both velocity placements or be explicitly scoped**.  <sub>sdflow-octree-amr-next.md:19-20</sub>
 - **TRAP: -DPECLET_FLOW_MREAL_DOUBLE=ON on the cmake command line silently builds float**. **Rejected:** passing -DPECLET_FLOW_MREAL_DOUBLE=ON as a normal cmake cache variable  <sub>defect-correction-campaign.md:45-46</sub>
@@ -184,11 +204,17 @@ reading until they are settled.
 - **The agglomerated-bottom MG anomaly required a per-fluid-component null-space projector, a double row-sum, and a looser inner tolerance**. **Rejected:** projecting the all-cell mean (rather than per-connected-fluid-component); leaving MG coefficients in single-precision row sums uncorrected; an inner t  <sub>agglomerated-bottom-ibm-fix.md:15</sub>
 - **The balanced-force projection is an option on both grids, default ON on collocated variable-rho (V8), OFF elsewhere**. **Rejected:** always-on (the user asked for an option); default off on V8 (loses the settled  <sub>flow</sub>
 - **The defect-correction rule: Krylov matvec/residual must be the exact double operator in flux form; preconditioners below may stay float**.  <sub>defect-correction-campaign.md:14-17</sub>
+- **The immersed scalar wall flux is never a two-point / series-resistance flux over the cut cell's centroid distance**. **Rejected:** the centroid two-point wall flux and the series-resistance (GFM, Liu–Fedkiw–Kang) wall and interface flux (first order; at the Maxwell disc, d/h = 128  <sub>flow</sub>
 - **The momentum solver is chosen by the operator's CONDITION NUMBER, and the rule names no geometry**. **Rejected:** (a) selecting on whether an immersed solid is present — the rule as first landed; IBM  <sub>user</sub>
 - **The np>1 VoF colour parity gates gate conservation, not the pointwise field**. **Rejected:** (a) loosening 1e-11 to a number above today's 3.174e-09 — it would have been fitted to  <sub>tests/kokkos_mpi/test_vof_bc_mpi.cpp,</sub>
 - **The porous "non-finite preconditioner" was a 0/0 in the bottom CG, not float storage (evidence correction)**. **Rejected:** attributing the porous non-finite preconditioner to float operator storage (the evidence cited in "Double operator storage is the DEFAULT", QUALITY_PL  <sub>flow</sub>
 - **The rotational (Timmermans) pressure update must be restored, not the non-rotational Goda form substituted**. **Rejected:** non-rotational Goda pressure update form; diagonal-preconditioned CG in place of geometric MG/MG-PCG; double-precision pressure operator storage  <sub>migration-faithful-port.md:61</sub>
+- **The scalar linear solve is BiCGStab + one ScalarMG V-cycle on the lumped-probe surrogate, with a max-norm relative stop (default 1e-10)**. **Rejected:** fixed RB-GS sweeps (the legacy 50-sweep path); (F)GMRES (restart storage and k reductions per iteration; FGMRES unnecessary for a fixed cycle); the ce  <sub>flow</sub>
+- **The scalar probe distance is s = 1.1·½Σ|n_a|h_a (0.55–0.95 h), the shortest that never needs the fallback**. **Rejected:** AMReX's κ-dependent short probe dx_eb = max(0.3, (κ² − ¼)/(2κ)) h with renormalized fallback (762 fallbacks, order 0.7–1.2, erratic); a 0.3 h probe (o  <sub>flow</sub>
+- **The scalar unknown sets follow the snapped apertures; κ = 0 ⇒ all apertures 0 by the strict-sign rule**. **Rejected:** unknown sets from a κ that is not the apertures' own volume (plane-cube `plicVolume`: κ = 0 next to an open face, κ > 0 behind all-closed faces, i.e.   <sub>flow</sub>
+- **The scalar-transport and phase-change energy API is physical under an armed extent, converted at the boundary**. **Rejected:** documenting the scalar/energy surface as internal (cell) units — "silently wrong" is the failure class U3's four missed setters already showed; conver  <sub>flow</sub>
 - **The standalone V-cycle pressure driver does not honor set_pressure_solver_params(n) and is ~30x slower at small grids**.  <sub>flow-thermal-convection-validated.md:25</sub>
+- **The transient ScalarMG level rule switches to the full table at κ_A = 1 + 4 dt'D'Σw_a ≥ 25 (Amendment A3, ruling D-WO9-3)**. **Rejected:** κ_A = 13, the design's value, kept by D-WO9-2 only because level 0 there took 11 iterations on one cold first step against G-iter's ≤ 10; κ_A ≈ 49 (co  <sub>flow</sub>
 - **UCX_RNDV_THRESH tuning is falsified as an explanation for the np8 anomaly — leave UCX defaults**. **Rejected:** tuning UCX_RNDV_THRESH=256k  <sub>comm-scaling-plan.md:57</sub>
 - **User decision: port Basilisk embed.h, not Trebotich–Graves, for 2nd-order collocated walls**. **Rejected:** Trebotich–Graves/EBChombo as the primary port target  <sub>sdflow-collocated-solver.md:186-191</sub>
 - **User directive: ghost-cell IBM must become production-grade (it generalizes to AMR better than cut-cell)**.  <sub>ghost-hardening-plan.md:11-14</sub>
@@ -219,25 +245,6 @@ reading until they are settled.
 - **set_ghost_projection(True) must be called before set_solid**.  <sub>flow-ghost-projection.md:33</sub>
 - **set_pressure_warmstart(True) diverges on the steady Stokes march; bench default is WARMSTART=0**. **Rejected:** set_pressure_warmstart(True) as a benchmark default  <sub>porous-scaling-benchmark.md:106-109</sub>
 - **⚠️ UNRESOLVED — interstitial vs superficial drag normalisation**. **Rejected:** nothing — these two statements in the SAME note assign Zick-Homsy and vdH to OPPOSITE  <sub>ibm-accuracy-sphere-validation.md:45-50</sub>
-- **Cut-cell scalar transport stores κ (the fluid fraction) in storage and sources**. **Rejected:** unit storage (first order; 2–12 % mass loss under advection)  <sub>flow</sub>
-- **Every κ > 0 scalar cell with an open face is its own unknown; slivers are never merged or linked**. **Rejected:** merging/linking slivers (Neumann limit first order)  <sub>flow</sub>
-- **The scalar unknown sets follow the snapped apertures; κ = 0 ⇒ all apertures 0 by the strict-sign rule (solid: κ_s > 0 ∧ (Σ a_s > 0 ∨ a conjugate facet), D-WO7-1)**. **Rejected:** plicVolume / cs_ κ for SDF sources (orphan rows); the solid rule "κ_s > 0 and conjugate" (frozen uncoupled unknowns)  <sub>flow</sub>
-- **Sealed scalar cells (fluid or solid) are not unknowns; they are gated on their volume (≤ 1e-6), not their count**. **Rejected:** a "0 sealed" count gate (grows like (R/h)²); changing the 1e-3 snap floor  <sub>flow</sub>
-- **Scalar faces carry the plain aperture two-point flux**. **Rejected:** Johansen–Colella face-centroid interpolation (no measurable change)  <sub>flow</sub>
-- **Immersed scalar walls use probe-flux: one probe on the facet normal, the BC eliminated per facet**. **Rejected:** the per-cell Dirichlet mask (order 0.7–1); Papac/Gibou symmetric Robin; the aperture + link hybrid; the quadratic normal probe (erratic)  <sub>flow</sub>
-- **The scalar probe distance is s = 1.1·½Σ|n_a|h_a (0.55–0.95 h), the shortest that never needs the fallback**. **Rejected:** AMReX's κ-dependent short probe (order 0.7–1.2, erratic); 0.3 h (0.4–0.9); a constant √3/2·h  <sub>flow</sub>
-- **The immersed scalar wall flux is never a two-point / series-resistance flux over the cut cell's centroid distance**. **Rejected:** centroid two-point and series-resistance / GFM (Liu–Fedkiw–Kang) wall fluxes (first order); the centroid-distance surrogate (ρ = 0.995)  <sub>flow</sub>
-- **Conjugate scalar transport is two fields on one grid in ψ = c/K, with the series-resistance 2×2 elimination at the fluid and solid probes (P2F)**. **Rejected:** Peters' directional one-field scheme (L∞ first order, 2–50× worse); one field + side array; a mixture one-field surrogate; lagged partitioned coupling  <sub>flow</sub>
-- **Scalar cut-cell geometry is the fan-tetrahedron PL model on the marching-squares samples; the scalar apertures are ungated and snapped at both ends**. **Rejected:** plicVolume for SDF sources; 4³ subsampling; the cell-centre projection as facet centroid; reusing the gated pressure openness  <sub>flow</sub>
-- **ScalarMG coarsens the surrogate with rediscretized coarse faces and variational coarse wall terms: the plain average of the level-0 terms at the FINE probe distance (A1)**. **Rejected:** wall terms at the level's own probe distance (contraction 3.1, divergent); Galerkin RAP (27-point, no better); extending CutcellMG; VelocityMG's staircase  <sub>flow</sub>
-- **The scalar linear solve is BiCGStab + one ScalarMG V-cycle on the lumped-probe surrogate, max-norm relative stop (default 1e-10)**. **Rejected:** fixed RB-GS sweeps; (F)GMRES; the centroid-distance surrogate  <sub>flow</sub>
-- **Scalar small cells under advection: a dynamic implicit-FOU split relative to the bulk Courant number**. **Rejected (for now):** weighted state redistribution (revisit for VoF/slip walls); explicit κ storage (unstable); fully implicit FOU (diffusive)  <sub>flow</sub>
-- **Scalar advection uses the projection's own constrained face flux; the scalar apertures weight diffusion only**. **Rejected:** the scalar apertures for advection (constants not preserved)  <sub>flow</sub>
-- **Cut-cell scalars refuse the ghost projection (collocated 'ghost', staggered set_ghost_projection) and, for now, collocated open faces**. **Rejected:** advecting with the ghost field under any openness (a constant drifts 0.80 in 50 steps); the collocated high-side boundary plane after project()  <sub>flow</sub>
-- **Scalar conservation is exact in the discretization; the solver residual is reported as a defect, never fixed up**. **Rejected:** a post-solve uniform mass correction  <sub>flow</sub>
-- **Steady scalar advection is preconditioned by a V-cycle on the ADVECTIVE surrogate (summed positive sub-face fluxes on the coarse levels; A2)**. **Rejected:** the symmetric surrogate (no convergence at Pe_h 1); level-0-only advection; pseudo-transient continuation; GraphAMG; defect correction; VelocityMG coarse upwinding; line/downstream smoothers; the net coarse flux; F/W-cycles as default  <sub>flow</sub>
-- **The transient ScalarMG level rule switches to the full table at κ_A ≥ 25 (A3, D-WO9-3)**. **Rejected:** κ_A = 13 (level 0 cheaper up to 25); κ_A ≈ 49 (a tie, not cheaper)  <sub>flow</sub>
-- **The scalar-transport and phase-change energy API is physical under an armed extent, converted at the boundary (constants re-derived when a scale is pinned; field setters need set_rho/set_dt first; constant-D operator mdot refused)**. **Rejected:** documenting internal (cell) units for scalars; converting fields with unpinned scales; an implicit rho c_p = 1 in the caller's units  <sub>flow</sub>
 
 ### Superseded — history, do not re-derive the old reading
 
@@ -285,7 +292,7 @@ reading until they are settled.
 
 ## dem — XPBD, contacts, packing
 
-108 in force, 7 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
+109 in force, 7 superseded — full text in [`decisions/dem.md`](decisions/dem.md)
 
 ### In force
 
@@ -297,7 +304,7 @@ reading until they are settled.
 - **An analytic non-spherical shape's baseRadius is its circumscribed radius**. **Rejected:** the geometric radius (end and corner contacts invisible to the broad phase and the band)  <sub>dem/docs/contact_physics_followups.md</sub>
 - **Blanket persistent-contact e=0 is rejected; restitution is one-sided-only when grounded and not rising**. **Rejected:** blanket persistent-contact e=0 for all persistent contacts  <sub>packing-velocity-position-split.md:17</sub>
 - **Body-body friction accumulates normal impulse across velocity-solve iterations; plane/wall uses one-shot post-gravity load**. **Rejected:** a velocity-approach-only proxy for body-body; accumulating normal impulse for plane/wall contacts  <sub>packing-velocity-position-split.md:45</sub>
-- **Body-body multi-contact friction is quantitatively too weak (by ~coordination number Z); the fix is deferred sequential-impulse friction**. **Rejected:** dividing each contact's friction bound by the per-body contact count (Jacobi count-averaging) as adequate for multi-contact bulk friction  <sub>packing-friction-followup.md:17</sub>
+- **Body-body multi-contact friction is quantitatively too weak (by ~coordination number Z); the fix is deferred sequential-impulse friction — since fixed with gravity on (friction-cone PGS), still live at g = 0 / Jacobi**. **Rejected:** dividing each contact's friction bound by the per-body contact count (Jacobi count-averaging) as adequate for multi-contact bulk friction  <sub>packing-friction-followup.md:17</sub>
 - **Both-asleep contacts are excluded from colouring by seeding colour = -2**.  <sub>dem-sweep-efficiency-plan.md:95</sub>
 - **Boundary contact alignment must use the absolute wall contact point (rAavg), not rAavg−rBavg**. **Rejected:** using diffCenters = rAavg − rBavg uniformly for boundary and body-body contacts  <sub>dem-sdf-walls-moving.md:43</sub>
 - **Bug fix: hertzCommitHistory must not wipe carried previous state on the post-migration sentinel**.  <sub>dem-mpi-solver-port-plan.md:50</sub>
@@ -317,6 +324,7 @@ reading until they are settled.
 - **Forward predicted position, not committed position, through ghost gather**. **Rejected:** gathering committed `d_pos`  <sub>suite-distributed-status.md:23-26</sub>
 - **Friction consolidated into one per-contact Coulomb friction in the velocity solve, replacing three overlapping patches**. **Rejected:** Fix A (manifold-only), Fix B (position-solve tangential friction), Fix C (velocity feedback from position solve's friction_lambda_n)  <sub>packing-velocity-position-split.md:41</sub>
 - **Friction stability fix: Jacobi count-averaging instead of Jacobi-summed impulses**. **Rejected:** Jacobi-summed per-contact friction impulses  <sub>packing-velocity-position-split.md:53</sub>
+- **Friction-cone PGS fixes body-body friction only with gravity on; the g = 0 path still runs the count-averaged friction**. **Rejected:** treating the "too weak by ~Z" defect as closed everywhere  <sub>dem</sub>
 - **Fused colour sweeps: CUDA-graph replay stays the solo default; fused auto-on only where capture is unavailable**. **Rejected:** making fused loop-kernels the universal default; a per-block-flag + block0-scan barrier variant (measured slower)  <sub>dem-perf-campaign.md:33-37</sub>
 - **Gallery fixes: dem OOB writes, wrong docstrings, opt-in reaction torque — root-caused, not worked around**.  <sub>peclet-examples-gallery.md:256-264</sub>
 - **General-particle shells must be voxel-decimated to a target point count**. **Rejected:** using the raw marching-cubes point count directly  <sub>dem-sdf-general-particles.md:60</sub>
@@ -592,7 +600,7 @@ reading until they are settled.
 
 ## core — decomposition, halo, rebalance
 
-32 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
+33 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
 
 ### In force
 
@@ -602,6 +610,7 @@ reading until they are settled.
 - **Anisotropic coarse-grid partitioning requires cellExtent, not raw cell-count kLargest**. **Rejected:** partitioning by raw cell-count kLargest on an anisotropic coarse grid  <sub>mg-decomposition-alignment.md:43</sub>
 - **Coarse-level redistribution lives in core; the hierarchies stay in the methods**. **Rejected:** per-method private implementations (three were forming); a core "multigrid stage" that owns the continued hierarchy below the stage point (core cannot  <sub>amr/docs/amr_mg_core_boundary.md</sub>
 - **Convention: keep NBX tag families >= 64 apart**.  <sub>nbx-round-tag-race.md:28</sub>
+- **Cut-cell geometry and probe kernels are container-free core headers**. **Rejected:** flow-private copies (amr and VoF would fork them); a core Krylov (core's MomentumSolver binds the operator to a CSR type and the vectors to a [0, n)+g  <sub>flow</sub>
 - **Device-vs-host numerical comparison policy: bit-exact assembly, tolerance-based apply on CUDA/HIP**. **Rejected:** requiring bit-exact apply/V-cycle results on CUDA/HIP (impossible given FMA contraction)  <sub>kokkos-cuda-constexpr-required.md:27-30</sub>
 - **GPU-aware MPI auto-detection uses query + checksum loopback probe, never blind probing**. **Rejected:** blind device-pointer probing to auto-detect CUDA-aware MPI  <sub>suite-mpi-gpu-campaign.md:16</sub>
 - **Gate the CUDA-aware MPI device path on an explicit env var, not the MPI query API**. **Rejected:** relying on MPIX_Query_cuda_support() to detect CUDA-aware MPI  <sub>suite-distributed-status.md:353</sub>
@@ -628,7 +637,6 @@ reading until they are settled.
 - **coarsenAlignment bug: natural-max alignment over-constrains ORB; cap alignment at 2^4**. **Rejected:** natural-max alignment for ORB decomposition snapping  <sub>parallel-scaling-study.md:60-64</sub>
 - **peclet-core sdist must vendor its own SuiteNanobind copy, not depend on the umbrella cmake/**. **Rejected:** the core sdist referencing the umbrella's cmake/ directory for SuiteNanobind  <sub>release-workflow-prep.md:93</sub>
 - **toVector must repack a strided device subview to a contiguous buffer before cross-space deep_copy**. **Rejected:** cross-space deep_copy directly on a strided device subview  <sub>dem-cubes-gpu-pyvista.md:30-34</sub>
-- **Cut-cell geometry and probe kernels are container-free core headers (scheme/cut_cell_geometry.hpp, scheme/probe_flux.hpp)**. **Rejected:** flow-private copies (amr and VoF would fork them); a core Krylov  <sub>core</sub>
 
 ### Superseded — history, do not re-derive the old reading
 
@@ -636,7 +644,7 @@ reading until they are settled.
 
 ## coupling — CFD-DEM
 
-19 in force, 1 superseded — full text in [`decisions/coupling.md`](decisions/coupling.md)
+19 in force, 3 superseded — full text in [`decisions/coupling.md`](decisions/coupling.md)
 
 ### In force
 
@@ -647,15 +655,15 @@ reading until they are settled.
 - **Drag coupling must be implicit (semi-implicit on the momentum diagonal), not explicit**. **Rejected:** explicit −βu drag forcing  <sub>multiphysics-framework-plan.md:387</sub>
 - **Exponential-integrator effective drag replaces plain explicit particle-side drag exchange**. **Rejected:** explicit particle-side drag exchange (β·dt/m unconstrained)  <sub>porous-eps-conservative-momentum.md:46-54</sub>
 - **Kuipers deposit-after-push reorder tested, not adopted**. **Rejected:** Deen/Kuipers synchronous eps-update ordering  <sub>porous-cfddem-cuda-two-bugs.md:39</sub>
-- **Model-B drag conversion: β_B = β_A/ε; CfdDem defaults changed (advection=True, eps_min 0.4)**. **Rejected:** eps_min=0.2 or 0.3  <sub>porous-cfddem-cuda-two-bugs.md:25-26</sub>
+- **Model-B drag conversion: β_B = β_A/ε; CfdDem defaults changed (advection=True; eps_min 0.4, a floor since superseded — now 0.25)**. **Rejected:** eps_min=0.2 or 0.3  <sub>porous-cfddem-cuda-two-bugs.md:25-26</sub>
 - **One partition from construction on, chosen by the combined CFD + DEM cost**. **Rejected:** dem adopting flow's `init_mpi` partition at start-up (and the interim guard that raised at the first step and told the user to call `rebalance()` by h  <sub>user</sub>
-- **Porosity clip changed from a 0.4 floor to [0,1]-only, per user directive; MFIX-faithful smoothing/drag law added instead**. **Rejected:** clamping ε at a 0.4 floor  <sub>porous-cfddem-cuda-two-bugs.md:59-62</sub>
 - **Reaction torque coupling stays off by default despite being resolved**. **Rejected:** turning reaction-torque coupling on by default  <sub>sdf-scene-campaign.md:56</sub>
 - **Rebuild all three mphys host trees before diagnosing a coupling test failure**.  <sub>stale-build-mphys-trees.md:10</sub>
 - **The CFD-DEM coupling force is the discrete reaction (route b), not the traction integral**. **Rejected:** hydro_force_torque (the traction integral) as the production coupling force  <sub>sdf-scene-campaign.md:18</sub>
-- **The cross-module CUDA porous-CFD-DEM crash was an async stream race, not a GraphAMG bug**. **Rejected:** "NOT graphAMG (my initial guess was WRONG)"  <sub>multiphysics-framework-plan.md:382</sub>
+- **The July porous CFD-DEM CUDA crash was three real bugs, not a stream race; a genuine cross-module stream race exists and is fenced by HandOff**. **Rejected:** the 2026-07-06 reading that the illegal-address crash was a cross-stream race (it was the DEM pair-buffer overflow plus two flow solver defects; "CUDA  <sub>memory</sub>
 - **The public force API returns the reaction; the traction is a named diagnostic**. **Rejected:** leaving the traction under the natural name `hydro_force_torque()` (a user asking for "the force on my particles" got one ~30 % low with no signal); m  <sub>USER</sub>
 - **USER DIRECTIVE: porous=True (volume-averaged NS) is the default for CFD-DEM**. **Rejected:** porous=False (plain incompressible NS with ε only in the drag closure) as the default  <sub>cfddem-porous-default-directive.md:10</sub>
+- **Void-fraction floor eps_min = 0.25: a physical regularisation at the random-close-packing limit**. **Rejected:** the 0.4 floor (clamps real dense-bed voidage ~0.28 and under-predicts the Ergun 1/ε³ drag ~3×, so a coarse dense bidisperse bed would not fluidize); t  <sub>coupling</sub>
 - **Volume-averaged gas momentum must be epsilon-weighted with a matched projection pair**. **Rejected:** the old plain-u momentum path with epsilon only in drag/constraint/coefficients  <sub>porous-eps-conservative-momentum.md:10-31</sub>
 - **porous=False is NOT "Model B" — terminology correction**. **Rejected:** calling porous=False "Model B"  <sub>porous-cfddem-cuda-two-bugs.md:22</sub>
 - **porous=False is only a justified cheap approximation, never for published benchmark comparisons**. **Rejected:** using porous=False in published benchmark comparisons  <sub>cfddem-porous-default-directive.md:23</sub>
@@ -663,6 +671,8 @@ reading until they are settled.
 ### Superseded — history, do not re-derive the old reading
 
 - GraphAMG default restricted to !hasBc_ (domain-BC path defect).  <sub>porous-cfddem-cuda-two-bugs.md:13</sub>
+- Porosity clip changed from a 0.4 floor to [0,1]-only, per user directive; MFIX-faithful smoothing/drag law added instead.  <sub>porous-cfddem-cuda-two-bugs.md:59-62</sub>
+- The cross-module CUDA porous-CFD-DEM crash was an async stream race, not a GraphAMG bug.  <sub>multiphysics-framework-plan.md:382</sub>
 
 ## pnm — pore-network extraction
 

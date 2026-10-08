@@ -66,7 +66,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - rejected: a velocity-approach-only proxy for body-body; accumulating normal impulse for plane/wall contacts
 - why: body-body: "a velocity approach proxy alone can't [capture force-chain loads], since a stiff chain has ~g·dt approach at every depth"; plane/wall: "a flat face's coplanar contacts converge poorly in the manifold, so accumulating over-holds"
 
-### Body-body multi-contact friction is quantitatively too weak (by ~coordination number Z); the fix is deferred sequential-impulse friction
+### Body-body multi-contact friction is quantitatively too weak (by ~coordination number Z); the fix is deferred sequential-impulse friction — since fixed with gravity on (friction-cone PGS), still live at g = 0 / Jacobi
 - area: dem
 - source: packing-friction-followup.md:17
 - decided: 2026-06-14
@@ -80,6 +80,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
     aggregate)...
 - rejected: dividing each contact's friction bound by the per-body contact count (Jacobi count-averaging) as adequate for multi-contact bulk friction
 - why: "body-body contacts are bounded by their own per-contact normal load (not an aggregate), so a packed particle's total friction comes out ≈ μ·(one contact's load) instead of μ·(sum over its ~Z contacts)"
+- conflict: scope annotation 2026-10-08 — the deferred sequential-impulse friction landed as the friction-cone PGS (dem `f6fb7d2`, 2026-07-20) but only where gravity is on and the velocity solve is Gauss–Seidel; see "Friction-cone PGS fixes body-body friction only with gravity on; the g = 0 path still runs the count-averaged friction".
 
 ### Both-asleep contacts are excluded from colouring by seeding colour = -2
 - area: dem
@@ -1635,3 +1636,22 @@ PSOR would have a unique least-displacement fixed point and legitimate over-rela
     walls/planes stay one-way (same defect class, out of scope).
 - rejected: two-way by default (per-step cost where not needed; USER efficiency directive); merging the two directions (no measured benefit)
 - why: fixes an invisible-penetration defect where it matters (thin walls, sharp edges, size disparity) without taxing the default path
+
+---
+
+### Friction-cone PGS fixes body-body friction only with gravity on; the g = 0 path still runs the count-averaged friction
+- area: dem
+- source: dem `f6fb7d2` (commit message); `dem/src/solve_driver.hpp:306,323`
+- decided: 2026-07-20 (recorded in the register 2026-10-08)
+- status: settled
+- quote: |
+    [f6fb7d2:] Friction cone: each manifold accumulates a world-frame tangential impulse lambdaT
+    (warm-started by pair key alongside lambdaN [...]), updated inside the colored PGS sweeps [...]
+    and projected onto the Coulomb disc |lambdaT| <= mu*lambdaN [...] The legacy count-averaged
+    friction cluster is retired on the PGS path (kept for Jacobi/g=0/MPI).
+    [solve_driver.hpp today:]
+    const bool usePersistPre = (P.gravity.x != 0.0f || P.gravity.y != 0.0f || P.gravity.z != 0.0f);
+    const bool legacyFriction = friction && !(usePersistPre && P.velocityUseGS);
+- rejected: treating the "too weak by ~Z" defect as closed everywhere
+- why: the cone path is selected by `usePersistPre && velocityUseGS`, so at g = 0 (LS-growth packing, the HCS benchmark) or with the Jacobi velocity solve the count-averaged friction (`legacyFriction`) still runs and the ~Z under-friction of the 2026-06-14 entry applies there. (The MPI exclusion in the commit message no longer appears in the gate.)
+- supersedes: none (scopes "Body-body multi-contact friction is quantitatively too weak (by ~coordination number Z)…": fixed on the gravity + GS path, open at g = 0 / Jacobi)
