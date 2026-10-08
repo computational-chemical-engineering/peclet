@@ -4125,3 +4125,21 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - rejected: gauge-exact (ex mode 9) as the unconditional collocated default, chosen by the 2026-08-18 A/B; the 2026-08-20 verdict's "ghost as production" dead end
 - why: the collocated-attractor campaign (flow `doc/collocated_invisible_subspace.md`) found ghost family-free, unconditionally stable and protocol-independent, with clean convergence ladders on both beds and the Z&H anchor; validation: AUTO == archived ghost trajectory digit-for-digit, explicit gauge-exact == its record, regression ×3 green, 33/33 MPI ctests, AMR ctests CUDA + OpenMP
 - supersedes: the "ghost-as-production" part of "Mode-10 quadrature, Seo-Mittal pressure-only split, and ghost-as-production are all dead ends" (mode 10 and Seo–Mittal stand)
+
+---
+
+### The host pressure-bottom factor runs a bitwise host-only schedule, with its own team constant (2)
+- area: flow
+- source: flow `62f91ef` `591bde4` `d8cd5ca` (commit messages); `src/mg_bottom_direct.hpp` (hostAssemble / hostInvert / hostBorder), `src/mac_cutcell_mg.hpp` kBottomHostFactorTeam; `doc/vof_step_performance_log.md` "A(b)"
+- decided: 2026-10-08 (A(b) USER DECISION: faster factor, bitwise, before factor reuse; team constant = implementer DECISION, genoa sweep pending)
+- status: settled (schedule); provisional (the value 2, pending the genoa T sweep `bubble_column_perf/s1/s1_bfac.slurm`)
+- quote: |
+    On a host backend the factor runs a second schedule of the same arithmetic: every stored scalar
+    is the team algorithm's expression with its operands in the same order, but the work is cut into
+    a few barrier-free phases per tile and each phase computes many independent outputs in a
+    vectorizable lane loop instead of one serial dot product per thread. Its factor storage (Q, Y,
+    e, s, stat) is bitwise identical to the team algorithm's on the same backend (ctest
+    bottom_direct U8). [kBottomHostFactorTeam = 2:] two is the fastest size that is also stable
+    under load. Device code untouched (if constexpr on CCMem == HostSpace).
+- rejected: running the device team algorithm on the host (≈170 team barriers per plane, every scalar a serial latency-bound dot: 5.6-6.5 ms per factor at its best T 4-8, 11 ms at T 1); sharing kBottomHostTeam = 8 with the FCG solve kernel (the host schedule at T 8: 1.43-1.88 ms vs 1.05-1.09 at T 2); reordering any accumulation for speed (would change bits; A(a) factor reuse is a separate, numerics-changing decision)
+- why: bench_bottom_factor (walls-y 16x12x8, P 12, b 128 = the bubble column's bottom), workstation 5965WX under load ~20, ms per factor: old team T 1/2/4/8/16/24 = 11.0/7.9/5.7/5.6/6.4/6.5; host schedule T 1/2/3/4/6/8 = 1.44-1.51/1.05-1.09/0.93-1.79/0.86-1.70/1.43-1.69/1.43-1.88; production kprof 1x24 mg_bottom_factor 6.6 -> 1.5-1.8 ms/step (genoa S-1 base 16.9). Gates: factor bytes identical to main (host and CUDA, walls-y + periodic/border), U8 incl. the restart path with a negative control, host G-BIT (state_hash + np2 + 50-step 'direct' dump at OMP 1/8/24), CUDA G-BIT, host battery 231/231

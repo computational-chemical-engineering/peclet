@@ -24,7 +24,7 @@ is authoritative.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-224 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+225 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -211,6 +211,7 @@ is authoritative.
 - **The balanced-force projection is an option on both grids, default ON on collocated variable-rho (V8), OFF elsewhere**. **Rejected:** always-on (the user asked for an option); default off on V8 (loses the settled  <sub>flow</sub>
 - **The defect-correction rule: Krylov matvec/residual must be the exact double operator in flux form; preconditioners below may stay float**.  <sub>defect-correction-campaign.md:14-17</sub>
 - **The distributed host 'direct' bottom runs redundantly on every rank, from the allgathered bottom openness (WO-H6, designed, not yet implemented)**. **Rejected:** a rank-0 solve plus broadcast; GraphAMG  <sub>design</sub>
+- **The host pressure-bottom factor runs a bitwise host-only schedule, with its own team constant (2)**. **Rejected:** running the device team algorithm on the host (≈170 team barriers per plane, every scalar a serial latency-bound dot: 5.6-6.5 ms per factor at its bes  <sub>flow</sub>
 - **The immersed scalar wall flux is never a two-point / series-resistance flux over the cut cell's centroid distance**. **Rejected:** the centroid two-point wall flux and the series-resistance (GFM, Liu–Fedkiw–Kang) wall and interface flux (first order; at the Maxwell disc, d/h = 128  <sub>flow</sub>
 - **The momentum solver is chosen by the operator's CONDITION NUMBER, and the rule names no geometry**. **Rejected:** (a) selecting on whether an immersed solid is present — the rule as first landed; IBM  <sub>user</sub>
 - **The np>1 VoF colour parity gates gate conservation, not the pointwise field**. **Rejected:** (a) loosening 1e-11 to a number above today's 3.174e-09 — it would have been fitted to  <sub>tests/kokkos_mpi/test_vof_bc_mpi.cpp,</sub>
