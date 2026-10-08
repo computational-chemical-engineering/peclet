@@ -486,3 +486,18 @@ Do not reverse an entry here without recording a new decision that supersedes it
     reduces RR(s,j) and b_j only (2 mk + 2 doubles); no reduction reads dG.
 - rejected: keeping the unused pressure metric or innerTolerance / GG / GR until after the tag (a breaking change then)
 - why: no consumer uses them after rev 1 / rev 2; removes one collective per step and the sdf dependency; the branch was untagged, so this was the cheap moment
+
+---
+
+### Cut-cell geometry and probe kernels are container-free core headers
+- area: core
+- source: flow doc/scalar_ibm_design.md D14, §7.1, §12 entry 12; core commits a031c6f, b1fcb6a (branch scalar-ibm)
+- decided: 2026-10-02
+- status: settled (design, core branch scalar-ibm; in force when it lands on main)
+- quote: |
+    Container-free kernels in **core** (`scheme/cut_cell_geometry.hpp`, `scheme/probe_flux.hpp`);
+    driver, storage, operators, ScalarMG and Krylov in flow
+    Lattice offsets are returned, not DOF indices. flow converts them to linear block offsets; amr maps
+    them to leaf DOFs.
+- rejected: flow-private copies (amr and VoF would fork them); a core Krylov (core's MomentumSolver binds the operator to a CSR type and the vectors to a [0, n)+ghost-tail layout, and flow's blocks interleave ghosts)
+- why: amr (per-leaf SDF samples) and the VoF species hook (plane source) reuse the same κ / aperture / facet / probe kernels, so the geometry stays consistent by construction across codes

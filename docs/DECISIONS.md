@@ -219,6 +219,25 @@ reading until they are settled.
 - **set_ghost_projection(True) must be called before set_solid**.  <sub>flow-ghost-projection.md:33</sub>
 - **set_pressure_warmstart(True) diverges on the steady Stokes march; bench default is WARMSTART=0**. **Rejected:** set_pressure_warmstart(True) as a benchmark default  <sub>porous-scaling-benchmark.md:106-109</sub>
 - **⚠️ UNRESOLVED — interstitial vs superficial drag normalisation**. **Rejected:** nothing — these two statements in the SAME note assign Zick-Homsy and vdH to OPPOSITE  <sub>ibm-accuracy-sphere-validation.md:45-50</sub>
+- **Cut-cell scalar transport stores κ (the fluid fraction) in storage and sources**. **Rejected:** unit storage (first order; 2–12 % mass loss under advection)  <sub>flow</sub>
+- **Every κ > 0 scalar cell with an open face is its own unknown; slivers are never merged or linked**. **Rejected:** merging/linking slivers (Neumann limit first order)  <sub>flow</sub>
+- **The scalar unknown sets follow the snapped apertures; κ = 0 ⇒ all apertures 0 by the strict-sign rule (solid: κ_s > 0 ∧ (Σ a_s > 0 ∨ a conjugate facet), D-WO7-1)**. **Rejected:** plicVolume / cs_ κ for SDF sources (orphan rows); the solid rule "κ_s > 0 and conjugate" (frozen uncoupled unknowns)  <sub>flow</sub>
+- **Sealed scalar cells (fluid or solid) are not unknowns; they are gated on their volume (≤ 1e-6), not their count**. **Rejected:** a "0 sealed" count gate (grows like (R/h)²); changing the 1e-3 snap floor  <sub>flow</sub>
+- **Scalar faces carry the plain aperture two-point flux**. **Rejected:** Johansen–Colella face-centroid interpolation (no measurable change)  <sub>flow</sub>
+- **Immersed scalar walls use probe-flux: one probe on the facet normal, the BC eliminated per facet**. **Rejected:** the per-cell Dirichlet mask (order 0.7–1); Papac/Gibou symmetric Robin; the aperture + link hybrid; the quadratic normal probe (erratic)  <sub>flow</sub>
+- **The scalar probe distance is s = 1.1·½Σ|n_a|h_a (0.55–0.95 h), the shortest that never needs the fallback**. **Rejected:** AMReX's κ-dependent short probe (order 0.7–1.2, erratic); 0.3 h (0.4–0.9); a constant √3/2·h  <sub>flow</sub>
+- **The immersed scalar wall flux is never a two-point / series-resistance flux over the cut cell's centroid distance**. **Rejected:** centroid two-point and series-resistance / GFM (Liu–Fedkiw–Kang) wall fluxes (first order); the centroid-distance surrogate (ρ = 0.995)  <sub>flow</sub>
+- **Conjugate scalar transport is two fields on one grid in ψ = c/K, with the series-resistance 2×2 elimination at the fluid and solid probes (P2F)**. **Rejected:** Peters' directional one-field scheme (L∞ first order, 2–50× worse); one field + side array; a mixture one-field surrogate; lagged partitioned coupling  <sub>flow</sub>
+- **Scalar cut-cell geometry is the fan-tetrahedron PL model on the marching-squares samples; the scalar apertures are ungated and snapped at both ends**. **Rejected:** plicVolume for SDF sources; 4³ subsampling; the cell-centre projection as facet centroid; reusing the gated pressure openness  <sub>flow</sub>
+- **ScalarMG coarsens the surrogate with rediscretized coarse faces and variational coarse wall terms: the plain average of the level-0 terms at the FINE probe distance (A1)**. **Rejected:** wall terms at the level's own probe distance (contraction 3.1, divergent); Galerkin RAP (27-point, no better); extending CutcellMG; VelocityMG's staircase  <sub>flow</sub>
+- **The scalar linear solve is BiCGStab + one ScalarMG V-cycle on the lumped-probe surrogate, max-norm relative stop (default 1e-10)**. **Rejected:** fixed RB-GS sweeps; (F)GMRES; the centroid-distance surrogate  <sub>flow</sub>
+- **Scalar small cells under advection: a dynamic implicit-FOU split relative to the bulk Courant number**. **Rejected (for now):** weighted state redistribution (revisit for VoF/slip walls); explicit κ storage (unstable); fully implicit FOU (diffusive)  <sub>flow</sub>
+- **Scalar advection uses the projection's own constrained face flux; the scalar apertures weight diffusion only**. **Rejected:** the scalar apertures for advection (constants not preserved)  <sub>flow</sub>
+- **Cut-cell scalars refuse the ghost projection (collocated 'ghost', staggered set_ghost_projection) and, for now, collocated open faces**. **Rejected:** advecting with the ghost field under any openness (a constant drifts 0.80 in 50 steps); the collocated high-side boundary plane after project()  <sub>flow</sub>
+- **Scalar conservation is exact in the discretization; the solver residual is reported as a defect, never fixed up**. **Rejected:** a post-solve uniform mass correction  <sub>flow</sub>
+- **Steady scalar advection is preconditioned by a V-cycle on the ADVECTIVE surrogate (summed positive sub-face fluxes on the coarse levels; A2)**. **Rejected:** the symmetric surrogate (no convergence at Pe_h 1); level-0-only advection; pseudo-transient continuation; GraphAMG; defect correction; VelocityMG coarse upwinding; line/downstream smoothers; the net coarse flux; F/W-cycles as default  <sub>flow</sub>
+- **The transient ScalarMG level rule switches to the full table at κ_A ≥ 25 (A3, D-WO9-3)**. **Rejected:** κ_A = 13 (level 0 cheaper up to 25); κ_A ≈ 49 (a tie, not cheaper)  <sub>flow</sub>
+- **The scalar-transport and phase-change energy API is physical under an armed extent, converted at the boundary (constants re-derived when a scale is pinned; field setters need set_rho/set_dt first; constant-D operator mdot refused)**. **Rejected:** documenting internal (cell) units for scalars; converting fields with unpinned scales; an implicit rho c_p = 1 in the caller's units  <sub>flow</sub>
 
 ### Superseded — history, do not re-derive the old reading
 
@@ -609,6 +628,7 @@ reading until they are settled.
 - **coarsenAlignment bug: natural-max alignment over-constrains ORB; cap alignment at 2^4**. **Rejected:** natural-max alignment for ORB decomposition snapping  <sub>parallel-scaling-study.md:60-64</sub>
 - **peclet-core sdist must vendor its own SuiteNanobind copy, not depend on the umbrella cmake/**. **Rejected:** the core sdist referencing the umbrella's cmake/ directory for SuiteNanobind  <sub>release-workflow-prep.md:93</sub>
 - **toVector must repack a strided device subview to a contiguous buffer before cross-space deep_copy**. **Rejected:** cross-space deep_copy directly on a strided device subview  <sub>dem-cubes-gpu-pyvista.md:30-34</sub>
+- **Cut-cell geometry and probe kernels are container-free core headers (scheme/cut_cell_geometry.hpp, scheme/probe_flux.hpp)**. **Rejected:** flow-private copies (amr and VoF would fork them); a core Krylov  <sub>core</sub>
 
 ### Superseded — history, do not re-derive the old reading
 
