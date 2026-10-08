@@ -12,6 +12,30 @@ need the user, as they spend billed cluster time; the gallery re-check (RELEASE.
 timing of the CUDA backward-facing step against v1.2.0; the pocket mask for `get_p` and the traction
 (a CHANGELOG known limitation).
 
+**Carried into the next cycle** (found by the pre-flight and the doc clean-up, 2026-10-08):
+
+- **Core must be tagged before flow ships.** flow `main` includes `peclet/core/scheme/cut_cell_geometry.hpp`
+  and `probe_flux.hpp`, which are absent at its pin `v1.4.0`: a wheel would not compile. Cut the core
+  tag, repin flow (`PECLET_CORE_TAG`), then release. `tools/release/check_release_state.sh` flags it.
+- **coupling's next version is a minor bump:** the `eps_min` default changed 0.25 → 0.05 (results
+  change wherever ε fell below 0.25; CHANGELOG [Unreleased]; register, coupling).
+- **The pre-flight's docstring audit fails locally** because `peclet.halo/geom/amr/coupling` are not
+  installed in the suite venv — an environment gap, not a package defect; install or point it at the
+  build trees before trusting the audit.
+- **Needs the user — GitHub hygiene:** (a) ~40 remote branches already merged into `main` (core,
+  flow `vof-p*`/`telescope`/`kokkos-migration`…, dem, voro, umbrella) can be deleted without loss —
+  blocked for agents by the permission policy; (b) ~35 open Dependabot GitHub-Actions PRs across
+  core, morton, flow, dem, voro and the umbrella (some from July): apply as direct commits or close.
+- **Doc debt to check in the release docs pass:** flow `doc/porous_drag_scheme.md` §2 may still show
+  the plain-u predictor/projection coefficients without ε (ρε inertia landed in flow `2d1564a`);
+  flow `doc/velocity_mg_plan.md` may cite stale names (`set_ibm_solid`,
+  `setVelocityStaircaseCoarse`); flow `AGENTS.md` not re-checked against the compacted CLAUDE.md;
+  `docs/DEVELOPMENT.md`, `CORE_BOUNDARY.md`, `AGENT_WORKFLOW_HARDENING.md` are not in the mkdocs nav
+  (`mkdocs build --strict` not run); dead plain-text paths in `PHYSICAL_UNITS_PLAN.md:319,321,415,459`
+  (`core/python/amr_bindings.cpp`, `test_amr.py` moved to amr) and `ROADMAP.md:101`
+  (`dem/mpi/test_particle_migration.cpp`); flow `quality.yml` still excludes six `vof-w4` files
+  from clang-format although `vof-w4` is superseded.
+
 **Earlier cycles, archived verbatim:**
 
 - [archive/RELEASE_PREP_1.0-1.1.md](archive/RELEASE_PREP_1.0-1.1.md) — 1.0.0 (2026-09-12), 1.0.1
