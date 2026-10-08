@@ -1207,7 +1207,7 @@ header repin), peclet-dem 0.5.0, peclet-voro 0.5.0, peclet-coupling 0.4.0, pecle
   9.51e-12 in double. The price is ~12% step time; a float build is still available with
   `-DPECLET_FLOW_OPERATOR_DOUBLE=OFF` and now emits a CMake warning. Dense-bed results from a float
   build should be regarded as untrustworthy. Regression state hashes and `perf_baseline.json` must be
-  re-blessed for this change before the tag (RELEASE_PREP §1.2). The double-*diagonal* fallback is a different mechanism and remains
+  re-blessed for this change before the tag ([archive/RELEASE_PREP_1.0-1.1.md](docs/archive/RELEASE_PREP_1.0-1.1.md) §1.2). The double-*diagonal* fallback is a different mechanism and remains
   retired (it converges to the float-face operator, 65× worse on divergence).
 - **Clean interpreter teardown in every module** (was a `Kokkos::abort`, exit 134, whenever a solver or a
   zero-copy view outlived the atexit finalize — scripts, `python -c`, notebooks): shared

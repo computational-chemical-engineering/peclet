@@ -26,13 +26,13 @@ from inside a submodule: the one venv (`../.venv`), the Kokkos/ArborX prefixes
 (`../extern/install/<backend>`), and the sibling headers each repo's `cmake/PecletDeps.cmake` prefers
 over a FetchContent. Put the worktree anywhere else — nested under a subdirectory, or outside
 `suite/` — and those resolve to nothing: the venv silently falls through to the system Python (§2),
-and CMake silently fetches pinned tags instead of using your siblings. `suite/tel/flow` is an
-existing worktree that does *not* satisfy this; do not copy it.
+and CMake silently fetches pinned tags instead of using your siblings. A nested `suite/tel/flow`
+worktree once did exactly this (removed 2026-10-08); do not copy it.
 
 Housekeeping:
 
-- Branch per topic, not per agent. `git worktree list` inside the submodule before adding another —
-  there are already abandoned ones (`.claude/worktrees/agent-*` at the umbrella, from 2026-09-02).
+- Branch per topic, not per agent. `git worktree list` inside the submodule before adding another,
+  and remove abandoned ones (a 2026-10-08 sweep removed 22 merged, idle worktrees).
 - `git worktree remove ../flow-<topic>` when the branch lands; `git worktree prune` for stale entries.
 - The coordinator `--ff-only` merges the branch into `main`, re-gates once, pushes and removes the
   worktree. Agents in *different* repos keep the plain checkouts, and everyone commits with a

@@ -62,8 +62,8 @@ cmake -S . -B build -DCMAKE_PREFIX_PATH="$PWD/../extern/install/nvidia-cuda"
 
 - **The sibling position is load-bearing.** `../.venv`, `../extern/install/<backend>` and the sibling
   headers `PecletDeps.cmake` prefers all resolve by `../`; anywhere else the venv silently falls
-  through to system Python and CMake silently fetches pinned tags. (`suite/tel/flow` violates this;
-  do not copy it.)
+  through to system Python and CMake silently fetches pinned tags. (A nested `suite/tel/flow` once
+  did exactly this; removed 2026-10-08.)
 - **Own `build*/` per worktree** — never share or point at another's. `extern/install/<backend>` is
   read-only and shared by design.
 - `git worktree list` before adding one (abandoned ones exist); `git worktree remove` when the branch

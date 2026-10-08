@@ -4,7 +4,7 @@ name: Wheel probe
 #
 # 1.0.0 ships manylinux_2_28 x86-64 only, because that is the only runner the release workflows have
 # ever used — never because anyone tried the others and found they failed. A Windows user's
-# `pip install peclet` therefore falls back to the sdists and dies in CMake (RELEASE_PREP section
+# `pip install peclet` therefore falls back to the sdists and dies in CMake (archive/RELEASE_PREP_1.0-1.1.md section
 # 11.1). Before committing to a release matrix, find out what actually breaks: cibuildwheel for ONE
 # interpreter (cp312) per package per runner, `fail-fast: false`, so every cell answers for itself.
 #
