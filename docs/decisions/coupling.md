@@ -293,7 +293,8 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: coupling
 - source: coupling `dfafc54` (commit message); `coupling/README.md` (void fraction); flow `doc/porous_drag_scheme.md` §4 table
 - decided: 2026-07-16 (recorded in the register 2026-10-08)
-- status: settled
+- status: superseded
+- superseded-by: "USER DECISION — the void-fraction floor eps_min is a division guard, default 0.05, not a packing limit" (2026-10-08)
 - quote: |
     eps_min default 0.05 -> 0.25: a physical regularisation (voidage below wide-bidisperse
     RCP can only be interpenetration/deposit artifacts) — the eps-conservative projection
@@ -322,3 +323,16 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - rejected: the 2026-07-06 reading that the illegal-address crash was a cross-stream race (it was the DEM pair-buffer overflow plus two flow solver defects; "CUDA-only" was the 50-iteration pressure cap truncating a diverging solve at backend-dependent points); leaving coupling kernels unordered against flow/dem kernels on shared zero-copy arrays
 - why: the race the July note hypothesised is real but was not what crashed: it surfaced on 2026-09-26 as stale eps ghosts (`update_void_fraction` on coupling's stream, then flow's `exchange_field("eps")` on flow's), failing `mpi_polydisperse_moving` np=4 on CUDA with rel-err up to 4.9e-3 in ~10–30 % of runs. With HandOff: 0/30 failures (max rel-err 3.75e-8); host-openmp bit-identical; CUDA cost 13.37 → 13.49 ms per coupled step.
 - supersedes: "The cross-module CUDA porous-CFD-DEM crash was an async stream race, not a GraphAMG bug" (its "NOT graphAMG" was half right — GraphAMG∧BC was one of the three bugs, not the crash)
+
+### USER DECISION — the void-fraction floor eps_min is a division guard, default 0.05, not a packing limit
+- area: coupling
+- source: user, session 2026-10-08; coupling `043d5e6` (default change), flow `5795fb0` (doc)
+- decided: 2026-10-08
+- status: settled
+- quote: |
+    [user:] Where is eps_min = 0.25 used. I hesitate to approve it. Different particle shapes can
+    have different minima. Why is it needed?
+    [after the analysis:] Lower the floor to a pure division guard of 0.05
+- rejected: eps_min = 0.25 as a "physical regularisation at random close packing" (true only for sphere mixtures — ellipsoids pack to ε ≈ 0.26, wide bidisperse mixes lower, space-filling shapes → 0 — so it caps the drag of exactly the dense non-spherical beds dem targets); 0.4 (under-predicted dense-bed drag ~3×)
+- why: the floor exists because a trilinear deposit on cells of ~one particle diameter is not a volume filter and can drive a cell's ε towards 0, where the 1/ε³ drag and the 1/ε projection blow up. That is a deposition defect, handled by `smooth_length` (~1.5 d_p), not by a physical bound; the floor only has to keep the 1/ε factors finite. No measured run was found behind the claim that the 0.05 floor "detonated beds" (it first appears in summaries after `dfafc54`, whose message gives only the reasoning; the one recorded blow-up of the period was pure DEM, restitution 0.8 on a resting pile). Matches the 2026-07-10 user directive: clip to [0,1], change the drag law if it misbehaves, don't clamp.
+- supersedes: "Void-fraction floor eps_min = 0.25: a physical regularisation at the random-close-packing limit"

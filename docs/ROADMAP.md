@@ -141,6 +141,22 @@ flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The
 - [x] **CFD-DEM coupling** as its own package (`peclet-coupling`): unresolved volume-averaged
       (`CfdDem`) and resolved cut-cell (`ResolvedCfdDem`) drivers over `flow` + `dem`, distributed
       when both are (see [MULTIPHYSICS_PLAN](archive/MULTIPHYSICS_PLAN.md)).
+- [ ] **Porosity-field methods for unresolved CFD-DEM — investigate, then implement properly**
+      (user request 2026-10-08). Today ε is a trilinear deposit, optionally followed by explicit
+      diffusive sweeps (`smooth_length`, MFIX `DES_DIFFUSE_WIDTH`); at h ≈ d_p the deposit is not a
+      volume filter and can drive a cell's ε towards 0, which is why `eps_min` exists (now only a
+      0.05 division guard — register, coupling: "the void-fraction floor eps_min is a division
+      guard"). Candidates to compare as selectable methods:
+      (a) deposit + smoothing filter (the current path, made a first-class option);
+      (b) smoothed delta-function kernels — Peskin-type (3-/4-point, Roma–Peskin) and the
+      Deen et al. kernels — with kernel width decoupled from the fluid cell;
+      (c) a diffused field from solving a PDE — implicit diffusion over a physical length
+      (Capecelatro–Desjardins / Sun–Xiao style), on device and MPI-distributed through the existing
+      MG.
+      Criteria: grid independence at h/d_p from ~1 to ≥ 4, volume conservation, wall handling
+      (the current deposit is wall-aware), positivity of ε without the floor, cost per step, and
+      drag accuracy against the fixed-bed Ergun and the moving-bed tests. Design through the
+      architect before implementing.
 - [ ] Reconcile remaining divergences (namespaces, C++ standard, dep management).
 
 ## Phase 7 — Dynamic load balancing (cross-cutting infra) — DONE

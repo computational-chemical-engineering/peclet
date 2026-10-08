@@ -645,7 +645,7 @@ is authoritative.
 
 ## coupling — CFD-DEM
 
-19 in force, 3 superseded — full text in [`decisions/coupling.md`](decisions/coupling.md)
+19 in force, 4 superseded — full text in [`decisions/coupling.md`](decisions/coupling.md)
 
 ### In force
 
@@ -663,8 +663,8 @@ is authoritative.
 - **The CFD-DEM coupling force is the discrete reaction (route b), not the traction integral**. **Rejected:** hydro_force_torque (the traction integral) as the production coupling force  <sub>sdf-scene-campaign.md:18</sub>
 - **The July porous CFD-DEM CUDA crash was three real bugs, not a stream race; a genuine cross-module stream race exists and is fenced by HandOff**. **Rejected:** the 2026-07-06 reading that the illegal-address crash was a cross-stream race (it was the DEM pair-buffer overflow plus two flow solver defects; "CUDA  <sub>memory</sub>
 - **The public force API returns the reaction; the traction is a named diagnostic**. **Rejected:** leaving the traction under the natural name `hydro_force_torque()` (a user asking for "the force on my particles" got one ~30 % low with no signal); m  <sub>USER</sub>
+- **USER DECISION — the void-fraction floor eps_min is a division guard, default 0.05, not a packing limit**. **Rejected:** eps_min = 0.25 as a "physical regularisation at random close packing" (true only for sphere mixtures — ellipsoids pack to ε ≈ 0.26, wide bidisperse mi  <sub>user,</sub>
 - **USER DIRECTIVE: porous=True (volume-averaged NS) is the default for CFD-DEM**. **Rejected:** porous=False (plain incompressible NS with ε only in the drag closure) as the default  <sub>cfddem-porous-default-directive.md:10</sub>
-- **Void-fraction floor eps_min = 0.25: a physical regularisation at the random-close-packing limit**. **Rejected:** the 0.4 floor (clamps real dense-bed voidage ~0.28 and under-predicts the Ergun 1/ε³ drag ~3×, so a coarse dense bidisperse bed would not fluidize); t  <sub>coupling</sub>
 - **Volume-averaged gas momentum must be epsilon-weighted with a matched projection pair**. **Rejected:** the old plain-u momentum path with epsilon only in drag/constraint/coefficients  <sub>porous-eps-conservative-momentum.md:10-31</sub>
 - **porous=False is NOT "Model B" — terminology correction**. **Rejected:** calling porous=False "Model B"  <sub>porous-cfddem-cuda-two-bugs.md:22</sub>
 - **porous=False is only a justified cheap approximation, never for published benchmark comparisons**. **Rejected:** using porous=False in published benchmark comparisons  <sub>cfddem-porous-default-directive.md:23</sub>
@@ -674,6 +674,7 @@ is authoritative.
 - GraphAMG default restricted to !hasBc_ (domain-BC path defect).  <sub>porous-cfddem-cuda-two-bugs.md:13</sub>
 - Porosity clip changed from a 0.4 floor to [0,1]-only, per user directive; MFIX-faithful smoothing/drag law added instead.  <sub>porous-cfddem-cuda-two-bugs.md:59-62</sub>
 - The cross-module CUDA porous-CFD-DEM crash was an async stream race, not a GraphAMG bug.  <sub>multiphysics-framework-plan.md:382</sub>
+- Void-fraction floor eps_min = 0.25: a physical regularisation at the random-close-packing limit.  <sub>coupling</sub>
 
 ## pnm — pore-network extraction
 

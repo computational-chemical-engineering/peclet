@@ -6,6 +6,19 @@ All notable changes to the peclet suite are documented here. The format is based
 
 ## [Unreleased]
 
+### `peclet-coupling`
+
+#### Changed
+
+- **The void-fraction floor `CfdDem(eps_min=…)` defaults to 0.05, down from 0.25** (also the default
+  of `_coupling.compute_void_fraction`). The floor is a division guard for the 1/ε factors in the
+  drag closures and the porous projection, not a physical packing limit: the minimum voidage
+  depends on particle shape and size distribution (spheres ~0.36, wide bidisperse mixes and
+  ellipsoids ~0.25, space-filling shapes → 0), so 0.25 capped the drag of dense non-spherical and
+  polydisperse beds. Results change wherever a cell's ε fell below 0.25. For a noisy deposit at a
+  cell of about one particle diameter, set `smooth_length` (~1.5 d_p); pass `eps_min=0.25` to
+  reproduce earlier runs.
+
 ## [1.4.0] — 2026-10-04 — steady states in a third of the steps, and the force on a body by its name
 
 `peclet-flow` 1.3.0 · `peclet-coupling` 1.1.1 · metapackages `peclet` and `peclet-cu13` 1.4.0.
