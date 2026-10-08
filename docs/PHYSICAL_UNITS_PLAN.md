@@ -2,7 +2,7 @@
 
 *Plan, 2026-09-06. Status: **PHASE 1 LANDED** (2026-09-06) — D1–D5 accepted as recommended.
 core, flow, pnm and coupling are on main; the gate table with its numbers is
-[RELEASE_PREP_0.7.x.md §8](archive/RELEASE_PREP_0.7.x.md) (carried forward as [RELEASE_PREP.md §7](RELEASE_PREP.md)). Phases 2–4 are untouched and §9.4–§9.5 stand as written.*
+[RELEASE_PREP_0.7.x.md §8](archive/RELEASE_PREP_0.7.x.md) (carried forward as §7 of the 1.0.0 cycle's prep, now [archive/RELEASE_PREP_1.0-1.1.md §7](archive/RELEASE_PREP_1.0-1.1.md)). Phases 2–4 are untouched and §9.4–§9.5 stand as written.*
 
 **Two deviations from §9, both deliberate, both measured:**
 

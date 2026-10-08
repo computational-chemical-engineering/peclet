@@ -219,7 +219,7 @@ the gallery.
 *FLAG FOR FRANK — needed before drafting*: (a) any publication, preprint or thesis that has used
 peclet; (b) any external group using it; (c) whether the RingBed surrogate study or a TU/e course
 counts as use he wants named; (d) whether the LUMI site package has actually been exercised on AMD
-hardware (RELEASE_PREP calls it "still untested on AMD hardware" as of 2026-09-12 — if still true,
+hardware (RELEASE_PREP — now `docs/archive/RELEASE_PREP_1.0-1.1.md` — calls it "still untested on AMD hardware" as of 2026-09-12 — if still true,
 say "Snellius" only). Without (a)/(b) this section says "credible near-term significance" and no
 more.
 

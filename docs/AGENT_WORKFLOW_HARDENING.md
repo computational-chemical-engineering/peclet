@@ -241,7 +241,7 @@ no user, two red Publish runs in a day, and a day on D1.
 - **A fresh mis-plan** (G2's first form): row 11 catches reuse of a tree by the wrong backend, not
   a plan that allocates one tree for two backends before either exists.
 - **Claims not tied to a push** — "tests pass" with no ctest log, "verified" with no command. Row 7
-  binds only push → CI. `RELEASE_PREP.md` §4 already asks that a "tests pass" claim be qualified; a
+  binds only push → CI. `RELEASE_PREP.md` §4 (now [archived](archive/RELEASE_PREP_1.0-1.1.md)) already asks that a "tests pass" claim be qualified; a
   ctest-ledger variant of row 7 is possible and is deliberately not proposed here — it would fire
   on every turn and be the ceremony the brief warns about.
 - **Semantic conflicts between worktrees** — two sessions changing the same function in

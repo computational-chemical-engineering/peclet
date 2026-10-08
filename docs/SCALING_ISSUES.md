@@ -42,7 +42,7 @@ is reproducible; the remaining defect is narrower.*
 > **Status (2026-09-12):** re-blessing was NOT needed — `perf_baseline.json` holds at +0.00 % on a
 > double build; only the `state_hash.py` hashes moved, as expected. The double default shipped in
 > 1.0.0. Left open there: re-measure the ~12 % on a quiet host, the CUDA `flags.make` check, and
-> re-checking published dense-bed numbers from float builds — see [RELEASE_PREP.md §1.2](RELEASE_PREP.md).
+> re-checking published dense-bed numbers from float builds — see [RELEASE_PREP §1.2](archive/RELEASE_PREP_1.0-1.1.md) (archived).
 >
 > The analysis below stands as the record of why.
 

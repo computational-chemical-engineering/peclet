@@ -3,7 +3,7 @@
 > **CARRIED OUT 2026-09-14 — the answer is §1's second horn: both gates asked for more than the
 > solver beneath them delivers, and both were replaced.** The decision, with the numbers, is in
 > [decisions/flow.md](decisions/flow.md) ("The np>1 VoF colour parity gates gate conservation, not
-> the pointwise field"); the summary is [RELEASE_PREP.md §11.4](RELEASE_PREP.md). Headline: the
+> the pointwise field"); the summary is [RELEASE_PREP §11.4](archive/RELEASE_PREP_1.0-1.1.md) (archived). Headline: the
 > 3.174e-09 is **one ulp of colour** amplified by `mycNormal`'s estimator selection
 > (`if (fabs(mm[cn][cn]) > t0) cn = 3;`), which is an exact tie at a near-axis-aligned interface —
 > np=1 is bitwise at every thread count, np=2 flips at 2..16 threads and not at 1, np=4 flips at
@@ -188,11 +188,12 @@ machine.
 - The fix, or the gate change, in `flow`, with the reasoning in the commit message.
 - An entry in `suite/docs/DECISIONS.md` + `docs/decisions/flow.md` if a gate's contract changes —
   that is a decision a later session could plausibly undo.
-- Update `suite/docs/RELEASE_PREP.md` §11.4, which currently records this as open.
+- Update `suite/docs/RELEASE_PREP.md` §11.4, which currently records this as open. (Done: §11.4 is
+  RESOLVED, now archived in `docs/archive/RELEASE_PREP_1.0-1.1.md`.)
 
 ## 10. Out of scope
 
 - The 1.0.1 release: it is done. Do not retag anything.
 - VoF W4 (parked WIP on branch `vof-w4`, 32/33, G2 unmet) — unrelated campaign.
-- The Windows/macOS wheel work of 1.0.1 (RELEASE_PREP §11.2, §11.3).
+- The Windows/macOS wheel work of 1.0.1 (RELEASE_PREP §11.2, §11.3; archived in `docs/archive/RELEASE_PREP_1.0-1.1.md`).
 - Anything about the quick start, the container thread pool, or `cpu_budget`.

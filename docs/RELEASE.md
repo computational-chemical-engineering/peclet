@@ -18,7 +18,7 @@ those releases, the workflows in each repo, and the traps they hit.
 |---|---|---|---|
 | **CPU wheels + sdists**: `peclet-core` (sdist only), `peclet-amr` (sdist only), `peclet-morton`, `peclet-flow`, `peclet-pnm`, `peclet-dem`, `peclet-voro`, `peclet-coupling` (sdist only) | PyPI | each submodule's `.github/workflows/release.yml` on a `v*` tag (cibuildwheel, manylinux x86-64 + aarch64, win_amd64, macOS arm64, cp310–cp314, `PECLET_VENDOR_DEPS=ON`; Trusted Publishing) | works (used for every release) |
 | **`peclet` metapackage** (== pins on the CPU family; extras `[mpi]`, `[cfd-dem]`) | PyPI | umbrella `.github/workflows/release.yml` on a `v*` tag | works |
-| **CUDA wheels** `peclet-flow-cu13`, `peclet-pnm-cu13`, `peclet-dem-cu13`, `peclet-voro-cu13` | PyPI | `cuda-wheel` job in the same `release.yml` (manylinux container + CUDA 13 toolkit, Kokkos-CUDA static, `nvidia-cuda-runtime` dependency wheel, rpath; **one job per interpreter**, cp310–cp314 — the same list as the CPU wheels, RELEASE_PREP §11.6) | works; all four published at 1.0.1 |
+| **CUDA wheels** `peclet-flow-cu13`, `peclet-pnm-cu13`, `peclet-dem-cu13`, `peclet-voro-cu13` | PyPI | `cuda-wheel` job in the same `release.yml` (manylinux container + CUDA 13 toolkit, Kokkos-CUDA static, `nvidia-cuda-runtime` dependency wheel, rpath; **one job per interpreter**, cp310–cp314 — the same list as the CPU wheels, [RELEASE_PREP 1.0–1.1 §11.6](archive/RELEASE_PREP_1.0-1.1.md)) | works; all four published at 1.0.1 |
 | **Containers** `peclet-cpu`, `peclet-cuda:*-sm80/-sm90`, `peclet-hip:*-gfx90a` | GHCR (`oras://ghcr.io/computational-chemical-engineering/...`) | umbrella `.github/workflows/containers.yml` on a `v*` tag or dispatch | cpu + cuda publish; hip builds since 2026-09-04 (failed on every tag 0.3.0–0.6.0, §8) |
 | **Snellius package** | `/projects/0/prjs1022/peclet` (install script + wheelhouse) and the GHCR CUDA image | `tools/hpc/install_snellius.sh` run from the release tag (§7) | script validated for flow; family-wide script is new |
 | **LUMI package** | HIP container + `tools/hpc/install_lumi.sh` | §8 | image builds (since 2026-09-04); **untested on AMD hardware** |
@@ -130,7 +130,7 @@ the bare configure line makes 2 of 3 coupling tests abort with `TypeError: initi
 shape_type: int` and a matching `set_body_force()` error, i.e. the July signatures, not the current
 ones. That is the lucky outcome. The dangerous one is the same fall-through when the old signature
 still happens to match: the tests pass, against a module nobody intended.
-This is the same failure class as RELEASE_PREP §1.3's `SDFLOW_BUILD` trap, and it is worth stating
+This is the same failure class as [RELEASE_PREP 1.0–1.1](archive/RELEASE_PREP_1.0-1.1.md) §1.3's `SDFLOW_BUILD` trap, and it is worth stating
 the general rule: **anything in this checklist that imports `peclet.*` must set `PYTHONPATH` to the
 build trees explicitly, or it is not testing what you think it is.** That includes
 `tools/gen_python_api.py` and `tools/release/audit_docstrings.py`.
@@ -495,8 +495,9 @@ LUMI login node first (link only, seconds), then the smoke job, then re-dispatch
    shows the new version (shields.io caches for a few minutes) and that the Python API pages carry
    the new methods: the `peclet-cpu` leg of `containers.yml` dispatches the Site workflow with the
    pinned image tag (§5.1; there is no version to edit on the site).
-4. **Memory/notes**: update `docs/SNELLIUS.md` "Validated releases", `RELEASE_PREP.md` → archive as
-   `docs/releases/<family>.md`, and reset `RELEASE_PREP.md` for the next cycle.
+4. **Memory/notes**: update `docs/SNELLIUS.md` "Validated releases", `RELEASE_PREP.md` → archive the closed
+   cycle's sections verbatim as `docs/archive/RELEASE_PREP_<cycles>.md` (entry in `docs/archive/README.md`),
+   and reset `RELEASE_PREP.md` for the next cycle.
 
 ---
 
@@ -620,7 +621,7 @@ Gaps to close (tracked in `RELEASE_PREP.md`; none blocks a release, all reduce r
   builds the CUDA wheel and uploads it as an artifact, publishing nothing. Nobody knew, so nobody
   rehearsed, and on 2026-09-14 voro's cuda-wheel job died at GitHub's 6-hour cap during the 1.0.1
   release — the one job a rehearsal would have exercised. Corrected after the fact; see
-  RELEASE_PREP.md §11.5.
+  [RELEASE_PREP 1.0–1.1 §11.5](archive/RELEASE_PREP_1.0-1.1.md).
 - **No `release.yml` in any of the eight repos sets `timeout-minutes`**, so every job inherits the
   6-hour default. That is not the cause of voro's failure — the work genuinely takes ~5 h — but it
   means the cap arrives as a kill with no warning rather than as a stated budget.
