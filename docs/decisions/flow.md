@@ -3625,6 +3625,23 @@ Do not reverse an entry here without recording a new decision that supersedes it
     balance is ~5000x worse than the exact projection — exactly the register's original objection
     (error ~ sigma·kappa). Re-opening needs a design that addresses the non-gradient term first.
 
+### FFT pressure solver (Dodd–Ferrante option E2(b)) DROPPED — no FFT driver in flow
+- area: flow
+- source: USER DECISION 2026-10-08 ("Drop the FFT pressure driver"); `flow/doc/vof_perf_STATE.md` "Open"; design `doc/vof_step_performance_design.md` §10 option E2(b)
+- decided: 2026-10-08
+- status: settled
+- quote: |
+    The FFT pressure solver for the constant-coefficient (Dodd–Ferrante) splitting, option E2(b)
+    of the VoF step-performance design and left "a separate, later decision" on 2026-09-25, is
+    dropped. flow gets no FFT driver and no FFT dependency. CPU parity with TBFsolver on the
+    bubble column is pursued on the exact variable-coefficient projection (the §14 host package,
+    measured in Snellius S-1).
+- rejected: an FFT Poisson solver (new dependency) behind the constant-coefficient driver
+- why: an FFT solves only the constant operator, so it is useful only behind the E2(a) splitting,
+    which is PARKED for failing the static-balance gate (~5000x the exact projection's spurious
+    velocity); it would also be limited to solid-free uniform boxes with periodic/wall BCs. Re-opening
+    needs a constant-coefficient driver that first passes the static-balance gate, then a new decision.
+
 ---
 
 ### Zero-aperture staggered velocity points stay live in the momentum solve (not masked)

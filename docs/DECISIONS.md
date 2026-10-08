@@ -24,7 +24,7 @@ is authoritative.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-217 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+218 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -91,6 +91,7 @@ is authoritative.
 - **Every VoF consumer is TOLD what a pure cell is; none decides on its own**. **Rejected:** |  <sub>this</sub>
 - **Every κ > 0 scalar cell with an open face is its own unknown; slivers are never merged or linked**. **Rejected:** cell merging or linking of slivers (the H-k / Hf-1 link schemes: Neumann limit −4.2e-3 at order 1.0, against −6.2e-5 at order 2.0 for κ-FV with every   <sub>flow</sub>
 - **Exact-crossing openness overrides must be masked to 0 at solid velocity points**. **Rejected:** unmasked exact apertures at solid-velocity-point faces  <sub>flow-ghost-projection.md:61</sub>
+- **FFT pressure solver (Dodd–Ferrante option E2(b)) DROPPED — no FFT driver in flow**. **Rejected:** an FFT Poisson solver (new dependency) behind the constant-coefficient driver  <sub>USER</sub>
 - **FV viscous operator confirmed 2nd-order-consistent — "face-flux placement" hypothesis refuted; barrier is the pressure coupling**. **Rejected:** the "face-flux placement" hypothesis; the wall-pressure-term-on-momentum-force fix (both signs)  <sub>sdflow-collocated-solver.md:152-166</sub>
 - **Face-primary uf reconstruction (mode 8) attempted and reverted — incompatible with flow's divided time convention**. **Rejected:** mode 8 (face-primary uf via Basilisk's acceleration-event reconstruction) under flow's current divided momentum-operator convention  <sub>embed-port-progress.md:33</sub>
 - **Final default: momentum residual tolerance follows the pressure solver's rtol, not a fixed constant**. **Rejected:** a fixed residual-stop constant (1e-5), decided earlier the same day  <sub>momentum-solve-residual-stop.md:53</sub>
