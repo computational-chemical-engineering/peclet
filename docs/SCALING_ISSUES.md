@@ -15,8 +15,8 @@ is reproducible; the remaining defect is narrower.*
 
 | # | Issue | Severity | Status |
 |---|---|---|---|
-| 1 | Float operator storage caps MG-PCG on dense beds | **High, silently invalid** | **CLOSED by decision 2026-09-11** (`PECLET_FLOW_OPERATOR_DOUBLE` defaults **ON**, `flow/CMakeLists.txt:93`; a float build warns and names this issue); **already shipped** in the 1.0.0 wheels |
-| 2 | MG depth capped by the per-rank block | High (scaling shape) | **Fixed 2026-09-02** (telescoping, opt-in), **measured**: iterations flat 24 → 1536 ranks, ≥ 99 % efficiency on the bed |
+| 1 | Float operator storage caps MG-PCG on dense beds | **High, silently invalid** | **CLOSED by decision 2026-09-11** — operator storage is **double by default** (flow `dc6ae78`: `PECLET_FLOW_OPERATOR_DOUBLE` defaults **ON**, `flow/CMakeLists.txt:93`; a float build warns and names this issue); **already shipped** in the 1.0.0 wheels |
+| 2 | MG depth capped by the per-rank block | High (scaling shape) | **Fixed 2026-09-02** (telescoping; landed opt-in in flow `db7b1ba`, **DEFAULT ON** since flow `d6b3eb5` the same day; the `PECLET_FLOW_TELESCOPE*` env knobs became `Solver.set_pressure_telescope(on)` / `CutcellMG::setTelescopeMinExtent(e)` in flow `ad917b1`, 2026-09-08), **measured**: iterations flat 24 → 1536 ranks, ≥ 99 % efficiency on the bed. Weighted level 0: Repartition stages (flow `d907c57`) + aligned weighted ORB (flow `fa3178f`) |
 | 3 | Solid intersecting an OPEN domain face stalls the solve | Medium, silently wrong (narrow) | **Fixed 2026-09-16** (flow: SDF ghost extension + Dirichlet-row aperture), gated `test_openbc_solid{,_mpi}` |
 | 4 | Intermittent multi-node hang in warmup | **High, silently wrong** (was: Medium) | **Root-caused and fixed 2026-09-02** (core `10294e6`): NBX inter-round tag race |
 | 5 | Momentum solve: cap-bound RB-GS (update criterion) | High (63 % of the packed step) | **Fixed 2026-09-02**: residual stop + velocity MG under MPI (mixed operator); packed step 2.2× faster at 384–1536 ranks |
@@ -29,7 +29,7 @@ is reproducible; the remaining defect is narrower.*
 ## 1. Float operator storage caps MG-PCG on dense cut-cell beds — CLOSED BY DECISION 2026-09-11
 
 > **Resolved by flipping the default, not by a new algorithm.** `PECLET_FLOW_OPERATOR_DOUBLE`
-> defaults to **ON** as of 2026-09-11 (flow `CMakeLists.txt:48-72`); a float build now emits a
+> defaults to **ON** as of 2026-09-11 (flow `dc6ae78`; `CMakeLists.txt:81-98`); a float build now emits a
 > CMake warning naming this issue. The decision, its rejected alternatives and its consequences
 > are recorded in [decisions/flow.md](decisions/flow.md) — *"Double operator storage is the
 > DEFAULT"*. The reasoning: the failure is **silent**, so documenting it protects nobody who
@@ -39,6 +39,10 @@ is reproducible; the remaining defect is narrower.*
 >
 > **Consequence still open:** this changes numerics in the default build, so regression state
 > hashes and `perf_baseline.json` must be re-blessed before the 1.0.0 tag.
+> **Status (2026-09-12):** re-blessing was NOT needed — `perf_baseline.json` holds at +0.00 % on a
+> double build; only the `state_hash.py` hashes moved, as expected. The double default shipped in
+> 1.0.0. Left open there: re-measure the ~12 % on a quiet host, the CUDA `flags.make` check, and
+> re-checking published dense-bed numbers from float builds — see [RELEASE_PREP.md §1.2](RELEASE_PREP.md).
 >
 > The analysis below stands as the record of why.
 
@@ -100,7 +104,10 @@ Single-phase (float build): 14.7 → 14.0 iterations flat, 34.8 → 0.656 s, 142
 iterations (max 69) / 10.8 s in place vs 39.8 / 7.28 s telescoped; single 24.9 / 2.48 s vs 14.0 /
 2.01 s. At 24 ranks the two are identical (129.5 vs 128.7 s) — the hierarchy is already full depth
 there. Every ladder bottoms at 3³ on one rank (384 → 8 → 1, 768 → 8 → 1, predicted 1536 → 64 → 1).
-**What remains of this issue**: telescoping is the DEFAULT since 2026-09-02 (the WO-R2
+**What remains of this issue**: telescoping is the DEFAULT since 2026-09-02 (flow `d6b3eb5`; since
+flow `ad917b1`, 2026-09-08, it is switched by `Solver.set_pressure_telescope(on)` and the minimum
+extent by `CutcellMG::setTelescopeMinExtent(e)` — the `PECLET_FLOW_TELESCOPE` /
+`PECLET_FLOW_TELESCOPE_MIN_EXTENT` environment variables no longer exist, QUALITY_PLAN D3) (the WO-R2
 variable-density outflow coefficient crosses a telescope point since the same evening,
 `test_telescope_varrho_mpi`); the `MIN_EXTENT` default (4) is untuned, and the gather is
 host-staged (fine on CPU; a device build would want a device-aware path).
@@ -378,7 +385,8 @@ rule; `set_velocity_residual_tolerance(x)` fixes it, `0` restores the update cri
 floor and a one-sweep minimum guard the exact cases), the constant-coefficient
 domain-BC smoother has its residual (`diffResidual`) so RB-GS covers that path too, and an AUTO
 rule picks the 3-level V-cycle under MPI below `PECLET_FLOW_VMG_AUTO_CELLS` = 65536 cells/rank
-(the measured crossover). At least one sweep / V-cycle always runs: an early return on a converged warm start left u*
+(the measured crossover; since flow `ad917b1` the knob is
+`solver.diagnostics.set_velocity_multigrid_auto(cells_per_rank=…)`, same default). At least one sweep / V-cycle always runs: an early return on a converged warm start left u*
 without the O(rtol) momentum response and the hydrostatic acid test (`vardensity_mpi`) drifted
 by 1e-8 in dP/dz (bisected; flow `327faf3`). The single-GPU regression suite is identical to its baseline on the coupled default (metrics
 +0.00 %, pressure iterations and step counts equal); a fixed 1e-5 had cost steady-state cases 5–20 %

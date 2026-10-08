@@ -65,7 +65,9 @@ the solver by hand.** The mode must be set before `mpi_block()` and `init_mpi()`
 from it.
 
 Because depth and balance trade off, the factory builds each candidate depth and **measures** its
-imbalance, taking the deepest within `PECLET_FLOW_DECOMP_MAX_IMBALANCE` (default 1.05). The search is
+imbalance, taking the deepest within `max_imbalance` (default 1.05; `Solver.set_decomposition(levels,
+max_imbalance)` / `mpi_block(..., max_imbalance=)`, the env var `PECLET_FLOW_DECOMP_MAX_IMBALANCE`
+before flow `ad917b1`). The search is
 a pure function of `(ranks, grid, levels)`, so every rank reaches the same answer without
 communicating — do not make it depend on anything rank-local.
 
@@ -160,7 +162,8 @@ is a mode spanning many cells along an axis (Gauss–Seidel needs O(L²) sweeps 
 cells). A 64 × 2 × 2 bottom is only 256 cells and still costs 6.0 iterations against 4.0.
 
 `set_pressure_bottom("auto")` agglomerates whenever the coarsest global grid exceeds
-`PECLET_FLOW_AGGLOM_EXTENT` (4) cells on any axis; `"smoother"` is the legacy cheap bottom,
+`set_pressure_bottom_extent(cells)` (default 4; the env var `PECLET_FLOW_AGGLOM_EXTENT` before flow
+`ad917b1`) cells on any axis; `"smoother"` is the legacy cheap bottom,
 `"agglomerated"` forces it. The agglomerated bottom is decomposition-independent by construction (the
 gathered operator is keyed by global cell id) and measures as such: np=6 against np=1 agrees to
 **4.5e-16**.
@@ -219,7 +222,8 @@ win lives); anchored operators keep the smoothed bottom, byte-identical to legac
 `"agglomerated"` still forces agglomeration anywhere. Caveat: porous / variable-ρ rebuild the
 operator — and therefore the bottom AMG — every step; fine for the intended few-cells-per-axis
 bottoms, but do not pair `auto` with a badly-factored grid (a huge bottom) on those paths.
-`PECLET_FLOW_AGGLOM_EXTENT=1000000` restores the legacy behaviour without a code change.
+`set_pressure_bottom_extent(1000000)` (formerly `PECLET_FLOW_AGGLOM_EXTENT=1000000`) restores the
+legacy behaviour without a code change.
 
 ### 2.8 The depth cap costs real iterations under strong scaling — measured end to end
 
@@ -283,6 +287,16 @@ Roughly in order of expected value.
 1. **Redistribute coarse levels onto fewer ranks, instead of stopping the hierarchy.** *The
    headline item — §2.8 measures it costing 33 % at 1536 ranks, and it is the one open problem here
    that changes the shape of the scaling curve rather than its offset.*
+
+   **Status: DONE, and the DEFAULT.** Coarse-level telescoping on the ORB tree landed 2026-09-02
+   (core `a156528`, flow `cc0e849`/`db7b1ba`, opt-in) and was switched ON by default the same day
+   (flow `d6b3eb5`). Since flow `ad917b1` (2026-09-08, QUALITY_PLAN D3 — no environment variable
+   changes a result) the `PECLET_FLOW_TELESCOPE` / `PECLET_FLOW_TELESCOPE_MIN_EXTENT` knobs are
+   `Solver.set_pressure_telescope(on)` (default `True`) and `CutcellMG::setTelescopeMinExtent(e)`
+   (C++, default 4). A weighted level 0 takes Repartition stages (flow `d907c57`, 2026-09-24) and
+   the weighted ORB is aligned (flow `fa3178f`, 2026-09-25). Measured: iterations flat 24 → 1536
+   ranks — [SCALING_ISSUES.md](SCALING_ISSUES.md) §2. The text below is the original problem
+   statement and design route, kept as the record.
 
    §1.2's gate exists only because a coarse level is required to be the fine decomposition
    `coarsened()` in place, so that restrict/prolong stay purely local. Drop that requirement on the
