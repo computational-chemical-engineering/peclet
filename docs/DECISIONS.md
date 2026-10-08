@@ -693,7 +693,7 @@ is authoritative.
 
 ### In force
 
-- **A host backend that does not size itself must be handed the thread budget**. **Rejected:** keeping the "say nothing on an unconstrained machine" policy for every backend (it is  <sub>RELEASE_PREP.md:11.3</sub>
+- **A host backend that does not size itself must be handed the thread budget**. **Rejected:** keeping the "say nothing on an unconstrained machine" policy for every backend (it is  <sub>archive/RELEASE_PREP_1.0-1.1.md</sub>
 - **A solver's internal grid-count threshold is a count, not cell-unit API**. **Rejected:** a physical-length form (wrong: the same length means a different level count at a  <sub>amr</sub>
 - **All coupled methods must share one BlockDecomposer; static-only co-decomposition is rejected**. **Rejected:** "Static-only co-decomposition"  <sub>multiphysics-framework-plan.md:410</sub>
 - **CMake suite_require_nanobind must be a macro, not a function**. **Rejected:** implementing suite_require_nanobind as a CMake function  <sub>nanobind-zero-copy-migration.md:15</sub>
@@ -722,7 +722,7 @@ is authoritative.
 - **USER DIRECTIVE: peclet.flow is the reference for shared-method design elsewhere in the suite, not Basilisk or the literature**. **Rejected:** taking Basilisk (or a paper) as the reference for a shared method design; the Basilisk face-acceleration form for the collocated projection  <sub>flow-is-the-method-reference.md:8-19</sub>
 - **USER DIRECTIVE: quality is the prime objective; next release is a clean-break 1.0.0, API-breaking allowed; AMR preserved not deleted**. **Rejected:** preserving backward compatibility / a minor version bump  <sub>suite-quality-plan-1-0-0.md:11-13</sub>
 - **USER DIRECTIVE: solvers take a physical domain + physical properties; spatial discretization must not influence physical property values**.  <sub>physical-units-plan.md:11</sub>
-- **Wheels for a toolchain without OpenMP ship Kokkos::Threads, not Serial**. **Rejected:** the Kokkos Serial backend (single-threaded, and it was chosen only because the third  <sub>RELEASE_PREP.md:11.3</sub>
+- **Wheels for a toolchain without OpenMP ship Kokkos::Threads, not Serial**. **Rejected:** the Kokkos Serial backend (single-threaded, and it was chosen only because the third  <sub>archive/RELEASE_PREP_1.0-1.1.md</sub>
 - **morton stays on ctypes by design; vorflow's legacy host bindings stay on pybind11**. **Rejected:** migrating morton's bindings to nanobind; migrating vorflow's legacy host bindings to nanobind  <sub>nanobind-zero-copy-migration.md:17</sub>
 - **nanobind Kokkos+CUDA modules require NOMINSIZE (nanobind's default -Os breaks nvcc)**. **Rejected:** nanobind's default -Os compile flag for Kokkos CUDA modules  <sub>nanobind-zero-copy-migration.md:24</sub>
 

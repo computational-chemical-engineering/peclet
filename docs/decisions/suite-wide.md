@@ -374,7 +374,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 
 ### Wheels for a toolchain without OpenMP ship Kokkos::Threads, not Serial
 - area: suite-wide
-- source: RELEASE_PREP.md:11.3
+- source: archive/RELEASE_PREP_1.0-1.1.md §11.3 (was RELEASE_PREP.md §11.3)
 - decided: 2026-09-13
 - status: settled
 - quote: |
@@ -396,7 +396,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 
 ### A host backend that does not size itself must be handed the thread budget
 - area: suite-wide
-- source: RELEASE_PREP.md:11.3
+- source: archive/RELEASE_PREP_1.0-1.1.md §11.3 (was RELEASE_PREP.md §11.3)
 - decided: 2026-09-13
 - status: settled
 - quote: |

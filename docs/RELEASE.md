@@ -6,7 +6,7 @@ documentation sites, and the example gallery. It is written so that the next rel
 executed by following it top to bottom. The one-off state for the release currently being prepared
 lives in [RELEASE_PREP.md](RELEASE_PREP.md); this file is the durable process.
 
-Releases so far: 0.1.0 / 0.2.0 (2026-07-02), 0.3.0 … 0.6.0 (2026-07-03 … 07-25). The 0.6.0 family
+Releases so far: 0.1.0 / 0.2.0 (2026-07-02), 0.3.0 … 0.6.0 (2026-07-03 … 07-25), 1.0.0 (2026-09-12) … 1.4.0 (2026-10-04). The 1.4.0 family
 is what PyPI serves today (see §4 for the version table). Everything below was reconstructed from
 those releases, the workflows in each repo, and the traps they hit.
 
