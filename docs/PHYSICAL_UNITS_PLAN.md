@@ -403,7 +403,8 @@ force, the phase-change layer's `V_cell`; AMR per-axis root spacing through the 
 the sampled builders. The architect designs each; Opus implements against the design note's gates.
 
 **PHASE 3 LANDED 2026-09-07** — both halves are on main. `flow/doc/anisotropic_vof.md` (VoF) and
-`core/docs/amr_anisotropic.md` (AMR) carry the design and the measured gate numbers.
+`core/docs/amr_anisotropic.md` (AMR; now `amr/docs/amr_anisotropic.md`, moved with the AMR split of
+2026-09-10) carry the design and the measured gate numbers.
 
 | gate | result |
 |---|---|
