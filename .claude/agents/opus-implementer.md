@@ -38,7 +38,13 @@ Token economy (every turn re-reads your whole context, so waste compounds):
   them, write the script, give the exact command and the expected output, and leave running it to
   the caller.
 - **Finish and stop.** When the work orders are done, report and end; do not pick up adjacent
-  items. If your context grows past ~300k tokens before you are done, commit, report what is done
+  items. If your context grows past ~250k tokens before you are done, commit, report what is done
   and what is not (a handoff a fresh agent can resume from), and stop.
 
 Report: the commit hashes, the gate table with its numbers, and anything you stopped on.
+
+**Token economy** (see `~/.claude/CLAUDE.md`). Compute is free, but everything you read costs tokens.
+Run builds, tests and gates through a script that prints one summary line, with the log in a file.
+On failure, `grep`/`tail` that log only. Use one blocking wait per job and never poll. Read only
+`grep -n`/`sed -n` ranges, and never re-read a file you already have. Cap your context at ~250k
+tokens: then commit, write a ≤40-line handoff file and stop. Keep reports ≤30 lines.
