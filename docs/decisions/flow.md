@@ -4143,3 +4143,60 @@ Do not reverse an entry here without recording a new decision that supersedes it
     under load. Device code untouched (if constexpr on CCMem == HostSpace).
 - rejected: running the device team algorithm on the host (≈170 team barriers per plane, every scalar a serial latency-bound dot: 5.6-6.5 ms per factor at its best T 4-8, 11 ms at T 1); sharing kBottomHostTeam = 8 with the FCG solve kernel (the host schedule at T 8: 1.43-1.88 ms vs 1.05-1.09 at T 2); reordering any accumulation for speed (would change bits; A(a) factor reuse is a separate, numerics-changing decision)
 - why: bench_bottom_factor (walls-y 16x12x8, P 12, b 128 = the bubble column's bottom), workstation 5965WX under load ~20, ms per factor: old team T 1/2/4/8/16/24 = 11.0/7.9/5.7/5.6/6.4/6.5; host schedule T 1/2/3/4/6/8 = 1.44-1.51/1.05-1.09/0.93-1.79/0.86-1.70/1.43-1.69/1.43-1.88; production kprof 1x24 mg_bottom_factor 6.6 -> 1.5-1.8 ms/step (genoa S-1 base 16.9). Gates: factor bytes identical to main (host and CUDA, walls-y + periodic/border), U8 incl. the restart path with a negative control, host G-BIT (state_hash + np2 + 50-step 'direct' dump at OMP 1/8/24), CUDA G-BIT, host battery 231/231
+
+---
+
+### Tier-3 PV fit: each interfacial cell's PLIC polygon is built once per curvature pass (per-cell cache), never once per target
+- area: flow
+- source: flow `bb95f97` (WO-2a), core `4806f87` (v1.5.0); `doc/vof_curvature_cost_design.md` §2.3, §5; `doc/vof_step_performance_log.md` 2026-10-09
+- decided: 2026-10-08 (design G); landed 2026-10-09
+- status: settled
+- quote: |
+    The tier-3 PV fit takes each interfacial cell's PLIC polygon from a per-cell cache filled in the
+    planes pass (indexed by a slot map), not rebuilt for every target that uses it. Bitwise.
+- rejected: rebuilding the polygon per target (15.6 builds per cell per pass, plicPolygon 50.0 of 81.2 ms of tier 3); a dense per-cell cache over the extended block
+- why: harness tier 3 78.8 -> 22.2 ms with WO-2c; G-BIT host znver3 + generic + CUDA (state_hash 12 + np2, 50-step dump, census). Note: `VofCurvature::cache_` is sized to listG_'s capacity, which on the structured path equals a dense cache (224 B·(n+4)³, lazy)
+
+---
+
+### Tier-3 PV terms come from per-cell polygon area moments, accumulated entry-parallel on the device (recorded round-off change)
+- area: flow
+- source: flow `17ba0f9` (WO-3; commit message has the state_hash table), `1ee216d` (WO-2b compaction); `doc/vof_curvature_cost_design.md` §5.4; log 2026-10-09
+- decided: 2026-10-09 (USER accepted G-Q1, the round-off change; C1 amendment = coordinator ruling)
+- status: settled
+- quote: |
+    Per-cell 3-D polygon area moments (PvMoments), transformed into each target's frame, replace
+    the cached polygons; the device team body compacts the neighbours (canonical offset order kept)
+    and sums each of the 27 lower/b entries serially in canonical order on its own lane. The moment
+    build (curvMomentsBuild) and the team body (curvFallbackTeam) are __noinline__ in the DEVICE
+    pass only, so the batched and per-block kernels run one compiled body. Do NOT re-inline them
+    on the device: inlined, nvcc contracts them differently per kernel and batched != per-block.
+- rejected: per-target Green's-theorem moments (2.6× slower, FP64-heavy); a centroid point fit; a smaller support; one lane accumulating all 42 entries (FP64-issue-bound); thread per target; a warp reduction; a CUDA tolerance on the batched == per-block gate C1
+- why: vs WO-2b, 50-step max rel host 2.71e-14 / CUDA 2.47e-14 (N50 2.52e-9), iterations identical, κ 3.6e-15 / 4.4e-15, census identical; only vof_droplet's hash changes. RTX 5080 tier 3 3.55 -> 0.575 ms, curvature stage 6.19 -> ~3.3 ms (shared GPU). The single-lane vs entry-parallel difference is FMA contraction (bitwise with --fmad=false), not order
+- supersedes: the one-lane accumulation of "PV curvature fallback: one team per target cell, canonical-order accumulation" (team shape and canonical order stand)
+
+---
+
+### Height-function columns stay 7 cells; longer (Popinet/TBFsolver-style) column walks are rejected
+- area: flow
+- source: `doc/vof_curvature_cost_design.md` §2.6 (gate B sphere, harness replay)
+- decided: 2026-10-08 (design G)
+- status: settled
+- quote: |
+    The cells only a long column closes are the steep-slope cells where height functions are
+    inaccurate; fewer tier-3 cells via longer columns is not a saving worth its error.
+- rejected: 9- and 11-cell columns to cut tier-3 work
+- why: gate B sphere max-error order 1.86 -> 1.50 (9) / 0.92 (11); max error at 64³ 3.8e-3 -> 6.3e-3 / 1.4e-2
+
+---
+
+### The PV normal equations accumulate only their lower triangle and diagonal
+- area: flow
+- source: flow `bb95f97`; core `4806f87` (T3)
+- decided: 2026-10-08 (design G)
+- status: settled
+- quote: |
+    curvSolveSym reads nothing above the diagonal, so only the lower triangle and diagonal are
+    accumulated. Bitwise.
+- rejected: the full 6×6 accumulation (dead work)
+- why: core T3 0 mismatches over 1e5 cases; flow G-BIT host + CUDA

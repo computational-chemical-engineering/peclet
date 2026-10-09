@@ -24,7 +24,7 @@ is authoritative.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-225 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+229 in force, 41 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -113,6 +113,7 @@ is authoritative.
 - **Grid-convergence studies must report dimensionless permeability k* = k/N², not dimensional k**. **Rejected:** reporting dimensional k_cells directly as a convergence metric  <sub>sdflow-regression-suite.md:20-22</sub>
 - **Grid-dimension convention: MG per-axis coarsening depends on factors of two; always check halvings before proposing a grid**. **Rejected:** choosing benchmark grid dimensions without checking per-axis halving depth (led to a "WORSE" refine ladder caught before burning GPU hours)  <sub>channel-scaling-rebenchmark.md:182-200</sub>
 - **Guidance: ghost for resolved/smooth IBM geometry, cutcell aperture for tight-throat porous media**. **Rejected:** using ghost projection for under-resolved tight-throat porous media  <sub>flow-ghost-projection.md:86</sub>
+- **Height-function columns stay 7 cells; longer (Popinet/TBFsolver-style) column walks are rejected**. **Rejected:** 9- and 11-cell columns to cut tier-3 work  <sub>`doc/vof_curvature_cost_design.md`</sub>
 - **Host backends use the 'direct' pressure bottom where eligible (reverses §13 D-5's host clause and Q-D6's default)**. **Rejected:** GraphAMG kept for host bitwise; GraphAMG at tau = 1e-5; GraphAMG setup reuse  <sub>flow</sub>
 - **Host launch rule: pencils on host, MDRange on device, one cell body; -ffp-contract=off on host, -march opt-in**. **Rejected:** host MDRange in hot paths (2.4x); rebuilding the shared Kokkos prefix with Kokkos_ARCH  <sub>flow</sub>
 - **Host list-driven batch kernels launch over exact counts with a dynamic schedule; host region kernels iterate rows**. **Rejected:** upper-bound launches under GCC's contiguous static schedule (idle threads on the  <sub>flow</sub>
@@ -207,6 +208,7 @@ is authoritative.
 - **Telescoping is default on for the pressure MG since 2026-09-02; the velocity solve does not need it**. **Rejected:** telescoping the velocity solve  <sub>momentum-solve-residual-stop.md:18</sub>
 - **Ten-Cate periodic-image bug: periodic images are a union, not independent slabs**. **Rejected:** the earlier CSG-slab-per-image geometry construction (implicitly non-union)  <sub>sdf-scene-campaign.md:131</sub>
 - **The Anderson steady-march accelerator has no instability guard; stability evidence comes only from plain steps (rev 2)**. **Rejected:** a Ritz-radius guard with a higher floor, a higher threshold, a longer consecutive count; the fall-back-to-plain consequence; a diagnostic-only radius;  <sub>flow</sub>
+- **The PV normal equations accumulate only their lower triangle and diagonal**. **Rejected:** the full 6×6 accumulation (dead work)  <sub>flow</sub>
 - **The agglomerated-bottom MG anomaly required a per-fluid-component null-space projector, a double row-sum, and a looser inner tolerance**. **Rejected:** projecting the all-cell mean (rather than per-connected-fluid-component); leaving MG coefficients in single-precision row sums uncorrected; an inner t  <sub>agglomerated-bottom-ibm-fix.md:15</sub>
 - **The balanced-force projection is an option on both grids, default ON on collocated variable-rho (V8), OFF elsewhere**. **Rejected:** always-on (the user asked for an option); default off on V8 (loses the settled  <sub>flow</sub>
 - **The defect-correction rule: Krylov matvec/residual must be the exact double operator in flux form; preconditioners below may stay float**.  <sub>defect-correction-campaign.md:14-17</sub>
@@ -223,6 +225,8 @@ is authoritative.
 - **The scalar-transport and phase-change energy API is physical under an armed extent, converted at the boundary**. **Rejected:** documenting the scalar/energy surface as internal (cell) units — "silently wrong" is the failure class U3's four missed setters already showed; conver  <sub>flow</sub>
 - **The standalone V-cycle pressure driver does not honor set_pressure_solver_params(n) and is ~30x slower at small grids**.  <sub>flow-thermal-convection-validated.md:25</sub>
 - **The transient ScalarMG level rule switches to the full table at κ_A = 1 + 4 dt'D'Σw_a ≥ 25 (Amendment A3, ruling D-WO9-3)**. **Rejected:** κ_A = 13, the design's value, kept by D-WO9-2 only because level 0 there took 11 iterations on one cold first step against G-iter's ≤ 10; κ_A ≈ 49 (co  <sub>flow</sub>
+- **Tier-3 PV fit: each interfacial cell's PLIC polygon is built once per curvature pass (per-cell cache), never once per target**. **Rejected:** rebuilding the polygon per target (15.6 builds per cell per pass, plicPolygon 50.0 of 81.2 ms of tier 3); a dense per-cell cache over the extended blo  <sub>flow</sub>
+- **Tier-3 PV terms come from per-cell polygon area moments, accumulated entry-parallel on the device (recorded round-off change)**. **Rejected:** per-target Green's-theorem moments (2.6× slower, FP64-heavy); a centroid point fit; a smaller support; one lane accumulating all 42 entries (FP64-issu  <sub>flow</sub>
 - **UCX_RNDV_THRESH tuning is falsified as an explanation for the np8 anomaly — leave UCX defaults**. **Rejected:** tuning UCX_RNDV_THRESH=256k  <sub>comm-scaling-plan.md:57</sub>
 - **User decision: port Basilisk embed.h, not Trebotich–Graves, for 2nd-order collocated walls**. **Rejected:** Trebotich–Graves/EBChombo as the primary port target  <sub>sdflow-collocated-solver.md:186-191</sub>
 - **User directive: ghost-cell IBM must become production-grade (it generalizes to AMR better than cut-cell)**.  <sub>ghost-hardening-plan.md:11-14</sub>
