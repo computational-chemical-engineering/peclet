@@ -4132,7 +4132,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: flow `62f91ef` `591bde4` `d8cd5ca` (commit messages); `src/mg_bottom_direct.hpp` (hostAssemble / hostInvert / hostBorder), `src/mac_cutcell_mg.hpp` kBottomHostFactorTeam; `doc/vof_step_performance_log.md` "A(b)"
 - decided: 2026-10-08 (A(b) USER DECISION: faster factor, bitwise, before factor reuse; team constant = implementer DECISION, genoa sweep pending)
-- status: settled (schedule); provisional (the value 2, pending the genoa T sweep `bubble_column_perf/s1/s1_bfac.slurm`)
+- status: superseded (2026-10-09) by "The host pressure-bottom factor runs a bitwise host-only schedule, with its own team constant (6)" — the schedule and the own-constant rule stand; the value 2 -> 6 (genoa sweep)
 - quote: |
     On a host backend the factor runs a second schedule of the same arithmetic: every stored scalar
     is the team algorithm's expression with its operands in the same order, but the work is cut into
@@ -4200,3 +4200,284 @@ Do not reverse an entry here without recording a new decision that supersedes it
     accumulated. Bitwise.
 - rejected: the full 6×6 accumulation (dead work)
 - why: core T3 0 mismatches over 1e5 cases; flow G-BIT host + CUDA
+
+---
+
+### USER: the FP32 V-cycle and the projected initial guess stay opt-in; the pressure-solve defaults do not change
+- area: flow
+- source: USER ruling 2026-10-15 (`bubble_column_perf/gate_proj/DECISIONS_PROJ.log`); flow `23a9c8c` (revert of the D default `37f8f5f`), `2a59131` ('auto' restored as an opt-in value); `doc/vof_projection_cost_design.md` Outcome
+- decided: 2026-10-15 (USER: "yes, I take the recommendation")
+- status: settled
+- quote: |
+    The FP32 V-cycle preconditioner stays opt-in ('fp64' default) and the projected guess stays
+    opt-in ('zero' default, E1 not promoted). Both setters take 'auto' as an OPT-IN value meaning the
+    fast path where eligible, else the default path, on every backend; the forced value
+    ('fp32' / 'projected') raises where ineligible. Revisit the defaults only with an FP64 restart on a
+    cap or breakdown and a distributed FP32 V-cycle / E: serial <-> np=1 bit-exactness is flow's contract.
+- rejected: 'auto' as the default on device backends (37f8f5f, reverted): single-rank-only fast paths as defaults break serial <-> np=1 bit-exactness, and under 'auto' a GPU solve can cap where FP64 converged with nothing but the iteration count to show it; promoting E (E1) on its 0.83-0.87 iterations/step; dropping D's 'auto' while E keeps one (asymmetric API, 23a9c8c, restored in 2a59131)
+- why: CUDA battery at 37f8f5f: 223/232 — eight np1 tests that compare a distributed np=1 run bitwise with a single-rank run (sdflow_colocated, varmu, cellforce, cutcellmg_aniso, vof_wetting, vof_wetting_dynamic, movingscene_advect, wall_slip; e.g. varmu du 5.6e-16) and units_scale_invariance (p 2.0e-11 / 1.05e-10 vs TOL 1e-13: FP32 weight rounding is not scale-invariant). Review finding 3 (`gate_proj/REVIEW_C0_D_G.md`): walled hydro slab 1e3/1e4, FP32 capped where FP64 took 123-135 iterations; `pressure_solve_failed()` is set only on breakdown
+
+---
+
+### The FP32 V-cycle preconditioner (D) runs below the exact FP64 PCG/FCG; opt-in ('fp64' default, 'fp32' forced, 'auto' where eligible)
+- area: flow
+- source: flow `d4888f6` (D0), `fcc3c0e` (D1), `4037569` (D2), `8b2e30b` (D3 commit 1), `6d24627` (review findings 4, 5), `2a59131` ('auto'); `37f8f5f` (D default) reverted by `23a9c8c`; `doc/vof_projection_cost_design.md` §4, §13 G-D1..G-D4, §15 Q-P1/R-4; `doc/vof_step_performance_log.md` "WO-D1".."Landing"
+- decided: 2026-10-09 (design, USER "yes, to all"); default ruling 2026-10-15 (USER: opt-in)
+- status: settled
+- quote: |
+    Per non-bottom level FP32 face weights WX, WY, WZ (diagonal derived, never stored), FP32 iterates
+    and flux-form arithmetic, the input scaled by an exact power of two; the Krylov matvec, dots, mean
+    projection and stop test stay FP64 and the bottom is FP64. Eligible: single rank, no outflow face,
+    no overlay solve, even inner dimensions on every non-bottom level, a double outer operator, face
+    weights in [1e-30, 1e30], mean-removal scope 'fine', a PCG / FCG driver. FP32 data are built only
+    where the configuration can be eligible (fp32Carriable), so 'fp64' builds nothing.
+- rejected: float band storage with a stored or independently rounded diagonal (u*kappa on near-null modes, §4.2 P4); FP32 faces with FP64 arithmetic ('D-lite': device stays FP64-issue-bound); a stored FP64 diagonal (8 B/cell for a derivable value); FP32 on the coarse levels only (14 % of the bytes); BF16/FP16 faces (not now); D under Chebyshev / standalone V-cycle / BiCGStab (out of v1)
+- why: projection A/B (prof.py 30 steps, rtol 1e-8, 3 interleaved rounds, D5 build): CUDA 12.28 -> 9.96 ms (0.811), host 1x8 0.892, 1x24 0.884; iterations 10.0 = 10.0. G-D4 ('fp32' vs FP64): rel 2.4e-14..5.0e-14, iterations 500/653 identical, d1cmp PASS (column 21103 = 21103). G-D3 on the 53 probe configurations where FP64 converges: 12664 -> 12666 iterations, none capped. Limit (R-4): walled hydro slab 1e3/1e4 caps (see the USER opt-in entry)
+
+---
+
+### G-D3 rulings: the health criterion is relative, the gates are scoped to where FP64 converges, no contrast bound in eligibility
+- area: flow
+- source: `bubble_column_perf/gate_proj/DECISIONS_PROJ.log` 2026-10-15; flow `doc/vof_projection_cost_design.md` §4.4.1, §13 G-D3, §15 R-4 (amended), Outcome (premise correction); log "Phase 3b"
+- decided: 2026-10-15 (coordinator, no architect pass; premise corrected by the reviewer the same day)
+- status: settled (the rulings); the reason given for "no contrast bound" was FALSE — see why
+- quote: |
+    (e) FP32's per-solve median health ratio <= 1.1x FP64's on the same case (not an absolute 1e-2);
+    (a), (d), (e) scoped to configurations where FP64 converges in every solve; no contrast bound in
+    eligibility; !meanRemovalAll_ is eligibility item 6 (FP32 implements the fine-scope mean removal only).
+- rejected: the absolute health median <= 1e-2 (unattainable by the FP64 V-cycle itself); a looser factor than 1.1; WO-D4c, the resident FCG (the host-loop FCG fails the same items with FP32)
+- why: FP64 health medians: bubble column PCG 0.32-0.47, FCG 0.064-0.084, FP32 identical (R != cP^T, §4.2 P7); on G-D1's cyl/pack at 1e4 FP64 breaks down or caps, so the medians cover different iteration counts. PREMISE CORRECTED: "a contrast bound would exclude the bubble column" is false — the column's density ratio is 50 (rho_g/rho_l = 0.02), so a bound in (50, 1e3) keeps it eligible. Moot while FP32 is opt-in; for a default flip the review prefers an FP64 restart on a cap to a contrast metric (which would penalise IBM cut faces)
+
+---
+
+### Reduced-precision operators are stored as face weights; the diagonal is derived, never stored; FP32 arithmetic uses the flux form
+- area: flow
+- source: flow `fcc3c0e` (D1), `4037569` (D2); `doc/vof_projection_cost_design.md` §4.2-§4.4; log "WO-D1", "WO-D2"
+- decided: 2026-10-09 (design D, the precision-policy rule's corollary)
+- status: settled
+- quote: |
+    Each face weight is stored once and read by both cells, so the FP32 operator keeps A*1 = 0 and
+    symmetry exactly and is spectrally equivalent to the FP64 one within (1 +- 2^-24), independent of
+    the contrast. Evaluating AC*x_i - sum w x_j in FP32 adds an error ~u*AC_i|x_i| per application:
+    the AC form is barred from FP32 arithmetic.
+- rejected: the AC (stored-diagonal) form in FP32 — the retired float storage's failure mode, a non-Laplacian diagonal perturbation of relative size u*kappa(A) on near-null modes (24 on a 256^3 bed at 1e4)
+- why: G-D1: symmetry <= 3e-19, max|w/t - 1| <= 5.93e-8 (2^-24 = 5.96e-8), FP32 decoupled set = FP64 AC < 1e-30 set on every level (pack L0 46541 = 46541); residual of c*1 exactly 0; dense tool: lambda_min of sym(M32) equals FP64's to 6 digits in 16/16
+
+---
+
+### The FP32 V-cycle's input is scaled by an exact power of two (2^-e, e = ilogb max|r|)
+- area: flow
+- source: flow `4037569`, `8b2e30b`, `191bba3` (the E entry exponent, review E0/X1 finding 8); `doc/vof_projection_cost_design.md` §4.4.4; log "WO-D2"
+- decided: 2026-10-09 (design D)
+- status: settled
+- quote: |
+    The FP64 input r is scaled by 2^-e, e = ilogb(max|r|) of the vector being preconditioned, rounded
+    once to FP32, and the output scaled back by 2^e; both scalings are exact. As built: on entry e =
+    ilogb(r0), which under E is the stop reference max|P b| (the only value the host holds), not
+    max|r| of the guess residual -- inert by scale covariance away from the FP32 denormal range.
+- why: G-D2(a): B(2^k r) = 2^k B(r) bitwise for k = -40, 0, 37 on host and CUDA — the FP32 V-cycle is scale-covariant, so the residual's magnitude never reaches the FP32 range edges
+
+---
+
+### The velocity MG stays FP64
+- area: flow
+- source: `doc/vof_projection_cost_design.md` §4.3, §14 item 4
+- decided: 2026-10-09 (design D)
+- status: settled
+- quote: |
+    The VMG solve is a stationary V-cycle iteration: its level-0 smoother defines the fixed point, so
+    FP32 there would solve the FP32 operator (the double-diagonal lesson).
+- rejected: an FP32 velocity V-cycle (levels >= 1 only would save <= 0.4 ms)
+- why: no code change; recorded with D so the precision split is not "completed" later by mistake
+
+---
+
+### The float-operator guard also flags float template arguments and defaults
+- area: flow
+- source: flow `d4888f6` (D0); log "WO-D0"
+- decided: 2026-10-09
+- status: settled
+- quote: |
+    `no_float_operator_casts` flags X<float>, X<float, ...>, X<..., float> and class|typename R = float
+    outside `// PRECISION-EXEMPT: <reason>`; `using VReal = float;` carries the marker.
+- why: the extended guard found 8 lines (the note named 2), all marked with their reason (the §13 FP32 bottom factor; four pre-G.6 float defaults whose production instantiations name mreal/MReal); a planted unmarked `BottomDirect<float>` fails the guard (rc 1)
+
+---
+
+### Host Krylov sum reductions in CutcellMG use 4 x-lanes per row (C0, recorded, host only)
+- area: flow
+- source: flow `8d8e5fd` (commit message: the 13 host state_hash re-baselines); `doc/vof_projection_cost_design.md` §6; log "WO-C0", "Phase 2 end"
+- decided: 2026-10-09 (design C, Q-H4 triggered by Snellius S-1)
+- status: settled
+- quote: |
+    ccReduce3Lanes: dot / dotTo / copyDotTo and every removeMean sum on a host backend (single rank
+    and distributed) sum 4 x-lanes per row; max reductions and the fluid count keep ccReduce3; the
+    device branch is ccReduce3. Bitwise per thread count.
+- rejected: keeping the 1-lane add chain (3.4 cycles/cell at OMP 1, latency-bound)
+- why: G-NUM-P vs the phase-1 reference: max rel 2.5e-14..6.5e-14 (N50 1.48e-8 / 2.52e-9), iterations identical (500 / 653 over 50 steps), d1cmp PASS (21103 = 21103, drift 5.2e-12); CUDA bitwise. Microbench: 0.27x per launch at OMP 1
+
+---
+
+### C0's gain is unproven on the workstation; the genoa S-3 run decides it
+- area: flow
+- source: `bubble_column_perf/gate_proj/DECISIONS_PROJ.log` (C0), `s3/DECISIONS_coord.log` 2026-10-09; flow log "Phase 2 end"
+- decided: 2026-10-09 (coordinator)
+- status: provisional (pending Snellius S-3, `bubble_column_perf/s3/s3_proj.slurm`)
+- quote: |
+    C0 stays although its per-launch gate (<= 0.5x) was not met on the workstation; the genoa S-3 run
+    decides it. If C0 is no gain there, reconsider it through a new entry (revert C0, redo C1-C4 on
+    the 1-lane order).
+- rejected: reverting C0 on the workstation timing (C1-C4 are built and gated on its order)
+- why: workstation 1x24, low load: mgdot per launch 1.11 / 1.00, mgmeanr 0.74 / 0.85 (two re-measures). A level-0 dot moves 12.6 MB in 53-64 us = 200-240 GB/s: bandwidth-bound at 24 threads, so the lanes buy nothing there; the §3.2 premise (175 us/launch, add-chain-bound) was measured on genoa
+
+---
+
+### Host Krylov reduction fusion (C1-C4) is host single-rank only, bitwise vs C0
+- area: flow
+- source: flow `ee29538` (C1), `165b9b8` (C2), `619e13a` (C3), `07595cd` (C4); `doc/vof_projection_cost_design.md` §6; log "WO-C1..C4"
+- decided: 2026-10-09 (design C, perf §14.3 H-5 confirmed with amendments)
+- status: settled
+- quote: |
+    Under hostKrylovFusion() (host memory, single rank with the fluid count, fusedWrapReads(),
+    singular operator, level 0 at width G): p.Ap in the level-0 matvec (C1), the fluid sum of r in the
+    x/r update (C2), max|r| in the mean subtract (C3), r.z in the V-cycle exit mean subtract (C4).
+    Elsewhere the separate kernels; the device is unchanged.
+- rejected: device fusion of the Krylov reductions (Q-P12: ~ -0.5 ms on the GPU for a device re-baseline)
+- why: launches/step 1159.2 -> 1107.0 = -4.0 per PCG iteration (13.05 iterations/step, 1x8 kp); G-BIT host vs C0 and CUDA PASS for each
+
+---
+
+### Host wrap kernels peel the row ends (S), bitwise
+- area: flow
+- source: flow `7bc4012` (WO-P0 go), `1d8743c` (S); `doc/vof_projection_cost_design.md` §9; log "WO-S", "Phase 2 end"
+- decided: 2026-10-09 (go rule: peeled pass >= 1.2x)
+- status: settled
+- quote: |
+    ccWrapRowPeeled / ccWrapForPeeled in the host branches of cutcellSmoothColorFaceWrap,
+    residualCutcellFaceWrap and applyCutcellOpExactWrap: per row the y/z offsets once, the first and
+    last cell with ccWrapNbrs, the interior with i +- 1. Same cells, body and operands: bitwise.
+- why: WO-P0 1.28-1.40 (GO); production pass 0.263-0.308 -> 0.180 ms at OMP 24, 3.17 -> 1.16 ms at OMP 1; `cc_smooth` per launch 1.35x at 1x24, low load. Not applied (open): applyCutcellOpFaceWrap and C1's fused matvecDotTo
+
+---
+
+### All-fluid level flag, precomputed fluid count and no staging copies in the pressure and velocity MG (H), bitwise
+- area: flow
+- source: flow `e2b2238` (H-1), `63603e8` (H-2a), `9231daf` (H-2b), `ca5306c` (H-2c), `01162f8` (H-2d); `doc/vof_projection_cost_design.md` §8; log "WO-P0"
+- decided: 2026-10-09 (design H; the 4-copy end state accepted by the coordinator)
+- status: settled
+- quote: |
+    Host single rank: an all-fluid flag and a precomputed fluid count per level; the pressure face
+    coefficients built straight into MG level 0; no level-0 staging in the resident PCG (p = z fused
+    into r.z); the zero-guess matvec skipped; the VMG solve on the caller's Views.
+- rejected: WO-H4 (ibm_build_diff_var) and WO-E0b, dropped by the coordinator for token economy
+- why: host deep copies/step 11 -> 4 (the remaining r <- rhs1 and 3x uOld <- u are outside §8); every item G-BIT host + CUDA
+
+---
+
+### The host pressure-bottom factor runs a bitwise host-only schedule, with its own team constant (6)
+- area: flow
+- source: flow `1090b21` (team 2 -> 6), `62f91ef` `591bde4` `d8cd5ca` (the schedule); `src/mac_cutcell_mg.hpp` kBottomHostFactorTeam; log "A(b) genoa confirmation", "WO-P0"
+- decided: 2026-10-08 (schedule, USER A(b)); 2026-10-09 (value 6, genoa sweep)
+- status: settled
+- quote: |
+    On a host backend the factor runs a second, barrier-light schedule of the same arithmetic (factor
+    storage bitwise identical to the team algorithm's, ctest bottom_direct U8), with its own team
+    constant kBottomHostFactorTeam = 6, independent of the FCG solve kernel's kBottomHostTeam = 8.
+- rejected: running the device team algorithm on the host; sharing kBottomHostTeam = 8; the provisional value 2 (workstation-chosen)
+- why: genoa walls-y P12 b128 sweep: T = 6 1.08 ms per factor vs 1.51 at T = 2, 1.20 at T = 8; G-BIT host PASS (10.00 it/step), bitwise by construction
+- supersedes: "The host pressure-bottom factor runs a bitwise host-only schedule, with its own team constant (2)" (the schedule and the own-constant rule stand; the value 2 -> 6)
+
+---
+
+### The momentum stop residual is one max-reduction at the live site, the RB-GS sweep loop (F-1)
+- area: flow
+- source: flow `fdbcd2f`; `doc/vof_projection_cost_design.md` §7; log "WO-F1 / WO-F2"; ruling F-1 (`gate_proj/DECISIONS_PROJ.log`)
+- decided: 2026-10-09 (coordinator: apply at the live site)
+- status: settled
+- quote: |
+    residualVarPinMax / diffResidualMax form each cell's residual with the verbatim body, take r = 0
+    on the held plane, and return max|r|, max|b - r|, max|b| with no write of velRes_. Bitwise.
+- rejected: applying it in VelocityMG::solve, as the design named (the bubble column's momentum never reaches it)
+- why: 1x8 kp: vmg_maxabs 14.25 -> 0, vmg_maxabsdiff 11.25 -> 0, vmg_zero_plane -> 0; launches/step 1107.0 -> 1078.2; G-BIT host + CUDA
+
+---
+
+### Momentum ghost fills: skip a fill identical to the previous one; the <= 25 bc_vel target is not taken (F-2, F-2b)
+- area: flow
+- source: flow `af4aca7` (F-2), `fc1a712` (F-2b); `doc/vof_projection_cost_design.md` §7; log "WO-F1 / WO-F2", "WO-F2b"
+- decided: 2026-10-09 (coordinator: dedupe only provably identical fills)
+- status: settled
+- quote: |
+    A ghost fill is skipped when the same functor ran on the same field with no field write between
+    (after a non-stopping residual check; the pair before the sweep loop). Bitwise.
+- rejected: merging dependent fills to reach the design's <= 25 bc_vel launches (unreachable under H-3(e): the remaining fills sit between dependent passes)
+- why: 1x8 kp: bc_vel 67.25 -> 62.0 -> 59.0; launches/step 1078.2 -> 1067.7 -> 1061.7; G-BIT host + CUDA
+
+---
+
+### F4 (a persistent host team for the coarse tail) is deferred, with the §10 re-evaluation rule
+- area: flow
+- source: `doc/vof_projection_cost_design.md` §10, §14 item 11; log "WO-P0"
+- decided: 2026-10-09 (design)
+- status: provisional (genoa t_L measured in S-3)
+- quote: |
+    F4 is not in the projection package; it is re-evaluated by the §10 rule from the measured
+    per-launch cost of the coarse tail.
+- rejected: F4 in this package
+- why: WO-P0 workstation: 840 launches x 4 us ~ 3.4 ms (< 5 ms), not triggered
+
+---
+
+### The projected initial guess (E): A-norm projection onto the last one or two solutions, stop relative to the zero-guess residual, Krylov drivers only, opt-in
+- area: flow
+- source: flow `9cff2a0` (E0), `2a59131` (docstrings), `191bba3` (review E0/X1 findings 1-3: the guess matvec builds deferred FP64 data, the c2 = 0 fallback never reads v2, ctest `projected_guess`); `doc/vof_projection_cost_design.md` §5; log "WO-E0", "Landing"
+- decided: 2026-10-09 (design E); opt-in by USER ruling 2026-10-15 (E1 not promoted)
+- status: settled
+- quote: |
+    set_pressure_initial_guess('zero' default | 'projected' | 'auto', history = 2): x0 = c1 phi^n +
+    c2 phi^(n-1) from the 2x2 Galerkin system of the current operator (never worse than x0 = 0 in the
+    A-norm; 0 on non-fluid cells); the stop stays relative to the ZERO-guess residual max|P b|. The
+    history restarts on the setter, a geometry change, a state write, a driver change and a failed or
+    capped solve; no history is checkpointed. Eligible: PCG / FCG, no ghost projection, no legacy warm
+    start, single rank.
+- rejected: x0 = phi^n with an r0-relative stop; unprojected 2 phi^n - phi^(n-1); Fischer L > 2 under per-step operator rebuilds; warm starts under Chebyshev, the standalone V-cycle or BiCGStab; E as the default (USER ruling)
+- why: bubble column, rtol 1e-8, host 1x8 (CUDA identical), --flux device: 300 steps 3056 -> 2796 (history 1, -0.867/step) / 2806 (history 2, -0.833/step); d1 column 2000 steps 21103 -> 19765. G-E1..G-E4, G-E6 PASS; G-NUM-P 3 (per-step div <= 2x) FAILS: max 4.08 over 300 steps (median 1.09), mechanism: both stops land anywhere in (rtol/6, rtol) rref; E's max over the run 0.80x the reference's
+
+---
+
+### Q11 bounded: under PCG/FCG with a double operator a warm start cannot amplify the error
+- area: flow
+- source: `doc/vof_projection_cost_design.md` §5.1 (T1, T2), §14 item 6
+- decided: 2026-10-09 (design E)
+- status: settled
+- quote: |
+    Under PCG/FCG with a double outer operator a warm start cannot amplify (T1: each step is the exact
+    A-norm line search for any preconditioner output) and an r0-relative stop only under-solves
+    boundedly (T2); the registered warm-start divergence needs a non-Krylov driver or a float outer
+    operator.
+- why: first-principles bound; WO-E0b (the reproduction table) was dropped, so the entry records the bound alone. E's stop is relative to the zero-guess residual, so T2 does not apply to it
+
+---
+
+### The resident PCG honours the stop reference stopRef_ (X1, recorded)
+- area: flow
+- source: flow `3be8c2c`, `191bba3` (state_hash case `colocated_bfp`, review E0/X1 finding 3); `doc/vof_projection_cost_design.md` §11 (i), §15 Q-P7; log "WO-X1"
+- decided: 2026-10-09 (USER: Q-P7 fixed, own commit)
+- status: settled
+- quote: |
+    solvePCGResident stops on rn < rtol * rref, rref = stopRef_ > 0 ? stopRef_ : r0 — the test of
+    the distributed loop, FCG and Chebyshev. Unset (every caller but solveBalancedForceSystem): bitwise.
+- why: G-BIT host + CUDA, no state_hash moved (no case runs the balanced-force projection single-rank under PCG); d1cmp all differences 0. Balanced-force iterations, host 1x8, BFP on, run totals staggered / collocated: static-k 1006 -> 655 / 997 -> 680, static 1583 -> 1541 / 1813 -> 1704, moving 913 -> 961 / 982 -> 1036 (its warm r0 exceeds max|b|). The first balanced-force solve of every case caps at 500 before and after (pre-existing). Hash gate: state_hash `colocated_bfp` (collocated ratio-1000 drop, BFP on, MG-PCG 1e-10; BFP iterations per step 500/24/9/12/10 before X1 -> 500/16/4/5/4)
+
+---
+
+### Under the FP32 V-cycle the non-bottom FP64 V-cycle data are built on demand (D5), bitwise
+- area: flow
+- source: flow `fd5166d`; `doc/vof_projection_cost_design.md` §4.4.7; log "WO-D5"
+- decided: 2026-10-09 (design D5)
+- status: settled
+- quote: |
+    With the FP32 V-cycle data built and the exact outer operator, setOpenness leaves the non-bottom
+    levels' FP64 V-cycle data unallocated; ensureFp64 builds them (same kernel, same operands: bitwise
+    the eager build) for every reader — an FP64 V-cycle, a non-exact level-0 apply, BiCGStab.
+- why: MG level arrays per fine cell, 256^3 box, 6 levels: 'fp64' 91.8, 'fp32' with FP64 data 119.3 -> 71.1 B/cell; bubble column CUDA device peak 2144.9 -> 2093.0 B/cell; run-time switches fp32 -> fp64 -> fp32 bitwise (ctest mg_fp32_vcycle)
