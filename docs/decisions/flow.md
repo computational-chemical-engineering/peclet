@@ -4322,13 +4322,14 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: `bubble_column_perf/gate_proj/DECISIONS_PROJ.log` (C0), `s3/DECISIONS_coord.log` 2026-10-09; flow log "Phase 2 end"
 - decided: 2026-10-09 (coordinator)
-- status: provisional (pending Snellius S-3, `bubble_column_perf/s3/s3_proj.slurm`)
+- status: in force — settled 2026-10-16 by genoa S-3 (job 28122155): C0 KEPT
 - quote: |
     C0 stays although its per-launch gate (<= 0.5x) was not met on the workstation; the genoa S-3 run
     decides it. If C0 is no gain there, reconsider it through a new entry (revert C0, redo C1-C4 on
     the 1-lane order).
 - rejected: reverting C0 on the workstation timing (C1-C4 are built and gated on its order)
 - why: workstation 1x24, low load: mgdot per launch 1.11 / 1.00, mgmeanr 0.74 / 0.85 (two re-measures). A level-0 dot moves 12.6 MB in 53-64 us = 200-240 GB/s: bandwidth-bound at 24 threads, so the lanes buy nothing there; the §3.2 premise (175 us/launch, add-chain-bound) was measured on genoa
+- outcome 2026-10-16: genoa S-3 (job 28122155, flow log "S-3 on genoa"): reduction family 8.82 -> 2.16 ms/step; per launch mgdot+mgmeans 174+79 us -> mgmeans_dot 103 us, mgmeanr 174 -> mgmeans_max 72 us (0.41x, gate met). Package total 1x24 82 -> 62.6 ms/step
 
 ---
 
@@ -4419,7 +4420,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: `doc/vof_projection_cost_design.md` §10, §14 item 11; log "WO-P0"
 - decided: 2026-10-09 (design)
-- status: provisional (genoa t_L measured in S-3)
+- status: provisional (genoa t_L still not isolated; S-3 2026-10-16: 853 launches/step x ~4 us = 3.4 ms < 5 ms -> stays deferred)
 - quote: |
     F4 is not in the projection package; it is re-evaluated by the §10 rule from the measured
     per-launch cost of the coarse tail.

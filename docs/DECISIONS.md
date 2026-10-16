@@ -49,7 +49,7 @@ is authoritative.
 - **Boiling scope addition did not resurrect transported-φ CLSVOF**. **Rejected:** transported-φ CLSVOF  <sub>vof-campaign.md:101-106</sub>
 - **Bubble-column benchmark case runs at pressure rtol 1e-8; the solver default stays 1e-10**. **Rejected:** 1e-6 (iterations 7.49, but a systematic gas-volume drift 1.5e-9 per 2000 steps —  <sub>USER</sub>
 - **Byte-identical gating is unmeasurable for atomic-add paths — gate against the path's own run-to-run spread instead**. **Rejected:** a byte-identical regression gate for atomic-add code paths  <sub>defect-correction-campaign.md:55-57</sub>
-- **C0's gain is unproven on the workstation; the genoa S-3 run decides it**. **Rejected:** reverting C0 on the workstation timing (C1-C4 are built and gated on its order)  <sub>flow</sub>
+- **C0's gain is unproven on the workstation; the genoa S-3 run decides it** (2026-10-16: KEPT, genoa reductions 8.8 -> 2.2 ms/step). **Rejected:** reverting C0 on the workstation timing (C1-C4 are built and gated on its order)  <sub>flow</sub>
 - **CA (event-halving) smoothing ships default ON with an env kill switch**.  <sub>comm-scaling-plan.md:23</sub>
 - **CSF force is exact; curvature error is the real budget — improve κ, never the force**. **Rejected:** arithmetic cell-force interpolation (set_csf_mode(1)); improving the force term to chase lower Ca  <sub>vof-campaign.md:430-444</sub>
 - **CUDA wheel dependency name: nvidia-cuda-runtime, not the deprecated -cu13 suffix**. **Rejected:** depending on the `nvidia-cuda-runtime-cu13` package name  <sub>peclet-cuda-wheel-feasible.md:28-30</sub>
