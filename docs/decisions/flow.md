@@ -4482,3 +4482,54 @@ Do not reverse an entry here without recording a new decision that supersedes it
     levels' FP64 V-cycle data unallocated; ensureFp64 builds them (same kernel, same operands: bitwise
     the eager build) for every reader — an FP64 V-cycle, a non-exact level-0 apply, BiCGStab.
 - why: MG level arrays per fine cell, 256^3 box, 6 levels: 'fp64' 91.8, 'fp32' with FP64 data 119.3 -> 71.1 B/cell; bubble column CUDA device peak 2144.9 -> 2093.0 B/cell; run-time switches fp32 -> fp64 -> fp32 bitwise (ctest mg_fp32_vcycle)
+
+---
+
+### Under 'auto' a non-converged FP32 PCG/FCG attempt is re-solved cold with the FP64 V-cycle, and FP64 is latched for the run
+- area: flow
+- source: flow `99dd50b`, `e4f75df`; `doc/vof_projection_distributed_design.md` §3.1, §4; review `bubble_column_perf/gate_dist/REVIEW.md`; log `gate_dist/DECISIONS_DIST.log`
+- decided: 2026-10-16 (design WO-R; USER 2026-10-16 "implement the distributed version and restart")
+- status: settled
+- quote: |
+    Trigger: an FP32 attempt that misses its stop test (cap, non-finite, pAp <= 1e-300). Restart from x = 0 with a fresh
+    maxit and the caller's stop reference: bitwise the 'fp64' cold solve. Latched until set_pressure_vcycle_precision is
+    called again; forced 'fp32' never restarts; one warning line on rank 0. Rejected: restart from the current iterate;
+    per-solve retry without latch; a stagnation trigger; a density-ratio bound in eligibility; restart under forced 'fp32'.
+- why: review finding 3 (gate_proj/REVIEW_C0_D_G.md): FP32 capped where FP64 converged on the walled slab (box 1e4 PCG 124 -> cap, pack 1e3/1e4 FCG 123/135 -> cap), unflagged. After WO-R, F-4 (66 CUDA probe configs): 0 solves where 'fp64' converged and 'auto' did not; 13 restarts, p after each bitwise 'fp64'. A cap persisting under FP64 does not set pressure_solve_failed() (design Q-6 default)
+
+---
+
+### 'auto' V-cycle precision means FP32 where eligible on device backends only; host 'auto' is 'fp64'
+- area: flow
+- source: flow `85b66fb`; `doc/vof_projection_distributed_design.md` §0; parent `doc/vof_projection_cost_design.md` Q-P1
+- decided: 2026-10-16 (design WO-A)
+- status: settled
+- quote: |
+    effectiveVprec() has a hostOnly term: on HostSpace 'auto' -> 'fp64'. Rejected: host 'auto' = FP32.
+- why: host projection gain 0.92-0.95 misses the 0.88 rule (Q-P1); CUDA 0.808 single rank. Host 'auto' memcmp-equal to 'fp64'
+
+---
+
+### The distributed FP32 V-cycle runs in the host-scalar PCG/FCG with one GridHalo<float> per FP32 level, FP64 from the first telescope point down
+- area: flow
+- source: flow `acf495a`, `87cdd62`, `5baf24b`, `afa062b`; `doc/vof_projection_distributed_design.md` §3.2, §5
+- decided: 2026-10-16 (design WO-D1/D2)
+- status: settled
+- quote: |
+    Mirror rule: op for op the distributed FP64 V-cycle incl. the CA ring (g = 2), sharing the single-rank FP32 cell bodies
+    (np = 1 memcmp-equal to single rank). FP32 down to fp32Last_ (first telescope point); below it and at the bottom the
+    FP64 code unchanged. No collective added per V-cycle; one Allreduce of the range flags per build. Rejected: a
+    distributed device-resident PCG; float telescope stages; reusing the double halo buffers.
+- why: G-DD1 np 1 memcmp 5 problems PCG+FCG; np 2-8 vs np 1 x within 2e-14 (column) .. 2.1e-9 (box64, |x| 5.5e4), iterations equal; G-DD3 rel <= 9.9e-14 vs 'fp64'. Cost: 'auto' at np > 1 keeps FP64 + FP32 level data (~ +30 % MG memory). np > 1 speed with one rank per GPU: S-4 (pending)
+
+---
+
+### The distributed projected guess allreduces its Gram packet; its history resets on init_mpi and every redistribute
+- area: flow
+- source: flow `a7d3e9e`; `doc/vof_projection_distributed_design.md` §3.3, §6
+- decided: 2026-10-16 (design WO-E)
+- status: settled
+- quote: |
+    One SUM over the five Gram sums, one MAX for rref on l0.comm; guard unchanged (d > 1e-10 G22). History reset on init_mpi
+    and on every redistribute, size-preserving included. Rejected: carrying phi^(n-1) through redistribute.
+- why: G-ED1 np 1 memcmp-equal to single rank (VoF var-rho, iterations 87/84/81); G-ED2 du <= 6.9e-17, dp <= 1.1e-16; G-ED3 max residual 9.83e-11 (gate 1.5e-10). E's default stays 'zero' (E1 failed G-NUM-P 3)

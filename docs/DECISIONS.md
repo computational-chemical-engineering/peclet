@@ -247,6 +247,10 @@ is authoritative.
 - **UCX_RNDV_THRESH tuning is falsified as an explanation for the np8 anomaly — leave UCX defaults**. **Rejected:** tuning UCX_RNDV_THRESH=256k  <sub>comm-scaling-plan.md:57</sub>
 - **USER: the FP32 V-cycle and the projected initial guess stay opt-in; the pressure-solve defaults do not change**. **Rejected:** 'auto' as the default on device backends (37f8f5f, reverted): single-rank-only fast paths as defaults break serial <-> np=1 bit-exactness, and under '  <sub>user</sub>
 - **Under the FP32 V-cycle the non-bottom FP64 V-cycle data are built on demand (D5), bitwise**.  <sub>flow</sub>
+- **Under 'auto' a non-converged FP32 PCG/FCG attempt is re-solved cold with the FP64 V-cycle, and FP64 is latched for the run**.  <sub>flow</sub>
+- **'auto' V-cycle precision means FP32 where eligible on device backends only; host 'auto' is 'fp64'**.  <sub>flow</sub>
+- **The distributed FP32 V-cycle runs in the host-scalar PCG/FCG with one GridHalo<float> per FP32 level, FP64 from the first telescope point down**.  <sub>flow</sub>
+- **The distributed projected guess allreduces its Gram packet; its history resets on init_mpi and every redistribute**.  <sub>flow</sub>
 - **User decision: port Basilisk embed.h, not Trebotich–Graves, for 2nd-order collocated walls**. **Rejected:** Trebotich–Graves/EBChombo as the primary port target  <sub>sdflow-collocated-solver.md:186-191</sub>
 - **User directive: ghost-cell IBM must become production-grade (it generalizes to AMR better than cut-cell)**.  <sub>ghost-hardening-plan.md:11-14</sub>
 - **V-cycle stale-ghost bug made MG convergence decomposition-dependent; fixed, now iteration count is decomposition-independent**. **Rejected:** reading stale ghosts in the V-cycle residual  <sub>channel-scaling-rebenchmark.md:67-73</sub>
