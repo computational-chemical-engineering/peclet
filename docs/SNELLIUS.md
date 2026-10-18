@@ -247,6 +247,20 @@ It is **slow above ~a hundred ranks** — run it in the background, one rank cou
 for: an odd axis never coarsens at all, and under MPI a level coarsens an axis only if *every*
 rank's block is even on it, so achievable depth is set by the per-rank block, not the global grid.
 
+## Open performance anomalies (2026-10-18)
+
+Unexplained timings on Snellius, kept here so a later run is read against them. Multi-GPU runs are
+judged by weak scaling at a size per GPU that fills the GPU (register, suite-wide, 2026-10-18).
+Evidence lives in `~/Codes/bubble_column_perf/` (not in git) unless a repo path is given.
+
+| # | where | what | status |
+|---|---|---|---|
+| G1 | gpu_h100, 1 node, job 28221803 (gcn105) | bubble column 128x96x64 split over 4 H100s (64x48x64 per rank, GPU-aware UCX, `--gpu-bind=per_task:1`): 1335 ms/step against 46 ms at 2 GPUs; only the pressure solve slows (~3.4 ms per halo exchange, cost follows bytes). The 4-rank case is the only one-node case pairing GPUs (26,C6) and (06,A6). Not reproducible on the workstation (MPI there is not CUDA-aware; the same decomposition costs the same as an x-only split). | hypothesis: no CUDA IPC between some GPU pairs when each rank sees one GPU, UCX falls back; untested (`gpu_diag/MGPU_REPORT.md`, `s4/summary_s4a.txt`) |
+| G2 | gpu_h100, 2 nodes, job 28221804 (gcn153, gcn158) | same case with 0.79M cells per GPU, 8 GPUs: ~1.2 ms per halo exchange, bytes-sensitive (one node: 0.08-0.2 ms). | same as G1, inter-node path |
+| G3 | gpu_h100, release 1.1.0 | packed bed 384³ strong ladder: 16 GPUs 1349 ms/step against 574 at 8 and 539 at 32; same iterations and sweeps, reproduced on 4 allocations | undiagnosed (`peclet-examples/benchmarks/release-1.1.0-scaling/index.qmd`) |
+| G4 | gpu_h100, one node | fixed cost per halo exchange 0.08-0.2 ms with GPU-aware MPI between H100s on one node, against ~10-20 µs expected over NVLink | unexplained; matters only for small subdomains |
+| C1 | genoa, 192 cores (64 ranks x 3 threads), jobs of 2026-10-03 and 28238662 | rare single-step stalls of 340-500 ms against a 55 ms median in peclet runs (seen in both jobs) | undiagnosed; quote medians of runs |
+
 ## Pointers
 
 - `docs/DECOMPOSITION_AND_MULTIGRID.md` — the per-axis coarsening rule, aligned vs coarse-first
