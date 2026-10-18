@@ -4547,3 +4547,15 @@ Do not reverse an entry here without recording a new decision that supersedes it
     users of pure-MPI layouts set the bottom explicitly. Rejected: a thread-count term in 'auto'.
 - rejected: choosing 'algebraic' when threads per rank are few and the bottom is large
 - why: 'direct' and 'algebraic' differ at ~1e-14, so a thread rule would make results depend on OMP_NUM_THREADS (QUALITY_PLAN D3 spirit; H-1 made 'direct' thread-count independent on purpose). 'direct' wins at >= 2 threads/rank (12x2 near-cap 90 vs 109) and everywhere on the bubble column (24x1 72 vs 79).
+
+### Device VoF block statistics reduce over fixed 512-cell tiles in fixed tile order (recorded diagnostics-order change); no lazy evaluation
+- area: flow
+- source: flow `44a4f76` (bbox, bitwise), `11593fb` (stats + compacted interface area); evidence `bubble_column_perf/gpu_diag/STATS_REPORT.md`
+- decided: 2026-10-18 (coordinator)
+- status: settled
+- quote: |
+    Each job's inner box is cut into 512-cell tiles, one team each; partials combine in fixed tile order, so results do not
+    depend on the team count. Device kernel time 2.21 -> 0.27 ms/step on the bubble column. The stats packet feeds
+    diagnostics only (vof_block_stats, the previous centroid for the velocity diagnostic); solver state is bitwise (G-BIT).
+- rejected: (b) lazy statistics computed only when read; one team per job (the old device schedule); tile sizes 256/1024/4096
+- why: lazy saves at most ~0.25 ms/step more and relies on the block colour (ghosts included) staying unchanged between measure and read, which no gate checks. The reorder moves the CUDA diagnostics by <= 1.2e-15 rel (velocity 3.8e-11 of |v|, = a 1.3e-15 centroid difference); host keeps one team per job and stays bitwise.

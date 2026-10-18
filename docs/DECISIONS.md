@@ -226,6 +226,7 @@ is authoritative.
 - **The defect-correction rule: Krylov matvec/residual must be the exact double operator in flux form; preconditioners below may stay float**.  <sub>defect-correction-campaign.md:14-17</sub>
 - **The distributed host 'direct' bottom runs redundantly on every rank, from the allgathered bottom openness (WO-H6, landed 2026-10-18)**. **Rejected:** a rank-0 solve plus broadcast; GraphAMG  <sub>flow</sub>
 - **Distributed host 'auto' bottom = 'direct' at any thread count; no thread-count cost term**. **Rejected:** choosing 'algebraic' at 1 thread/rank near the size cap (faster there, but results would depend on OMP_NUM_THREADS)  <sub>flow</sub>
+- **Device VoF block statistics reduce over fixed 512-cell tiles in fixed tile order (recorded diagnostics-order change); no lazy evaluation**. **Rejected:** lazy statistics on read; one team per job  <sub>flow</sub>
 - **The float-operator guard also flags float template arguments and defaults**.  <sub>flow</sub>
 - **The host pressure-bottom factor runs a bitwise host-only schedule, with its own team constant (6)**. **Rejected:** running the device team algorithm on the host; sharing kBottomHostTeam = 8; the provisional value 2 (workstation-chosen)  <sub>flow</sub>
 - **The immersed scalar wall flux is never a two-point / series-resistance flux over the cut cell's centroid distance**. **Rejected:** the centroid two-point wall flux and the series-resistance (GFM, Liu–Fedkiw–Kang) wall and interface flux (first order; at the Maxwell disc, d/h = 128  <sub>flow</sub>
