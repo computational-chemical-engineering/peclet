@@ -727,10 +727,10 @@ is authoritative.
 
 ## suite-wide — naming, layout, provisioning
 
-32 in force, 1 superseded — full text in [`decisions/suite-wide.md`](decisions/suite-wide.md)
+33 in force, 1 superseded — full text in [`decisions/suite-wide.md`](decisions/suite-wide.md)
 
 ### In force
-
+- **USER DIRECTIVE: multi-GPU performance is measured by weak scaling only, at a system size per GPU large enough to fill the GPU**. **Rejected:** strong scaling of small cases on GPUs (S-4: 0.1-0.4M cells per GPU) as a health measure  <sub>suite-wide</sub>
 - **A host backend that does not size itself must be handed the thread budget**. **Rejected:** keeping the "say nothing on an unconstrained machine" policy for every backend (it is  <sub>archive/RELEASE_PREP_1.0-1.1.md</sub>
 - **A solver's internal grid-count threshold is a count, not cell-unit API**. **Rejected:** a physical-length form (wrong: the same length means a different level count at a  <sub>amr</sub>
 - **All coupled methods must share one BlockDecomposer; static-only co-decomposition is rejected**. **Rejected:** "Static-only co-decomposition"  <sub>multiphysics-framework-plan.md:410</sub>

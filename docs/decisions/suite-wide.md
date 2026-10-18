@@ -480,3 +480,18 @@ Do not reverse an entry here without recording a new decision that supersedes it
     mu*dt catches it
 - conflict: sharpens suite-wide "flow is the reference ... Basilisk face-acceleration form
     REJECTED" (2026-09-03)
+
+### USER DIRECTIVE: multi-GPU performance is measured by weak scaling only, at a system size per GPU large enough to fill the GPU
+- area: suite-wide
+- source: user 2026-10-18 (this session); evidence `~/Codes/bubble_column_perf/gpu_diag/DECISIONS_GPU.log`, `s4/summary_s4a.txt`
+- decided: 2026-10-18
+- status: settled
+- quote: |
+    "It seems multi-GPU should be tested by weak scaling only, with system sizes per GPU large
+    enough." (user, 2026-10-18)
+- rejected: strong scaling of small cases on GPUs (e.g. S-4: the 0.79M-cell bubble column split
+    over 2-8 H100s, 0.1-0.4M cells per GPU), and judging multi-GPU health from such runs
+- why: at 0.2-0.8M cells per GPU the ~0.1-0.2 ms fixed cost per halo exchange (~376 per step)
+    dominates a 17 ms step; the earlier H100 benchmarks (17-57M cells per GPU, steps 0.4-3 s,
+    same launch) scaled well. Small-case strong scaling measures latency and transport, not the
+    solver. CPU layouts (ranks x threads on one node) are not covered by this entry.
