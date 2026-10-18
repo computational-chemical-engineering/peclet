@@ -3758,11 +3758,11 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - rejected: team reductions on host (order depends on the team size)
 - why: a thread-count-independent host result, matching the register's host reduction-order rule (B2)
 
-### The distributed host 'direct' bottom runs redundantly on every rank, from the allgathered bottom openness (WO-H6, designed, not yet implemented)
+### The distributed host 'direct' bottom runs redundantly on every rank, from the allgathered bottom openness (WO-H6, landed 2026-10-18)
 - area: flow
-- source: design `doc/vof_step_performance_design.md` §14.3 H-6, §14.8 entry 3
-- decided: 2026-10-04
-- status: settled (design; until WO-H6 lands the distributed path keeps GraphAMG — S-1 6x4/3x8/8x3 ran 'algebraic')
+- source: design `doc/vof_step_performance_design.md` §14.3 H-6, §14.8 entry 3; flow `36a3ce6` + review fixes `6350a07`..`e3fbede` (ctest `bottom_direct_mpi`), docs `b820652`
+- decided: 2026-10-04; landed 2026-10-18
+- status: settled (in force; np 1 bitwise to single-rank 'direct', np > 1 G-NUM-H 2.3-3.6e-14 with iterations identical every step — the design's np > 1 bitwise clause was over-strong: np > 1 was already not bitwise on the bubble column, 'algebraic' 5.9e-14; workstation 8x3 61.4 -> 53.6 ms/step)
 - quote: |
     Under MPI the host 'direct' bottom is factored and solved redundantly on every rank from the
     allgathered bottom openness; no rank-0 solve and broadcast.
@@ -4533,3 +4533,17 @@ Do not reverse an entry here without recording a new decision that supersedes it
     One SUM over the five Gram sums, one MAX for rref on l0.comm; guard unchanged (d > 1e-10 G22). History reset on init_mpi
     and on every redistribute, size-preserving included. Rejected: carrying phi^(n-1) through redistribute.
 - why: G-ED1 np 1 memcmp-equal to single rank (VoF var-rho, iterations 87/84/81); G-ED2 du <= 6.9e-17, dp <= 1.1e-16; G-ED3 max residual 9.83e-11 (gate 1.5e-10). E's default stays 'zero' (E1 failed G-NUM-P 3)
+
+---
+
+### Distributed host 'auto' bottom = 'direct' at any thread count; no thread-count cost term
+- area: flow
+- source: flow `b820652` (CLAUDE.md bottom paragraph, design header); evidence `bubble_column_perf/dist_cpu/FIX_REPORT.md` (F3)
+- decided: 2026-10-18 (coordinator)
+- status: settled (revisit with the genoa S-2 layouts incl. 1 thread/rank)
+- quote: |
+    'auto' keeps 'direct' on distributed host whenever it is eligible (size caps 8192 cells / 192-cell plane). At 1 thread
+    per rank with a bottom near the cap 'algebraic' is faster (workstation 24x1, 7680-cell bottom: 113 vs 161 ms/step);
+    users of pure-MPI layouts set the bottom explicitly. Rejected: a thread-count term in 'auto'.
+- rejected: choosing 'algebraic' when threads per rank are few and the bottom is large
+- why: 'direct' and 'algebraic' differ at ~1e-14, so a thread rule would make results depend on OMP_NUM_THREADS (QUALITY_PLAN D3 spirit; H-1 made 'direct' thread-count independent on purpose). 'direct' wins at >= 2 threads/rank (12x2 near-cap 90 vs 109) and everywhere on the bubble column (24x1 72 vs 79).
