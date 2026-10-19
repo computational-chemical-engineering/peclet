@@ -4207,7 +4207,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: USER ruling 2026-10-15 (`bubble_column_perf/gate_proj/DECISIONS_PROJ.log`); flow `23a9c8c` (revert of the D default `37f8f5f`), `2a59131` ('auto' restored as an opt-in value); `doc/vof_projection_cost_design.md` Outcome
 - decided: 2026-10-15 (USER: "yes, I take the recommendation")
-- status: settled
+- status: superseded for the V-cycle precision by the USER ruling of 2026-10-19 (below); the initial-guess half stands
 - quote: |
     The FP32 V-cycle preconditioner stays opt-in ('fp64' default) and the projected guess stays
     opt-in ('zero' default, E1 not promoted). Both setters take 'auto' as an OPT-IN value meaning the
@@ -4605,3 +4605,17 @@ Do not reverse an entry here without recording a new decision that supersedes it
     accumulator FMA chains and barriers, not by L2 latency. Bottom FCG v2 (B2, design R-1) was conditional on F1 and is not done.
 - rejected: shared-memory Σ -> L -> W factor (R-2); B2 bottom FCG v2 (R-1) in this package
 - why: the premise (L2 latency bound) was false on measurement; the remaining cost is to be hidden by the side instance (above), not shortened.
+
+### USER: the pressure V-cycle precision defaults to 'auto' (FP32 on device where eligible, FP64 restart); the initial guess stays 'zero'
+- area: flow
+- source: USER ruling 2026-10-19 ("Yes, make the GPU V-cycle default 'auto'"); flow `a942251` (flip, isolated), `eb6f737` (gate numbers); design `doc/vof_projection_distributed_design.md` §9; evidence `bubble_column_perf/gate_dist/WOF_REPORT.md`, Snellius S-4 `s4/summary_s4a.txt`
+- decided: 2026-10-19 (USER)
+- status: settled; supersedes the V-cycle half of "USER: the FP32 V-cycle and the projected initial guess stay opt-in" (2026-10-15)
+- quote: |
+    Default vprec_ = 'auto': FP32 V-cycle where eligible on device backends, at every np, with the FP64 restart on a cap or
+    breakdown (latched); host 'auto' = FP64, so host results are bitwise unchanged. The 2026-10-15 revisit conditions were met
+    (FP64 restart + distributed FP32 landed 2026-10-17). F-1..F-7 on the flip commit: CUDA single rank 0.723 x 'fp64'
+    projection, np2 1.010; 66 probe configs 0 violations; 2000 steps 0 restarts. units_scale_invariance pins 'fp64'.
+    CUDA state hashes re-baselined (table in a942251's message).
+- rejected: keeping 'fp64' as the device default; a single-rank-only flip (S-4: auto/fp64 <= 1 at np 1/2/4/8); flipping E (initial guess) as well (E1 failed its own gate)
+- why: ~5 % per step on one H100 (16.9 -> 16.1 ms), -28 % projection on the RTX 5080, never slower at np > 1; correctness guarded by the FP64 restart; the change is confined to device last digits (~1e-13 rel).
