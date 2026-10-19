@@ -4587,7 +4587,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: flow `0a78b0a` (WO-X), `4abd575` (join before lv_.clear()); design §9 R-5; gate ctest `prefactor_hoist_bitwise`
 - decided: 2026-10-19 (coordinator; landed flow ddd753a)
-- status: settled (overlap fraction to be confirmed quiet: gpu_diag/gate/runs/quiet3)
+- status: settled (confirmed quiet 2026-10-19, RTX 5080: overlap 0.89 (fp64) / 0.885 (auto), 0 global syncs in the window; step fp64 19.95 -> 16.59, auto 16.98 -> 13.53 ms vs flow 11593fb; gpu_diag/gate/runs/quiet4)
 - quote: |
     The coefficients are built right after updateProperties(); the factor runs on a partition_space side instance and is
     joined at the start of the first bottom solve. Hoist on vs off is memcmp-identical (u, v, w, p, C over 10 steps).
