@@ -4619,3 +4619,33 @@ Do not reverse an entry here without recording a new decision that supersedes it
     CUDA state hashes re-baselined (table in a942251's message).
 - rejected: keeping 'fp64' as the device default; a single-rank-only flip (S-4: auto/fp64 <= 1 at np 1/2/4/8); flipping E (initial guess) as well (E1 failed its own gate)
 - why: ~5 % per step on one H100 (16.9 -> 16.1 ms), -28 % projection on the RTX 5080, never slower at np > 1; correctness guarded by the FP64 restart; the change is confined to device last digits (~1e-13 rel).
+
+### The distributed host PCG runs C2-C4 with unchanged MPI calls (design §12 entry 4)
+- area: flow
+- source: doc/vof_distributed_host_comm_design.md §4 row "Krylov", §5.4, §12 item 4; doc/vof_projection_cost_design.md §6
+- decided: 2026-10-19
+- status: settled (landed core v1.6.0 fcb3b06, flow be35841)
+- quote: |
+    The distributed host-scalar PCG (and FCG) fuse the update with the fluid {sum, count} of r (C2), the mean
+    subtract with max|r| (C3) and the level-0 V-cycle exit subtract with r.z (C4), host memory only, in the
+    ccReduce3Lanes order, then the SAME allreduceSum2 / MAX / SUM calls: every global scalar bitwise at every np.
+- rejected: C1 (p.Ap in the matvec: the box matvec splits rows interior/shell, the lane order cannot be kept);
+  merging max|r| into the {sum, count} Allreduce (needs a user op or a rank-ordered Allgather, changes the np > 1
+  sum order: class b for ~0.4 ms); pipelined CG (class b, less stable)
+- why: -4 Krylov launches per PCG iteration at np 1 (11 -> 7; single rank 8) with every gate bitwise (G-BIT-D 1-4,
+  FCG / FP32 V-cycle / projected-guess variants np 1/2/4); the ghost entries of x and r are no longer updated
+  (no reader before the next exchange: listed in flow commit distcomm-k4).
+
+### Pressure-MG stencil exchanges use a faces-only halo with rank-local periodic axes read in-kernel
+- area: flow (+ core GridHaloTopology Neighborhood::Faces)
+- source: doc/vof_distributed_host_comm_design.md §5.2
+- decided: 2026-10-19
+- status: settled (landed core v1.6.0 fcb3b06, flow be35841)
+- quote: |
+    Smoother, residual and matvec exchange on Level::sdev/sdevf (Neighborhood::Faces, periodicity cleared on the
+    wrap axes M_L: one block on the axis, no outflow face, even extent, no overlay); masked axes read the wrap in the
+    box kernels (wrapMask). np 1 has no stencil exchange and one smoother launch per colour pass. `dev` (full) stays
+    for prolong, operator/openness fills and CA smoothing.
+- rejected: 26-neighbour fills for 7-point stencils; routing np 1 to the single-rank engines (§14 Q-H2)
+- why: partners per stencil exchange 8x3 5 -> 3, 24x1 17 -> 5; np 1 cc_smooth_box launches 3200 -> 1920 per 3 steps;
+  bitwise (G-BIT-D, mg_stencil_halo_np{1,2,4}, mutation-checked).

@@ -501,3 +501,51 @@ Do not reverse an entry here without recording a new decision that supersedes it
     them to leaf DOFs.
 - rejected: flow-private copies (amr and VoF would fork them); a core Krylov (core's MomentumSolver binds the operator to a CSR type and the vectors to a [0, n)+ghost-tail layout, and flow's blocks interleave ghosts)
 - why: amr (per-leaf SDF samples) and the VoF species hook (plane source) reuse the same κ / aperture / facet / probe kernels, so the geometry stays consistent by construction across codes
+
+### On-node halo exchange by MPI-3 shared windows with sequence flags (GridHalo, host memory only)
+- area: core
+- source: flow doc/vof_distributed_host_comm_design.md §4 rows "overlap"/"transport", §5.5, §12 item 5;
+  bubble_column_perf/distcomm/STATE.md (K5 section)
+- decided: 2026-10-19
+- status: settled (landed core v1.6.0 fcb3b06, flow be35841) (default on a host memory space; debug kill switch PECLET_CORE_HALO_SHM=0, bitwise-neutral)
+- quote: |
+    On a host memory space GridHalo moves on-node payloads through an MPI-3 shared window per instance:
+    the sender's gather writes straight into the receiver's parity-(s & 1) slot and publishes exchange s
+    with a release store of seq[s & 1]; the receiver acquires it, unpacks and releases `consumed = s`.
+    Off-node partners keep the persistent MPI requests; device builds are unchanged.
+- rejected: eager-limit tuning (btl_sm_eager_limit / UCX_RNDV_THRESH) as the fix — site- and version-specific,
+  two copies; an MPI progress thread / MPI_THREAD_MULTIPLE — fragile with Kokkos OpenMP; MPI progress inside
+  the interior sweep (chunked sweeps + MPI_Testall) — more fork/joins, single-threaded copy.
+- why: WO-0/M2 showed the halo transfer progresses only inside MPI (rendezvous in exchangeEnd), protocol share
+  10.9–12.5 µs/exchange after K1; with K5 M2 measures 1.05–1.73 µs (kill switch 11.4–13.2, same binary,
+  load 28–39, provisional). Class a: G-BIT-D bitwise twice, shm on vs off bitwise in one build (np 4, 8).
+- constraint: GridHalo::init and the instance's destruction are COLLECTIVE over the topology communicator
+  (node split, MPI_Win_allocate_shared / MPI_Win_free); every consumer creates and destroys instances at the
+  same program point on every rank (verified for flow and pnm at K5).
+
+### GridHalo on host: one gather launch, calling-thread copies below kHaloSerialCopy, persistent requests
+- area: core
+- source: flow doc/vof_distributed_host_comm_design.md §5.1; WO-0 M2/M3 (flow doc/vof_step_performance_log.md, d3e0439)
+- decided: 2026-10-18
+- status: settled (landed core v1.6.0 fcb3b06, flow be35841)
+- quote: |
+    exchangeBegin runs ONE parallel_for over self-copy + pack; on a host memory space a gather or unpack of at most
+    kHaloSerialCopy = 2048 elements runs on the calling thread; tag 0 runs on persistent requests built at init
+    (Startall/Waitall), any other tag on Isend/Irecv.
+- rejected: separate self-copy and pack launches; Isend/Irecv per exchange; merging unpack into the shell sweep;
+  MPI_Neighbor_alltoallv (blocking completion, no gain on one node)
+- why: on a 3-thread rank each launch is ~8.5 us of fork/join for a few hundred elements; M3 copy crossover T=3 one CCD
+  4096, straddled 8192, T=1 none to 16384 (2048 kept); M2 L2/L3 exchange 13-20 -> 5-7 us. Class a (G-HALO, G-BIT-D).
+
+### GridHalo fences only where MPI needs it
+- area: core
+- source: bubble_column_perf/gpu_diag/MGPU_REPORT.md Q2a; core 460cb56
+- decided: 2026-10-19
+- status: settled (landed core v1.6.0 fcb3b06, flow be35841)
+- quote: |
+    exchangeBegin fences before MPI only when the instance has an MPI partner; exchangeEnd does not fence after the
+    unpack (stream-ordered before the caller's next kernel), except on the GPU-aware path, where a caller may hand the
+    exchanged device field straight to MPI.
+- rejected: unconditional fences in exchangeBegin and exchangeEnd
+- why: ~6 ms/step on the device np 1 distributed path (892 vs 176 fences/step); host staging is fenced by the
+  two-argument deep_copy; consumers (flow, pnm) use one execution-space instance. Bitwise (G-BIT-D, device m1/np2).
