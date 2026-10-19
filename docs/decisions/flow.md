@@ -4559,3 +4559,49 @@ Do not reverse an entry here without recording a new decision that supersedes it
     diagnostics only (vof_block_stats, the previous centroid for the velocity diagnostic); solver state is bitwise (G-BIT).
 - rejected: (b) lazy statistics computed only when read; one team per job (the old device schedule); tile sizes 256/1024/4096
 - why: lazy saves at most ~0.25 ms/step more and relies on the block colour (ghosts included) staying unchanged between measure and read, which no gate checks. The reorder moves the CUDA diagnostics by <= 1.2e-15 rel (velocity 3.8e-11 of |v|, = a 1.3e-15 centroid difference); host keeps one team per job and stays bitwise.
+
+### Single-rank device mean removal uses a per-level device fluid count; no per-iteration reduction has two results
+- area: flow
+- source: flow `6c3dc1b` (WO-S1), design `doc/vof_gpu_coarse_tail_design.md` §9 R-3; evidence `bubble_column_perf/gpu_diag/IMPL_GPU_REPORT.md`
+- decided: 2026-10-19 (coordinator; landed flow ddd753a)
+- status: settled
+- quote: |
+    Kokkos 5.1 combined (two-result) reducers fence twice per call; the fluid count per level is fixed per hierarchy, so it
+    lives in a device scalar and the mean is a single-result reduction.
+- rejected: `{sum, count}` reductions into device Views every iteration
+- why: two global fences per mean removal per iteration; bitwise on CUDA because the MDRange reduce tree does not depend on the value size (unproven on HIP: LUMI bits may move, still deterministic).
+
+### On device, step() holds no global synchronization; guarded by the ctest device_sync_budget
+- area: flow
+- source: flow `6f0dbd2` (S2), `9ea674d` (S4), `2ef7396` + `fcaa772` (S4b), `c4aa7c4`, `7f7c017`; design §9 R-4; review `bubble_column_perf/gpu_diag/REVIEW_GPU.md`
+- decided: 2026-10-19 (coordinator; landed flow ddd753a)
+- status: settled
+- quote: |
+    Instance-scoped copies, fills and fences (CCExec().fence()), pinned host packets. Global CUDA fences per step 38 -> 0 on
+    the bubble column; device_sync_budget pins global 0, View allocations 0, and combined-reducer fences only on an
+    allowlist (vmg_resid_max, rho_minmax, overlap_census: a separate package).
+- rejected: bare Kokkos::fence() or exec-less deep_copy inside step(); an exact pinned count of combined fences (iteration-dependent)
+- why: each global fence drains the device and blocks the side-instance overlap. External consequence: step() no longer syncs at entry, so a Python driver writing field_view from its own non-blocking stream must sync it first (documented on field_view).
+
+### Variable-rho single-rank device: bottom 'direct' factor on a side execution instance right after updateProperties()
+- area: flow
+- source: flow `0a78b0a` (WO-X), `4abd575` (join before lv_.clear()); design §9 R-5; gate ctest `prefactor_hoist_bitwise`
+- decided: 2026-10-19 (coordinator; landed flow ddd753a)
+- status: settled (overlap fraction to be confirmed quiet: gpu_diag/gate/runs/quiet3)
+- quote: |
+    The coefficients are built right after updateProperties(); the factor runs on a partition_space side instance and is
+    joined at the start of the first bottom solve. Hoist on vs off is memcmp-identical (u, v, w, p, C over 10 steps).
+- rejected: lazy factor at the first bottom solve (serial, ~3 ms on the critical path); CUDA graphs in this package; native CUDA events
+- why: density changes the operator every step, so the factor cannot be lagged (not bitwise); overlapping it with the velocity/VoF work is the only bitwise way to take it off the critical path. Host and distributed builds never take the side path.
+
+### The device bottom factor stays in the global-memory schedule; the team-shared-memory schedule (F1) is rejected on measurement
+- area: flow
+- source: design `doc/vof_gpu_coarse_tail_design.md` R-2 (NOT landed); evidence `bubble_column_perf/gpu_diag/P2_ANALYSIS.md`, IMPL_GPU2_REPORT.md; WIP `gpu_diag/gate/f1wip_tree.patch`
+- decided: 2026-10-19 (coordinator)
+- status: settled (revisit only with a design that breaks the dependent-phase chain)
+- quote: |
+    Quiet H/W, walls-y b = 128: global schedule 3.100/3.105 ms, forced shared-memory 3.020/3.020 ms (bitwise): saves
+    0.03-0.08 ms, below the 0.5 ms acceptance rule. The factor is ~2000 dependent phases at ~1.5 us, bound by single-
+    accumulator FMA chains and barriers, not by L2 latency. Bottom FCG v2 (B2, design R-1) was conditional on F1 and is not done.
+- rejected: shared-memory Σ -> L -> W factor (R-2); B2 bottom FCG v2 (R-1) in this package
+- why: the premise (L2 latency bound) was false on measurement; the remaining cost is to be hidden by the side instance (above), not shortened.
