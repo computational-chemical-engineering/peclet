@@ -4649,3 +4649,15 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - rejected: 26-neighbour fills for 7-point stencils; routing np 1 to the single-rank engines (§14 Q-H2)
 - why: partners per stencil exchange 8x3 5 -> 3, 24x1 17 -> 5; np 1 cc_smooth_box launches 3200 -> 1920 per 3 steps;
   bitwise (G-BIT-D, mg_stencil_halo_np{1,2,4}, mutation-checked).
+
+### Communication-avoiding coarse smoothing with walls (WO-K2) is NOT adopted; measured neutral to harmful on genoa
+- area: flow
+- source: flow branch `distcomm-k2` 7ab3f22 (kept, unmerged); genoa job 28302113 (`bubble_column_perf/dist_cpu/s2c/comm-5cb356e/summary.txt`); design `doc/vof_distributed_host_comm_design.md` §5.3
+- decided: 2026-10-19 (coordinator)
+- status: settled (revisit only with a CA ring that exchanges faces/edges only and a recount of the §9 exchange bound)
+- quote: |
+    Bitwise (CA on vs off identical), but cores 0-23, N = 200, 2 reps: k2/new 0.997 (8x3), 1.055 (24x1), 0.995 (6x4),
+    1.009 (4x1x2), 1.013 (np 1). Exchanges 323/step against the design bound <= 262 (the bound omitted the per-build
+    ring-openness refill); CA levels exchange the full 26-neighbour halo, wait per exchange 63 -> 410 us at 24x1.
+- rejected: merging K2; narrowing "Domain-BC paths stay blocking" for it (the entry stays as it was)
+- why: no layout gains more than 0.5 %, 24x1 loses 5.5 %; the remaining multi-rank gap is load imbalance (per-rank kernel time 46-81 ms at 24x1; CCD-straddling ranks 85 vs 66 ms at 8x3), which CA does not address.

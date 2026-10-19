@@ -258,6 +258,7 @@ is authoritative.
 - **USER: the pressure V-cycle precision defaults to 'auto' (FP32 on device where eligible, FP64 restart); the initial guess stays 'zero'** (2026-10-19). **Rejected:** keeping 'fp64' on device; a single-rank-only flip; flipping E too  <sub>flow</sub>
 - **The distributed host PCG runs C2-C4 with unchanged MPI calls (design §12 entry 4)**. **Rejected:** C1 (p.Ap in the matvec: the box matvec splits rows interior/shell, the lane order cannot be kept); merging max|r| into the {sum, count} Allreduce (needs a user   <sub>flow</sub>
 - **Pressure-MG stencil exchanges use a faces-only halo with rank-local periodic axes read in-kernel**. **Rejected:** 26-neighbour fills for 7-point stencils; routing np 1 to the single-rank engines (§14 Q-H2)  <sub>flow</sub>
+- **Communication-avoiding coarse smoothing with walls (WO-K2) is NOT adopted; measured neutral to harmful on genoa**. **Rejected:** merging K2 (k2/new 0.995-1.055)  <sub>flow</sub>
 - **Under the FP32 V-cycle the non-bottom FP64 V-cycle data are built on demand (D5), bitwise**.  <sub>flow</sub>
 - **Under 'auto' a non-converged FP32 PCG/FCG attempt is re-solved cold with the FP64 V-cycle, and FP64 is latched for the run**.  <sub>flow</sub>
 - **'auto' V-cycle precision means FP32 where eligible on device backends only; host 'auto' is 'fp64'**.  <sub>flow</sub>
