@@ -277,6 +277,15 @@ ladder, because MueLu *repartitions its coarse levels onto fewer ranks* rather t
    count in 8× steps), compute weak efficiency from **per-GPU throughput**, which corrects for it.
 7. **Watch `last_pressure_iterations()`, not just ms/step.** A clamped iteration count (equal to
    `PMAXIT` every step) means the solve never converged and the timing measures the cap, not the work.
+9. **Threads per rank must divide the cores per L3 (CCD) domain; prefer one rank per L3 domain.**
+   A rank whose OpenMP team spans two L3 domains runs its small, synchronization-bound kernels
+   1.4–2.7× slower (cross-CCD cache-line and barrier latency), and no partition fixes that: genoa
+   (8-core CCDs) 8 ranks × 3 threads = 100.4 ms/step, ranks 2 and 5 straddling, +17.6 ms; the
+   workstation (5965WX, 6-core CCDs) shows the same with the roles swapped, 6×4 = 67.6 against
+   4×6 = 47.1 and 1×24 = 52.3 (`flow/doc/vof_distributed_partition_design.md` F8, §0). Genoa:
+   T ∈ {1, 2, 4, 8}; 5965WX: T ∈ {1, 2, 3, 6}. `flow.Solver.init_mpi` prints one stderr line naming
+   the straddling ranks when every OpenMP thread is pinned to one CPU. Launch recipes: SNELLIUS.md
+   ("One NUMA domain, hybrid MPI × OpenMP").
 
 ---
 
@@ -352,10 +361,16 @@ Roughly in order of expected value.
    The user-facing framing to keep in mind: **the number of iterations should be a property of the
    problem, not of the rank count.**
 
-2. **Derive the alignment cap from the requested depth.** It is hard-coded at 16 (five levels) in
+2. **Derive the alignment cap from the requested depth.** *Partially addressed (2026-10): the
+   default "auto" decomposition (item 13) adds core's balance-aware split axis
+   (`SplitAxis::Balanced`), which reaches exact balance at cap 16 where the longest-axis snap does
+   not; the cap itself is unchanged.* It is hard-coded at 16 (five levels) in
    `coarsenAlignment`. It should follow `MGLEVELS` bounded by a load-balance budget, the way
    coarse-first already does. §2.5 is the regression to protect.
-3. **Graceful degradation instead of skipping the snap.** The aligned ORB abandons alignment entirely
+3. **Graceful degradation instead of skipping the snap.** *Partially addressed (2026-10): the
+   balance-aware split axis never chooses an aligned axis too short to cut aligned as an
+   alternative, so it introduces no new unaligned cut; the snap itself is unchanged.* The aligned
+   ORB abandons alignment entirely
    once a sub-box drops below `2*align` (`initImpl`), which silently costs a level — visible as np=7,
    12, 16, 24 dropping from 6 levels to 5 in §2.3. Snapping to the largest power of two that still
    fits would keep the depth.
@@ -405,8 +420,16 @@ Roughly in order of expected value.
 12. **Odd-grid coarsening.** Allowing `n → (n+1)/2` with matched transfer operators removes the
    divisibility constraint at the root. Larger change; padding (8) buys most of the benefit first, and item 1 removes the
    pressure to do it at all.
-13. **Should coarse-first become the default?** It is opt-in today. It changes the partition for every
-   existing MPI run, so this needs a bit-exactness and performance sweep across the suite first.
+13. **Should coarse-first become the default?** *Status (2026-10, flow branch `partition`, design
+   `flow/doc/vof_distributed_partition_design.md`): the default `levels = 0` becomes the AUTO
+   policy* — the legacy aligned ORB whenever it is exactly balanced (every such run keeps its
+   partition bit for bit), else coarse-first at depth 5, then 4, with the balance-aware split axis,
+   else the balance-aware aligned ORB if it has a smaller largest block and nests at least
+   min(3, legacy) levels; it never cuts an axis the legacy ORB leaves whole. **Legacy = `levels=1`**
+   (`set_decomposition(1)` / `flow.mpi_block(..., levels=1)`), for reproducing an older np > 1
+   partition. On 128×96×64 the changed rank counts are 3, 12, 24, 32, 96 (all exact); 2, 4, 6, 8,
+   16, 48 are unchanged. The original question: it changes the partition for every existing MPI
+   run, so this needs a bit-exactness and performance sweep across the suite first.
 
 ---
 

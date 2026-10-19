@@ -206,6 +206,22 @@ srun --mpi=pmix --ntasks=$N --ntasks-per-node=$RPN --cpus-per-task=1 \
      --distribution=block:block --cpu-bind=cores "$VENV/bin/python" driver.py
 ```
 
+One NUMA domain, hybrid MPI × OpenMP (genoa, NPS4: cores 0–23 = 3 CCDs × 8 cores). Threads per
+rank must divide the 8 cores of a CCD (1, 2, 4, 8); one rank per CCD is the recommended hybrid
+(`../docs/DECOMPOSITION_AND_MULTIGRID.md` §3 rule 9). On an exclusive node, inside the job's
+`--cpus-per-task` blocks:
+
+```bash
+# 3 ranks x 8 threads (one rank per CCD) / 6 ranks x 4 threads (two per CCD)
+export OMP_NUM_THREADS=8 OMP_PLACES=cores OMP_PROC_BIND=close     # 4 for 6x4
+srun --mpi=pmix --ntasks=3 --cpus-per-task=8 --distribution=block:block --cpu-bind=cores \
+     "$VENV/bin/python" driver.py                                     # --ntasks=6 --cpus-per-task=4
+```
+
+Never 8 × 3 (two ranks straddle a CCD, +18 % step time measured); `init_mpi` warns about such a
+placement on stderr. ctests keep `--bind-to none` (MPIEXEC_PREFLAGS). Genoa numbers for these
+recipes enter after the S-PART run (`flow/doc/vof_distributed_partition_design.md` §8).
+
 - **Force `-DMPIEXEC_EXECUTABLE=/usr/bin/mpirun`** when configuring the ctest suites — FindMPI may
   pick ParaView's bundled `mpiexec` from `PATH`, which launches the OpenMPI-linked binaries as
   singletons, so `*_np4` silently runs 4× np=1.
