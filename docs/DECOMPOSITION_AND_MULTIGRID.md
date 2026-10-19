@@ -425,9 +425,9 @@ Roughly in order of expected value.
    `flow/doc/vof_distributed_partition_design.md`): the default `levels = 0` becomes the AUTO
    policy* — the legacy aligned ORB whenever it is exactly balanced (every such run keeps its
    partition bit for bit), else coarse-first at depth 5, then 4, with the balance-aware split axis,
-   else the balance-aware aligned ORB if it has a smaller largest block; every candidate must nest
-   at least min(3, legacy) levels in place (blocks even and at least 4 cells wide), and none cuts
-   an axis the legacy ORB leaves whole. **Legacy = `levels=1`**
+   else the balance-aware aligned ORB if it has a smaller largest block; a coarse-first candidate
+   must nest as many levels in place as legacy, the aligned one at least min(3, legacy) (blocks
+   even and at least 4 cells wide), and none cuts an axis the legacy ORB leaves whole. **Legacy = `levels=1`**
    (`set_decomposition(1)` / `flow.mpi_block(..., levels=1)`), for reproducing an older np > 1
    partition. On 128×96×64 the changed rank counts are 3, 12, 24, 32, 96 (all exact); 2, 4, 6, 8,
    16, 48 are unchanged. The original question: it changes the partition for every existing MPI
