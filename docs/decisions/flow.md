@@ -4661,3 +4661,16 @@ Do not reverse an entry here without recording a new decision that supersedes it
     ring-openness refill); CA levels exchange the full 26-neighbour halo, wait per exchange 63 -> 410 us at 24x1.
 - rejected: merging K2; narrowing "Domain-BC paths stay blocking" for it (the entry stays as it was)
 - why: no layout gains more than 0.5 %, 24x1 loses 5.5 %; the remaining multi-rank gap is load imbalance (per-rank kernel time 46-81 ms at 24x1; CCD-straddling ranks 85 vs 66 ms at 8x3), which CA does not address.
+
+### Host 'direct' bottom solve: one thread, lane-scheduled M (rows as SIMD lanes), bitwise; H-6 replication kept
+- area: flow
+- source: flow `91964b7` (WO-1/B1), design `doc/vof_distributed_partition_design.md` §5.3, §11 item 3; evidence `bubble_column_perf/dist_cpu/IMBAL_REPORT.md`, `PART_REPORT.md`
+- decided: 2026-10-19 (coordinator; architect design)
+- status: settled
+- quote: |
+    7.0 of the 9.6 ms/step replicated bottom at genoa 24x1 was the preconditioner application M: each row a 128-long chain
+    of dependent FP32 multiply-adds. The host solve now runs on one thread with rows as SIMD lanes in the same summation
+    order (-ffp-contract=off), bitwise to the team schedule, which stays the device path and the host oracle (ctest
+    bottom_direct U9). It removes the 1-thread-per-rank cost edge of the 2026-10-18 entry.
+- rejected: subset agglomeration or a rank-0 solve plus broadcast (no critical-path gain at equal T); a cooperative on-node factor (complexity for ~2 ms; deferred); a thread-count 'algebraic' rule in 'auto'
+- why: the cost was latency of dependent FMAs, not bandwidth; lanes hide it without changing a bit (G-BIT host + CUDA, 35 distributed dumps incl. 3x8/6x4/12x2/24x1, batteries).
