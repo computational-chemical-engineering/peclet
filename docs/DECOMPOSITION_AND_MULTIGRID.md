@@ -284,7 +284,8 @@ ladder, because MueLu *repartitions its coarse levels onto fewer ranks* rather t
    workstation (5965WX, 6-core CCDs) shows the same with the roles swapped, 6×4 = 67.6 against
    4×6 = 47.1 and 1×24 = 52.3 (`flow/doc/vof_distributed_partition_design.md` F8, §0). Genoa:
    T ∈ {1, 2, 4, 8}; 5965WX: T ∈ {1, 2, 3, 6}. `flow.Solver.init_mpi` prints one stderr line naming
-   the straddling ranks when every OpenMP thread is pinned to one CPU. Launch recipes: SNELLIUS.md
+   the straddling ranks when np > 1 and every OpenMP thread is pinned to one CPU (a one-rank job
+   stays silent). Launch recipes: SNELLIUS.md
    ("One NUMA domain, hybrid MPI × OpenMP").
 
 ---
@@ -424,8 +425,9 @@ Roughly in order of expected value.
    `flow/doc/vof_distributed_partition_design.md`): the default `levels = 0` becomes the AUTO
    policy* — the legacy aligned ORB whenever it is exactly balanced (every such run keeps its
    partition bit for bit), else coarse-first at depth 5, then 4, with the balance-aware split axis,
-   else the balance-aware aligned ORB if it has a smaller largest block and nests at least
-   min(3, legacy) levels; it never cuts an axis the legacy ORB leaves whole. **Legacy = `levels=1`**
+   else the balance-aware aligned ORB if it has a smaller largest block; every candidate must nest
+   at least min(3, legacy) levels in place (blocks even and at least 4 cells wide), and none cuts
+   an axis the legacy ORB leaves whole. **Legacy = `levels=1`**
    (`set_decomposition(1)` / `flow.mpi_block(..., levels=1)`), for reproducing an older np > 1
    partition. On 128×96×64 the changed rank counts are 3, 12, 24, 32, 96 (all exact); 2, 4, 6, 8,
    16, 48 are unchanged. The original question: it changes the partition for every existing MPI
