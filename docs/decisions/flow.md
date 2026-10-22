@@ -469,7 +469,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: mg-decomposition-alignment.md:22
 - decided: 2026-08-11
-- status: settled
+- status: superseded in part 2026-10-22 by "The default level-0 decomposition is the AUTO policy" (explicit levels >= 2 unchanged)
 - quote: |
     **Shipped 2026-08-11 (core c98964a, flow 7e0a3b1, umbrella 8ec5f39, all pushed):** coarse-first
     decomposition, OPT-IN (`flow.set_decomposition_levels(L)` / `PECLET_FLOW_DECOMP_LEVELS`, 0 =
@@ -4674,3 +4674,31 @@ Do not reverse an entry here without recording a new decision that supersedes it
     bottom_direct U9). It removes the 1-thread-per-rank cost edge of the 2026-10-18 entry.
 - rejected: subset agglomeration or a rank-0 solve plus broadcast (no critical-path gain at equal T); a cooperative on-node factor (complexity for ~2 ms; deferred); a thread-count 'algebraic' rule in 'auto'
 - why: the cost was latency of dependent FMAs, not bandwidth; lanes hide it without changing a bit (G-BIT host + CUDA, 35 distributed dumps incl. 3x8/6x4/12x2/24x1, batteries).
+
+### The default level-0 decomposition is the AUTO policy (legacy when exact, else balance-aware coarse-first); levels=1 = legacy, levels>=2 unchanged
+- area: flow
+- source: flow `bd7b6ce`..`353baa8` (WO-3, review fixes), core v1.7.0 `8bfd73c` (WO-2); design `doc/vof_distributed_partition_design.md` §11; evidence `bubble_column_perf/dist_cpu/{IMBAL_REPORT,PART_REPORT,PART2_REPORT,PART3_REPORT,REVIEW_PART}.md`
+- decided: 2026-10-22 (coordinator, architect design; USER OK for the core tag and landing 2026-10-22)
+- status: settled; supersedes in part "Coarse-first decomposition ships opt-in, legacy remains the default" (2026-08-11)
+- quote: |
+    set_decomposition(0) (default) = AUTO: the legacy aligned ORB when exactly balanced (bit-identical there), else
+    coarse-first at depth 5 then 4 with core SplitAxis::Balanced within max_imbalance, else the better of legacy and the
+    balance-aware aligned ORB. A coarse-first candidate must nest at least as deep as legacy (blocks >= 4 cells); the
+    aligned candidate >= min(3, legacy). Never cuts an axis the legacy ORB leaves whole (wall-normal status quo).
+    levels = 1 is the legacy ORB; explicit levels >= 2 keep SplitAxis::Longest (published partitions byte-identical,
+    2394/2394). initMpi(dec) throws on every rank if a block size or the decomposition fingerprint disagrees.
+- rejected: legacy as is (24x1 imbalance 2.000, ~-15 ms genoa); plain coarse-first default (12x2 +3.4 ms local); Balanced for explicit levels >= 2 (moved published partitions, split wall-normal y); a Cartesian process grid; a core axis mask; depth >= min(3, legacy) for coarse-first (no measured need)
+- why: bubble column 24x1 cells 2:1 imbalanced under legacy; changed partitions np 3/12/24 within G-NUM-H (<= 5.9e-14 vs 1.5e-11, iterations identical); unchanged ones bitwise; census 351 configs, mutation-checked.
+
+### No VoF weights in the default partition; CCD/L3 placement is documentation plus an init-time warning
+- area: flow
+- source: flow `bd7b6ce`..`353baa8` (WO-3, review fixes), core v1.7.0 `8bfd73c` (WO-2); design `doc/vof_distributed_partition_design.md` §11; evidence `bubble_column_perf/dist_cpu/{IMBAL_REPORT,PART_REPORT,PART2_REPORT,PART3_REPORT,REVIEW_PART}.md`
+- decided: 2026-10-22 (coordinator)
+- status: settled (dynamic VoF rebalancing deferred; trigger: a genoa VoF spread >= 3 ms at a recommended layout)
+- quote: |
+    The default partition carries no VoF or static initial-state weights. Threads per rank must divide the cores per L3
+    (CCD) domain, one rank per L3 domain preferred; with np > 1 init_mpi prints one stderr line on rank 0 naming ranks
+    whose pinned threads straddle L3 domains (no API, no result effect). 8x3-type layouts on 8-core CCDs are unsupported
+    for speed.
+- rejected: static VoF weights (~4 ms at 24x1, lowest payoff); a placement-weighted partition (results would depend on the scheduler's placement); warning at np 1 (no better layout exists)
+- why: genoa 8x3 straddling ranks +17.6 ms kernel time (sync/cache-line latency, not bandwidth); no partition fixes it.

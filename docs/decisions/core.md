@@ -549,3 +549,14 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - rejected: unconditional fences in exchangeBegin and exchangeEnd
 - why: ~6 ms/step on the device np 1 distributed path (892 vs 176 fences/step); host staging is fenced by the
   two-argument deep_copy; consumers (flow, pnm) use one execution-space instance. Bitwise (G-BIT-D, device m1/np2).
+
+### core SplitAxis::Balanced is opt-in; Longest stays core's default ORB split rule
+- area: core
+- source: core `cab86d9`, release v1.7.0 `8bfd73c`; flow design `doc/vof_distributed_partition_design.md` §11 item 2
+- decided: 2026-10-22 (coordinator; USER OK for the tag)
+- status: settled
+- quote: |
+    SplitAxis::Balanced picks the axis whose aligned cut is most exact; it yields the identical tree whenever Longest is
+    exact (P-i). 2030 existing decomposer constructions byte-identical vs v1.6.0.
+- rejected: changing core's default (dem/voro/amr/pnm partitions would move without a measured need)
+- why: flow's auto policy needs it; nobody else asked for it.

@@ -58,7 +58,7 @@ is authoritative.
 - **Chebyshev pressure bounds re-estimated from a warm start after a coefficient rebuild (D3)**. **Rejected:** the cold 15 + 15 estimate every step (30 of 44 V-cycles per step); warm-starting from a  <sub>flow</sub>
 - **Chebyshev pressure driver's apparent win was a placement artifact, not a real gain**. **Rejected:** adopting the Chebyshev pressure driver based on the uncontrolled 36% win  <sub>momentum-solve-residual-stop.md:39</sub>
 - **Clean-fluid-interior mask required on both restriction and prolongation for IBM velocity-MG correctness**. **Rejected:** θ-weighting the diagonal's identity (I) term; coupling the coarse grid at cut/solid cells (masking cut cells only, not solid cells, was tried and stil  <sub>velocity-mg-design.md:54-64</sub>
-- **Coarse-first decomposition ships opt-in, legacy remains the default**. **Rejected:** making coarse-first decomposition the default  <sub>mg-decomposition-alignment.md:22</sub>
+- ~~**Coarse-first decomposition ships opt-in, legacy remains the default**~~ (superseded in part 2026-10-22). **Rejected:** making coarse-first decomposition the default  <sub>mg-decomposition-alignment.md:22</sub>
 - **Coarse-level solve policy default stays "smoother", not "auto", because auto regresses the cut-cell IBM path**. **Rejected:** making "auto" the default coarse-level solve policy  <sub>mg-decomposition-alignment.md:28</sub>
 - **Collocated AUTO default = ghost projection (2026-08-25), superseding "ghost as production is a dead end"**. **Rejected:** gauge-exact (ex mode 9) as the unconditional collocated default, chosen by the 2026-08-18 A/B; the 2026-08-20 verdict's "ghost as production" dead end  <sub>flow</sub>
 - **Collocated momentum advection uses the PROJECTED divergence-free face field, not the cell→face average**. **Rejected:** the un-projected cell→face average ½(u_i+u_j) as the collocated advecting velocity  <sub>flow/doc/uf_advection.md;</sub>
@@ -168,6 +168,7 @@ is authoritative.
 - **On-node halo exchange by MPI-3 shared windows with sequence flags (GridHalo, host memory only)**. **Rejected:** eager-limit tuning (btl_sm_eager_limit / UCX_RNDV_THRESH) as the fix — site- and version-specific, two copies; an MPI progress thread / MPI_THREAD_MULTIPLE — fr  <sub>core</sub>
 - **GridHalo on host: one gather launch, calling-thread copies below kHaloSerialCopy, persistent requests**. **Rejected:** separate self-copy and pack launches; Isend/Irecv per exchange; merging unpack into the shell sweep; MPI_Neighbor_alltoallv (blocking completion, no gain on one  <sub>core</sub>
 - **GridHalo fences only where MPI needs it**. **Rejected:** unconditional fences in exchangeBegin and exchangeEnd  <sub>core</sub>
+- **core SplitAxis::Balanced is opt-in; Longest stays core's default ORB split rule**. **Rejected:** changing core's default  <sub>core</sub>
 - **Pairing lesson: stability needs (G,D) structural match, accuracy needs closure-value consistency — only the ghost architecture has both**. **Rejected:** Design B (star) — "SPD-but-scheme-unstable"; B+ gates ("dead")  <sub>collocated-attractor-campaign.md:35</sub>
 - **Part II phase-change architecture: Robin IHTR, PLIC plane-shift regression, transported-φ CLSVOF stays dead**. **Rejected:** hard T_sat interface condition; volume-source-in-C interface regression; transported-φ CLSVOF  <sub>vof-campaign.md:115-125</sub>
 - **Part III bubbly-flow container reuses V0–V4 kernels; Dodd–Ferrante FFT not needed**. **Rejected:** Dodd–Ferrante constant-coefficient FFT pressure solve  <sub>vof-campaign.md:107-114</sub>
@@ -260,6 +261,8 @@ is authoritative.
 - **Pressure-MG stencil exchanges use a faces-only halo with rank-local periodic axes read in-kernel**. **Rejected:** 26-neighbour fills for 7-point stencils; routing np 1 to the single-rank engines (§14 Q-H2)  <sub>flow</sub>
 - **Communication-avoiding coarse smoothing with walls (WO-K2) is NOT adopted; measured neutral to harmful on genoa**. **Rejected:** merging K2 (k2/new 0.995-1.055)  <sub>flow</sub>
 - **Host 'direct' bottom solve: one thread, lane-scheduled M (rows as SIMD lanes), bitwise; H-6 replication kept**. **Rejected:** subset agglomeration / rank-0 solve + broadcast; cooperative on-node factor; a thread-count 'algebraic' rule  <sub>flow</sub>
+- **The default level-0 decomposition is the AUTO policy (legacy when exact, else balance-aware coarse-first); levels=1 = legacy, levels>=2 unchanged** (2026-10-22). **Rejected:** legacy as is (24x1 2:1); plain coarse-first default; Balanced for explicit levels>=2  <sub>flow</sub>
+- **No VoF weights in the default partition; CCD/L3 placement is documentation plus an init-time warning**. **Rejected:** static VoF weights; a placement-weighted partition; warning at np 1  <sub>flow</sub>
 - **Under the FP32 V-cycle the non-bottom FP64 V-cycle data are built on demand (D5), bitwise**.  <sub>flow</sub>
 - **Under 'auto' a non-converged FP32 PCG/FCG attempt is re-solved cold with the FP64 V-cycle, and FP64 is latched for the run**.  <sub>flow</sub>
 - **'auto' V-cycle precision means FP32 where eligible on device backends only; host 'auto' is 'fp64'**.  <sub>flow</sub>
