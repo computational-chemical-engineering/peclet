@@ -141,7 +141,7 @@ For each project with its own `CLAUDE.md`, **defer to it** — these are entry p
 DEVELOPMENT.md §3. `flow`, `pnm`, `dem`, `voro`, `amr` build via `find_package(Kokkos)` (+`ArborX` for
 dem) against the bootstrapped prefix `extern/install/<backend>` (built once by
 `tools/bootstrap_deps.sh` — a **hard build dependency**). Put `nvcc` on `PATH` for the CUDA backend
-(`export PATH=/usr/local/cuda-13.2/bin:$PATH`).
+(`export PATH=/usr/local/cuda-13.4/bin:$PATH`).
 
 ```bash
 # morton — non-BMI2 build is contractually PDEP/PEXT-free; AVX-512 only under Intel SDE

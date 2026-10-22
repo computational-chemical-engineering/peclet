@@ -93,7 +93,7 @@ tools/release/check_release_state.sh          # versions, tags, pins, PyPI, work
 
 Run on the workstation with `OMP_NUM_THREADS=8 OMP_PROC_BIND=false` (the CUDA prefix has an OpenMP
 host backend; an unbounded pool on 48 cores is an hour-long trap) and with
-`PATH=/usr/local/cuda-13.2/bin:$PATH`. Build trees named `build_rel_*` so they cannot be confused
+`PATH=/usr/local/cuda-13.4/bin:$PATH`. Build trees named `build_rel_*` so they cannot be confused
 with campaign trees; **delete them first** — FindPython artefact variables are sticky and a tree
 configured against a retired venv fails with "Cannot run the interpreter".
 
@@ -319,7 +319,7 @@ atexit-finalize pattern; flow had a teardown abort), and the PyPI Trusted Publis
 registered for the new project name *before* tagging (a new name publishes fine with no extra
 registration — pnm 0.1.0 proved it — but only if the workflow's `environment: pypi` is configured).
 
-Validate locally before CI: `PATH=/usr/local/cuda-13.2/bin:$PATH CMAKE_PREFIX_PATH=$PWD/extern/install/nvidia-cuda pip wheel ./dem`
+Validate locally before CI: `PATH=/usr/local/cuda-13.4/bin:$PATH CMAKE_PREFIX_PATH=$PWD/extern/install/nvidia-cuda pip wheel ./dem`
 into a fresh venv, then run a verify script on the GPU.
 
 ---
