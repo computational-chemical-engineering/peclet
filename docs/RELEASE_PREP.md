@@ -58,9 +58,9 @@ CITATION `date-released` is set on tag day (left at 2026-10-04 on purpose).
 - [ ] **§1 freeze criteria** — (1) unmerged worktrees: flow `partition2` must land; flow `cpu14`,
   `vof-issues`, `uf-outlet-diag`, `vof-w4` and the detached `flow-s2tdiag`/`flow-main-base`/
   `flow-partition2-base`, core `core-partition2` are campaign trees, not in this release (parked by
-  scope) unless the user decides otherwise (Q2). (2)/(3) every checkout at `origin/main`, pointers ==
+  scope) unless the user decides otherwise (Q2 for `uf-outlet-diag`). (2)/(3) every checkout at `origin/main`, pointers ==
   HEADs: yes (pre-flight 2026-10-22). (4) CI: core and flow **Quality red** (clang-format) — fixed
-  on `release-prep`, green once merged. (5) local matrix: §13.4. (6) "silently wrong" issues: Q3.
+  on `release-prep`, green once merged. (5) local matrix: §13.4. (6) "silently wrong" issues: Q2.
 - [x] **A pre-flight** run (§13.5); worktree branches parked by scope as above.
 - [ ] **B test matrix** (§13.4) — host column done except the rows that wait for `partition2`; CUDA
   column after `partition2`.
