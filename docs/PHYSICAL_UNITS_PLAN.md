@@ -316,9 +316,9 @@ clear message otherwise). `setSurfaceTension` physical; `vof_geometry()['kappa']
 and capillary-wave gates re-run with `extent = 1e-2·cells` and physical `sigma` — same physical numbers to
 the existing tolerances.
 
-**U6 — core AMR.** `Octree(brick, lmax, origin, h0)` (`core/python/amr_bindings.cpp`) and
+**U6 — core AMR.** `Octree(brick, lmax, origin, h0)` (`core/python/amr_bindings.cpp`, now `amr/python/amr_bindings.cpp`) and
 `AmrFlow::init(t, h0, origin)` (`amr/flow.hpp:471`): accept `cells, extent, origin`; Phase 1 keeps `h0`
-scalar (assert isotropic). Gate: `core/python/test_amr.py` unchanged + one physical-units case (Poiseuille
+scalar (assert isotropic). Gate: `core/python/test_amr.py` (now `amr/python/test_amr.py`) unchanged + one physical-units case (Poiseuille
 channel with `h0 = 1/Nc` already exists there — make it the model).
 
 **U7 — pnm and coupling.** `extract_pore_network(sdf, spacing, origin)` returns physical radii/volumes/
@@ -413,7 +413,7 @@ the sampled builders. The architect designs each; Opus implements against the de
 | flow regression (never `--update`) | **PASS**, every metric +0.00 %, every `p_iter_tot` +0.0 % |
 | flow verify scripts | **PASS** ×5 |
 | core ctests plain / Kokkos | **104/104** / **158/158** |
-| `core/python/test_amr.py` np = 1, 2, 4 | OK |
+| `core/python/test_amr.py` (now `amr/python/test_amr.py`) np = 1, 2, 4 | OK |
 | K1–K5 (VoF kernels) | 1.22e-15 · L1 order 2.27 · 6.66e-16 · 5.34e-16 · 9.60e-16 (index-offset control 1.50e+00) |
 | S2 `units_vof_aniso` | exactness 2.30e-17 (aspect 2) / 1.92e-17 (aspect 4); Young-Laplace rel 0; `dt_sigma ~ h_min^{3/2}` to 1e-9 |
 | A2 / A4 (AMR) | Poiseuille 4.06e-15 / 1.58e-15 / 9.81e-15 · Zick & Homsy **-0.76 %** on a box mesh vs -2.69 % cubic |
@@ -457,7 +457,7 @@ missing.** The Python side exposes `cells`, `global_cells`, `extent`, `origin`, 
 | where | what it refuses | relaxed by |
 |---|---|---|
 | `Solver::setPhysicalDomain`, `flow/src/flow_ibm.hpp` (~:216) | an extent that does not give one spacing | **RELAXED by Phase 2 commit C2** (flow `735fb46`): the throw became the §1.4 SNAP — three spacings agreeing to 1e-12 relative are set equal, so the isotropic metric is EXACT; otherwise `hRef = min_a h_a`. Phase 3 must not touch it until the VoF path is ready |
-| `h0FromExtent`, `core/python/amr_bindings.cpp` (~:147) | a non-cubic octree extent | **Phase 3** (AMR half) |
+| `h0FromExtent`, `core/python/amr_bindings.cpp` (~:147; now `amr/python/amr_bindings.cpp`) | a non-cubic octree extent | **Phase 3** (AMR half) |
 | `CfdDem.__init__`, `coupling/python/peclet_coupling/driver.py` (~:66) | a non-cubic flow spacing | neither, until the coupling deposit kernel takes a per-axis `h` — a Phase 2 follow-up, not a blocker |
 
 **Anchors, refreshed against flow `1e3d67d`.** Line numbers rot; the greps do not.

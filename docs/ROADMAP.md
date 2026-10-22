@@ -98,7 +98,7 @@ Concrete plan (dem's data is SoA `float4` arrays — `d_pos` [.xyz pos, .w inv_m
 flags, and existing ghost-particle infrastructure `num_real`/`d_top_ghost`). The shared
 `peclet::core::halo::ParticleMigrator` (validated in core) and block decomposition map directly:
 
-- [x] **Step 1 — migration (done):** `dem/mpi/test_particle_migration.cpp` decomposes the
+- [x] **Step 1 — migration (done):** `dem/mpi/test_particle_migration.cpp` (removed in dem `ae88d3e`; the migration is now gated by `dem/tests/kokkos_mpi/test_migrate_mpi.cpp`) decomposes the
       periodic domain, builds a `DomainMap` from packing's domain+periodicity, and migrates
       packing-style particles (full SoA record as opaque payload) with `ParticleMigrator`. Conservation
       + correct placement validated over random-walk steps, np=1,2,4. Standalone build
