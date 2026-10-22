@@ -180,8 +180,13 @@ say "== Python API page coverage (every shipped package has a PAGES entry and a 
 if "$_lp" tools/release/check_api_pages.py; then :; else fail=1; fi
 say ""
 say "== docstring audit (a bound callable without a docstring is a failure)"
+# RELEASE.md §3: peclet wheels installed in the suite venv make a module missing from PYTHONPATH
+# import the installed copy SILENTLY, so the audit would grade those wheels, not the candidate. They
+# were removed 2026-09-16 and came back (the peclet 1.1.0 family, installed 2026-09-19).
+_stale=$(ls -d .venv/lib/python3*/site-packages/peclet*.dist-info 2>/dev/null | xargs -rn1 basename | tr '\n' ' ')
+[ -n "$_stale" ] && bad "installed peclet wheels in .venv shadow the build trees: ${_stale}(pip uninstall them; RELEASE.md §3)"
 _ad=$("$_lp" tools/release/audit_docstrings.py --strict 2>&1); _rc=$?
-printf '%s\n' "$_ad" | grep -E 'undocumented|stale|not importable|^total' | sed 's/^/  /'
+printf '%s\n' "$_ad" | grep -E 'undocumented|stale|not importable|^total|^peclet\.' | sed 's/^/  /'
 [ "$_rc" = 0 ] || { bad "docstring audit failed (exit $_rc: unimportable module or undocumented callable)"; }
 say ""
 say "== untracked scratch in the umbrella (not part of any release):"

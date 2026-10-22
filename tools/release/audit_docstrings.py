@@ -63,7 +63,10 @@ def audit_module(name):
             if is_cls and full.count(".") - name.count(".") < 2:   # module.Class.method, no deeper
                 visit(obj, full + ".")
     visit(mod, name + ".")
-    return {"total": total, "undocumented": undocumented, "stale": stale}
+    # where the module came from: a build tree, or an installed wheel that a missing PYTHONPATH
+    # entry fell through to (docs/RELEASE.md §3) -- the table must show which one was audited
+    origin = getattr(mod, "__file__", None) or str(list(getattr(mod, "__path__", [])))
+    return {"total": total, "undocumented": undocumented, "stale": stale, "origin": origin}
 
 
 def main():
@@ -81,7 +84,7 @@ def main():
         if "error" in v:
             print(f"{m:<18}  not importable: {v['error']}")
         else:
-            print(f"{m:<18}{v['total']:>10}{len(v['undocumented']):>14}{len(v['stale']):>7}")
+            print(f"{m:<18}{v['total']:>10}{len(v['undocumented']):>14}{len(v['stale']):>7}  {v['origin']}")
     print(f"{'total':<18}{tot:>10}{und:>14}")
     for m, v in out.items():
         for n in v.get("undocumented", []):
