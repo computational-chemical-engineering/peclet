@@ -70,6 +70,9 @@ in the script — the recipe above is the corrected one; see [RELEASE](RELEASE.m
   so two backends in one tree destroy each other whether run together or in sequence.
 - **`--gpus=0` does not override `#SBATCH --gpus-per-node=1`** on a GPU-less partition; use
   `--gpus-per-node=0` or sbatch rejects the job.
+- **Multi-node GPU jobs: request `--nodes=N --gpus-per-node=4`, never a total `--gpus=K` with K > 4.**
+  SURF wiki ("Allocating multiple GPU nodes", noted 2026-10-22): with a total above 4, OpenMPI jobs
+  that call srun or mpirun hang. Our scripts already use the per-node form (s4, surf_repro).
 
 ### Validated releases
 
