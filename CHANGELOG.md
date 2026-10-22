@@ -28,8 +28,9 @@ flow and coupling pin `v1.7.0`, and `peclet[mpi]` now installs `peclet-core` 1.7
   order for Neumann, Dirichlet and Robin walls (`set_scalar_wall`), conjugate transport into the
   solid (`set_scalar_solid`, `get_scalar_solid`), sources (`set_scalar_source`), a mean-gradient
   closure for periodic beds (`set_scalar_mean_gradient`, `diagnostics.scalar_mean_flux`), and a
-  steady solve (`solve_scalar_steady`) beside the transient advance; `set_scalar_tolerance`,
-  `set_scalar_max_iterations`; per-body wall fluxes `diagnostics.scalar_wall_flux`, budgets and
+  steady solve (`solve_scalar_steady`) beside the transient advance; `set_scalar_residual_tolerance`
+  (the velocity solver's criterion, one spelling), `diagnostics.set_scalar_max_iterations(max_iter)`;
+  per-body wall fluxes `diagnostics.scalar_wall_flux`, budgets and
   solver statistics `diagnostics.scalar_budget` / `scalar_census`, the cut-cell record
   `diagnostics.scalar_geometry` / `scalar_facets`. Conservation is exact in the discretization; the
   solver residual is reported, never fixed up. Staggered grids and the collocated cut-cell
@@ -60,8 +61,10 @@ flow and coupling pin `v1.7.0`, and `peclet[mpi]` now installs `peclet-core` 1.7
   the legacy split is inexact** (bubble column np 3/12/24): fields within 5.9e-14 of the legacy
   partition, iterations identical; the bubble column at 24×1 was 2:1 imbalanced under legacy.
   `set_decomposition(1)` is the legacy ORB; explicit levels ≥ 2 are unchanged (2394/2394 published
-  partitions byte-identical). [The 12×2 serial-shell fix of branch `partition2` lands before the
-  tag — entry to be added.]
+  partitions byte-identical). The policy keeps legacy's set of split axes unless legacy's max/mean
+  load is ≥ 5/4; this guard reverts 14 census configurations to the legacy partition (128×96×64
+  at np 12 among them). The box-shell launch of the auto 12×2 column no longer runs serially on one
+  thread (6.2 ms/step on genoa); bitwise.
 - **Host backends use the `'direct'` pressure bottom where eligible** (single rank: FP32
   block-tridiagonal factor + FP64 FCG, replacing GraphAMG; distributed: solved redundantly on every
   rank from the allgathered bottom). 50-step difference 3.3e-14 single rank, 2.3–3.6e-14 at np > 1,
@@ -78,6 +81,22 @@ flow and coupling pin `v1.7.0`, and `peclet[mpi]` now installs `peclet-core` 1.7
   physical-units contract): `add_scalar`'s diffusivity, mass fluxes, latent heat, conductivity,
   ρc_p and the closures on ρ/μ/forces are converted at the boundary; the getters report physical.
   Scripts that passed cell-unit values to a solver built with `extent=` change result.
+- **VoF blocks under a physical domain** (`Solver(cells, extent=…)` with `enable_vof_blocks`): the
+  step handed its internal dt to the physical-unit block advector, which converted it a second
+  time (the first step hit the Weymouth–Yue cap), and the block CSF kept a σ from before the first
+  `set_dt` (1/t_ref² too strong). Both fixed; cell-unit runs are bitwise unchanged (ctest
+  `vof_blocks_physical_units`).
+- **Open boundaries keep their high-side face plane.** Ghost fills of the MAC face fields wrapped
+  every axis, so a non-periodic high-side face (outflow or inflow) carried the low boundary's
+  face; the collocated projection and the collocated VoF bridge exposed it, and legacy scalars
+  read the wrapped plane. Periodic axes are untouched (ctest `open_face_plane`, np 1–3).
+- **Scalar inflow.** A scalar's ghosts are filled before the old state is frozen, so the first
+  step after `set_field` (or a coupling or VoF write) no longer upwinds from stale ghosts; at a
+  Dirichlet face that is also a velocity inflow the advection upwinds the prescribed value, not the
+  Dirichlet reflection (a plug's inventory was U t + 0.5 cells; now U t to 6e-14, ctest
+  `scalar_inflow`). Results change for scalars written before the first step (state hash
+  `scalar`). Trade: on a smooth inflow profile the first interior face carries an O(h) error
+  (gh/6 coded limiter, gh/4 second-order upwind).
 
 #### Changed (performance, bitwise)
 
@@ -92,8 +111,6 @@ flow and coupling pin `v1.7.0`, and `peclet[mpi]` now installs `peclet-core` 1.7
 
 - Cut-cell scalars: particles in contact do not converge at R/h 8–32 (no contact model yet);
   collocated open faces are refused.
-- [If `uf-outlet-diag` is not merged:] legacy scalars at high-side open faces read a wrapped velocity
-  plane.
 - Distributed host runs: threads per rank must divide the cores of an L3 domain; 8×3-type layouts
   on 8-core CCDs are slow (+17.6 ms kernel time on genoa), whatever the partition.
 
