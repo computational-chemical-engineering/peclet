@@ -4666,7 +4666,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: flow `91964b7` (WO-1/B1), design `doc/vof_distributed_partition_design.md` §5.3, §11 item 3; evidence `bubble_column_perf/dist_cpu/IMBAL_REPORT.md`, `PART_REPORT.md`
 - decided: 2026-10-19 (coordinator; architect design)
-- status: settled
+- status: settled (amended 2026-10-22: genoa 0.25-0.40 ms per solve against <= 0.08 designed; helps only at 1 thread per rank, -3.0 ms at 24x1; M is vectorized, 3.3 us/plane; the cold Q between V-cycles is the open difference — design §13.2, WO-M)
 - quote: |
     7.0 of the 9.6 ms/step replicated bottom at genoa 24x1 was the preconditioner application M: each row a 128-long chain
     of dependent FP32 multiply-adds. The host solve now runs on one thread with rows as SIMD lanes in the same summation
@@ -4679,7 +4679,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: flow `bd7b6ce`..`353baa8` (WO-3, review fixes), core v1.7.0 `8bfd73c` (WO-2); design `doc/vof_distributed_partition_design.md` §11; evidence `bubble_column_perf/dist_cpu/{IMBAL_REPORT,PART_REPORT,PART2_REPORT,PART3_REPORT,REVIEW_PART}.md`
 - decided: 2026-10-22 (coordinator, architect design; USER OK for the core tag and landing 2026-10-22)
-- status: settled; supersedes in part "Coarse-first decomposition ships opt-in, legacy remains the default" (2026-08-11)
+- status: settled (amended 2026-10-22 by the partition guard below); supersedes in part "Coarse-first decomposition ships opt-in, legacy remains the default" (2026-08-11)
 - quote: |
     set_decomposition(0) (default) = AUTO: the legacy aligned ORB when exactly balanced (bit-identical there), else
     coarse-first at depth 5 then 4 with core SplitAxis::Balanced within max_imbalance, else the better of legacy and the
@@ -4702,3 +4702,27 @@ Do not reverse an entry here without recording a new decision that supersedes it
     for speed.
 - rejected: static VoF weights (~4 ms at 24x1, lowest payoff); a placement-weighted partition (results would depend on the scheduler's placement); warning at np 1 (no better layout exists)
 - why: genoa 8x3 straddling ranks +17.6 ms kernel time (sync/cache-line latency, not bandwidth); no partition fixes it.
+
+### Host box shells run serially only if cells + 8 x-runs < 8192 (WO-A, bitwise)
+- area: flow
+- source: flow `70d9594` (WO-A), design `doc/vof_distributed_partition_design.md` §13.3-§13.4(1); evidence `bubble_column_perf/dist_cpu/part2/summary.txt`, `PART4_REPORT.md`
+- decided: 2026-10-22 (coordinator, architect design)
+- status: settled
+- quote: |
+    The host serial cutoff (kHostSerialCellCutoff = 8192) counted cells only; a 32x32x64 column block with z a wrap axis has
+    a 7936-cell level-0 shell made of 3840 one-cell x-runs, which then ran on one thread: 6.2 ms/step on 8 of 12 ranks at
+    12x2. The shell test now counts runs too. Both branches call the same per-cell run, so results are bitwise.
+- rejected: lowering the cutoff globally (moves every small level); restructuring ccBoxShellRuns (P-shell, only if WO-T shows > 15 %)
+- why: 12x2 auto 51.8 -> 48.5 ms/step locally (quiet), G-BIT 32/32 host + CUDA, batteries green.
+
+### Partition guard: an AUTO candidate must cut the same axes as legacy unless legacy max/mean >= 5/4 (WO-D)
+- area: flow
+- source: flow `76c9ec0`, `931906e` (census asserts the 14 reverts by name; mutation-checked); design §13.4(2); review `bubble_column_perf/dist_cpu/REVIEW_PART4.md`
+- decided: 2026-10-22 (coordinator; pre-registered landing rule R = 12x2 auto/legacy after WO-A = 1.0115 > 1.01)
+- status: settled
+- quote: |
+    The guard reverts 14 census configurations to the legacy partition: 128x96x64 np 12 and three others of the design's set,
+    ten small test grids (30^3 np 3/5/6/7, 36^3 np 3/5/6, 48x32x40 np 3, 48x40x30 np 3) and 480x80x160 np 30. 24x1, 3x8 and
+    48^3 np 3/5/7 keep the AUTO partition. Every revert returns to the pre-2026-10 partition.
+- rejected: an imbalance threshold alone (np 3 and np 12 share legacy max/mean 1.125 but gain 6.3 % vs lose 8.3 %); a depth/telescope rule (hierarchies identical); restricting the guard to a list of cases (tuning to cases); smooth cost terms; thread-count-aware rules
+- why: genoa 12x2 regressed +8.3 % under AUTO; after WO-A it was still 1.15 % slower than legacy locally.

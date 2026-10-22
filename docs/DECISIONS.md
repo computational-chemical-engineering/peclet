@@ -263,6 +263,8 @@ is authoritative.
 - **Host 'direct' bottom solve: one thread, lane-scheduled M (rows as SIMD lanes), bitwise; H-6 replication kept**. **Rejected:** subset agglomeration / rank-0 solve + broadcast; cooperative on-node factor; a thread-count 'algebraic' rule  <sub>flow</sub>
 - **The default level-0 decomposition is the AUTO policy (legacy when exact, else balance-aware coarse-first); levels=1 = legacy, levels>=2 unchanged** (2026-10-22). **Rejected:** legacy as is (24x1 2:1); plain coarse-first default; Balanced for explicit levels>=2  <sub>flow</sub>
 - **No VoF weights in the default partition; CCD/L3 placement is documentation plus an init-time warning**. **Rejected:** static VoF weights; a placement-weighted partition; warning at np 1  <sub>flow</sub>
+- **Host box shells run serially only if cells + 8 x-runs < 8192 (WO-A, bitwise)**. **Rejected:** lowering the cutoff globally; restructuring the shell runs  <sub>flow</sub>
+- **Partition guard: an AUTO candidate must cut the same axes as legacy unless legacy max/mean >= 5/4 (WO-D)** (2026-10-22). **Rejected:** imbalance threshold alone; depth rule; a case list  <sub>flow</sub>
 - **Under the FP32 V-cycle the non-bottom FP64 V-cycle data are built on demand (D5), bitwise**.  <sub>flow</sub>
 - **Under 'auto' a non-converged FP32 PCG/FCG attempt is re-solved cold with the FP64 V-cycle, and FP64 is latched for the run**.  <sub>flow</sub>
 - **'auto' V-cycle precision means FP32 where eligible on device backends only; host 'auto' is 'fp64'**.  <sub>flow</sub>
