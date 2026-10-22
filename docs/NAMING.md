@@ -156,6 +156,29 @@ Status: **removed 1.0.0** = the non-canonical spelling was deleted in the clean-
 | `predict_hierarchy(gnx, gny, gnz, np, levels, …, min_extent)` | `cells=(nx, ny, nz)`, `num_ranks=` (§1.1, §1.3); the bottom threshold as amr's `bottom_extent` | **OPEN divergence** (found 2026-09-24): amr's forecast follows the canon, flow's predates it. Fix at flow's next breaking change, through §0's ladder. |
 | `hydro_force_torque()` — the reconstructed TRACTION integral under the name a user reaches for as "the force on my particles" (~30 % low at any resolution) | the force and torque on the bodies: `hydro_force_torque_reaction()` (shipped, unchanged); the traction and its pressure/viscous split: `diagnostics.hydro_force_torque_traction()` (the `hydro_force_torque_<method>` pattern of the shipped reaction name, and coupling's `force_method=`) | **deprecated, warns** from the first release after flow 1.2.0 (2026-09-30, USER-approved; returns the same array; removal needs a major, D9). Warns at once, not one release later — §4 2026-09-30 says why. Register: coupling "The public force API returns the reaction". |
 | call-order docstrings ("call BEFORE set_solid / init_mpi") | state checks: `set_domain_bc(_profile)`, `set_aperture_order`, `set_fluid_only_constraint`, `set_exact_crossings`, `set_openness_override`, `set_ghost_projection`/`'ghost'` RAISE after geometry; `set_decomposition`, `set_comm_avoiding` RAISE after `init_mpi`; late `set_rho`/`set_mu` now dirty the stencil (were silently wrong); `set_domain_bc(_profile)` after geometry is ALLOWED for a VALUE update on a face whose type is unchanged (a ramped inflow or lid — the tangential fold is refreshed) and raises only on a type change | **canon** (F) |
+| `add_scalar(name, diffusivity, scheme, iters=None, cutcell=False)` | — | **canon**, new keyword (scalar-ibm). `cutcell=` follows `set_solid(..., cutcell_pressure=)`. `iters` keeps its name; its default became `None` (= the legacy 50; it must stay `None` when `cutcell=True`). Spelling KEPT by Frank 2026-10-22 (design §13 Q5); opt-in (`cutcell=False`) in flow 1.4.0 (Q7). |
+| `set_scalar_bc(name, face, type, value)` with `value` a per-face profile `(N_t1, N_t2)` | — | **canon**, new overload (scalar-ibm), cut-cell scalars only. Shape in the face's tangential axes in x, y, z order, this rank's slice, as `set_domain_bc_profile`. |
+| `set_scalar_wall(name, type, value=0.0, coefficient=0.0, instance=None)` | — | **canon**, new (scalar-ibm). `type` is `'neumann'`, `'dirichlet'` or `'robin'`; `coefficient` is the Robin k (L/T). |
+| `set_scalar_solid(name, diffusivity, capacity=1.0, partition=1.0, contact_resistance=0.0, instance=None)` | — | **canon**, new (scalar-ibm): D_s, C_s, K, R_c, all physical. |
+| `get_scalar_solid(name)` | — | **canon**, new (scalar-ibm): an array copied out (§1.2), c_s = Kψ_s, NaN outside solid unknowns. |
+| `set_scalar_source(name, source)` (float or `(nx, ny, nz)` array) | — | **canon**, new (scalar-ibm). |
+| `set_scalar_mean_gradient(name, gradient)` (3-sequence) | — | **canon**, new (scalar-ibm). |
+| `scalar_mean_flux(name)` → `(3,)` | — | **canon**, new (scalar-ibm): computed on call, bare-name method (§1.2). The array-valued precedent is `hydro_force_torque_reaction()`. |
+| `scalar_wall_flux(name)` → `(num_bodies,)` | — | **canon**, new (scalar-ibm): computed (a reduction), bare-name method. |
+| `solve_scalar_steady(name)` | — | **canon**, new (scalar-ibm): a verb. |
+| `set_scalar_tolerance(name, rtol)` | `set_scalar_residual_tolerance(name, rtol)` | **canon**, renamed before its first release (USER 2026-10-22; unreleased, so no alias, §0/§0.1): the criterion, max\|b − A c\| ≤ rtol · max(max\|b\|, max\|A c\|), is that of `set_velocity_residual_tolerance(rtol)`, so one concept, one spelling. |
+| `diagnostics.set_scalar_max_iterations(name, maxit)` | `diagnostics.set_scalar_max_iterations(name, max_iter)` | **canon**, renamed before its first release (USER 2026-10-22; unreleased, so no alias, §0/§0.1): the Krylov cap is `max_iter` in `set_pressure_pcg` / `_fcg` / `_chebyshev`; `iters` stays a sweep count. |
+| `diagnostics.scalar_census(name)` → dict | — | **canon**, new (diagnostics `*_census` family). |
+| `diagnostics.scalar_budget(name)` → dict | — | **canon**, new (diagnostics `*_budget` family). |
+| `diagnostics.scalar_facets(name)` → dict of per-facet arrays | — | **canon**, new (diagnostics tier, dict-returning like `vof_diagnostics()`). |
+| `diagnostics.scalar_geometry(name)` → dict of `(nx, ny, nz)` F-order arrays | — | **canon**, new (diagnostics tier). |
+| census keys `num_unknowns`, `num_solid_unknowns`, `num_cut_cells`, `num_facets`, `num_two_sided`, `num_thin_solid`, `num_sealed`, `num_small_cells`, `num_implicit_faces`, `num_flux_faces`, `num_guarded_flux_faces`, `num_backflow_faces` | — | **canon** (§1.3 spelling, although keys are exempt). |
+| census keys `sealed_volume`, `solid_volume`, `sealed_solid_volume` (physical), `probe_rungs` (`{'fluid': (R0, R1a, R1b, R2), 'solid': …}`), `bulk_courant`, `max_cell_peclet`, `steady_incompatibility`, `krylov_iterations`, `krylov_residual`, `krylov_converged` | — | **canon** (data keys). |
+| census key `mg_levels` | `num_mg_levels` | **canon**, renamed before its first release (USER 2026-10-22; unreleased, so no alias, §0/§0.1): a count, §1.3 (keys are exempt, but new ones follow the canon). |
+| budget keys `mass`, `mass_solid`, `d_mass`, `wall_in`, `boundary_in`, `source_in`, `defect`, `identity_error` | — | **canon** (data keys). |
+| facet keys `centroid` (physical), `normal`, `area`, `instance`, `wall_value`, `flux`, `probe_rung` | — | **canon** (data keys; American `centroid`). |
+| geometry keys `kappa`, `aperture_x`, `aperture_y`, `aperture_z`, `unknown`, `kappa_solid`, `solid_unknown` | — | **canon** (data keys; one name per axis, as `get_ox` / `get_oy` / `get_oz`). |
+| registered field `<name>_solid` (ψ_s, internal), via `get_field` / `field_view` | — | **canon** (the registry convention). It holds ψ_s = c_s/K; the converted copy is `get_scalar_solid`. |
 
 ### peclet.dem
 
@@ -271,6 +294,13 @@ identity — `peclet::core`, `peclet/core/...`, the repo and its tags — does *
 
 ## 4. History
 
+- 2026-10-22 — **flow cut-cell scalar transport** (scalar-ibm, landed 2026-10-04; first released in
+  flow 1.4.0): 23 rows in §2 `peclet.flow`, all canon. Before the release, USER decided the three
+  divergences the branch had flagged: `set_scalar_tolerance` → `set_scalar_residual_tolerance` (the
+  velocity solver's criterion and spelling), `diagnostics.set_scalar_max_iterations(maxit=)` →
+  `max_iter=` (the pressure drivers' Krylov cap), census key `mg_levels` → `num_mg_levels` (§1.3).
+  Unreleased, so no alias (§0, §0.1). The opt-in `add_scalar(..., cutcell=True)` keeps its spelling
+  (that of `set_solid(..., cutcell_pressure=)`) and stays opt-in in 1.4.0 (flow design §13 Q5, Q7).
 - 2026-10-04 — **flow `diagnostics.num_pressure_chebyshev_restarts`** (developer tier, `num_*` count
   per §1.3): how many times the Chebyshev driver's warm spectral-bound estimate was rejected by its
   guard and redone cold (WO-12). New name, additive.
