@@ -6,7 +6,98 @@ All notable changes to the peclet suite are documented here. The format is based
 
 ## [Unreleased]
 
-### `peclet-coupling`
+Draft of the family **1.5.0** section (docs/RELEASE_PREP.md §13; title and date are set on tag day).
+Proposed title: *a faster distributed VoF step, solids in scalar transport, and balanced partitions by default*.
+
+`peclet-flow` 1.4.0 · `peclet-coupling` 1.2.0 · metapackages `peclet` and `peclet-cu13` 1.5.0.
+Unchanged and still pinned: `peclet-dem` 1.1.0, `peclet-pnm` 1.0.3, `peclet-voro` 1.0.4,
+`peclet-morton` 1.0.2, `peclet-geom` 1.0.1, `peclet-amr` 0.2.0 (their commits since their tags touch
+docs, scripts or packaging metadata only). They keep their `PECLET_CORE_TAG v1.3.0` pins: the pin is
+build-time only, and the one run-time contract between packages that core touched since — the
+weighted ORB that flow and dem build the shared CFD-DEM partition from — is byte-identical from core
+v1.3.0 to v1.7.0 (`SplitAxis::Balanced` applies only to unweighted decompositions that ask for it).
+`peclet-halo` / `peclet-core` 1.5.0, 1.6.0 and 1.7.0 were released on their own (sections below);
+flow and coupling pin `v1.7.0`, and `peclet[mpi]` now installs `peclet-core` 1.7.0.
+
+### `peclet-flow` 1.4.0
+
+#### Added
+
+- **Cut-cell scalar transport with solids** (opt-in: `add_scalar(name, D, cutcell=True)`). A
+  transported scalar sees the immersed bodies as cut cells with a probe-flux wall condition, second
+  order for Neumann, Dirichlet and Robin walls (`set_scalar_wall`), conjugate transport into the
+  solid (`set_scalar_solid`, `get_scalar_solid`), sources (`set_scalar_source`), a mean-gradient
+  closure for periodic beds (`set_scalar_mean_gradient`, `diagnostics.scalar_mean_flux`), and a
+  steady solve (`solve_scalar_steady`) beside the transient advance; `set_scalar_tolerance`,
+  `set_scalar_max_iterations`; per-body wall fluxes `diagnostics.scalar_wall_flux`, budgets and
+  solver statistics `diagnostics.scalar_budget` / `scalar_census`, the cut-cell record
+  `diagnostics.scalar_geometry` / `scalar_facets`. Conservation is exact in the discretization; the
+  solver residual is reported, never fixed up. Staggered grids and the collocated cut-cell
+  projection; refused by name: the collocated `'ghost'` scheme, collocated open faces, porous
+  continuity, moving scenes. Legacy scalars (`cutcell=False`, the default) are unchanged.
+- `diagnostics.set_pressure_vcycle_precision('fp64' | 'fp32' | 'auto')` and
+  `diagnostics.pressure_vcycle_precision` — an FP32 V-cycle below the exact FP64 PCG/FCG, with an
+  FP64 restart (latched for the run) on a cap or breakdown; single rank and distributed.
+- `diagnostics.set_pressure_initial_guess('zero' | 'projected')` (opt-in; default `'zero'`):
+  A-norm projection onto the last one or two pressure solutions.
+- `diagnostics.set_pressure_prefactor_hoist(bool)`, `diagnostics.num_pressure_prefactors`,
+  `diagnostics.num_pressure_chebyshev_restarts` (developer tier).
+- With np > 1, `init_mpi` prints one line on rank 0 naming ranks whose OpenMP threads straddle L3
+  (CCD) domains (no result effect). `initMpi(dec)` refuses, on every rank, a decomposition the ranks
+  do not share.
+
+#### Changed (named numerics changes)
+
+- **The GPU pressure V-cycle defaults to `'auto'`**: FP32 where eligible on device backends, at
+  every np, with the FP64 restart; host `'auto'` is `'fp64'`, so host results are bitwise unchanged.
+  Device fields move in the last digits (~1e-13 relative); 66 probe configurations 0 violations,
+  2000 steps 0 restarts. ~5 % per step on one H100 (16.9 → 16.1 ms), −28 % projection on an
+  RTX 5080, never slower at np > 1. `'fp64'` restores the previous solve.
+- **The default decomposition (`set_decomposition(0)`) is the AUTO policy**: the legacy aligned ORB
+  where it is exactly balanced (bit-identical there), otherwise a balance-aware coarse-first
+  partition (core `SplitAxis::Balanced`), otherwise the better of legacy and the balance-aware
+  aligned ORB; it never cuts an axis the legacy ORB leaves whole. **np > 1 partitions change where
+  the legacy split is inexact** (bubble column np 3/12/24): fields within 5.9e-14 of the legacy
+  partition, iterations identical; the bubble column at 24×1 was 2:1 imbalanced under legacy.
+  `set_decomposition(1)` is the legacy ORB; explicit levels ≥ 2 are unchanged (2394/2394 published
+  partitions byte-identical). [The 12×2 serial-shell fix of branch `partition2` lands before the
+  tag — entry to be added.]
+- **Host backends use the `'direct'` pressure bottom where eligible** (single rank: FP32
+  block-tridiagonal factor + FP64 FCG, replacing GraphAMG; distributed: solved redundantly on every
+  rank from the allgathered bottom). 50-step difference 3.3e-14 single rank, 2.3–3.6e-14 at np > 1,
+  pressure iterations identical; `set_pressure_bottom_solver('algebraic')` restores GraphAMG.
+  Workstation 8×3: 61.4 → 53.6 ms/step.
+- VoF tier-3 curvature fallback (core 1.5.0's moment kernels): a recorded round-off change, 50-step
+  max relative 2.7e-14 host / 2.5e-14 CUDA, iterations identical; tier 3 3.55 → 0.58 ms on an
+  RTX 5080.
+- Host pressure-MG sum reductions run in pencil order; the Chebyshev driver re-estimates its spectral
+  bounds from the previous estimate after a variable-density rebuild (cold re-estimate on a guard,
+  counted); VoF block statistics are reduced in one launch per step (device: fixed 512-cell tiles) —
+  diagnostics order only.
+- **Scalar and phase-change energy inputs are physical under an armed extent** (a fix of the
+  physical-units contract): `add_scalar`'s diffusivity, mass fluxes, latent heat, conductivity,
+  ρc_p and the closures on ρ/μ/forces are converted at the boundary; the getters report physical.
+  Scripts that passed cell-unit values to a solver built with `extent=` change result.
+
+#### Changed (performance, bitwise)
+
+- Distributed host step: the pressure-MG stencil exchanges are faces-only with rank-local periodic
+  axes read in-kernel; core 1.6.0's halo transport (persistent requests, one pack launch, on-node
+  shared memory: 10.9–12.5 → 1.1–1.7 µs per exchange); fused host Krylov reductions; host VoF
+  kernels and momentum ghost fills in fewer launches.
+- Device step: no global synchronization inside `step()` (ctest `device_sync_budget`), GPU-resident
+  coarse tail with the bottom factor on a side execution instance.
+
+#### Known limitations
+
+- Cut-cell scalars: particles in contact do not converge at R/h 8–32 (no contact model yet);
+  collocated open faces are refused.
+- [If `uf-outlet-diag` is not merged:] legacy scalars at high-side open faces read a wrapped velocity
+  plane.
+- Distributed host runs: threads per rank must divide the cores of an L3 domain; 8×3-type layouts
+  on 8-core CCDs are slow (+17.6 ms kernel time on genoa), whatever the partition.
+
+### `peclet-coupling` 1.2.0
 
 #### Changed
 
@@ -18,6 +109,7 @@ All notable changes to the peclet suite are documented here. The format is based
   polydisperse beds. Results change wherever a cell's ε fell below 0.25. For a noisy deposit at a
   cell of about one particle diameter, set `smooth_length` (~1.5 d_p); pass `eps_min=0.25` to
   reproduce earlier runs.
+- Pins core `v1.7.0`.
 
 ## [1.4.0] — 2026-10-04 — steady states in a third of the steps, and the force on a body by its name
 
@@ -343,6 +435,60 @@ No change to results or Python API.
   are split into one translation unit per subsystem for development, and the wheel keeps a unity
   build so the split costs it nothing.
 - pnm, voro and geom pin core v1.3.0 (geom's vendored headers are byte-identical).
+
+## `peclet-halo` / `peclet-core` 1.7.0 — 2026-10-22 — a balance-aware split axis, on request
+
+A core-only minor release (C++ headers; the Python surface `peclet.halo` is unchanged). No numerics
+change for any existing caller.
+
+#### Added
+
+- **`decomp::SplitAxis::Balanced`**, an opt-in split rule of the unweighted `BlockDecomposer::init`
+  (aligned overload taking a `SplitAxis`): each split takes the axis whose aligned cut is most
+  exact, and the identical tree wherever `Longest` is exact. `Longest` stays the default; 2030
+  existing decomposer constructions are byte-identical to v1.6.0, and weighted decompositions never
+  use the rule. Built for flow 1.4.0's AUTO default decomposition.
+
+## `peclet-halo` / `peclet-core` 1.6.0 — 2026-10-19 — the distributed halo transport
+
+A core-only minor release (C++ headers; `peclet.halo` unchanged). Every change is bitwise for the
+exchanged values.
+
+#### Changed
+
+- **`GridHalo` on host memory spaces**: the gather (self-copy + pack) is one launch; gathers and
+  unpacks of at most 2048 elements run on the calling thread; tag 0 runs on persistent requests built
+  at `init`; on-node partners exchange through an MPI-3 shared window with sequence flags (off-node
+  partners keep MPI). Measured per exchange: 10.9–12.5 µs → 1.1–1.7 µs.
+- `GridHalo` fences only where MPI needs it (a ~6 ms/step saving on flow's device np = 1
+  distributed path).
+- **`GridHalo::init` and the instance's destruction are collective** over the node communicator:
+  every consumer creates and destroys instances at the same program point on every rank (flow and
+  pnm verified).
+
+#### Added
+
+- `GridHaloTopology` `Neighborhood::Faces` — a faces-only ghost topology for stencil exchanges.
+- Debug-only environment variables (no result effect): `PECLET_CORE_HALO_SHM=0` (the kill switch of
+  the on-node transport), `PECLET_CORE_HALO_SHM_GROUP=k`, `PECLET_CORE_HALO_TIMEOUT`.
+
+## `peclet-halo` / `peclet-core` 1.5.0 — 2026-10-09 — cut-cell geometry kernels and cheaper VoF curvature
+
+A core-only minor release (C++ headers; `peclet.halo` unchanged).
+
+#### Added
+
+- `scheme/cut_cell_geometry.hpp` and `scheme/probe_flux.hpp`: the cut-cell geometric record and the
+  probe-flux kernels (lattice offsets, fan-face apertures) shared by flow's cut-cell scalar transport
+  and, later, amr and the VoF species hook.
+- CI: an MPI-side header manifest gate.
+
+#### Changed
+
+- **VoF tier-3 curvature cost kernels**: per-cell polygon and area-moment caches, a support
+  prefilter, lower-triangle accumulation and per-entry device accumulation. The device accumulation
+  is a recorded round-off change in flow's tier-3 fallback (max relative 2.7e-14 over 50 steps,
+  iterations identical; flow 1.4.0's entry).
 
 ## `peclet-halo` / `peclet-core` 1.4.0 — 2026-10-03 — Anderson acceleration of steady marches
 
