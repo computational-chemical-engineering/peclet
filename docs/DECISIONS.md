@@ -265,6 +265,9 @@ is authoritative.
 - **No VoF weights in the default partition; CCD/L3 placement is documentation plus an init-time warning**. **Rejected:** static VoF weights; a placement-weighted partition; warning at np 1  <sub>flow</sub>
 - **Host box shells run serially only if cells + 8 x-runs < 8192 (WO-A, bitwise)**. **Rejected:** lowering the cutoff globally; restructuring the shell runs  <sub>flow</sub>
 - **Partition guard: an AUTO candidate must cut the same axes as legacy unless legacy max/mean >= 5/4 (WO-D)** (2026-10-22). **Rejected:** imbalance threshold alone; depth rule; a case list  <sub>flow</sub>
+- **Cut-cell scalar transport ships opt-in as `add_scalar(..., cutcell=True)`; `set_scalar_residual_tolerance`, `max_iter`, `num_mg_levels`** (USER 2026-10-22). **Rejected:** another opt-in spelling; cut-cell default in 1.4.0; the old names; aliases  <sub>flow</sub>
+- **A MAC face field's high-side domain face is kept across every ghost fill**. **Rejected:** reordering fill and outflow correction; outflow faces only; full transverse extent  <sub>flow</sub>
+- **A scalar's advective inflow state is the prescribed value; cOld's ghosts are filled first** (trade: first interior face gh/6 on smooth profiles). **Rejected:** upwinding the Dirichlet reflection; changing c's own ghost; constant ghost at walls  <sub>flow</sub>
 - **Under the FP32 V-cycle the non-bottom FP64 V-cycle data are built on demand (D5), bitwise**.  <sub>flow</sub>
 - **Under 'auto' a non-converged FP32 PCG/FCG attempt is re-solved cold with the FP64 V-cycle, and FP64 is latched for the run**.  <sub>flow</sub>
 - **'auto' V-cycle precision means FP32 where eligible on device backends only; host 'auto' is 'fp64'**.  <sub>flow</sub>

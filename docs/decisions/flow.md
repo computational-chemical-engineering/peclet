@@ -4726,3 +4726,39 @@ Do not reverse an entry here without recording a new decision that supersedes it
     48^3 np 3/5/7 keep the AUTO partition. Every revert returns to the pre-2026-10 partition.
 - rejected: an imbalance threshold alone (np 3 and np 12 share legacy max/mean 1.125 but gain 6.3 % vs lose 8.3 %); a depth/telescope rule (hierarchies identical); restricting the guard to a list of cases (tuning to cases); smooth cost terms; thread-count-aware rules
 - why: genoa 12x2 regressed +8.3 % under AUTO; after WO-A it was still 1.15 % slower than legacy locally.
+
+### Cut-cell scalar transport ships opt-in as `add_scalar(..., cutcell=True)`; its three pre-release names follow the canon
+- area: flow
+- source: flow branch `release-fixes` (7ade940, 6f29ad7, aed416c, e369ad6); design `doc/scalar_ibm_design.md` §13 Q5, Q7; `docs/NAMING.md` §2
+- decided: 2026-10-22 (USER, on the coordinator's recommendations)
+- status: settled for 1.4.0 (making cut-cell the default is a new decision after 1.4.0 has shipped; the conjugate contact row, Q4, is still OPEN)
+- quote: |
+    Keep `cutcell=` (Q5); opt-in this release (Q7). Rename `set_scalar_tolerance` -> `set_scalar_residual_tolerance`,
+    `diagnostics.set_scalar_max_iterations(maxit)` -> `max_iter`, census key `mg_levels` -> `num_mg_levels`; no alias (unreleased).
+- rejected: another opt-in spelling (e.g. `discretization='cutcell'`; `cutcell=` already matches `set_solid(..., cutcell_pressure=)`); cut-cell as the default in 1.4.0; keeping the three names; aliases (nothing released carries the old names)
+- why: one spelling per concept before the first release, when a rename is free (NAMING §0, §0.1).
+
+### A MAC face field's HIGH-side domain face is kept across every ghost fill
+- area: flow
+- source: flow branch `release-fixes` (c06b10a..36ea5b9 = rebased `uf-outlet-diag`; review fixes 12ae2ad, 5c335de, d46ace7, 8c94e69); `doc/uf_outlet_fix.md`; review `bubble_column_perf/release_prep/relfix/REVIEW_UF.md`
+- decided: 2026-10-22 (USER OK to merge with a review; reviewer MERGE-WITH-FIXES, fixes applied)
+- status: settled
+- quote: |
+    Every ghost fill of a face field whose consumer reads the boundary face (the collocated projection before
+    bcCorrectOutflow, advanceScalars on both grids, the collocated VoF bridge, the steady cut-cell scalar solve) goes
+    through fillFaceGhostsKeepBoundary: save/restore the high-side face plane over the INNER transverse range on every
+    non-periodic axis whose high global face the rank owns.
+- rejected: reordering the fill and bcCorrectOutflow (the fill overwrites the plane whatever ran first); restoring outflow faces only (a high-side INFLOW face is wrapped the same way); restoring the full transverse extent (SCALING_ISSUES #8)
+- why: the plain fill wrapped the low boundary's plane onto the high face: c overshoot to 1.35 in [0,1], blinded collocated backflow census, staggered max_open_divergence_projected 0.785, inlet-cell u 3.8 % off at a high-side collocated inlet. Gates: ctests open_face_plane (incl. collocated VoF variant), open_face_plane_mpi_np3 (np 1..6 vs serial <= 1.8e-14 in review). Momentum at an outflow face unchanged by construction; state_hash: only `scalar` moves.
+
+### A scalar's advective inflow state is the prescribed value, and cOld's ghosts are filled first
+- area: flow
+- source: flow branch `release-fixes` (9fd2f38, 4ea9731; doc 3eca158); `doc/uf_outlet_fix.md` §B
+- decided: 2026-10-22 (coordinator; trade accepted for 1.4.0 after review)
+- status: settled for 1.4.0; follow-up open: impose F = u_n v at the Dirichlet inflow face and keep the reflection ghost
+- quote: |
+    advanceScalars fills c's ghosts BEFORE freezing c^n into cOld, and at a scalar-Dirichlet face that is a velocity
+    inflow face sets cOld's ghosts to the prescribed value v.
+- rejected: upwinding the Dirichlet reflection 2v - c_inner (right for diffusion, wrong as an upwind state); changing c's own ghost (breaks the diffusion row); the constant ghost at Dirichlet WALLS (no flux there)
+- why: stale ghosts gave zero influx on the first step after set_field (c = 1 -> 0.5); the reflection gave +0.5 U dt spurious inventory. Trade: exact, conservative flux at a front (was O(1) error); on a smooth inflow profile the first interior face loses exactness (gh/6 coded limiter, gh/4 SOU). Gate: ctest scalar_inflow.
+
