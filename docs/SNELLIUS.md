@@ -222,8 +222,20 @@ srun --mpi=pmix --ntasks=3 --cpus-per-task=8 --distribution=block:block --cpu-bi
 ```
 
 Never 8 × 3 (two ranks straddle a CCD, +18 % step time measured); `init_mpi` warns about such a
-placement on stderr. ctests keep `--bind-to none` (MPIEXEC_PREFLAGS). Genoa numbers for these
-recipes enter after the S-PART run (`flow/doc/vof_distributed_partition_design.md` §8).
+placement on stderr. ctests keep `--bind-to none` (MPIEXEC_PREFLAGS).
+
+**3 × 8 is confirmed** (S-PART, job 28464076, cores 0–23 of one node, the bubble column 128×96×64,
+median ms/step; `flow/doc/vof_distributed_partition_design.md` §13): one rank × 24 threads 68.0
+(no MPI needed: use it); **3×8 78.5**, the fastest distributed layout (+15 %); 6×4 81.7; 24×1 85.5
+(only when the code needs one thread per rank); 8×3 100.1. Multi-node: the same rule per node,
+one rank per CCD:
+
+```bash
+# N nodes x 24 ranks x 8 threads (2-socket genoa node = 24 CCDs of 8 cores)
+export OMP_NUM_THREADS=8 OMP_PLACES=cores OMP_PROC_BIND=close
+srun --mpi=pmix --nodes=$N --ntasks-per-node=24 --cpus-per-task=8 --distribution=block:block \
+     --cpu-bind=cores "$VENV/bin/python" driver.py
+```
 
 - **Force `-DMPIEXEC_EXECUTABLE=/usr/bin/mpirun`** when configuring the ctest suites — FindMPI may
   pick ParaView's bundled `mpiexec` from `PATH`, which launches the OpenMPI-linked binaries as

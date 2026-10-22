@@ -287,6 +287,15 @@ ladder, because MueLu *repartitions its coarse levels onto fewer ranks* rather t
    the straddling ranks when np > 1 and every OpenMP thread is pinned to one CPU (a one-rank job
    stays silent). Launch recipes: SNELLIUS.md
    ("One NUMA domain, hybrid MPI × OpenMP").
+   Measured on genoa (S-PART, job 28464076: one NUMA domain = 24 cores = 3 CCDs, the bubble column
+   128×96×64, median ms/step; `flow/doc/vof_distributed_partition_design.md` §13.5):
+   1. MPI not needed: one rank × 24 threads, 68.0.
+   2. Distributed: **one rank per CCD with 8 threads**, 3×8 = 78.5 (+15 %), the fastest
+      distributed layout. 6×4 (81.7) is acceptable; 24×1 (85.5) only when the code needs one
+      thread per rank; 12×2 measured 89.0 before the box-shell fix (flow WO-A, which removes its
+      local loss: 51.8 → 48.5 ms on the workstation); genoa re-measurement pending.
+   3. Never a thread count per rank that does not divide the CCD: 8×3 = 100.1.
+   4. Multi-node: the same rule per node, 24 ranks × 8 threads on a two-socket genoa node.
 
 ---
 
