@@ -18,9 +18,8 @@ corrected in a review round on 2026-09-19 (every number re-traced to `headline.j
 
 - [ ] Resolve every `TODO-FRANK` comment in `paper.md` and `paper.bib`: ORCID, department,
       research impact (publications / external users / LUMI-on-AMD status), the AI-disclosure
-      model range and Copilot naming, acknowledgements, and the Zenodo DOI of the 1.1.0 scaling
-      record (`@scaling2026` currently cites the GitHub directory, as the page itself instructs
-      until the deposit is published).
+      model range and Copilot naming, and acknowledgements. (The 1.1.0 scaling record is now cited
+      as its Zenodo deposit, `@peters2026parallel`, concept DOI 10.5281/zenodo.22828093.)
 - [ ] JOSS's **required section names**, in this order, are what the reviewer checklist ticks:
       *Summary*, *Statement of need*, *State of the field*, *Software design*, *Research impact
       statement*, *AI usage disclosure*, then *Acknowledgements* and *References*. The draft has

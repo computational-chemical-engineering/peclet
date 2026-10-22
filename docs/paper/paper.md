@@ -30,8 +30,8 @@ geometric volume-of-fluid (`peclet-flow`); dynamic Voronoi tessellation of movin
 (`peclet-voro`); pore-network extraction (`peclet-pnm`); and two-way CFD–DEM coupling
 (`peclet-coupling`) — each built on one shared decomposition, halo-exchange and geometry layer
 (`peclet-core`, `peclet-morton`). One source runs on a laptop CPU, one GPU or across nodes (CUDA,
-HIP and OpenMP through Kokkos [@kokkos]) and installs with `pip install peclet` for CPython
-3.10–3.14. A public gallery [@gallery] of 46 executed examples and eight benchmark studies freezes
+HIP and OpenMP through Kokkos [@trott2022kokkos]) and installs with `pip install peclet` for CPython
+3.10–3.14. A public gallery [@peters2026pecletb] of 46 executed examples and eight benchmark studies freezes
 outputs at a release tag, validated against published references where they exist.
 
 # Statement of need
@@ -58,23 +58,23 @@ of the codes named below, it alone offers the chain.
 
 # State of the field
 
-In incompressible CFD, OpenFOAM [@openfoam] is the ubiquitous general unstructured solver; incflo,
-on AMReX [@amrex], is `peclet`'s own method family (finite-volume, geometric-multigrid projection,
-embedded boundary) at exascale; CaNS [@cans] sets the throughput reference on a periodic box with
-an exact FFT solve. In granular dynamics, LIGGGHTS [@liggghts] is the reference open-source DEM
-and MercuryDPM [@mercurydpm] the richest in particle shape and coarse-graining. In gas–solid
-coupling, MFIX-Exa [@mfixexa] is the exascale reference and CFDEM [@cfdem] the widely used
-OpenFOAM–LIGGGHTS pairing. OpenPNM [@openpnm] is the pore-network modeling ecosystem and Voro++
-[@voropp] the standard serial tessellator.
+In incompressible CFD, OpenFOAM [@weller1998tensorial] is the ubiquitous general unstructured solver; incflo,
+on AMReX [@zhang2019amrex], is `peclet`'s own method family (finite-volume, geometric-multigrid projection,
+embedded boundary) at exascale; CaNS [@costa2018fft] sets the throughput reference on a periodic box with
+an exact FFT solve. In granular dynamics, LIGGGHTS [@kloss2012models] is the reference open-source DEM
+and MercuryDPM [@weinhart2020fast] the richest in particle shape and coarse-graining. In gas–solid
+coupling, MFIX-Exa [@musser2022mfix] is the exascale reference and CFDEM [@goniva2012influence] the widely used
+OpenFOAM–LIGGGHTS pairing. OpenPNM [@gostick2016openpnm] is the pore-network modeling ecosystem and Voro++
+[@rycroft2009voro] the standard serial tessellator.
 
 On a single device `peclet` is not the fastest code at any one of these methods: CaNS's FFT solve
 is 2.3 times faster on one H100 and 3 times on a 24-core workstation — the price `peclet` pays
 for general cut-cell geometry, and a lead that holds until the problem spans more than one node.
 These figures are from a head-to-head study on a pre-1.0 build
-(August 2026) [@gallery], with CaNS on cuDecomp's autotuned MPI transposes, which
+(August 2026) [@peters2026pecletb], with CaNS on cuDecomp's autotuned MPI transposes, which
 understates its multi-GPU points. `peclet`'s claim is the chain, not the link: CFDEM couples two
 codes with two decompositions, `peclet-coupling` places fluid and particles on one; `peclet-pnm`
-extracts networks for OpenPNM to model on. On the DEM8 bulk-process benchmark [@dosta2024], re-run
+extracts networks for OpenPNM to model on. On the DEM8 bulk-process benchmark [@dosta2024comparing], re-run
 against MUSEN and LIGGGHTS on one machine, `peclet-dem`'s Hertz–Mindlin engine reproduces the
 references on every case and its impulse-based solver on all but two documented residuals.
 
@@ -86,16 +86,16 @@ dynamic load balancing. One decomposition denies each method its own — includi
 FFT solve wants; that is the price of the chain.
 
 Every method runs on the device and across ranks; host paths exist only as test oracles. Kokkos
-supplies CUDA, HIP and OpenMP from one source (ArborX [@arborx] for the discrete-element broad
+supplies CUDA, HIP and OpenMP from one source (ArborX [@lebrungrandie2021arborx] for the discrete-element broad
 phase); the original CUDA implementations were retired once the Kokkos ports were validated
 against them, bit-identical for the flow solver. Python is the composition layer: nanobind
-bindings [@nanobind] expose fields and particle state as zero-copy views, and solvers take a
+bindings [@jakob2022nanobind] expose fields and particle state as zero-copy views, and solvers take a
 physical domain and properties and derive the discretization.
 
 The design keeps one contract: the physics must not depend on the partition. Creeping
 flow through a 1043-sphere cut-cell packing returns the same mean velocity after 13 steps to a
 worst relative deviation of 8e-11 across 34 runs, from 1 to 1536 ranks, on CUDA and OpenMP
-backends, from 56.6 million to 1.81 billion cells [@scaling2026]. Weak scaling to 32 H100 GPUs
+backends, from 56.6 million to 1.81 billion cells [@peters2026parallel]. Weak scaling to 32 H100 GPUs
 holds 64% efficiency with the pressure iteration count flat; strong scaling from 24 to 1536 CPU
 cores takes the step from 36.3 s to 0.89 s. One rung, 16 GPUs, is reproducibly over twice as slow
 as its neighbors and reported undiagnosed.
@@ -105,9 +105,9 @@ as its neighbors and reported undiagnosed.
 `peclet` is installed as a site package on the Snellius national supercomputer, distributed as
 Apptainer and Docker containers, and its documented quick start runs in CI against each
 release's published wheels. Its validation cases are the field's canonical
-references — Ghia et al. [@ghia1982], Zick and Homsy [@zick1982], ten Cate et al. [@tencate2002],
-Moser et al. [@mkm1999], Hysing et al. [@hysing2009], Verma et al. [@verma2014] and the DEM8 suite
-[@dosta2024] — each a runnable, executed page rather than a reproduced figure; most example pages
+references — Ghia et al. [@ghia1982high], Zick and Homsy [@zick1982stokes], ten Cate et al. [@tencate2002particle],
+Moser et al. [@moser1999direct], Hysing et al. [@hysing2009quantitative], Verma et al. [@verma2014bubble] and the DEM8 suite
+[@dosta2024comparing] — each a runnable, executed page rather than a reproduced figure; most example pages
 open in Colab.
 
 <!-- TODO-FRANK: if any publication, preprint, thesis or external group has used peclet, name it
