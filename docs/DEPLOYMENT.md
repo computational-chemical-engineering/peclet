@@ -143,6 +143,9 @@ pip install peclet-flow            # or any one on its own
 # Single NVIDIA GPU — CUDA wheels straight from PyPI (needs only the driver; NOT alongside `peclet`):
 pip install peclet-cu13            # peclet-morton + peclet-{flow,pnm,dem,voro}-cu13 (+ nvidia-cuda-runtime)
 pip install peclet-flow-cu13       # or any one on its own
+# CFD-DEM on the GPU: NOT `peclet-cu13[cfd-dem]` (peclet-coupling depends on the CPU peclet-flow and
+# peclet-dem, which then overwrite the -cu13 modules: runs fall back to the host backend). Instead:
+pip install peclet-cu13 && pip install --no-deps peclet-coupling     # verified 1.5.0, 2026-10-23
 
 # From a source checkout against a bootstrapped prefix (dev, GPU + MPI, or to add MPI to a CPU build).
 # CMake reads CMAKE_PREFIX_PATH from the environment; the backend is whatever that prefix targets:
