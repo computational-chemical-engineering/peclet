@@ -8,7 +8,10 @@ compile fix, no release). Release, Containers (cpu, cuda-sm80, cuda-sm90, hip-gf
 green. GitHub Releases: flow v1.4.0, coupling v1.2.0, core v1.5.0/v1.6.0/v1.7.0, umbrella v1.5.0.
 Matrix (§13.4): host and CUDA (13.4) all green, CUDA after the dem fix. **Left:** fresh-venv smoke
 (§13.6 step 7), Zenodo DOIs, §10 gallery re-check, F Snellius / G LUMI (user, billed), then archive
-this cycle.
+this cycle. Smoke 2026-10-23: `peclet[mpi,cfd-dem]`, `peclet-cu13` (CUDA backend, first GPU smoke of
+the cu13 wheels) PASS, k = 1.2410e-01; **`peclet-cu13[cfd-dem]` installs the CPU flow/dem over the
+-cu13 ones** (coupling's deps; documented workaround in DEPLOYMENT.md) — next cycle: a cu13 coupling
+distribution or no flow/dem deps in coupling, and add the cu13[cfd-dem] leg to the smoke.
 
 **Earlier cycles, archived verbatim:**
 

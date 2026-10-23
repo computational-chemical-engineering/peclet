@@ -113,7 +113,7 @@ flow and coupling pin `v1.7.0`, and `peclet[mpi]` now installs `peclet-core` 1.7
 - Distributed host runs: threads per rank must divide the cores of an L3 domain; 8×3-type layouts
   on 8-core CCDs are slow (+17.6 ms kernel time on genoa), whatever the partition.
 - `peclet-cu13[cfd-dem]` also installs the CPU `peclet-flow` and `peclet-dem` (coupling's own
-  dependencies, since coupling 1.0), which overwrite the `-cu13` modules: CFD-DEM then runs on the
+  dependencies; 1.1.1 had the same), which overwrite the `-cu13` modules: CFD-DEM then runs on the
   host backend. Install `peclet-cu13`, then `pip install --no-deps peclet-coupling`
   (docs/DEPLOYMENT.md). Fix in the next cycle.
 
