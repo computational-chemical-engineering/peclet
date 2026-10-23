@@ -6,8 +6,7 @@ All notable changes to the peclet suite are documented here. The format is based
 
 ## [Unreleased]
 
-Draft of the family **1.5.0** section (docs/RELEASE_PREP.md §13; title and date are set on tag day).
-Proposed title: *a faster distributed VoF step, solids in scalar transport, and balanced partitions by default*.
+## [1.5.0] — 2026-10-23 — a faster distributed VoF step, solids in scalar transport, and balanced partitions by default
 
 `peclet-flow` 1.4.0 · `peclet-coupling` 1.2.0 · metapackages `peclet` and `peclet-cu13` 1.5.0.
 Unchanged and still pinned: `peclet-dem` 1.1.0, `peclet-pnm` 1.0.3, `peclet-voro` 1.0.4,
