@@ -1,11 +1,14 @@
-# Release preparation — family 1.5.0 (cycle opened 2026-10-22; not published)
+# Release preparation — family 1.5.0 (cycle opened 2026-10-22; published 2026-10-23)
 
 The one-off companion of [RELEASE.md](RELEASE.md) (the durable workflow): the state of the release
-currently being prepared. **Current state:** prepared up to, not including, any outward step (no
-merge to `main`, push, tag, publish, GitHub release or workflow dispatch). Every change sits on a
-local branch `release-prep` in a sibling worktree. **The flow tag waits for branch `partition2`**
-(the 12×2 serial-shell cutoff, WO-A/WO-D): when it lands, rebase `flow-release`, re-run the flow and
-coupling rows of §13.4 on both backends, then publish on the user's go (§13.6).
+currently being prepared. **Current state: published 2026-10-23.** PyPI `peclet-flow`/`-cu13` 1.4.0,
+`peclet-coupling` 1.2.0, `peclet`/`peclet-cu13` 1.5.0; tags flow `v1.4.0`, coupling `v1.2.0`,
+umbrella `v1.5.0` (main 569deb7); core main 907743e (format only, no tag); dem e375b97 (nvcc 13.4
+compile fix, no release). Release, Containers (cpu, cuda-sm80, cuda-sm90, hip-gfx90a) and Site
+green. GitHub Releases: flow v1.4.0, coupling v1.2.0, core v1.5.0/v1.6.0/v1.7.0, umbrella v1.5.0.
+Matrix (§13.4): host and CUDA (13.4) all green, CUDA after the dem fix. **Left:** fresh-venv smoke
+(§13.6 step 7), Zenodo DOIs, §10 gallery re-check, F Snellius / G LUMI (user, billed), then archive
+this cycle.
 
 **Earlier cycles, archived verbatim:**
 
