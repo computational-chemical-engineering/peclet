@@ -576,7 +576,7 @@ is authoritative.
 
 ## amr — block octree, mixed-level cut band
 
-70 in force, 3 superseded — full text in [`decisions/amr.md`](decisions/amr.md)
+70 in force, 4 superseded — full text in [`decisions/amr.md`](decisions/amr.md)
 
 ### In force
 
@@ -645,14 +645,15 @@ is authoritative.
 - **cf=1 (quadratic C/F flux) is not optional on graded meshes**. **Rejected:** standard (cf=0) two-point C/F flux on graded/throat meshes  <sub>amr-mixed-level-cut-band-plan.md:113</sub>
 - **mpi4py rule: never call a collective inside a rank-0-only block**.  <sub>amr-distributed-flow-campaign.md:84</sub>
 - **np=1 bit-exactness is the gate for every distributed default**.  <sub>amr-distributed-flow-campaign.md:75</sub>
-- **setGhostProjection default is AUTO (tri-state), not always-on or always-off**.  <sub>amr-ghost-collocated-ns-plan.md:98</sub>
 - **setSolid bottleneck diagnosed as SDF evaluation cost, not builder logic**. **Rejected:** a scalar std::function SDF evaluation API (locks in serial host evaluation forever)  <sub>performance-sota-yardstick.md:21-28</sub>
 - **transferField prolongation gradients must be halo-completed, not block-local**. **Rejected:** block-local prolongation gradients  <sub>amr-distributed-flow-campaign.md:47</sub>
 - **κ-restrict re-tested on Dirichlet: floor gone but still no win over plain — plain stays default**. **Rejected:** κ-weighted restriction as default (confirmed again)  <sub>amr-octree-status.md:899-910</sub>
 - **κ-weighted MG restriction evaluated and rejected as default; plain volume-average stays default**. **Rejected:** κ-weighted restriction as the default MG restriction operator  <sub>amr-octree-status.md:888-898</sub>
+- **USER DIRECTIVE — AmrFlow momentum advection is ON by default (as flow); never reintroduce a default off** (`setAdvection(false)` / `set_advection(False)` for Stokes). **Rejected:** `advect_ = false` in `AmrFlow` and the oracle  <sub>user, 2026-10-23; amr `9205762`</sub>
 
 ### Superseded — history, do not re-derive the old reading
 
+- setGhostProjection default is AUTO (tri-state), not always-on or always-off — superseded 2026-08-25 (AUTO = ghost unconditionally).  <sub>amr-ghost-collocated-ns-plan.md:98</sub>
 - G.2 decision changed: the whole core/amr tree becomes its own package peclet-amr, depending on core alone.  <sub>suite-quality-plan-1-0-0.md:68-80</sub>
 - Graded-mesh flow requires ALL flow operators (momentum, divergence/gradient, advection) to be C/F-consistent — momentum-only fix insufficient.  <sub>amr-octree-status.md:947-958</sub>
 - cfDiv/cfGrad row gate must be rowRegular, not rowFluid.  <sub>amr-mixed-level-cut-band-plan.md:70</sub>

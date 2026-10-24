@@ -20,6 +20,18 @@ All notable changes to the peclet suite are documented here. The format is based
   test, verify script and study that relied on the old default now sets it explicitly; those
   whose physics is Navier–Stokes but which had run as Stokes are marked `NS physics` and kept off.
 
+### `peclet-amr`
+
+#### Changed
+
+- **Behaviour change — "advection default": momentum advection is ON by default** in `Flow`
+  (`AmrFlow` and its host oracle), as in `peclet-flow`; a script that never called
+  `set_advection` used to solve unsteady Stokes. Scheme unchanged (SOU, implicit FOU + deferred
+  correction). **Stokes scripts must now call `set_advection(False)`**; every amr test, benchmark
+  and example that relied on the old default does.
+- The CUDA build compiles again (device-kernel member functions of the AMG bottom solve and the
+  multigrid made public, as nvcc requires; no numerics change).
+
 ### `peclet-coupling`
 
 #### Changed

@@ -1059,7 +1059,11 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: amr
 - source: amr-ghost-collocated-ns-plan.md:98
 - decided: 2026-07-25
-- status: settled
+- status: superseded
+- superseded-by: the 2026-08-25 user decision (suite-wide "Collocated default is AUTO ghost
+    projection (in both flow and AMR)"; flow.md "Collocated AUTO default = ghost projection"): AUTO
+    is ghost UNCONDITIONALLY, no longer tied to advection at setSolid — code comment at
+    `amr/include/peclet/amr/flow.hpp` setSolid, "DEFAULT SWITCH (2026-08-25, user decision)".
 - quote: |
     **NS DEFAULT + STEP 5 DONE (2026-07-25; core `1306084`, umbrella `cc08472`, NOT pushed).**
     (1) setGhostProjection now TRI-STATE: default AUTO = ghost when advection on at setSolid
@@ -1130,3 +1134,13 @@ Do not reverse an entry here without recording a new decision that supersedes it
     nullspace floor — don't "improve" the restriction without preserving Σ V·res.)
 - rejected: κ-weighted restriction as the default MG restriction operator
 - why: "κ-weighting breaks the EXACT conservation of the volume-average, so on the SINGULAR (periodic, constant-nullspace) problem the restricted residual is no longer ⊥ the nullspace ⇒ slower + residual FLOOR"
+
+### USER DIRECTIVE — AmrFlow momentum advection is ON by default (as flow); never reintroduce a default off
+- area: amr
+- source: user, session 2026-10-23 (flow's entry "USER DIRECTIVE — momentum advection is ON by default"); amr `3713103` (explicit Stokes pins), `9205762` (flip); landing record `bubble_column_perf/validation/advdefault/amr/`
+- decided: 2026-10-24
+- status: settled
+- quote: |
+    [user:] Of course momentum convection needs to be on by default!!
+- rejected: `advect_ = false` in `AmrFlow` / `oracle::AmrFlow` (Stokes unless the caller opts in) — the default flow dropped on 2026-10-23
+- why: an NS solver whose default drops the inertia term gives plausible wrong dynamics with no warning; Stokes callers say `setAdvection(false)` / `set_advection(False)`. No scheme selection depends on the flag (AUTO = ghost unconditionally since 2026-08-25; the only read of `advect_` is in `step()`), so the flip changes no setup path. Every test, benchmark and example that relied on the old default was pinned to Stokes first (runtime trap over the full battery + state_hash: 19 ctests; none an NS-physics test that ran as Stokes); host and CUDA batteries and state_hash bit-identical before/after.
