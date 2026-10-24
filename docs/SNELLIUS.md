@@ -53,7 +53,10 @@ cd $PROJ/suite-v<family>          # SUBMIT FROM INSIDE THE TREE (see the traps b
 sbatch --nodes=1 --gpus-per-node=1 --ntasks-per-node=1             tools/hpc/install_snellius.sh v<family> h100
 sbatch -p gpu_a100 --nodes=1 --gpus-per-node=1 --ntasks-per-node=1 tools/hpc/install_snellius.sh v<family> a100
 sbatch -p genoa --gpus-per-node=0 --ntasks=1 --cpus-per-task=32    tools/hpc/install_snellius.sh v<family> cpu
-sbatch tools/hpc/smoke_snellius.slurm     # certifies it: 1- vs 8-rank permeability, dem step_mpi
+# certify each backend (positional <tag> <target>; 1- vs 4-rank permeability, dem step_mpi):
+sbatch --nodes=1 --gpus-per-node=4 --ntasks-per-node=4             tools/hpc/smoke_snellius.slurm v<family> h100
+sbatch -p gpu_a100 --nodes=1 --gpus-per-node=4 --ntasks-per-node=4 tools/hpc/smoke_snellius.slurm v<family> a100
+sbatch -p genoa --gpus-per-node=0 --ntasks-per-node=4 -c 4         tools/hpc/smoke_snellius.slurm v<family> cpu
 ```
 
 Arguments are positional (SURF's `sbatch` drops leading `VAR=x`); `snellius_env.sh` next to it is the
@@ -73,6 +76,10 @@ in the script — the recipe above is the corrected one; see [RELEASE](RELEASE.m
 - **Multi-node GPU jobs: request `--nodes=N --gpus-per-node=4`, never a total `--gpus=K` with K > 4.**
   SURF wiki ("Allocating multiple GPU nodes", noted 2026-10-22): with a total above 4, OpenMPI jobs
   that call srun or mpirun hang. Our scripts already use the per-node form (s4, surf_repro).
+- **A multi-node GPU job with fewer than 4 GPUs per node is rejected unless `--exclusive`**
+  ("You've requested less than the maximum amount of GPUs for your multi-node job", measured
+  2026-10-24), and with `--exclusive` it is **billed for all 4 GPUs of every node** — a 2-node ×
+  1-GPU test costs 8 GPU-hours per hour. Keep such tests short (`--time=00:10:00`).
 
 ### Validated releases
 
@@ -85,7 +92,19 @@ in the script — the recipe above is the corrected one; see [RELEASE](RELEASE.m
 Each wheelhouse (`$PROJ/wheelhouse/v1.1.0-<backend>/`) carries all seven packages at the released
 versions: flow 1.1.0, core/dem/pnm/voro 1.0.2, morton/coupling 1.0.1, cp312, linked against the
 module OpenMPI + CUDA 12.6 — **site-specific, never upload these to PyPI**. Project members install
-with `pip install --no-index --find-links $PROJ/wheelhouse/v1.1.0-<backend> peclet-flow`.
+into their own venv:
+
+```bash
+source $PROJ/suite-v<family>-<backend>/tools/hpc/snellius_env.sh   # Python 3.12 + the OpenMPI/CUDA the wheels link
+python3 -m venv ~/venvs/peclet && source ~/venvs/peclet/bin/activate
+pip install numpy mpi4py      # from PyPI: the wheelhouse holds only peclet wheels; mpi4py builds against the module mpicc
+pip install --no-index --find-links $PROJ/wheelhouse/v<family>-<backend> peclet-flow
+python -c "import peclet.flow as f; print(f.execution_space, f.has_mpi)"   # h100/a100: on a GPU node
+```
+
+Without the module environment `python3` is the system 3.9 and the cp312 wheels do not match; without
+the `numpy` step the `--no-index` install fails on `numpy>=1.20` (the 1.1.0 text said only the last
+pip line; corrected 2026-10-24). A GPU wheelhouse does not import on a login node (no `libcuda.so.1`).
 
 `$PROJ/suite-v1.1.0` (no backend suffix) is the tree the release was submitted *from*; it carries
 `tools/` only and has no venv.
