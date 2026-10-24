@@ -21,18 +21,39 @@ if [[ -z "$OMPI" ]]; then
   echo "                 'module load OpenMPI/4.1.x-GCC-...' so the host MPI can be bound." >&2
 fi
 
+# The host libmpi also needs the libraries of its own module dependencies (EasyBuild 2023 stack:
+# hwloc, libevent, libpciaccess, libxml2, XZ, zlib; UCX's UCC/libfabric/numactl; binutils' libbfd for
+# mca_pml_ucx). Without them the import dies on "libhwloc.so.15: cannot open shared object file", and
+# without libbfd OpenMPI silently drops pml_ucx, the InfiniBand transport (both measured 2026-10-24).
+DEPS=""
+for v in EBROOTHWLOC EBROOTLIBEVENT EBROOTLIBPCIACCESS EBROOTLIBXML2 EBROOTXZ EBROOTZLIB \
+         EBROOTUCC EBROOTLIBFABRIC EBROOTNUMACTL EBROOTBINUTILS; do
+  [[ -n "${!v:-}" && -d "${!v}" ]] && DEPS="$DEPS ${!v}"
+done
+
+# The project space: /projects/0/<prj> is a symlink into /gpfs/work4, so bind both or a script under
+# it is invisible in the container ("can't open file"). Extra dirs: PECLET_HOST_BIND (colon-separated).
 BIND=""
-for d in "$OMPI" "$UCX" "$PMIX" /run/munge /var/run/munge /etc/slurm ${PECLET_HOST_BIND:+${PECLET_HOST_BIND//:/ }}; do
+for d in "$OMPI" "$UCX" "$PMIX" $DEPS /projects /gpfs/work4 /run/munge /var/run/munge /etc/slurm \
+         ${PECLET_HOST_BIND:+${PECLET_HOST_BIND//:/ }}; do
   [[ -n "$d" && -e "$d" ]] && BIND="${BIND:+$BIND,}$d"
 done
 export APPTAINER_BIND="${BIND}${APPTAINER_BIND:+,$APPTAINER_BIND}"
 export SINGULARITY_BIND="${APPTAINER_BIND}"
 
-# Prefer the host OpenMPI/UCX/PMIx libs inside the container; OPAL_PREFIX points OpenMPI at the host tree.
-INJECT="${OMPI:+$OMPI/lib}${UCX:+:$UCX/lib}${PMIX:+:$PMIX/lib}:/opt/openmpi/lib:/usr/local/cuda/lib64"
+# Prefer the host OpenMPI/UCX/PMIx libs (and their dependencies) inside the container; OPAL_PREFIX
+# points OpenMPI at the host tree.
+INJECT="${OMPI:+$OMPI/lib}${UCX:+:$UCX/lib}${PMIX:+:$PMIX/lib}"
+for d in $DEPS; do
+  for l in "$d/lib64" "$d/lib"; do [[ -d "$l" ]] && INJECT="$INJECT:$l"; done
+done
+INJECT="$INJECT:/opt/openmpi/lib:/usr/local/cuda/lib64"
 export APPTAINERENV_LD_LIBRARY_PATH="${INJECT}"
 export SINGULARITYENV_LD_LIBRARY_PATH="${INJECT}"
 export APPTAINERENV_OPAL_PREFIX="${OMPI:-/opt/openmpi}"
+# The container's PMIx client trips "PMIX ERROR ... gds_ds12_lock_pthread.c" against the host server;
+# the hash GDS component avoids the shared-memory store it fails on.
+export APPTAINERENV_PMIX_MCA_gds="${PMIX_MCA_gds:-hash}"
 export APPTAINERENV_PECLET_CORE_GPU_AWARE_MPI="${PECLET_CORE_GPU_AWARE_MPI:-0}"
 
 # --nv binds the host NVIDIA driver + devices into the container.
