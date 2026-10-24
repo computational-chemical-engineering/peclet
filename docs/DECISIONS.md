@@ -24,7 +24,7 @@ is authoritative.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-248 in force, 42 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+249 in force, 42 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -265,6 +265,7 @@ is authoritative.
 - **No VoF weights in the default partition; CCD/L3 placement is documentation plus an init-time warning**. **Rejected:** static VoF weights; a placement-weighted partition; warning at np 1  <sub>flow</sub>
 - **Host box shells run serially only if cells + 8 x-runs < 8192 (WO-A, bitwise)**. **Rejected:** lowering the cutoff globally; restructuring the shell runs  <sub>flow</sub>
 - **Partition guard: an AUTO candidate must cut the same axes as legacy unless legacy max/mean >= 5/4 (WO-D)** (2026-10-22). **Rejected:** imbalance threshold alone; depth rule; a case list  <sub>flow</sub>
+- **USER DIRECTIVE — momentum advection is ON by default; never reintroduce a default off** (`set_advection(False)` for Stokes; inert under `enable_vof_momentum`). **Rejected:** `advect_ = false` as the default (ran case A and the bubble-column benchmark as unsteady Stokes)  <sub>user, 2026-10-23; flow `09d80db`</sub>
 - **Cut-cell scalar transport ships opt-in as `add_scalar(..., cutcell=True)`; `set_scalar_residual_tolerance`, `max_iter`, `num_mg_levels`** (USER 2026-10-22). **Rejected:** another opt-in spelling; cut-cell default in 1.4.0; the old names; aliases  <sub>flow</sub>
 - **A MAC face field's high-side domain face is kept across every ghost fill**. **Rejected:** reordering fill and outflow correction; outflow faces only; full transverse extent  <sub>flow</sub>
 - **A scalar's advective inflow state is the prescribed value; cOld's ghosts are filled first** (trade: first interior face gh/6 on smooth profiles). **Rejected:** upwinding the Dirichlet reflection; changing c's own ghost; constant ghost at walls  <sub>flow</sub>

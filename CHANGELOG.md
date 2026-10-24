@@ -6,6 +6,27 @@ All notable changes to the peclet suite are documented here. The format is based
 
 ## [Unreleased]
 
+### `peclet-flow`
+
+#### Changed
+
+- **Behaviour change — "advection default": momentum advection is ON by default** in `Solver` and
+  `SolverColocated` (it was off, so a script that never called `set_advection` solved unsteady
+  Stokes; the bubble-column benchmark and the case-A bubble array ran that way unnoticed). The
+  scheme is unchanged: SOU, with implicit FOU + deferred correction on the domain-BC path.
+  **Scripts that want Stokes (creeping flow, permeability, Poiseuille, steady Stokes marches) must
+  now call `set_advection(False)`.** Under `enable_vof_momentum` the VoF fluxes carry the momentum
+  advection and `set_advection` is inert (it used to throw on a domain-BC box when on). Every
+  test, verify script and study that relied on the old default now sets it explicitly; those
+  whose physics is Navier–Stokes but which had run as Stokes are marked `NS physics` and kept off.
+
+### `peclet-coupling`
+
+#### Changed
+
+- `CfdDem(advection=False)` now switches the gas advection off explicitly instead of relying on
+  flow's former default (the default `advection=True` is unchanged).
+
 ## [1.5.0] — 2026-10-23 — a faster distributed VoF step, solids in scalar transport, and balanced partitions by default
 
 `peclet-flow` 1.4.0 · `peclet-coupling` 1.2.0 · metapackages `peclet` and `peclet-cu13` 1.5.0.

@@ -4727,6 +4727,16 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - rejected: an imbalance threshold alone (np 3 and np 12 share legacy max/mean 1.125 but gain 6.3 % vs lose 8.3 %); a depth/telescope rule (hierarchies identical); restricting the guard to a list of cases (tuning to cases); smooth cost terms; thread-count-aware rules
 - why: genoa 12x2 regressed +8.3 % under AUTO; after WO-A it was still 1.15 % slower than legacy locally.
 
+### USER DIRECTIVE — momentum advection is ON by default; never reintroduce a default off
+- area: flow
+- source: user, session 2026-10-23 (case-A diagnosis, `bubble_column_perf/validation/G5_DIAG.md`); flow `09d80db` (flip), `a594295` (VoF momentum), `38b0eef` + `0e161f3` (explicit pins); coupling `21d7a04`
+- decided: 2026-10-23
+- status: settled
+- quote: |
+    [user:] Of course momentum convection needs to be on by default!! Do this and rerun the bubble benchmark.
+- rejected: `advect_ = false` as the default (Stokes unless the script opts in) — it silently ran case A and the bubble-column gallery benchmark as unsteady Stokes, while flow's own reference solver (`flow_reference.hpp`) already defaulted to advection on
+- why: an NS solver whose default drops the inertia term produces plausible but wrong dynamics with no warning; the caller who wants Stokes knows it and says `set_advection(False)`. The scheme is unchanged (SOU; implicit FOU + deferred correction on the domain-BC path). Under `enable_vof_momentum` the VoF fluxes own the momentum advection, so `set_advection` is inert there (`advectsMomentum() = !vofMomEnabled_ && advect_`) — before, advection-on was bit-inert on a periodic box and threw on a domain-BC box. Every check was kept bit-identical by explicit pins; NS-physics tests that had run as Stokes are pinned off and listed in the flip commits, not flipped. amr's `AmrFlow` still defaults off (its AUTO ghost selection is tied to advection at `setSolid`, amr.md) — open.
+
 ### Cut-cell scalar transport ships opt-in as `add_scalar(..., cutcell=True)`; its three pre-release names follow the canon
 - area: flow
 - source: flow branch `release-fixes` (7ade940, 6f29ad7, aed416c, e369ad6); design `doc/scalar_ibm_design.md` §13 Q5, Q7; `docs/NAMING.md` §2
