@@ -19,6 +19,13 @@ All notable changes to the peclet suite are documented here. The format is based
   advection and `set_advection` is inert (it used to throw on a domain-BC box when on). Every
   test, verify script and study that relied on the old default now sets it explicitly; those
   whose physics is Navier–Stokes but which had run as Stokes are marked `NS physics` and kept off.
+- **`enable_vof_momentum(rho_gas, rho_liquid)` checks its densities against the density closure.**
+  The pair means rho at C = 0, then rho at C = 1, whichever phase that is (when C = 1 marks the
+  gas, `rho_gas` is the liquid density). When a `'rho'` closure on `'C'` is registered
+  (`set_property_model` linear, or `set_property_table`), a pair that does not match it at C = 0
+  and C = 1 now raises, naming both and saying when the pair is swapped; a swapped pair used to
+  run silently with the momentum carried at the wrong phase's density. With no such closure yet,
+  unchecked as before. Results of correctly called scripts are unchanged.
 
 ### `peclet-amr`
 
