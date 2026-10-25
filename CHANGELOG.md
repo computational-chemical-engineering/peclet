@@ -39,6 +39,10 @@ All notable changes to the peclet suite are documented here. The format is based
   `set_viscous_stress("laplacian")`. `SolverColocated` is unchanged (Laplacian; AUTO prints the notice).
   Distributed: the kept outflow face's transverse ghost ring now carries its single-rank value for the
   transpose term. Design: flow `doc/full_viscous_stress.md`.
+- **`enable_vof_momentum` takes `rho_c0`, `rho_c1`**: the density at C = 0 and at C = 1, whichever
+  phase that is. The former keywords `rho_gas`/`rho_liquid` misled when C = 1 marks the gas; they stay
+  as an overload (bitwise the same), gain a `DeprecationWarning` in the next release and go at 2.0.0.
+  Positional calls are unchanged; a mixed call raises `TypeError`. The swapped-pair error names rho_c0 / rho_c1.
 
 ### `peclet-amr`
 

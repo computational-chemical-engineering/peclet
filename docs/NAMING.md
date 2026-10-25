@@ -138,6 +138,7 @@ Status: **removed 1.0.0** = the non-canonical spelling was deleted in the clean-
 
 | former | canonical | status |
 |---|---|---|
+| `enable_vof_momentum(rho_gas=, rho_liquid=)` (the names assume C = 1 is the liquid; when C = 1 marks the gas, `rho_gas` received the liquid density) | `enable_vof_momentum(rho_c0=, rho_c1=)`: the density at C = 0 and at C = 1, whichever phase each is | **open** — the canonical overload landed 2026-10-25 (flow c4fed58; USER-approved); former keywords kept silently in 1.5.x, `DeprecationWarning` in the next release, removed at 2.0.0 (§0 ladder; §0.1 holds because both overloads take only required arguments, so a mixed call raises `TypeError`) |
 | `extent`, `origin`, `spacing`, `cells`, `global_cells` | — | **canon** (Phase 1 of the units plan) |
 | `get_spacing()` | `spacing` (a list `[dx, dy, dz]`) | **removed 1.0.0** |
 | `get_resolution()` / `global_resolution()` | `cells` / `global_cells` | **removed 1.0.0** |
