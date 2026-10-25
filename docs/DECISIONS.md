@@ -24,7 +24,7 @@ is authoritative.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-249 in force, 42 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+250 in force, 43 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -59,7 +59,6 @@ is authoritative.
 - **Chebyshev pressure driver's apparent win was a placement artifact, not a real gain**. **Rejected:** adopting the Chebyshev pressure driver based on the uncontrolled 36% win  <sub>momentum-solve-residual-stop.md:39</sub>
 - **Clean-fluid-interior mask required on both restriction and prolongation for IBM velocity-MG correctness**. **Rejected:** θ-weighting the diagonal's identity (I) term; coupling the coarse grid at cut/solid cells (masking cut cells only, not solid cells, was tried and stil  <sub>velocity-mg-design.md:54-64</sub>
 - ~~**Coarse-first decomposition ships opt-in, legacy remains the default**~~ (superseded in part 2026-10-22). **Rejected:** making coarse-first decomposition the default  <sub>mg-decomposition-alignment.md:22</sub>
-- **Coarse-level solve policy default stays "smoother", not "auto", because auto regresses the cut-cell IBM path**. **Rejected:** making "auto" the default coarse-level solve policy  <sub>mg-decomposition-alignment.md:28</sub>
 - **Collocated AUTO default = ghost projection (2026-08-25), superseding "ghost as production is a dead end"**. **Rejected:** gauge-exact (ex mode 9) as the unconditional collocated default, chosen by the 2026-08-18 A/B; the 2026-08-20 verdict's "ghost as production" dead end  <sub>flow</sub>
 - **Collocated momentum advection uses the PROJECTED divergence-free face field, not the cell→face average**. **Rejected:** the un-projected cell→face average ½(u_i+u_j) as the collocated advecting velocity  <sub>flow/doc/uf_advection.md;</sub>
 - **Collocated pressure coupling is the ABC (MAC) approximate projection, NOT Rhie–Chow**. **Rejected:** Rhie–Chow interpolation as the collocated coupling  <sub>sdflow-collocated-solver.md:37-39</sub>
@@ -155,6 +154,7 @@ is authoritative.
 - **Momentum-advection kernels must use the actual wall velocity field, not maskVelocity's solid zeros**. **Rejected:** reading maskVelocity's solid-zero convention as the wall velocity for a moving wall  <sub>advective-cutwall-flux-plan.md:15</sub>
 - **Multiphysics assembly is runtime-dispatched flags on existing kernels, not a Solver<Grid,Props> template**. **Rejected:** a templated Solver<Grid,Props> design  <sub>multiphysics-framework-plan.md:403</sub>
 - **Must re-mask solid velocity after grad(phi) correction**. **Rejected:** skipping the re-mask  <sub>cuda-kokkos-migration.md:354-355</sub>
+- **No numeric-only GraphAMG refresh; the per-step rebuild leaves the production path with the depth rule**. **Rejected:** a numeric-only GraphAMG refresh (fixed aggregates, new Galerkin values)  <sub>flow `doc/mg_depth_policy.md`</sub>
 - **Non-incremental Chorin projection gives wrong steady Z&H drag — incremental-rotational required**. **Rejected:** non-incremental Chorin projection (−40% error, splitting-error); the warm-detector convergence protocol  <sub>embed-port-progress.md:21-22</sub>
 - **Old single-GPU CFDSolver reference retired; pnm_backend is pore-network extraction only**. **Rejected:** keeping the CFDSolver single-GPU reference implementation; pnm_backend carrying a CFD solver  <sub>sdflow-dt-divided-convention.md:29-38</sub>
 - **On host, the 'direct' bottom FCG's reductions are single-lane in index order (bits independent of T_host and of the thread count)**. **Rejected:** team reductions on host (order depends on the team size)  <sub>flow</sub>
@@ -218,6 +218,7 @@ is authoritative.
 - **Steady scalar advection is preconditioned by a V-cycle on the ADVECTIVE surrogate (Amendment A2)**. **Rejected:** the symmetric lumped surrogate for steady advection (preconditioned spread β ≈ Pe_h N/2π; 3-D 13 → 40 → 89 iterations at Pe_h 0 / 0.1 / 0.3 and no con  <sub>flow</sub>
 - **Steady state after acceleration: velocity-residual handover, a 12-block certification budget with an early slow exit, and a stagnation fallback (rev 1 + review R1)**. **Rejected:** requiring plain-march reachability as well (Q18: a plain verification tail costs plain steps exactly where acceleration matters — the dense bed at dt   <sub>flow</sub>
 - **Strict staggered bit-identical guard must be held through every change; AMR must work for both velocity placements or be explicitly scoped**.  <sub>sdflow-octree-amr-next.md:19-20</sub>
+- **The pressure MG depth is derived: the shallowest D >= 4 whose global coarsest grid the bottom engine admits**. **Rejected:** fixed depth 4; a per-rank coarsest extent; the deepest coarsening; a cost model; backend-specific depths  <sub>flow `doc/mg_depth_policy.md`</sub>
 - **TRAP: -DPECLET_FLOW_MREAL_DOUBLE=ON on the cmake command line silently builds float**. **Rejected:** passing -DPECLET_FLOW_MREAL_DOUBLE=ON as a normal cmake cache variable  <sub>defect-correction-campaign.md:45-46</sub>
 - **Telescoping is default on for the pressure MG since 2026-09-02; the velocity solve does not need it**. **Rejected:** telescoping the velocity solve  <sub>momentum-solve-residual-stop.md:18</sub>
 - **Ten-Cate periodic-image bug: periodic images are a union, not independent slabs**. **Rejected:** the earlier CSG-slab-per-image geometry construction (implicitly non-union)  <sub>sdf-scene-campaign.md:131</sub>
@@ -311,6 +312,7 @@ is authoritative.
 - "No portable GPU wheel" was a policy choice, not a hard limit — single-GPU CUDA wheels are feasible.  <sub>peclet-cuda-wheel-feasible.md:10-13</sub>
 - (superseded) fp32-floor-explains-everything hypothesis.  <sub>vof-campaign.md:366-381</sub>
 - (superseded) precision-vs-indefiniteness verdict corrected — S3 indefiniteness is real and separate from the float-storage floor.  <sub>vof-campaign.md:346-347</sub>
+- ~~**Coarse-level solve policy default stays "smoother", not "auto", because auto regresses the cut-cell IBM path**~~ (superseded 2026-08-14 by the singular-path "auto" bottom default). **Rejected:** making "auto" the default coarse-level solve policy  <sub>mg-decomposition-alignment.md:28</sub>
 - 1/2-1/2 constraint truncation exonerated as the plateau cause — a previously-published claim was wrong.  <sub>collocated-second-order-verdict.md:29-34</sub>
 - 2nd order finally resolved by ghost-cell projection FD family, not the full Basilisk embed rewrite.  <sub>sdflow-collocated-solver.md:10-27</sub>
 - Agreed IBM velocity-MG coarse-op scheme: volume-fraction Helmholtz, coarse-only solid masking, masked volume-weighted transfers.  <sub>velocity-mg-design.md:37-52</sub>

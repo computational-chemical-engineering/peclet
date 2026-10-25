@@ -30,6 +30,13 @@ applied to **each axis independently**. Three consequences, none of them obvious
   no coarse grid ever sees an error mode along it.
 
 The hierarchy stops at `nLevels` (`set_pressure_multigrid(on, levels)`) or when no axis can coarsen.
+**Since 2026-10-25 the default `levels=0` derives `nLevels`** (flow `doc/mg_depth_policy.md`, register
+flow.md "The pressure MG depth is derived"): the shallowest depth ≥ 4 whose *global* coarsest grid the
+exact bottom solver admits (≤ 8192 cells and an axis whose planes hold ≤ 192 cells; or every axis ≤ the
+bottom extent), else the natural end of coarsening. It reads global dims only, so the global hierarchy
+is the same at every rank count and on every backend; an operator with an outflow face keeps depth 4.
+Every grid whose depth-4 bottom was already admissible (≤ 96³, the bubble column 128×96×64) is
+unchanged; 192³ goes to 5 levels (12³ bottom), 256³ to 6 (8³), 2048×64×64 to 5 (128×4×4).
 
 ### 1.2 Under MPI, the per-rank block sets the depth
 
@@ -271,7 +278,10 @@ ladder, because MueLu *repartitions its coarse levels onto fewer ranks* rather t
 2. **Choose the rank count to divide the atom grid**, where an atom is `2^(L-1)` cells — not to be a
    power of two. Think of the domain as a grid of atoms and decompose *that*.
 3. **Multigrid depth is a resolution setting, not a constant.** Across a refinement ladder hold the
-   *coarsest grid* fixed, not the level count.
+   *coarsest grid* fixed, not the level count. The default depth (`levels=0`, 2026-10-25) does this
+   automatically: the bottom stays between ≈ 1/8 and 1× the direct engine's admission under refinement
+   and weak scaling. Do not go deeper than the first admitted level on a high-contrast problem
+   (bubble column: +65 % iterations one level past 16×12×8).
 5. **Prefer coarse-first when the rank count is awkward**, and let the imbalance budget pick the depth.
 6. **When cells/rank cannot be held exactly constant** (3-D power-of-two refinement moves the cell
    count in 8× steps), compute weak efficiency from **per-GPU throughput**, which corrects for it.

@@ -481,7 +481,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: mg-decomposition-alignment.md:28
 - decided: 2026-08-11
-- status: settled
+- status: superseded (2026-08-14) by "Agglomerated/"auto" bottom solve default is gated to the singular (mean-removed) path only, not enabled universally"
 - quote: |
     coarse-level solve policy `set_pressure_bottom("smoother"|"auto"|"agglomerated")` + `BOTTOM` env
     in the channel driver. **DEFAULT STAYS "smoother"** — `auto` makes the cut-cell `random_spheres`
@@ -4815,3 +4815,28 @@ Do not reverse an entry here without recording a new decision that supersedes it
   rotation-dominated modes (that needs a variable-coefficient VMG, deferred); harmonic makes the edge μ
   component-dependent (asymmetric T); collocated breaks the cell-Laplacian/face-transpose energy pairing;
   with solids the staircase drops the transpose flux at the wall, a defect larger than the term it adds.
+
+### The pressure MG depth is derived: the shallowest D >= 4 whose global coarsest grid the bottom engine admits
+- area: flow
+- source: flow `doc/mg_depth_policy.md` (design 246541f, §3.1, §4.1-4.4), WO-0 measurements `doc/mg_depth_policy_log.md` (05c43f6), WO-1 plumbing 882bd55, the flip d2558a2 (branch `mgdepth`)
+- decided: 2026-10-25 (design note; coordinator Q1/Q2 answers 2026-10-24)
+- status: settled
+- quote: |
+    D_auto = min( D_nat , min{ D >= 4 : A(g_{D-1}) } ), where D_nat is where coarsening ends by itself and A is
+    the direct engine's own size test (n <= 8192 cells and a plane of <= 192 cells), or "every axis <= the bottom
+    extent (4)" for a smoothed bottom. Decided on global dims only, so the global hierarchy is independent of np and
+    backend. set_pressure_multigrid(on, levels) with levels >= 1 stays an exact override; levels=0 is the default.
+- rejected: fixed depth 4 (the bottom grows as N: host GraphAMG 84 % of the step at 192^3, 155.6 vs 81.1 ms/step quiet RTX 5080); a per-rank coarsest extent (the global bottom still grows with np and the preconditioner would depend on the rank count); the deepest coarsening (E1: +65 % iterations one level past 16x12x8 on the bubble column; swarm 192^3 L7 = L6 time); a cost model choosing D by predicted time (needs an iteration predictor; the penalty is problem-dependent); backend-specific depths (host and device would run different preconditioners)
+- why: the shallowest admitted level keeps the exact bottom as fine as the engine takes cheaply; one level too shallow costs <= ~5 %, one too deep up to +65 % (the arithmetic coarse coefficients turn the V-cycle indefinite deeper down; S3 is the real fix). Floor 4 keeps every grid whose depth-4 bottom was admissible bit-identical (all 14 state_hash cases, the bubble column 128x96x64, isotropic <= 96^3). Anchored (outflow) operators keep depth 4: WO-5 deferred, M6 128x32x32 at depth 6 took 3x the iterations of depth 4 (90.4 vs 29.5). WO-0: M1 192^3 L5 81.1 ms vs L4 155.6 / L6 79.4; M2 256x192x128 L5 91.3 vs L4 203.3; G-PERF-WS (b) t(L5) <= 0.20 t(L4) MISS on record (0.52; the threshold came from a loaded-host pilot), not re-thresholded. WO-2 gate numbers: the flip commit message.
+
+### No numeric-only GraphAMG refresh; the per-step rebuild leaves the production path with the depth rule
+- area: flow
+- source: flow `doc/mg_depth_policy.md` §3.3 (246541f); the flip d2558a2
+- decided: 2026-10-25
+- status: settled
+- quote: |
+    The direct engine refactors once per operator change (per step under variable rho / porous), as now. GraphAMG
+    keeps amg_.reset() in setOpenness and its lazy rebuild -- correct for the fallback, and now reached only on
+    fallback configurations.
+- rejected: a numeric-only GraphAMG refresh (fixed aggregates, new Galerkin values)
+- why: complexity paid forever for a path the depth rule removes; under moving interfaces the strength graph changes, so it would need its own re-setup trigger; the H-1 entry already rejected "GraphAMG setup reuse" in favour of the direct engine. Remaining GraphAMG cases: inadmissible natural-end bottoms (badly factored grids, telescoping off), > 64 fluid components, forced 'algebraic', and the distributed GPU until WO-3.

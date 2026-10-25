@@ -43,6 +43,14 @@ All notable changes to the peclet suite are documented here. The format is based
   phase that is. The former keywords `rho_gas`/`rho_liquid` misled when C = 1 marks the gas; they stay
   as an overload (bitwise the same), gain a `DeprecationWarning` in the next release and go at 2.0.0.
   Positional calls are unchanged; a mixed call raises `TypeError`. The swapped-pair error names rho_c0 / rho_c1.
+- **The pressure-multigrid depth is derived by default** (`set_pressure_multigrid(on, levels=0)`,
+  was `levels=4`; flow `doc/mg_depth_policy.md`): the shallowest depth ≥ 4 whose global coarsest
+  grid the exact bottom solver admits (≤ 8192 cells, a plane of ≤ 192), or where coarsening ends by
+  itself. Grids whose depth-4 bottom was already admissible (≤ 96³, the bubble column 128×96×64,
+  every operator with an outflow face) are bit-identical; larger grids get a deeper hierarchy and
+  leave the host GraphAMG bottom (swarm 192³ on an RTX 5080: 155.6 → 81 ms/step), with results
+  moving within the pressure tolerance. `levels ≥ 1` is still exact; the resolved depth is
+  `len(diagnostics.pressure_mg_level_ratios())`.
 
 ### `peclet-amr`
 
