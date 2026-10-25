@@ -4840,3 +4840,25 @@ Do not reverse an entry here without recording a new decision that supersedes it
     fallback configurations.
 - rejected: a numeric-only GraphAMG refresh (fixed aggregates, new Galerkin values)
 - why: complexity paid forever for a path the depth rule removes; under moving interfaces the strength graph changes, so it would need its own re-setup trigger; the H-1 entry already rejected "GraphAMG setup reuse" in favour of the direct engine. Remaining GraphAMG cases: inadmissible natural-end bottoms (badly factored grids, telescoping off), > 64 fluid components, forced 'algebraic', and the distributed GPU until WO-3.
+
+### A pressure-solver change is judged on the divergence contract, not on a per-step divergence ratio
+- area: flow
+- source: flow `doc/mg_depth_policy.md` gates G-CONV (c) and G-IBM (amended 2026-10-25); WO-2 gate log
+  `doc/mg_depth_policy_log.md` (25929ec); diagnosis `bubble_column_perf/gpu_diag/mgd/WO2_DIAG.md`
+- decided: 2026-10-25, USER ("I go with your recommendation"; corrected version: "Yes, that is fine")
+- status: settled; supersedes the pre-registered G-CONV (c) "max_open_divergence_projected() new/old <= 2 on every step"
+  and G-IBM's "flux divergence <= 2 x L4's". The WO-2 MISSes against the old wording stay on record.
+- quote: |
+    (1) At the production tolerance, every step's post-projection max|div u| <= rtol * r0 of that step (the stop
+    test of the PCG and Chebyshev drivers, mac_cutcell_mg.hpp:3204 / :6240), for both configurations.
+    (2) At a fixed tight tolerance (rtol 1e-13), the worst divergence over the run, new / old, <= 2.
+    The post-projection max divergence IS the final max-norm residual; a solve stops anywhere in (rho*rtol, rtol]*r0,
+    so two correct configurations differ per step by up to 1/rho (5-15x): L6/L5 and L6/L4 fail "<= 2 per step" as
+    often as L5/L4 (M3z 9.98, M7a 30/30 steps). At rtol 1e-13 the worst-over-run ratio is 0.76-1.24 (M7a 1.19),
+    M3z 1.00 per step. At the matrix rtols M7a's worst-over-run is 6.95 (one step, both 11 iterations: 1.9e-11 vs
+    6.2e-13) -- a stopping-point draw, on record.
+- rejected: the per-step max-norm ratio <= 2 (measures where the last iteration landed, not the projection); a
+  worst-over-run ratio at the production tolerance (still a stopping-point draw); solving every gate case to 1e-13
+  in production (costs the speed the change is for)
+- why: a gate a correct change cannot pass is no gate; the contract (1) is what the projection promises, and (2) at a
+  tolerance where the iteration no longer dominates compares the operators themselves.
