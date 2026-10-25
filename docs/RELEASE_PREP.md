@@ -75,7 +75,10 @@ CITATION `date-released` is set on tag day (left at 2026-10-04 on purpose).
 - [ ] **D docs** — CHANGELOG drafted; landing pages pass; docstring audit and
   `check_docs_snippets.py --ref` (§13.5); `mkdocs build --strict` with generated pages.
 - [ ] **E publish** (one driver, after the user's go) — §13.6.
-- [ ] **F Snellius / G LUMI** — need the user (billed). Still open from 1.4.0 as well.
+- [x] **F Snellius** (USER OK 2026-10-24, ~398 SBU of the 1000 cap) — cpu/h100/a100 site builds + smokes, both
+  containers, 2-node h100 site + container: all `k=5.845422163491e+00` bit-exact; GPU wheelhouses WITHOUT amr (tag amr
+  7bf183a fails nvcc 12.6, fixed amr ae970b1); 4-GPU tile anomaly G5. Job ids: SNELLIUS.md "Validated releases".
+- [ ] **G LUMI** — no access. Still open from 1.4.0 as well.
 - [ ] **H containers, GitHub Releases, Zenodo, Site.**
 - [ ] **I gallery re-check** (after the release).
 

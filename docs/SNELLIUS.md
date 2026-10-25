@@ -88,6 +88,11 @@ in the script — the recipe above is the corrected one; see [RELEASE](RELEASE.m
 | v1.1.0 | cpu (genoa) | `suite-v1.1.0-cpu` | 26813727 | **OK** — `flow OpenMP has_mpi True`; **smoke 26814834 CERTIFIED** (see below) |
 | v1.1.0 | h100 | `suite-v1.1.0-h100` | 26813725 | **OK** — `flow Cuda has_mpi True`; smoke **26813984 queued** (gpu_h100 was at 56 alloc / 12 resv; est. start 2026-09-17T12:30) — result will be `suite-v1.1.0-h100/peclet-smoke-26813984.out`, compare its two `k` lines |
 | v1.1.0 | a100 | `suite-v1.1.0-a100` | 26813726 | **OK** — `flow Cuda has_mpi True`; **smoke 26815101 CERTIFIED** (see below) |
+| v1.5.0 | cpu (genoa) | `suite-v1.5.0-cpu` | 28535053 | **OK** — all ten packages incl. amr; `flow OpenMP has_mpi True`; **smoke 28535366 CERTIFIED**: np=1 and np=4 `k=5.845422163491e+00`, `div=1.847e-13` (= 1.1.0) |
+| v1.5.0 | h100 | `suite-v1.5.0-h100` | 28535051 FAILED, 28536575 | **OK without amr** — stock script fails on `peclet-amr` (below); rebuilt with the amr-skipping variant `$PROJ/phaseF-v1.5.0/install_noamr.sh`; `flow Cuda has_mpi True`; **smoke 28537289 CERTIFIED** (np=1 = np=4 `k=5.845422163491e+00`); **2 nodes x 1 GPU 28537290 CERTIFIED** (np=1 = np=2, same `k`) |
+| v1.5.0 | a100 | `suite-v1.5.0-a100` | 28536577 | **OK without amr** (same variant); `flow Cuda has_mpi True`; **smoke 28555799 CERTIFIED** (np=1 = np=4 `k=5.845422163491e+00`) |
+| v1.5.0 | container sm90 | `peclet-cuda:1.5.0-sm90` | 28536273; 2-node 28536563 | **OK** via `containers/snellius-run.sh` (fixed b8c4146; first try 28535248 died on `libhwloc.so.15`): `flow 1.4.0 Cuda has_mpi True`, np=1 `k=5.845422163491e+00`; 2 nodes x 1 GPU host OpenMPI 4.1.5/UCX bound: np=2 same `k` |
+| v1.5.0 | container sm80 | `peclet-cuda:1.5.0-sm80` | 28536272 | **OK** — `flow 1.4.0 Cuda has_mpi True`, np=1 `k=5.845422163491e+00` |
 
 Each wheelhouse (`$PROJ/wheelhouse/v1.1.0-<backend>/`) carries all seven packages at the released
 versions: flow 1.1.0, core/dem/pnm/voro 1.0.2, morton/coupling 1.0.1, cp312, linked against the
@@ -105,6 +110,17 @@ python -c "import peclet.flow as f; print(f.execution_space, f.has_mpi)"   # h10
 Without the module environment `python3` is the system 3.9 and the cp312 wheels do not match; without
 the `numpy` step the `--no-index` install fails on `numpy>=1.20` (the 1.1.0 text said only the last
 pip line; corrected 2026-10-24). A GPU wheelhouse does not import on a login node (no `libcuda.so.1`).
+
+**v1.5.0 (Phase F, 2026-10-24/25).** Every backend gives `k = 5.845422163491e+00`, `div = 1.847e-13`,
+9 pressure iterations — the 1.1.0 value to all thirteen digits, on cpu, h100, a100, both containers and
+across two nodes. **The GPU wheelhouses lack `peclet-amr`:** the tag's amr (0.2.0, `7bf183a`) does not
+compile under nvcc 12.6 (`amg_bottom.hpp`/`multigrid.hpp`: extended `KOKKOS_LAMBDA` in private member
+functions; fixed on amr main `ae970b1`, unreleased), so `install_snellius.sh` dies at `wheel ./amr`.
+The h100/a100 trees were built with `$PROJ/phaseF-v1.5.0/install_noamr.sh` (the stock script minus amr)
+and smoked with `smoke_noamr.slurm` (minus the `peclet.amr` import). The next family release with the
+amr fix needs the stock script again. Containers: `$PROJ/containers-v1.5.0/` (sifs + `container_smoke.slurm`).
+The 4-GPU tile is slow on both GPU partitions (h100 3152 ms/step, a100 2346 ms against 1.1.0's 103.6) —
+anomaly G5 below; numerics unaffected.
 
 `$PROJ/suite-v1.1.0` (no backend suffix) is the tree the release was submitted *from*; it carries
 `tools/` only and has no venv.
@@ -309,6 +325,7 @@ Evidence lives in `~/Codes/bubble_column_perf/` (not in git) unless a repo path 
 | G2 | gpu_h100, 2 nodes, job 28221804 (gcn153, gcn158) | same case with 0.79M cells per GPU, 8 GPUs: ~1.2 ms per halo exchange, bytes-sensitive (one node: 0.08-0.2 ms). | same as G1, inter-node path |
 | G3 | gpu_h100, release 1.1.0 | packed bed 384³ strong ladder: 16 GPUs 1349 ms/step against 574 at 8 and 539 at 32; same iterations and sweeps, reproduced on 4 allocations | undiagnosed (`peclet-examples/benchmarks/release-1.1.0-scaling/index.qmd`) |
 | G4 | gpu_h100, one node | fixed cost per halo exchange 0.08-0.2 ms with GPU-aware MPI between H100s on one node, against ~10-20 µs expected over NVLink | job 28262849: the bare exchange is 34-65 µs per exchange (1-3 partners, ~11 µs of it launch + sync), so most of flow's 0.08-0.2 ms is flow-side overhead, not transport; matters only for small subdomains |
+| G5 | gpu_h100 + gpu_a100, 1 node x 4 GPUs, release smoke tile (`profile_mpi_flow.py --L 48`, grid 1x2x2, default host-staged MPI) | v1.5.0: h100 3152 ms/step (28537289), a100 2346 ms/step (28555799) against 103.6 ms on a100 at v1.1.0 (26815101); 2 nodes x 1 GPU (grid 2x1x1) 61.6 ms (28537290); cpu 142.5 ms (28535366). Same 9 pressure iterations, same `k`. Same 2x2-layout signature as G1, but now on A100 too and ~20x the 1.1.0 time | undiagnosed; regression window v1.1.0 -> v1.5.0 (core halo / `snellius_env.sh`) not bisected |
 | C1 | genoa, 192 cores (64 ranks x 3 threads), jobs of 2026-10-03 and 28238662 | rare single-step stalls of 340-500 ms against a 55 ms median in peclet runs (seen in both jobs) | undiagnosed; quote medians of runs |
 
 ## Pointers
