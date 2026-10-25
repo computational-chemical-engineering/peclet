@@ -26,6 +26,19 @@ All notable changes to the peclet suite are documented here. The format is based
   and C = 1 now raises, naming both and saying when the pair is swapped; a swapped pair used to
   run silently with the momentum carried at the wrong phase's density. With no such closure yet,
   unchecked as before. Results of correctly called scripts are unchanged.
+- **Behaviour change — "full viscous stress": variable viscosity uses the full deviatoric stress by
+  default** in `Solver` (staggered). `set_viscous_stress` gains `"auto"`, the new default: it resolves to
+  `"full"`, ∇·(μ(∇u + ∇uᵀ)), when μ is variable, the face viscosity is arithmetic, momentum is not porous,
+  no scene instance moves and no immersed solid is present; otherwise to `"laplacian"`, with a one-time
+  stderr notice. The Laplacian form imposed the wrong tangential stress condition at a viscosity jump
+  (case A, bubble array at μ ratio 0.1: +20 % rise velocity against Basilisk; with full stress and
+  advection it agrees with Basilisk extrapolated to h → 0, ΔRe = 0.09 ± 0.10). **Published variable-μ
+  numbers change**; constant-μ runs, runs with solids, and every state_hash case are byte-identical.
+  Explicit `set_viscous_stress("full")` with solids is allowed but drops the transpose flux across the
+  staircase face (an O(γh) near-wall error; the repair is open). Scripts that want the old operator call
+  `set_viscous_stress("laplacian")`. `SolverColocated` is unchanged (Laplacian; AUTO prints the notice).
+  Distributed: the kept outflow face's transverse ghost ring now carries its single-rank value for the
+  transpose term. Design: flow `doc/full_viscous_stress.md`.
 
 ### `peclet-amr`
 

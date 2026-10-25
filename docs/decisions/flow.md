@@ -4772,3 +4772,46 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - rejected: upwinding the Dirichlet reflection 2v - c_inner (right for diffusion, wrong as an upwind state); changing c's own ghost (breaks the diffusion row); the constant ghost at Dirichlet WALLS (no flux there)
 - why: stale ghosts gave zero influx on the first step after set_field (c = 1 -> 0.5); the reflection gave +0.5 U dt spurious inventory. Trade: exact, conservative flux at a front (was O(1) error); on a smooth inflow profile the first interior face loses exactness (gh/6 coded limiter, gh/4 SOU). Gate: ctest scalar_inflow.
 
+### Variable viscosity uses the full deviatoric stress (staggered): explicit conservative MAC transpose term on uⁿ
+- area: flow
+- source: flow `doc/full_viscous_stress.md` (design 425f169, amendments f56224b, A4 3d9c672); `src/full_stress.hpp`
+  (f9f318a), wiring + `set_viscous_stress` (09ac4da); ctests `full_stress_operator` (f9f318a),
+  `full_stress_operator_np{2,4}` (9507d2f), `ghost_edges_mpi_np{1,2,4}` (ca5e303, outflow case 88e156a),
+  `full_stress_large_dt_outflow` (9cb691a), `mirror_symmetry` full-stress variants (09ac4da); study
+  `tests/study/full_stress_{gates,large_dt}.py`; default AUTO = full (WO-7, 21b25eb); review fixes B1 3d9c672,
+  S1 9b75144, S2 9cb691a; landed flow 9cb691a (2026-10-25). Evidence: `bubble_column_perf/validation/`
+  `FULLSTRESS_REPORT.md`, `REVIEW_FULLSTRESS.md`, `FULLSTRESS_FIXES_HANDOFF.md`, `wo7/`, `fsfix/`
+- decided: 2026-10-22 (design); default 2026-10-23, USER: "yes: full stress becomes default." (Q1); solids
+  excluded from AUTO 2026-10-25 (coordinator, on reviewer finding B1 and its decisive check).
+  status: settled. Default `set_viscous_stress("auto")` = full on the staggered Solver when μ is variable,
+  the face mean arithmetic, momentum not porous, no scene moving and no immersed solid; else laplacian with a
+  one-time stderr notice. Explicit `"full"` stays allowed with solids. `"laplacian"` reproduces earlier
+  numbers. WO-5 G5 MISSED its pre-registered band (d/h 40 Re 21.888 > 21.7; 2026-10-23); the user set the
+  default regardless. OPEN: the cut-cell repair of the transpose flux (architect item).
+- quote: |
+    The Laplacian form ∇·(μ∇u) imposes [μ∂ₙu]=0 instead of [μ(∇u+∇uᵀ)n]=0: an h-independent interface
+    force. Hadamard–Rybczynski at κ=0.1: drag 3.5 vs 4.18 πμUR → +19.5 % rise velocity; case A measured
+    +20.1 % vs Basilisk at d/h 40. Transpose term = divergence of stress elements (normal at cell centres,
+    shear on edges) with the SAME β as the Laplacian bands; explicit on uⁿ (unconditionally stable
+    predictor: λ=(m+⟨T⟩)/(m+⟨K⟩)∈(−1,1]); skipped exactly iff μ globally uniform.
+    Measured: rigid rotation cancels to 3e-13 of max|L|; smooth-μ order 1.99 (Laplacian alone −0.03);
+    kinked rotating core order 0.85; state_hash 14 cases identical host + CUDA; T bitwise np 1 = 2 = 4;
+    dt 20 vs 100 same steady K to 6e-9. Case A with advection, full stress (GPU) d/h 10/20/40/80:
+    21.82 / 22.09 / 22.12 / 22.08; local Basilisk 21.553 / 21.838 / 21.897 / 21.984; extrapolated
+    ΔRe at h → 0 = 0.09 ± 0.10, consistent. G5 band [20.6, 21.7] MISSED (on record).
+    Review B1: with a staircase solid, full and laplacian differ at μ = μ0(1 + 1e-9 cos) by
+    K_full/K_lap − 1 = −4.74e-2 (independent of the perturbation; 0 at ε = 0): the staircase drops the
+    transpose flux, an O(γh) near-wall error → AUTO excludes solids; vof_cutcell(_mpi) byte-equal to pre-WO-7.
+    S1: the MPI outflow face's transverse ghost ring was wrapped (w edge mismatches 56/144 np1), fixed (0).
+    S2: outflow at large dt steady (2.3e-9); phase change at μ ratio 0.1 order 3.97, 0.159 %.
+    Final gates: battery 261/261 host + CUDA; state_hash 14/14 unchanged; case A d/h 20 bitwise.
+- rejected: product form (∇μ)·(∇u)ᵀ; excess-viscosity form with global μ_ref; transpose on the Picard
+  iterate u*; implicit normal-stress diagonal; coupled implicit 3-component solve; harmonic edge μ with
+  full stress (v1); collocated now; full stress under AUTO with staircase/cut-cell solids (until repaired)
+- why: product form leaves an O(1) interface error at oblique kinked interfaces (direction-dependent μ
+  averages × δ-like second differences); excess form needs the same reduction and breaks T≤K for
+  compressive modes; u* is not solenoidal (λ→−1, perturbs the rotational term) and gains no rate;
+  implicit/coupled variants change the validated operator without speeding the physically slow
+  rotation-dominated modes (that needs a variable-coefficient VMG, deferred); harmonic makes the edge μ
+  component-dependent (asymmetric T); collocated breaks the cell-Laplacian/face-transpose energy pairing;
+  with solids the staircase drops the transpose flux at the wall, a defect larger than the term it adds.
