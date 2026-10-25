@@ -17,4 +17,8 @@ module load Python/3.12.3-GCCcore-13.3.0 2>/dev/null || \
   _die "no Python 3.x for GCCcore-13.3.0" '^Python/3'
 
 export OMPI_MCA_pml=ucx UCX_MEMTYPE_CACHE=n     # GPU-aware MPI
+# Host-staged halos by default on Snellius (transport only; results are bit-identical): CUDA-aware MPI is
+# 23x slower on a 1-node 4-GPU 1x2x2 layout (SNELLIUS.md anomaly G5, job 28563748; SURF ticket open).
+# Export PECLET_CORE_GPU_AWARE_MPI=1 before sourcing to measure the GPU-aware path.
+export PECLET_CORE_GPU_AWARE_MPI=${PECLET_CORE_GPU_AWARE_MPI:-0}
 echo "[snellius_env] $(module -t list 2>&1 | grep -iE 'gompi|^GCC|OpenMPI|^CUDA/|UCX-CUDA|^Python/' | tr '\n' ' ')"
