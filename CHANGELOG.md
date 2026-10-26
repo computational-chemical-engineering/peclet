@@ -51,6 +51,11 @@ All notable changes to the peclet suite are documented here. The format is based
   leave the host GraphAMG bottom (swarm 192³ on an RTX 5080: 155.6 → 81 ms/step), with results
   moving within the pressure tolerance. `levels ≥ 1` is still exact; the resolved depth is
   `len(diagnostics.pressure_mg_level_ratios())`.
+  An axis that stops coarsening (an odd extent such as 128×128×25) leaves the depth rule unchanged;
+  such grids converge in more V-cycles than at depth 4 but run faster (128×128×25: 16.4 vs 47.7
+  ms); a line smoother for them is in progress.
+- **Changed: `predict_hierarchy(..., telescope=True)` is now the default**, matching the Solver's
+  telescoping default; pass `telescope=False` for the in-place-only forecast.
 
 ### `peclet-amr`
 
