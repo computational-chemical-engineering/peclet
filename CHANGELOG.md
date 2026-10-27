@@ -57,6 +57,15 @@ All notable changes to the peclet suite are documented here. The format is based
 - **Changed: `predict_hierarchy(..., telescope=True)` is now the default**, matching the Solver's
   telescoping default; pass `telescope=False` for the in-place-only forecast.
 
+#### Fixed
+
+- **A distributed run with comm-avoiding smoothing on a periodic axis of ODD global extent (e.g. nz = 25)
+  no longer differs from single rank.** The comm-avoiding red-black pairs (pressure MG coarse levels and
+  the momentum sweep) re-swept the ghost ring in the wrong colour across such a wrap: np 1 differed from
+  single rank by 7e-7 in p, np 2/4 by 4e-4 in the MG solution. Comm-avoiding is now off there (the
+  per-colour exchange runs instead); even extents are bitwise unchanged. Pre-existing; gate
+  `ca_odd_periodic_mpi`.
+
 ### `peclet-amr`
 
 #### Changed

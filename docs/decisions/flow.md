@@ -4866,3 +4866,18 @@ Do not reverse an entry here without recording a new decision that supersedes it
   in production (costs the speed the change is for)
 - why: a gate a correct change cannot pass is no gate; the contract (1) is what the projection promises, and (2) at a
   tolerance where the iteration no longer dominates compares the operators themselves.
+
+### Comm-avoiding red-black smoothing is off across a periodic axis of ODD global extent
+- area: flow
+- source: flow `doc/vof_distributed_host_comm_design.md` §5.3; fix 97c366c, gate ctest `ca_odd_periodic_mpi` (67d307c,
+  eddb790); diagnosis `bubble_column_perf/gpu_diag/mgd/WO7_DIAG.md` D1; landed flow eddb790
+- decided: 2026-10-27 (coordinator)
+- status: settled
+- quote: |
+    CA red-black smoothing is off on any MG level, and on the velocity decomposition, with a periodic axis of odd
+    global extent; those use the per-colour exchange.
+- rejected: fixing the ring parity inside the CA kernels
+- why: across an odd wrap the ghost-ring slot has the opposite parity of its image, so the ring was swept in the wrong
+  colour (np 1 != single rank: M10 7.37e-7 in p; np 2/4 MG x 3.6e-4). A kernel fix adds hot-kernel code for a class
+  with no production case; the per-colour path is the validated reference. Even extents stay bitwise (state_hash
+  host 460e6fd14885673e, CUDA 20f528f0c295ca15 = main); M10 CUDA np 1 cost nil (29.24 vs 29.13 ms/step).
