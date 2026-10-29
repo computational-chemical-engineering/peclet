@@ -313,6 +313,25 @@ It is **slow above ~a hundred ranks** — run it in the background, one rank cou
 for: an odd axis never coarsens at all, and under MPI a level coarsens an axis only if *every*
 rank's block is even on it, so achievable depth is set by the per-rank block, not the global grid.
 
+## Measured: VoF bubble-swarm weak scaling, H100 (2026-10-26..28)
+
+256³ cells + 8 bubbles (d/h 20) per GPU, triply periodic, MG depth 7, flow 661eee6, 110 timed steps per leg,
+host-staged halos (the Snellius default). Bit-identical across transports and comm-avoiding modes; 9.03
+pressure iterations per step at every NP. 454 SBU in total. Record: `~/Codes/bubble_column_perf/gpu_diag/weak/WEAK_PROD.md`.
+
+| NP (tiles) | 1 | 2 (2,1,1) | 4 (2,2,1) | 8 (2,2,2) | 16 (4,2,2) | 32 (4,4,2) |
+|---|---|---|---|---|---|---|
+| ms/step, host-staged | 104.4 | 166.0 | 229.3 | 270.9 | 264.8 | 298.0 |
+| ms/step, comm-avoiding off | | | 206.5 | 232.2 | | 263.5 |
+| E vs single rank (99.7) | 0.955 | 0.600 | 0.435 | 0.368 | 0.377 | 0.334 |
+
+- The loss is inside a node (1 → 4 GPUs: 104 → 229 ms); 4 → 32 GPUs costs 229 → 298 ms (0.77 over 8×).
+- Comm-avoiding smoothing is slower on GPUs at every NP measured (−21…−39 ms/step off) and bit-identical;
+  USER 2026-10-29: its default becomes off on device backends.
+- GPU-aware MPI (G5) remains 1.6× (np 2) and 5.6× (np 4) slower than host-staged; SURF still investigating.
+- A first NP 16 run took 446.8 ms/step (≈ 214 ms outside the timed solver phases); the repeat on other nodes,
+  same hash, 264.8 — one-off, like C1.
+
 ## Open performance anomalies (2026-10-18)
 
 Unexplained timings on Snellius, kept here so a later run is read against them. Multi-GPU runs are
