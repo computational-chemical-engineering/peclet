@@ -4881,3 +4881,17 @@ Do not reverse an entry here without recording a new decision that supersedes it
   colour (np 1 != single rank: M10 7.37e-7 in p; np 2/4 MG x 3.6e-4). A kernel fix adds hot-kernel code for a class
   with no production case; the per-colour path is the validated reference. Even extents stay bitwise (state_hash
   host 460e6fd14885673e, CUDA 20f528f0c295ca15 = main); M10 CUDA np 1 cost nil (29.24 vs 29.13 ms/step).
+
+### Pressure-MG levels with a blocked strong axis get zebra line relaxation along it
+- area: flow
+- source: flow `doc/mg_depth_policy.md` Amendment A2 (A2.4, A2.5 G-LR, A2.7 text N5), WO-7; gate log
+  `doc/mg_depth_policy_log.md`; landed flow 2732e51
+- decided: 2026-10-29 (design A2 accepted 2026-10-26; landing gates incl. A1 (2′), USER U-Q2 2026-10-27)
+- status: settled
+- quote: |
+    Pressure-MG levels whose unique strong axis is blocked with A' > θ get zebra line relaxation along it.
+- rejected: aspect cap on the depth, plane cap as remedy, depth 4 for the class, more sweeps, lagged periodic wraps,
+  Galerkin coarse operators, odd-grid coarsening/padding
+- why: on 128×128×25 (M10) the point smoother stalls on the blocked axis; with LR AUTO gives 8.1 iterations/step vs
+  10.1 at depth 4 (G-LR (1) bound 12.1), time 16.61 ≤ 17.00 ms/step, divergence floor ratio 1.13 (A1 (2′)); np 1
+  memcmp-equal to single rank. Grids where no smoothed level triggers are bitwise unchanged; `scalar` moves.

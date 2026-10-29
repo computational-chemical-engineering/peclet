@@ -53,7 +53,12 @@ All notable changes to the peclet suite are documented here. The format is based
   `len(diagnostics.pressure_mg_level_ratios())`.
   An axis that stops coarsening (an odd extent such as 128×128×25) leaves the depth rule unchanged;
   such grids converge in more V-cycles than at depth 4 but run faster (128×128×25: 16.4 vs 47.7
-  ms); a line smoother for them is in progress.
+  ms).
+- **Changed: line relaxation on blocked-axis pressure-MG levels** (default on;
+  `diagnostics.set_pressure_line_relaxation(False)` restores point smoothing). A level whose only strong
+  axis cannot coarsen (128×128×25) is smoothed by zebra lines along that axis: M10 8.1 pressure
+  iterations per step instead of 10.1 at depth 4. Grids where no smoothed level triggers are bitwise
+  unchanged; the `scalar` state-hash case moves (host fc99aa51→b9fc5744, CUDA 83554517→27445fd8).
 - **Changed: `predict_hierarchy(..., telescope=True)` is now the default**, matching the Solver's
   telescoping default; pass `telescope=False` for the in-place-only forecast.
 

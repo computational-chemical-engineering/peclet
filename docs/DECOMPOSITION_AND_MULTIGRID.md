@@ -433,10 +433,10 @@ Roughly in order of expected value.
    refine upward — which would make dynamic load balancing and multigrid coexist. Not attempted.
 10. **Wall-normal decomposition.** Would lift the ceiling in §2.6. Needs the pressure solve and the
    velocity BC handling to tolerate an internal boundary in the wall-normal direction.
-11. **Line relaxation for anisotropic levels.** Once only one axis is still coarsening, the coarse
-   operator is strongly anisotropic and a point Red-Black Gauss-Seidel smoother is a poor smoother for
-   it. Line relaxation in the strong direction is the textbook remedy, and would make deep
-   semi-coarsened hierarchies actually pay off.
+11. ~~**Line relaxation for anisotropic levels.**~~ **DONE 2026-10-29** (flow 2732e51, `doc/mg_depth_policy.md`
+   A2, WO-7): a pressure-MG level whose unique strong axis is blocked (odd extent) gets zebra line relaxation
+   along it, on by default (`diagnostics.set_pressure_line_relaxation`). 128×128×25 swarm (M10): 8.1
+   iterations/step against 10.1 at depth 4 without it, 16.61 ≤ 17.00 ms/step. Register N5.
 12. **Odd-grid coarsening.** Allowing `n → (n+1)/2` with matched transfer operators removes the
    divisibility constraint at the root. Larger change; padding (8) buys most of the benefit first, and item 1 removes the
    pressure to do it at all.
