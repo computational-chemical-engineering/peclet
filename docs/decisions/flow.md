@@ -4966,3 +4966,22 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - why: on H100 CA off measured 21–39 ms/step faster and CA is bit-identical, so on a device it only adds cost
   (CUDA state_hash with/without the commit equal, 81ed80eebb3c905a)
 
+
+### The VoF momentum flux defaults to 'muscl_phase'; never a slope of the mixed CV velocity without the cap
+- area: flow
+- source: flow commit eeb77d0 (flip), a196a36 (note); flow `doc/vof_momentum_second_order.md` §9, §11, §12; `bubble_column_perf/validation/highratio/DECISIONS.log`
+- decided: 2026-10-29 (USER: the default becomes muscl_phase only if ALL of its gates pass), flipped 2026-10-31
+- status: settled
+- quote: |
+    The VoF momentum flux defaults to 'muscl_phase': per-phase interface-biased MC slopes of the one
+    control-volume velocity plus a mass-aware cap. NEVER a slope of the mixed control-volume velocity
+    without the cap. `diagnostics.set_vof_momentum_scheme('upwind')` restores the former default.
+- rejected: 'upwind' as the default (first order: P1 Re 35.33 at d/h 16, 36.41 at d/h 24 vs 38.60);
+  'muscl_mixed', MinMod of the mixed velocity (wrong limit, P1 +3.0/+3.1 % at d/h 16/24; mechanism OPEN —
+  the cap-only ablation G-D, Re 39.659 at d/h 16, refuted the emptying-CV explanation); MC of the mixed
+  velocity without the cap (1D: diverges); Basilisk-faithful two momenta + unlimited slopes (no maximum
+  principle in 3D, +9 exchanges/step); Zalesak FCT on u; exact donor mass from widened PLIC ghosts
+- why: all pre-registered gates G-M2-1..10 PASS — bitwise uniform identity at ratios 1..1e4, P1 from rest
+  at t60 d/h 16/24/32/48 = 37.443/38.001/38.289/38.523 (pairwise orders 1.62/2.28/3.44 toward 38.60),
+  P2 d/h 48 within 0.03 % of upwind with dt_min >= 0.92x upwind's, np 1/2/4 bitwise, device
+  fences/allocations equal to upwind's

@@ -70,6 +70,19 @@ All notable changes to the peclet suite are documented here. The format is based
   bit-identical, faster on H100); `set_comm_avoiding` selects it explicitly.
 - **Changed: `predict_hierarchy(..., telescope=True)` is now the default**, matching the Solver's
   telescoping default; pass `telescope=False` for the in-place-only forecast.
+- **Behaviour change — "VoF momentum flux": `enable_vof_momentum` transports momentum with the
+  second-order `'muscl_phase'` flux by default** (it was first-order donor-cell upwind). Each phase's
+  mass flux carries its own face velocity, from an interface-biased MC slope of the one control-volume
+  velocity, scaled by a mass-aware cap: a per-sweep discrete maximum principle at any density ratio,
+  the uniform-velocity identity bit-exact. Rising bubble at ratio ~1e3 (P1), d/h 16 / 24 / 32 / 48:
+  Re 37.44 / 38.00 / 38.29 / 38.52 against the reference 38.60 (upwind: 35.33 at d/h 16, 36.41 at 24),
+  measured no slower per step than upwind. New selector `diagnostics.set_vof_momentum_scheme('upwind' |
+  'muscl_mixed' | 'muscl_mixed_capped' | 'muscl_phase')` and getter `vof_momentum_scheme()`;
+  `vof_momentum_diagnostics()['capped']` counts the faces the cap scaled.
+  `set_vof_momentum_muscl(on)` stays as the former spelling (`'muscl_mixed'` / `'upwind'`).
+  `'muscl_mixed'` (MinMod of the mixed velocity) converges to a wrong limit (+3 % at P1) and is kept
+  opt-in only as a control. **Results of VoF-momentum runs change**; `set_vof_momentum_scheme('upwind')`
+  reproduces the old default. Design and gates: flow `doc/vof_momentum_second_order.md` §9, §12.
 
 #### Fixed
 
