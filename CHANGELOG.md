@@ -59,6 +59,15 @@ All notable changes to the peclet suite are documented here. The format is based
   axis cannot coarsen (128×128×25) is smoothed by zebra lines along that axis: M10 8.1 pressure
   iterations per step instead of 10.1 at depth 4. Grids where no smoothed level triggers are bitwise
   unchanged; the `scalar` state-hash case moves (host fc99aa51→b9fc5744, CUDA 83554517→27445fd8).
+- **Changed: the pressure V-cycle is symmetric by default**: piecewise-constant prolongation P = c·Rᵀ
+  and a palindromic smoothed bottom (an SPD preconditioner for CG). Every pressure result moves within
+  solve tolerance (state_hash host 51fec031→805e3e99, CUDA 83377527→e7edbb47);
+  `diagnostics.set_pressure_vcycle_symmetric(False)` restores the trilinear V-cycle bit for bit. Under it the
+  Chebyshev driver's cold λmax is the top Ritz value of a short PCG run (broadband np-independent seed, margin on
+  the lmin shift, bounds ratchet; a wall-bounded case diverged with the old estimate), and its growth guard tests
+  the M⁻¹-norm r·z instead of max|r| (no false trips on healthy solves).
+- **Changed: communication-avoiding smoothing is off by default on GPU backends** (on for host backends;
+  bit-identical, faster on H100); `set_comm_avoiding` selects it explicitly.
 - **Changed: `predict_hierarchy(..., telescope=True)` is now the default**, matching the Solver's
   telescoping default; pass `telescope=False` for the in-place-only forecast.
 

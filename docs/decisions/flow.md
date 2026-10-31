@@ -768,7 +768,8 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: flow
 - source: physical-units-phase2-aniso.md:28-31
 - decided: 2026-09-07
-- status: settled
+- status: partly superseded 2026-10-30 — the clause "no symmetric-V-cycle decision needed" is replaced by "The pressure
+  V-cycle is symmetric" below; the aspect-rule finding stands
 - quote: |
     C3 LANDED (flow 6cf870b, umbrella cd50c56): E2 RESOLVED by the rule alone — stretched MG-PCG 500-cap
     → 10 (cubic 9-10), pr 0.356 → 0.068 (isotropic ~0.06), level table (1,2,1)(2,2,1)(2,2,2)…; new
@@ -4895,3 +4896,73 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - why: on 128×128×25 (M10) the point smoother stalls on the blocked axis; with LR AUTO gives 8.1 iterations/step vs
   10.1 at depth 4 (G-LR (1) bound 12.1), time 16.61 ≤ 17.00 ms/step, divergence floor ratio 1.13 (A1 (2′)); np 1
   memcmp-equal to single rank. Grids where no smoothed level triggers are bitwise unchanged; `scalar` moves.
+
+### The pressure V-cycle is symmetric: piecewise-constant prolongation P = c·Rᵀ, palindromic smoothed bottom
+- area: flow
+- source: flow `doc/mg_depth_policy.md` Amendment A3 (A3.3–A3.7); gates `doc/mg_depth_policy_log.md` (WO-S1..S3, mgsym4,
+  mgsym5); landed flow 4b59f52 (2026-10-31)
+- decided: 2026-10-30 (design A3 2026-10-26; USER U-A3 2026-10-27: default on within each case's gate tolerances)
+- status: settled; partly supersedes E2's clause "no symmetric-V-cycle decision needed"
+- quote: |
+    The pressure V-cycle is symmetric: piecewise-constant prolongation P = c·Rᵀ of the cell-average restriction,
+    palindromic smoothed bottom. NEVER reintroduce a prolongation that is not c·Rᵀ under a CG driver because
+    "trilinear is more accurate".
+- rejected: FCG default / AUTO-FCG (symptom; FCG(trilinear) ≥ PCG(constant) everywhere: 12 vs 10, 143 vs 10, 247 vs 80);
+  trilinear P + full-weighting R (symmetric but over-corrects: stationary |E| 1.3–26); constant P on thin-axis transfers
+  only; a symmetric bottom only; Galerkin operators for this purpose
+- why: CG needs an SPD preconditioner; trilinear P ≠ c·Rᵀ broke it (64³ blob ×100 PCG 30 vs 10; ×10⁴ cap vs 10; 128³
+  swarm cap vs 80); with P = c·Rᵀ the V-cycle is SPD for any coarse coefficients. Gate mgsym4: host + CUDA 274/274,
+  G-NP 20/20, physics (Hysing 1/2, static drop) on vs off ≤ 1.7e-12 rel. Final gate mgsym5 (after the Chebyshev
+  review fixes below): host 275/275, CUDA 273/275 (scalar_cutcell_g3a/_g4 GPU OOM, 2/2 serial rerun); state_hash
+  host 51fec031a160c88b → 805e3e99a93333c7, CUDA 8337752781faf71b → e7edbb471ea7a742. Guard: ctest `mg_vcycle_symmetry`;
+  `diagnostics.set_pressure_vcycle_symmetric(False)` restores trilinear bit for bit.
+
+### Chebyshev bounds under the symmetric V-cycle: cold λmax by Lanczos, broadband seed, margin on the lmin shift, ratchet
+- area: flow
+- source: flow `doc/mg_depth_policy_log.md` entries cb63826, 8dd2b95, 2026-10-30 (A3 review), 2026-10-31 (A3 finish);
+  commits c54a828, 88d196f, cf3a2d3; decisions `bubble_column_perf/gpu_diag/DECISIONS_GPU.log` 2026-10-29/30
+- decided: 2026-10-29 (coordinator), amended 2026-10-30 by the A3 review fixes (b)(c)
+- status: settled
+- quote: |
+    Symmetric mode: cold power-iteration seed = rhs + max|rhs|·h(global cell) (np-independent hash); the cold λmax is
+    the top Ritz value of a short PCG run (≤ 10 steps, stop at relative change < 1e-3), the warm path seeded with its
+    Ritz vector; λmin by the iteration shifted by 1.15 × the λmax estimate; 1.05 upper margin as before. A growth
+    trip's bracketed λmax persists as a floor (ratchet) for later warm estimates. Trilinear path bitwise.
+- rejected: bracketing λmax with a larger upper margin on the power estimate (needs ≥ 1.13: +9.6 % Chebyshev
+  V-cycles over 53 ctests; 1.10 still an unconverged estimate); rhs-only seed (sees a 1-D subspace); the
+  A-norm Rayleigh quotient of the power iteration alone (safety min 0.9997 at collocated_stability_guard)
+- why: with P = c·Rᵀ, λmax(M⁻¹A) = 1.05–1.13 exceeds the 15-iteration estimate; the shifted lmin iteration then converged
+  to the wrong end (0.02 vs true 0.90) and pressure_wallbounded B diverged (4e84). With the Ritz estimate the safety
+  ratio (0.95·λmin + 1.05·λmax)/λ_true is ≥ 1.0864 cold, 1.0867 warm (was 0.9997 / 1.0035); 0 growth and 0 guard3 trips
+  over 18 131 symmetric solves (the collocated_stability_guard re-estimate loop of 421 + 420 trips is gone); Chebyshev
+  V-cycles 240 206 vs 232 854 (+3.2 %, vof_collocated +13.5 % on the now bracketing bounds). Without the ratchet the
+  warm estimate fell back below the bracket (ctest `pressure_chebyshev_bounds` case 3, negative control FAIL).
+
+### The Chebyshev cold-solve growth guard tests r·z (the M⁻¹-norm), in symmetric AND trilinear mode
+- area: flow
+- source: flow commit 60fac53; `doc/mg_depth_policy_log.md` 2026-10-30 (STOP 2), 2026-10-31 (A3 finish);
+  `bubble_column_perf/gpu_diag/DECISIONS_GPU.log` 2026-10-30 (a), 2026-10-31 (trilinear)
+- decided: 2026-10-30 (coordinator, (a)); trilinear mode 2026-10-31 (coordinator)
+- status: settled
+- quote: |
+    The growth guard trips on ρ_k = r·z rising, lagged one iteration (one Allreduce of {max, sum}, no new
+    synchronisation), in all V-cycle modes. In trilinear mode M is not symmetric and the test is a heuristic,
+    not the symmetric-mode monotonicity proof. NEVER test the max norm of the Chebyshev residual for growth.
+- rejected: max|r| growth test (false positives on healthy bracketed solves: ×5.7 at iteration 1 in multiphysics,
+  ×1.55 in vof_blocks_ns); r·z only when the V-cycle is symmetric, max norm in trilinear (more code, more trips)
+- why: with bracketing bounds only the M⁻¹-norm of the Chebyshev residual is non-increasing. Symmetric: 0 trips.
+  Trilinear (53/53 ctests pass either way): r·z 420 growth + 439 guard3 = 859 trips over 19 022 solves vs max norm
+  541 + 436 = 977 over 19 160; the trilinear trips predate the change.
+
+### Comm-avoiding red-black smoothing defaults off on a device backend, on on a host backend
+- area: flow
+- source: flow commit c6c0494; H100 weak scaling `docs/SNELLIUS.md` "Measured: VoF bubble-swarm weak scaling"
+- decided: 2026-10-29 (USER: "On the comm-avoiding part: yes set it to off for GPU")
+- status: settled
+- quote: |
+    Communication-avoiding smoothing defaults to on for a host backend and off for a device backend;
+    `set_comm_avoiding` overrides on any backend.
+- rejected: on everywhere
+- why: on H100 CA off measured 21–39 ms/step faster and CA is bit-identical, so on a device it only adds cost
+  (CUDA state_hash with/without the commit equal, 81ed80eebb3c905a)
+
