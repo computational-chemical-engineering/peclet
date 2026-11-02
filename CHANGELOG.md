@@ -8,6 +8,18 @@ All notable changes to the peclet suite are documented here. The format is based
 
 ### `peclet-flow`
 
+#### Added
+
+- **The MG-PCG and flexible-CG pressure drivers re-check their true residual once per solve** — a
+  safety net: a solve that capped, broke down, or stopped above max(10·rtol, 1e-8)·r0 is counted
+  and reported on stderr instead of returning a wrong field silently. Since A3 (the SPD V-cycle)
+  that silent-wrong-field mode is reproducible only with the trilinear V-cycle
+  (`diagnostics.set_pressure_vcycle_symmetric(False)`: flexible CG at density ratio 1e5 stops
+  "converged" at 5·10¹⁰× its tolerance); on the default V-cycle PCG/FCG at 1e3–1e4 stay silent. A
+  one-time notice names Chebyshev when PCG/FCG is forced on the trilinear V-cycle at
+  ρmax/ρmin ≥ 1e3. New: `diagnostics.num_pressure_unconverged_solves`,
+  `diagnostics.last_pressure_true_residual()`. Results are bitwise unchanged.
+
 #### Changed
 
 - **Behaviour change — "advection default": momentum advection is ON by default** in `Solver` and

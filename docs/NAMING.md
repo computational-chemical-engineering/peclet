@@ -296,6 +296,8 @@ identity — `peclet::core`, `peclet/core/...`, the repo and its tags — does *
 
 ## 4. History
 
+- 2026-11-01 — flow `diagnostics.num_pressure_unconverged_solves` (`num_*` count, §1.3)
+  and `diagnostics.last_pressure_true_residual()`, developer tier, additive.
 - 2026-10-22 — **flow cut-cell scalar transport** (scalar-ibm, landed 2026-10-04; first released in
   flow 1.4.0): 23 rows in §2 `peclet.flow`, all canon. Before the release, USER decided the three
   divergences the branch had flagged: `set_scalar_tolerance` → `set_scalar_residual_tolerance` (the
