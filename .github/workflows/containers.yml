@@ -77,7 +77,7 @@ jobs:
 
       - name: Set up Apptainer
         if: steps.gate.outputs.run == 'true'
-        uses: eWaterCycle/setup-apptainer@v2
+        uses: eWaterCycle/setup-apptainer@v3
         with:
           apptainer-version: 1.3.6
 
