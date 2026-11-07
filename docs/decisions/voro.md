@@ -369,7 +369,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - area: voro
 - source: vorflow-scratchcell-retired-dynamic-cells-next.md:33-37
 - decided: 2026-06-27
-- status: settled
+- status: superseded
 - quote: |
     ## Scope cuts (NO production consumer of either — grep-verified)
     - **Device Power/Laguerre DROPPED** (`static_assert(!Weighted)` in buildCell). ConvexCell's foot-point
@@ -379,6 +379,7 @@ Do not reverse an entry here without recording a new decision that supersedes it
       (voronoi.hpp) still works (test_power_cells passes).
 - rejected: device Power/Laguerre diagrams under the current ConvexCell foot-point half-space representation
 - why: a radical plane can place the seed outside its own cell (negative offset), which the foot-point form cannot represent
+- conflict: superseded 2026-07 by the ConvexCell Power plane policy (`plane_policy.hpp` `struct Power`), threaded through the device tessellator and `MovingTessellation` repair (P4a; `tests/kokkos/test_power_cells.cpp`, cold rebuild reproduced to 5e-16). Exact in the small-weight regime (every face d > 0); live d < 0 faces (A2b) and multi-image periodic gather at large weight spread (A2c) remain open. Recorded 2026-11-07 (session `voronoi`, M7 Phase 1 uses device power cells in this regime).
 
 ### Device kernel must scalarize small dynamically-indexed arrays to registers via #pragma unroll, not leave them local-memory
 - area: voro
