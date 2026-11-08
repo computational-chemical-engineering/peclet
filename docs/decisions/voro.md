@@ -1229,3 +1229,19 @@ Do not reverse an entry here without recording a new decision that supersedes it
     with Voro++'s `voro::` namespace, so chose `vorflow` (a moving-Voronoi flow solver, parallels sdflow).
 - rejected: naming it "voronoi"
 - why: "the bare `voronoi` was taken (separate private repo) AND clashes with Voro++'s `voro::` namespace"
+
+### Cospherical cuts: topology rule in ConvexCell::clip, kept at +4.5–7 % host build cost
+- area: voro
+- source: peclet-papers work/DECISIONS_LOG.md (2026-11-08); voro 61850e9, 84e4b60, 808ccdb (test_cospherical)
+- decided: 2026-11-08
+- status: settled
+- quote: |
+    A plane through an existing edge or vertex (mirrored/cospherical seeds) gave undefined or orientation-reversed
+    corners: silent wrong volumes (ΣV off up to 8e-2) or overflow on dyadic inputs. Fix: a cut corner whose
+    replacement would reverse orientation (or is near-collinear) counts as on-plane and is kept; the cut region must be
+    a disk (growDisk), else overflow is reported; kDegenerate in build_report. state_hash unchanged.
+- rejected: an on-plane tolerance band on the cut test (measured: moves the failure to band-sized jitter, ΣV off 3e-3
+  at jitter 1e-13); holding the merge until the 4.5–7 % host build cost is recovered
+- why: a silent wrong partition violates valid-by-construction (Sugihara–Iri directive); cost is recoverable
+  (follow-up: reuse the horizon-collection determinant, measure GPU FP32 occupancy first). Do not remove the
+  orientation test for speed.

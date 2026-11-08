@@ -488,7 +488,7 @@ is authoritative.
 
 ## voro — tessellation, ConvexCell, mesh optimizer
 
-81 in force, 8 superseded — full text in [`decisions/voro.md`](decisions/voro.md)
+82 in force, 8 superseded — full text in [`decisions/voro.md`](decisions/voro.md)
 
 ### In force
 
@@ -513,6 +513,7 @@ is authoritative.
 - **ConvexCell geometry decoupled from plane-definition: calculus is a function of {n_k} only**. **Rejected:** 4×T fused kernels (one kernel per geometry-tier × cell-type combination); inlining plane-from-dofs into the hot geometry kernel  <sub>vorflow-convexcell-geometry-split.md:10-17</sub>
 - **Convexity certificate alone is insufficient — propagation to neighbours is essential**. **Rejected:** independent local repair without propagation (S3 alone)  <sub>vorflow-dynamic-update-strategy-study.md:52-55</sub>
 - **Cooperative/warp-parallel half-edge cut is a dead end — do not re-attempt**. **Rejected:** cooperative/warp-parallel half-edge cut (team-per-cell intra-cut parallelism)  <sub>vorflow-kokkos-migration.md:1181-1192</sub>
+- **Cospherical cuts: topology rule in ConvexCell::clip (orientation-reversed corners kept on-plane, disk cut region), kept at +4.5–7 % host build cost**. **Rejected:** an on-plane tolerance band (moves the failure to band-sized jitter); removing the orientation test for speed  <sub>peclet-papers DECISIONS_LOG 2026-11-08</sub>
 - **DEC viscous term shelved — first-order on skewed meshes, unstable explicitly**. **Rejected:** DEC viscous term as an explicit covolume viscous operator  <sub>voronoi-methods-plan.md:174-179</sub>
 - ~~**Device Power/Laguerre diagrams dropped — no ConvexCell radical-plane geometry yet**~~ (superseded 2026-07: device Power policy, small-weight d > 0 regime; A2b/A2c open). **Rejected:** device Power/Laguerre diagrams under the current ConvexCell foot-point half-space representation  <sub>vorflow-scratchcell-retired-dynamic-cells-next.md:33-37</sub>
 - **Device kernel must scalarize small dynamically-indexed arrays to registers via #pragma unroll, not leave them local-memory**. **Rejected:** naive analytic dAreaTri implementation with dynamically-indexed local arrays (2.4x slower on GPU)  <sub>vorflow-convexcell-geometry-split.md:68-72</sub>
