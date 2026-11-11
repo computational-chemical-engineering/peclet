@@ -105,6 +105,24 @@ All notable changes to the peclet suite are documented here. The format is based
   per-colour exchange runs instead); even extents are bitwise unchanged. Pre-existing; gate
   `ca_odd_periodic_mpi`.
 
+### `peclet-pnm`
+
+#### Added
+
+- **`extract_network_flow` (single-rank and `_mpi`) returns the per-throat and per-pore quantities
+  needed for an energy balance of the network** (paper A7, step 0).
+  - Per throat, per unit density and oriented like `throat_flow`: `throat_momentum_flux_zyx`,
+    `throat_kinetic_energy_flux`, `throat_pressure_work_flux`, `throat_normal_zyx`,
+    `throat_centroid_zyx`, and `throat_dp_mean` (the volume-mean-pressure difference including the
+    drive).
+  - Per pore, over its watershed segment: `pore_volume`, `pore_mean_pressure`,
+    `pore_mean_kinetic_energy`, `pore_mean_velocity_zyx`, `pore_volume_centroid_zyx`.
+  - The existing outputs are byte-identical (`tests/regression/state_hash.py`). The new arrays agree
+    across MPI ranks to the atomic-sum order, as the existing ones do.
+  - `scripts/verify_network_flow.py` gains momentum, kinetic-energy and per-pore energy-balance
+    checks. It now pins `set_advection(False)` for its Stokes cases, which follows the flow advection
+    default above.
+
 ### `peclet-amr`
 
 #### Changed
