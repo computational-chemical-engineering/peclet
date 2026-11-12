@@ -30,6 +30,12 @@ frontmatter and nowhere else.
 | derivation check | `derivation-checker` | one load-bearing derivation, as a file with claim, assumptions and outline |
 | implementation review | `reviewer` | once per landed package that changes numerics |
 
+**Budget (Frank, 2026-11-12: the weekly token budget is a real constraint; do not spend tokens that buy nothing).**
+One agent at a time unless he asks for more. The cheapest role that can do the work properly. The highest-effort
+agents only for a load-bearing question. No status turns, re-checks or cross-session notices that nobody needs. Your
+own context is the largest cost, because every turn re-reads it: at a milestone, write the state file and let a fresh
+session continue from this skill.
+
 Choose by risk, not size. When specified work and engineering are a close call, choose engineering.
 
 ## Formulation decisions (independent of which model the session is)
