@@ -23,9 +23,9 @@ frontmatter and nowhere else.
 | role | agent today | give it |
 |---|---|---|
 | scout | `recon` | "where is X in voro, which tests pin it, what pattern to follow" before any brief that touches voro |
-| specified work | `sonnet-implementer` | an option or diagnostic on an existing probe, a parameter ladder, a number or table generator, a unit test of defined behavior, documentation |
-| engineering | `opus-engineer` | a new probe whose method is written down but whose numerics need judgment; voro implementation; debugging with several live hypotheses; accelerator-kernel performance |
-| settled design in voro | `opus-implementer` | work orders of a committed design note, with its gates |
+| specified work | `spec-implementer` | an option or diagnostic on an existing probe, a parameter ladder, a number or table generator, a unit test of defined behavior, documentation |
+| engineering | `engineer` | a new probe whose method is written down but whose numerics need judgment; voro implementation; debugging with several live hypotheses; accelerator-kernel performance |
+| settled design in voro | `design-implementer` | work orders of a committed design note, with its gates |
 | design | `architect` | the voro design note: data layout for a changing face set, device residency, MPI contract. Once per package, from a digest |
 | derivation check | `derivation-checker` | one load-bearing derivation, as a file with claim, assumptions and outline |
 | implementation review | `reviewer` | once per landed package that changes numerics |
