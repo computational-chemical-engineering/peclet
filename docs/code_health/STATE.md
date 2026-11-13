@@ -3,7 +3,7 @@
 **Objective.** Lower code debt across the peclet suite with behaviour proved unchanged, using
 cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; tool side: session `code_health`.
 
-**Tool pin.** cce-code-health a59effb in `~/.venvs/codehealth` (cpp@0, C++ self-test, same_lines).
+**Tool pin.** cce-code-health c5ee4df (from 11-13 S2 end; a59effb before) in `~/.venvs/codehealth` (cpp@0, C++ self-test, same_lines).
 
 ## Where we are (2026-11-13)
 - Repo 1 = **dem** (worktree `suite/dem-health`, branch `code-health`, off main e375b97). Nothing pushed.
@@ -13,16 +13,21 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
   - **S1 (WO-2) done**: 5c2bb0a `colorVelocityPhase`, a842970 `colorPositionPhase`, 913d709 `solvePositionPhase`;
     each GATE PASS 13/13 bitwise, logged (`runs/dem-s1.jsonl`, 3 accepted). demSolveContacts debt 345→258.3,
     CCN 261→196, NLOC 912→693; dem debt 1871.8→1858.2. Session review: moves verbatim (color-moved diff:
-    only wrappers + clang-format reflow), Hooks const& unchanged, moved locals stay local. Independent check: HEAD 913d709 state_hash vs the pre-rename reference (main e375b97) ALL IDENTICAL.
+    only wrappers + clang-format reflow), Hooks const& unchanged, moved locals stay local.
+  - **S2 (WO-3) done**: fcb957c `ColorSchedule`, 54315b3 `HertzMaterials`, 38d9cab `VelocityPhaseViews` (12 halo
+    kernels); each GATE PASS 13/13 first attempt; dem debt 1858.2→1799.3. Review: launchers unpack the struct into
+    locals with the old names, kernel bodies/captures untouched; ColorSchedule built once is safe (colour Views only
+    reallocated in growContactBuffers before the solve). HEAD 38d9cab state_hash vs pre-rename ref ALL IDENTICAL.
+  - 07f9dc5 playbook docs commit (seed c5ee4df anti-pattern); tool re-pinned c5ee4df (no self-test: tier/comparator code unchanged). Independent check: HEAD 913d709 state_hash vs the pre-rename reference (main e375b97) ALL IDENTICAL.
   - Baseline at CB: debt 1871.8 (143.56/kNLOC), 13038 NLOC, brain 12 → `dem/.git/codehealth/runs/dem-s1-base.json`.
   - Self-test PASS (state_hash caught solver_hertz.hpp:59 4.0->7.0). Full-tier smoke gate (comment-only change vs base 7538e81): GATE PASS 12/12, 1789 s wall incl. cold base build (build_host 350, ctest 513, state_hash 360, build_cuda 545 s at load ~80).
 - Baseline scan (scope `src/*`, before WO-1): 26 files, 13063 NLOC, debt 1872.6, health 5.49, brain 12.
 
 ## Next actions
-1. S2 (WO-3, engineer running) launch-params-struct: `solvePositionPhase` (19 params, brain, debt 43.1) and the 14–33-param launchers;
-   then the PGS velocity solve (~30 shared locals with stab/multilevel/Poisson) via a param struct, not by args.
-1b. At S2 end: copy tool c5ee4df seed anti-pattern into dem playbook (docs commit; static checks read config at HEAD, so safe) → re-pin c5ee4df → self-test only if a59effb..c5ee4df touches tier/comparator code. `--ref-base` stays 3fd9b93 for the whole campaign.
-2. Then dedup-colouring. Each step: `codehealth gate --require-gain` green, logged.
+1. S3 (WO-4): the PGS velocity solve out of `demSolveContacts` via a context struct (~30 shared locals with
+   stab/multilevel/Poisson), then dedup-colouring. Base for S3 step 1 = dem 07f9dc5; `--ref-base` stays 3fd9b93.
+2. Leftovers: halo baseline group (baseV/W/O/Pk, 5 kernels), dead `haloPackVelocityStateB`/`haloUnpackVelocityStateB`
+   (no callers; removal is a separate decision), fused ML loop (CUDA-only args, host gate blind).
 3. Then pnm, flow (after sharpvisc-land), voro last.
 
 ## Gates (dem, measured 11-13 on TRS2 at load ~80)
