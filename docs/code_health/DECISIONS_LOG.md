@@ -1,0 +1,8 @@
+# Code-health campaign — decisions log (append-only)
+
+- 2026-11-13 First repo: pnm → **dem**. pnm was ~95 % frozen by A7 at the time (since withdrawn); dem was idle, unclaimed and has a byte gate. Rejected: morton (performance-tuned bit twiddling with exact-integer behaviour, so it calibrates little). Order: dem, pnm, flow, voro.
+- 2026-11-13 Gate tests at `OMP_NUM_THREADS=1`. Measured: at 8 threads per rank the np8 tests took 635 s each (~10 h battery); at 1 thread the full battery takes 343 s. dem is bitwise reproducible only at 1 thread (dem CLAUDE.md).
+- 2026-11-13 Pin core for the gate's base side through `FETCHCONTENT_SOURCE_DIR_PECLET_SIB_PECLET-CORE=$PECLET_SUITE/core`. Without it the base worktree (no sibling `../core`) fetches core v1.3.0 while the head side uses core main.
+- 2026-11-13 The gate has its own core Python build (`core/build_health_py`) for `peclet.halo`, instead of borrowing another session's build directory.
+- 2026-11-13 `build_cuda` compiles with tests + MPI (the draft compiled the module only); added a `clang_format` tier because dem's CI format job is blocking.
+- 2026-11-13 The `*Kokkos` renames go in one ordinary commit before the campaign base. Not campaign steps: they lower no debt, so `--require-gain` would reject them.
