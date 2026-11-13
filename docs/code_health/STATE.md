@@ -3,7 +3,7 @@
 **Objective.** Lower code debt across the peclet suite with behaviour proved unchanged, using
 cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; tool side: session `code_health`.
 
-**Tool pin.** cce-code-health c5ee4df (from 11-13 S2 end; a59effb before) in `~/.venvs/codehealth` (cpp@0, C++ self-test, same_lines).
+**Tool pin.** cce-code-health 00b1849 (relocated %; from S3 end; c5ee4df S3, a59effb S1–S2) in `~/.venvs/codehealth` (cpp@0, C++ self-test, same_lines).
 
 ## Where we are (2026-11-13)
 - Repo 1 = **dem** (worktree `suite/dem-health`, branch `code-health`, off main e375b97). Nothing pushed.
@@ -18,17 +18,20 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
     kernels); each GATE PASS 13/13 first attempt; dem debt 1858.2→1799.3. Review: launchers unpack the struct into
     locals with the old names, kernel bodies/captures untouched; ColorSchedule built once is safe (colour Views only
     reallocated in growContactBuffers before the solve). HEAD 38d9cab state_hash vs pre-rename ref ALL IDENTICAL.
+  - **S3 (WO-4) done**: 36ef1a9 solveVelocityPhase, d609439 stabilizeVelocityPhase, d9e8aa8 closeVelocityPhase;
+    `VelocitySolveContext` = context bag (24 by-value members, logged as such). demSolveContacts 258.1→114.6 but
+    step 2 relocated 95 %: brain 12→15, health 5.49→4.98, dem debt 1799.3→1784.6. CUDA device check PASS (below).
   - 07f9dc5 playbook docs commit (seed c5ee4df anti-pattern); tool re-pinned c5ee4df (no self-test: tier/comparator code unchanged). Independent check: HEAD 913d709 state_hash vs the pre-rename reference (main e375b97) ALL IDENTICAL.
   - Baseline at CB: debt 1871.8 (143.56/kNLOC), 13038 NLOC, brain 12 → `dem/.git/codehealth/runs/dem-s1-base.json`.
   - Self-test PASS (state_hash caught solver_hertz.hpp:59 4.0->7.0). Full-tier smoke gate (comment-only change vs base 7538e81): GATE PASS 12/12, 1789 s wall incl. cold base build (build_host 350, ctest 513, state_hash 360, build_cuda 545 s at load ~80).
 - Baseline scan (scope `src/*`, before WO-1): 26 files, 13063 NLOC, debt 1872.6, health 5.49, brain 12.
 
 ## Next actions
-1. S3 (WO-4): the PGS velocity solve out of `demSolveContacts` via a context struct (~30 shared locals with
-   stab/multilevel/Poisson), then dedup-colouring. Base for S3 step 1 = dem 07f9dc5; `--ref-base` stays 3fd9b93.
-2. Leftovers: halo baseline group (baseV/W/O/Pk, 5 kernels), dead `haloPackVelocityStateB`/`haloUnpackVelocityStateB`
-   (no callers; removal is a separate decision), fused ML loop (CUDA-only args, host gate blind).
-3. Then pnm, flow (after sharpvisc-land), voro last.
+1. S4 (WO-5, running): split `stabilizeVelocityPhase` by mode (brain, 96.4) so S3's relocation becomes a real
+   reduction; group the inline warm-start/orphan block of `demSolveContacts`. Base d9e8aa8, ref-base 3fd9b93.
+2. Then: `PGSManifoldSweep::solveOne` 97.4, `buildContactHierarchy` 86.1, solver_velocity.hpp duplication
+   (dedup-colouring), halo baseline group, dead `haloPack/UnpackVelocityStateB` (removal = separate decision).
+3. Per round end: the CUDA device check (below). Then pnm, flow (after sharpvisc-land), voro last.
 
 ## Gates (dem, measured 11-13 on TRS2 at load ~80)
 | tier | pass criterion | time |
@@ -37,6 +40,7 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
 | build_host / build_cuda | builds (CUDA with tests + MPI) | ~150 s / ~340 s |
 | ctest_host | 303/303, no skip | ~345 s |
 | state_hash | hashes.json byte-identical to base | 6 s |
+| CUDA device check (per round, by hand: `scratchpad/cuda_ref.sh`, worktree `suite/dem-cudaref`) | CUDA ctest 303/303; state_hash ×3 base vs ×3 head: A-vs-B max\|Δ\| ≤ 1.5× max(within-A, within-B) per scenario (GPU is NOT run-to-run deterministic) | ~25 min |
 | clang_tidy (campaign) | per-file/check counts do not rise (baseline 2514 warnings) | ~530 s |
 
 ## Open decisions (default in force)
