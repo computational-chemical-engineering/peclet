@@ -27,6 +27,9 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
 - Baseline scan (scope `src/*`, before WO-1): 26 files, 13063 NLOC, debt 1872.6, health 5.49, brain 12.
 
 ## Next actions
+0. **Milestone exit rule (pre-registered 11-13, before S4 results):** a milestone (round) closes only with
+   dem brain count ≤ its value at CB (12) AND debt below the previous milestone; single steps may relocate.
+   S4 does not close until brain ≤ 12 (now 15); more WO-5-style steps follow if needed.
 1. S4 (WO-5, running): split `stabilizeVelocityPhase` by mode (brain, 96.4) so S3's relocation becomes a real
    reduction; group the inline warm-start/orphan block of `demSolveContacts`. Base d9e8aa8, ref-base 3fd9b93.
 2. Then: `PGSManifoldSweep::solveOne` 97.4, `buildContactHierarchy` 86.1, solver_velocity.hpp duplication
