@@ -30,6 +30,9 @@ $CH gate --ref-base 3fd9b93 --require-gain --json /tmp/claude-1003/wo2_step<N>.j
 tail -16 /tmp/claude-1003/wo2_step<N>.log
 ```
 The gate compares the working tree with HEAD (build, ctest 303, state_hash bitwise, CUDA compile, format).
+- Log EVERY attempt: `$CH log --gate-json /tmp/claude-1003/wo2_step<N>.json --campaign dem-s1 --target src/solve_driver.hpp::peclet::dem::demSolveContacts --recipe extract-kernel-phase`
+  (PASS: commit exactly the gated tree FIRST, then log; FAIL: log before resetting). A neutral step (no debt drop) is
+  gated without --require-gain and logged with `--result accepted-neutral --reason "..."`.
 - PASS → commit the step (named paths; message: phase moved, debt before→after from the gate line, "gate PASS").
 - FAIL → read only the failing tier's lines in `/tmp/codehealth-gate-dem-health.log` (grep/tail). A state_hash
   difference means the move was not verbatim: find it; never "fix" by changing numerics. Format failure:
