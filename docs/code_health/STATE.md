@@ -19,8 +19,9 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
 - Baseline scan (scope `src/*`, before WO-1): 26 files, 13063 NLOC, debt 1872.6, health 5.49, brain 12.
 
 ## Next actions
-1. S2 launch-params-struct: `solvePositionPhase` (19 params, brain, debt 43.1) and the 14–33-param launchers;
+1. S2 (WO-3, engineer running) launch-params-struct: `solvePositionPhase` (19 params, brain, debt 43.1) and the 14–33-param launchers;
    then the PGS velocity solve (~30 shared locals with stab/multilevel/Poisson) via a param struct, not by args.
+1b. At S2 end: copy tool c5ee4df seed anti-pattern into dem playbook (docs commit) → new CB → re-pin c5ee4df → self-test.
 2. Then dedup-colouring. Each step: `codehealth gate --require-gain` green, logged.
 3. Then pnm, flow (after sharpvisc-land), voro last.
 
