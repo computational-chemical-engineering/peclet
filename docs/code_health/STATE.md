@@ -8,13 +8,15 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
 ## Where we are (2026-11-13)
 - Repo 1 = **dem** (worktree `suite/dem-health`, branch `code-health`, off main e375b97). Nothing pushed.
   - 548c66b gate config; 0424510 WO-1 renames (97 `*Kokkos` ids, state_hash ALL IDENTICAL, 303/303);
-    246837a PecletDeps prints resolved header path both branches; 7538e81 same_lines guard. **Campaign base = 7538e81.**
+    246837a PecletDeps prints resolved header path both branches; 7538e81 same_lines guard; 3fd9b93 `.codehealth/playbook.md`.
+    **Campaign base CB = 3fd9b93** (every `.codehealth/` file exists before CB; steps may not touch it).
+  - Baseline at CB: debt 1871.8 (143.56/kNLOC), 13038 NLOC, brain 12 → `dem/.git/codehealth/runs/dem-s1-base.json`.
   - Self-test PASS (state_hash caught solver_hertz.hpp:59 4.0->7.0). Full-tier smoke gate (comment-only change vs base 7538e81): GATE PASS 12/12, 1789 s wall incl. cold base build (build_host 350, ctest 513, state_hash 360, build_cuda 545 s at load ~80).
 - Baseline scan (scope `src/*`, before WO-1): 26 files, 13063 NLOC, debt 1872.6, health 5.49, brain 12.
 
 ## Next actions
-1. Write the playbook stub (dem: recipes + anti-patterns), then CB = first step.
-2. Steps from base 7538e81: `demSolveContacts` phase extraction (one phase per step) → launcher parameter objects
+1. Campaign S1 steps (brief WO-2): extract-kernel-phase on `demSolveContacts`, one phase per gated step.
+2. Steps from CB: `demSolveContacts` phase extraction (one phase per step) → launcher parameter objects
    (struct of Views) → velocity/position colouring dedup. Each step: `codehealth gate` green.
 3. Then pnm, flow (after sharpvisc-land), voro last.
 
