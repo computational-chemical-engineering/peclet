@@ -30,9 +30,9 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
 0. **Milestone exit rule (pre-registered 11-13, before S4 results):** a milestone (round) closes only with
    dem brain count ≤ its value at CB (12) AND debt below the previous milestone; single steps may relocate.
    S4 does not close until brain ≤ 12 (now 15); more WO-5-style steps follow if needed.
-1. S4: WO-5 done (16d9a45 split stabilizeVelocityPhase by mode 96.4→4.0, 43 % relocated; bab8b36
-   openVelocityWarmStart, demSolveContacts 114.6→95.1); dem debt 1718.3, brain 15→14 — NOT closed (rule: ≤ 12).
-   WO-6 running: solvePositionPhase (CCN 35) and solveVelocityPhase (CCN 27) below the brain limits.
+1. S4: WO-5 (16d9a45, bab8b36) + WO-6 (0a31e05 launchFusedVelocityLoop, 68c567d runOverlapProjection with
+   PositionSolveContext, de67b0b countRankLevelActivity): dem debt 1693.5, **brain 12** (exit rule met), health 5.08.
+   Closes after the CUDA device check at de67b0b passes (ctest 303/303 + envelope ≤ 1.5×).
 2. Then: `PGSManifoldSweep::solveOne` 97.4, `buildContactHierarchy` 86.1, solver_velocity.hpp duplication
    (dedup-colouring), halo baseline group, dead `haloPack/UnpackVelocityStateB` (removal = separate decision).
 3. Per round end: the CUDA device check (below). Then pnm, flow (after sharpvisc-land), voro last.
