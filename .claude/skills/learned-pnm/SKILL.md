@@ -11,7 +11,7 @@ This skill is the procedure. The position lives in files; read them, do not rely
    Frank).
 2. Read `~/Codes/peclet-study-A7-learned-pnm/A7_RULES.md` (Frank's constraints, settled choices, ownership, git,
    TRS2 jobs, evidence standard).
-3. Read the design note only in the sections your task touches: `~/Codes/suite/pnm-junction-law/docs/junction_law_design.md`
+3. Read the design note only in the sections your task touches: `design/junction_law_design.md` in the private study repo (moved from pnm 11-13)
    (grep `^## Amendment`, `^### `; read by `sed -n` ranges).
 4. Grep `DECISIONS_STEP0.md` before changing anything it covers.
 
