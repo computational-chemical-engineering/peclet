@@ -21,7 +21,7 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
 ## Next actions
 1. S2 (WO-3, engineer running) launch-params-struct: `solvePositionPhase` (19 params, brain, debt 43.1) and the 14–33-param launchers;
    then the PGS velocity solve (~30 shared locals with stab/multilevel/Poisson) via a param struct, not by args.
-1b. At S2 end: copy tool c5ee4df seed anti-pattern into dem playbook (docs commit) → new CB → re-pin c5ee4df → self-test.
+1b. At S2 end: copy tool c5ee4df seed anti-pattern into dem playbook (docs commit; static checks read config at HEAD, so safe) → re-pin c5ee4df → self-test only if a59effb..c5ee4df touches tier/comparator code. `--ref-base` stays 3fd9b93 for the whole campaign.
 2. Then dedup-colouring. Each step: `codehealth gate --require-gain` green, logged.
 3. Then pnm, flow (after sharpvisc-land), voro last.
 
