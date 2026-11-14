@@ -41,8 +41,8 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
    flow"; awaiting Frank's word. Campaign-close findings: `codehealth diff --base 3fd9b93` FAILS on a NEW
    large_file smell (S6 took solver_multilevel.hpp NLOC 957→1003; the step gate has no file-smell check). Fix =
    restructure proposal for Frank (no threshold shave): split the hierarchy build (eligible…buildContactHierarchy)
-   from the coarse cycle (MlCoarseSweep…multilevelCoarseCycle). Campaign-cadence gate FAILS forbid/scope on the
-   skill-mandated playbook commit (tool gap, reported). Run-log copy + playbook consolidation: after the decision.
+   from the coarse cycle (MlCoarseSweep…multilevelCoarseCycle). Tool now 965de38 (both gaps fixed): campaign gate 6/7,
+   only debt (large_file) fails. Proposal: briefs/RESTRUCTURE-dem-multilevel-proposal.md. Run-log copy + playbook consolidation: after the decision.
 1b. **pnm onboarded 11-14** (worktree suite/pnm-health, branch code-health off 0ccf947): 49df044 PecletDeps log
    line (as dem 246837a), **CB b65b4a2** (config + playbook with A7 keep-out). Self-test PASS (pore_kernels.hpp:373
    mutation caught by state_hash), smoke 13/13. Baseline: 2642 NLOC, debt 319.3, brain 2, health 6.18. Gate ~15 min
