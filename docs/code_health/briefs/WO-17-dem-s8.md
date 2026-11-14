@@ -15,7 +15,20 @@ the recipes below, and you stop on anything that needs a design decision those r
    launch-params-struct, dedup-colouring, and the anti-patterns.
 5. Briefs WO-13, WO-14 and WO-16: the scripts, the scenarios and the counting-build method.
 
-## Targets (dem-health `code-health` HEAD after the S7 close; the session gives you the sha)
+## Step 0 (before S8 proper): clear the campaign gate's clang-tidy rise
+The S7 close campaign gate at 5353296 fails only on `[readability-identifier-naming] 226 -> 228 over the
+touched files (src/solver_velocity.hpp 53 -> 57)`. The S7 helpers `gatherRow`, `weighRow` and
+`releaseIncrement` unpack into the old physics names (Nsum, TauA, TauB, Nsq, wA_n, wB_n, ...). Rename those
+locals to camelBack (nSum, tauA, tauB, nSq, wAn, wBn) INSIDE those three helper bodies only, never in solveOne
+or elsewhere. Use a word-boundary rename limited to each helper's line range, then clang-format. Gates:
+- G-host (no --require-gain; log it as accepted-neutral with --reason);
+- G-sass: expect all S0;
+- G-fma bitwise and G-branch on both builds.
+Then re-run the campaign gate
+(`codehealth gate --mode refactor --cadence campaign --base 3fd9b93 --ref-base 3fd9b93`): it must PASS 13/13.
+Log with `--campaign dem-s7 --recipe tidy-campaign-findings`.
+
+## Targets (dem-health `code-health` HEAD = step 0's commit)
 - `solveVelocityColoredGS` (src/solver_velocity.hpp:~1783): NLOC 131, CCN 31, 20 params.
 - `hertzWallForces` (src/solver_hertz.hpp:180): NLOC 184, CCN 29, 24 params.
 Both are host launchers. Their complexity sits in KOKKOS_LAMBDA bodies.
