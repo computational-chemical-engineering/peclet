@@ -47,6 +47,7 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
 | ctest_host | 303/303, no skip | ~345 s |
 | state_hash | hashes.json byte-identical to base | 6 s |
 | CUDA device check (per round, by hand: `scratchpad/cuda_ref.sh`, worktree `suite/dem-cudaref`) | CUDA ctest 303/303; state_hash ×3 base vs ×3 head: A-vs-B max\|Δ\| ≤ 1.5× max(within-A, within-B) per scenario (GPU is NOT run-to-run deterministic) | ~25 min |
+| GPU timing (rounds that change kernels; `scratchpad/cuda_bench.sh` ABBA, examples/bench_step.py np1 N=4000, 5 pairs) | median speedup base/head ≥ 0.95; 0.90–0.95 → rerun with 10 pairs; < 0.90 = MISS. Pre-registered 11-14 from A/A: median 0.999, pair range 0.891–1.015 (3.4 ms/step, load ~80) | ~5 min |
 | clang_tidy (campaign) | per-file/check counts do not rise (baseline 2514 warnings) | ~530 s |
 
 ## Open decisions (default in force)
