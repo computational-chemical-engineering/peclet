@@ -27,6 +27,10 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
 - Baseline scan (scope `src/*`, before WO-1): 26 files, 13063 NLOC, debt 1872.6, health 5.49, brain 12.
 
 ## Next actions
+**NOW (11-14):** dem S7 running. dem-health HEAD 4055ffc; campaign gate PASS 13/13 (tool 93a36d8). Implementer on WO-12
+(A1–A4, solveOne split; design `designs/dem-s7-design.md`, gates G-host/G-sass/G-fma/G-branch/G-cuda/G-time).
+Then B1–B6 (demSolveContacts, host). Then S8 (Frank, Desk B): solveVelocityColoredGS + hertzWallForces with the S7
+recipe, architect-free. Then dem PR with full CI, merged by this session (Frank). pnm held until junction-law (Desk B).
 0. **Milestone exit rule (pre-registered 11-13):** a round closes only with dem brain ≤ 12 (CB value) AND debt
    below the previous milestone, plus the CUDA device check; single steps may relocate.
 1. **dem PAUSED after S6 (11-14)** at dem 6df7eb6: debt 1649.4 (CB 1871.8, −11.9 %), brain 9 (CB 12), 16 steps,
