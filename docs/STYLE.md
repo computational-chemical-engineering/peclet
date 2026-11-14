@@ -64,7 +64,8 @@ Adopt the two-pronged CI already present in the suite:
 - **Hygiene** (voronoi pattern): `clang-format --dry-run --Werror`, `clang-tidy -p build`, and Doxygen
   build as a non-blocking doc check. **State 2026-09-08:** clang-format runs *informationally* in
   morton/flow/dem/voro/core (hundreds of pre-existing violations each), nowhere blocking; `.clang-tidy`
-  exists only in voro and runs in no CI. Making both blocking after one reformat commit per repo is
+  then existed only in voro and ran in no CI (since 2026-09-08 core, flow, dem, pnm, amr and voro carry one;
+  morton, geom and coupling do not; clang-tidy is still informational everywhere). Making both blocking after one reformat commit per repo is
   [QUALITY_PLAN.md](QUALITY_PLAN.md) D.7.
 - **Special emulation** (morton pattern): where SIMD/ISA paths exist, validate under Intel SDE.
 

@@ -141,7 +141,7 @@ For each project with its own `CLAUDE.md`, **defer to it** — these are entry p
 DEVELOPMENT.md §3. `flow`, `pnm`, `dem`, `voro`, `amr` build via `find_package(Kokkos)` (+`ArborX` for
 dem) against the bootstrapped prefix `extern/install/<backend>` (built once by
 `tools/bootstrap_deps.sh` — a **hard build dependency**). Put `nvcc` on `PATH` for the CUDA backend
-(`export PATH=/usr/local/cuda-13.4/bin:$PATH`).
+(`export PATH=/usr/local/cuda/bin:$PATH`; CUDA 13.5 on TRS2 since 11-2026, the old `cuda-13.4` path is gone).
 
 ```bash
 # morton — non-BMI2 build is contractually PDEP/PEXT-free; AVX-512 only under Intel SDE
@@ -205,8 +205,11 @@ There is **one** development virtualenv, `suite/.venv` (gitignored); every proje
   built before the switch statically link the old Kokkos and are unaffected until rebuilt —
   but do NOT compose old- and new-prefix modules in one Python process (e.g. `coupling`
   importing flow + dem) until both are rebuilt against the same prefix.
-- **MPI ctests need `--bind-to none`** (`-DMPIEXEC_PREFLAGS="--bind-to;none"`): OpenMPI's default
-  pins every rank of an np≤2 run to the same cores.
+- **MPI ctests need `--bind-to none`**: OpenMPI's default pins every rank of an np≤2 run to the same
+  cores. Spelling depends on the repo: core/flow/voro/amr take the list form
+  (`-DMPIEXEC_PREFLAGS="--bind-to;none"`); dem and pnm split it with `separate_arguments`, so they need the
+  space form (`"-DMPIEXEC_PREFLAGS=--bind-to none"`) — the list form reaches mpirun as ONE argument and every
+  MPI test fails in 0.01 s.
 - **Kokkos C++ projects** (`flow`, `dem`, `pnm`) put device kernels in header-only `.hpp` (compiled as
   C++; the Kokkos launch compiler routes them through `nvcc`/`hipcc` — never `.cu`) and expose the
   simulation as an importable Python module via a nanobind binding TU (scikit-build-core, on core's
