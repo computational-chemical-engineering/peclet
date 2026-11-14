@@ -24,7 +24,7 @@ Briefs: [briefs/](briefs/). Tool: cce-code-health (`~/.venvs/codehealth`, pin in
 - flow: after sharpvisc-land (vof pings when flow main moves, ~11-14/15). Then busy, keep out: src/vof/sharp_viscous.hpp,
   src/vof/curvature_field.hpp, src/flow_ibm*.hpp (esp. flow_ibm_closures.hpp), the sharp-viscous setters in
   src/flow_bindings.cpp. Rest of flow free.
-- umbrella: this campaign's docs commits sit UNPUSHED on the shared checkout's main (ecc79ec..); never push the
+- umbrella: campaign docs live on branch code-health-docs in worktree suite/.claude/worktrees/suite-code-health (moved off shared main 11-14); never push the
   umbrella from here without the user; vof pushes its own work from a worktree off origin/main, then we `pull --rebase`.
 - voro: WAIT (session voronoi, 11-14) until the M7 m7-* branches land (date depends on the user). They modify
   ~30 files (convex_cell, tess_grid, repair, reeval_tessellation, subset_gather, ot_optimizer, params, energy/*,
