@@ -11,7 +11,7 @@ You execute a SETTLED design. You decide nothing the design leaves open: stop an
 
 ## Where
 - Code: dem worktree `/home/frankp/Codes/suite/dem-health`, branch `code-health`, HEAD = the
-  tidy-cleanup commit 17d83ec (or later, if the session says so). Commit there; never push.
+  tidy-cleanup commit 4055ffc (or later, if the session says so). Commit there; never push.
 - Probe/base builds: create a detached worktree for the base side
   (`git -C /home/frankp/Codes/suite/dem-health worktree add /home/frankp/Codes/suite/dem-s7base <prev> --detach`)
   with its own build dirs, reused across WOs (checkout `<prev>` per WO). Remove it at the end.
@@ -35,7 +35,7 @@ You execute a SETTLED design. You decide nothing the design leaves open: stop an
    (suite venv) on the touched files.
 2. Gates (§8), all against `<prev>` = the previous WO's commit:
    - G-host: `codehealth gate --mode refactor --base <prev> --ref-base 3fd9b93 --require-gain --json <f>`
-     (`~/.venvs/codehealth/bin/codehealth`, tool pin 569c85b).
+     (`~/.venvs/codehealth/bin/codehealth`, tool pin 93a36d8).
    - G-sass, G-fma, G-branch (A3 with the Poisson scenarios, A4 with β ≠ 0).
    - G-cuda and G-time. Before the first use of `bench_step_s7.py`, run one A/A pass as §8 says.
 3. On PASS: commit (one commit per WO; the message states the moved ranges and the gate numbers),
