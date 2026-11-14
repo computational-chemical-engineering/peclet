@@ -34,8 +34,8 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
    not run the multilevel path; its kernels are token-identical). Remaining brains are device inner loops
    (solveOne 97, hertzWallForces 49, generateSdf splat, solveVelocity, solveVelocityColoredGS), packState, the
    declined *Incremental pair → a device-function recipe would need its own CUDA A/B design (open, not scheduled).
-   **Batch for the user:** dem `code-health` = 17 commits on e375b97 (rename, PecletDeps log, gate config,
-   playbook ×2, 16 steps... see git log 3fd9b93..6df7eb6), push pending the user.
+   **Batch for the user:** dem `code-health` = 22 commits on e375b97 (rename, PecletDeps log, gate config + guards,
+   playbook ×2, 16 steps; `git log e375b97..6df7eb6`), push pending the user.
 2. **Design item (parked, not a step):** the rest of `demSolveContacts` (87.7) holds the `[&]` host lambdas
    (foldVel, syncVel, voteInvariant, withConsensus, growSlots, noteInvariant) and blocks that declare later-used
    locals; needs a think/architect pass on how the solve's host-side state is owned before any further move.
