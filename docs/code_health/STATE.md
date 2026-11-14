@@ -40,7 +40,8 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
    line (as dem 246837a), **CB b65b4a2** (config + playbook with A7 keep-out). Self-test PASS (pore_kernels.hpp:373
    mutation caught by state_hash), smoke 13/13. Baseline: 2642 NLOC, debt 319.3, brain 2, health 6.18. Gate ~15 min
    cold / ~8.5 min cached. ALL top-10 targets sit in A7 heavy-overlap files → A7 freed extract_pore_network_mpi +
-   steepest (11-14) → P1 (WO-10) running; the rest waits for junction-law on main (A7 pings).
+   steepest (11-14) → **P1 done**: 97b6bbe globalRenumber, 63a963a globalMergeLabels; extract_pore_network_mpi
+   47.2→5.4 (out of brain, params unchanged); pnm debt 319.3→299.4, brain 2→1 (left: A7's extract_network_flow_mpi); the rest waits for junction-law on main (A7 pings).
 2. **Design item (parked, not a step):** the rest of `demSolveContacts` (87.7) holds the `[&]` host lambdas
    (foldVel, syncVel, voteInvariant, withConsensus, growSlots, noteInvariant) and blocks that declare later-used
    locals; needs a think/architect pass on how the solve's host-side state is owned before any further move.
