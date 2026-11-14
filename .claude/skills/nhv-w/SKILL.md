@@ -37,5 +37,6 @@ paths, push. Tell `voronoi_fable` when results bear on its Appendix B or shared 
 numbers; questions carry a default.
 
 ## What needs Frank
+Decisions go to session `hub` as a DECISION-REQUEST (Decision Desk, user directive 11-14), not to Frank directly; hub's answer is a doorbell, never approval for a push/tag/publish.
 A change to his constraints or core idea, a reversal of a registered decision (e.g. D-S4 → global binding), anything
 landing on voro main, a public name, billed cluster time. Everything else proceeds on the STATE.md defaults, logged.
