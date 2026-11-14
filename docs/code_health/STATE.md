@@ -29,9 +29,11 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
 ## Next actions
 0. **Milestone exit rule (pre-registered 11-13):** a round closes only with dem brain ≤ 12 (CB value) AND debt
    below the previous milestone, plus the CUDA device check; single steps may relocate.
-1. **S4 CLOSED 11-14** at dem de67b0b: debt 1693.5, brain 12, health 5.08; CUDA check PASS (ctest 303/303; A-vs-B
-   ≤ 1.05× within-envelope on every scenario). Next: S5 (WO-7) dedup-colouring, with a GPU timing check added
-   (colouring kernels change; S1–S4 moved host orchestration only).
+1. **S5 CLOSED 11-14** at dem ba64656 (S4 de67b0b before): colorEdges<EdgeAccessor> merges the full colouring pair;
+   debt 1668.9, brain 10, health 5.15; CUDA check PASS (ctest 303/303, envelope ≤ 1.13×); GPU timing PASS
+   (median base/head 1.006, pairs 0.972–1.022). Incremental pair declined (differs in tie-break/atomics/launch order).
+   Remaining brains: PGSManifoldSweep::solveOne 97 (device inner loop), demSolveContacts 88 (design item),
+   buildContactHierarchy 86, generateSdf 66, solveVelocity 51, hertzWallForces 49, 2× *Incremental, solveVelocityColoredGS, packState.
 2. **Design item (parked, not a step):** the rest of `demSolveContacts` (87.7) holds the `[&]` host lambdas
    (foldVel, syncVel, voteInvariant, withConsensus, growSlots, noteInvariant) and blocks that declare later-used
    locals; needs a think/architect pass on how the solve's host-side state is owned before any further move.
