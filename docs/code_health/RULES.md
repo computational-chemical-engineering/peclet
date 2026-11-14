@@ -27,6 +27,9 @@ Briefs: [briefs/](briefs/). Tool: cce-code-health (`~/.venvs/codehealth`, pin in
   src/pore_extraction.hpp, src/pore_extraction_mpi.hpp, tests/kokkos_mpi/test_pnm_flow_mpi.cpp. In pore_kernels.hpp
   never rename/move the flow-mapping stage kernels, and never touch the extract_network_flow(_mpi) binding block,
   unless that is the commit's point; formatting-only passes over those files are fine as SEPARATE commits.
+  A7 11-14: FREE now: kernels::steepest; extract_pore_network_mpi (refactor OK, keep its parameter list and the
+  segmentation-dispatch point recognizable). WAIT for junction-law on main (A7 pings): extract_network_flow_mpi,
+  extract_network_flow_k, kernels::throatFlux.
 - Umbrella `CHANGELOG`, `docs/NAMING.md`, `docs/DECISIONS.md`, `docs/decisions/`: vof is mid-commit — tell vof first.
 - Other sessions' worktrees (`flow-svl-*`, `flow-sharpvisc-*`, `core-sharpvisc`, `voro-*`, `ale-*`).
 
