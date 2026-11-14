@@ -22,6 +22,11 @@ Briefs: [briefs/](briefs/). Tool: cce-code-health (`~/.venvs/codehealth`, pin in
 - flow `src/vof/`, staggered viscous/VoF files, `VofCurvature`, AUTO setter: frozen until vof lands `sharpvisc-land`.
 - voro `include/peclet/voro/lagrangian/*`: frozen (M7); voro goes last.
 - pnm: open (A7 withdrew its freeze); send A7 the list of commits landed on pnm main; never touch `junction-law` / `suite/pnm-junction-law`.
+  A7 (session `pnm`, 11-14): no pnm main work planned; junction-law (merge-base 0ccf947) rebases onto our batches,
+  so send the commit list per batch. Heavy-overlap files (rebase cost): src/pnm_bindings.cpp, src/pore_kernels.hpp,
+  src/pore_extraction.hpp, src/pore_extraction_mpi.hpp, tests/kokkos_mpi/test_pnm_flow_mpi.cpp. In pore_kernels.hpp
+  never rename/move the flow-mapping stage kernels, and never touch the extract_network_flow(_mpi) binding block,
+  unless that is the commit's point; formatting-only passes over those files are fine as SEPARATE commits.
 - Umbrella `CHANGELOG`, `docs/NAMING.md`, `docs/DECISIONS.md`, `docs/decisions/`: vof is mid-commit — tell vof first.
 - Other sessions' worktrees (`flow-svl-*`, `flow-sharpvisc-*`, `core-sharpvisc`, `voro-*`, `ale-*`).
 
