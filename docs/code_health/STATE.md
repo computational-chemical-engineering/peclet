@@ -46,7 +46,7 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
    locals; needs a think/architect pass on how the solve's host-side state is owned before any further move.
 3. Then: `PGSManifoldSweep::solveOne` 97.4, `buildContactHierarchy` 86.1, solver_velocity.hpp duplication
    (dedup-colouring), halo baseline group, dead `haloPack/UnpackVelocityStateB` (removal = separate decision).
-4. Per round end: the CUDA device check (below). Then pnm, flow (after sharpvisc-land), voro last.
+4. Per round end: the CUDA device check (below). Then flow (vof: after sharpvisc-land, asked 11-14); voro WAITS for the M7 branches (voronoi 11-14).
 
 ## Gates (dem, measured 11-13 on TRS2 at load ~80)
 | tier | pass criterion | time |

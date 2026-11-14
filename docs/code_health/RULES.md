@@ -21,6 +21,10 @@ Briefs: [briefs/](briefs/). Tool: cce-code-health (`~/.venvs/codehealth`, pin in
 ## Keep-out (re-check with the owner before touching; owners announce changes via hub)
 - flow `src/vof/`, staggered viscous/VoF files, `VofCurvature`, AUTO setter: frozen until vof lands `sharpvisc-land`.
 - voro `include/peclet/voro/lagrangian/*`: frozen (M7); voro goes last.
+- voro: WAIT (session voronoi, 11-14) until the M7 m7-* branches land (date depends on the user). They modify
+  ~30 files (convex_cell, tess_grid, repair, reeval_tessellation, subset_gather, ot_optimizer, params, energy/*,
+  voro_bindings*, voro_optimizers.cpp, voro_tessellation.cpp, CMake, CLAUDE.md) and add ~25 lagrangian/ headers.
+  voronoi_fable's ale-* branches may add more.
 - pnm: open (A7 withdrew its freeze); send A7 the list of commits landed on pnm main; never touch `junction-law` / `suite/pnm-junction-law`.
   A7 (session `pnm`, 11-14): no pnm main work planned; junction-law (merge-base 0ccf947) rebases onto our batches,
   so send the commit list per batch. Heavy-overlap files (rebase cost): src/pnm_bindings.cpp, src/pore_kernels.hpp,
