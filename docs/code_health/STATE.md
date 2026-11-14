@@ -29,11 +29,13 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
 ## Next actions
 0. **Milestone exit rule (pre-registered 11-13):** a round closes only with dem brain ≤ 12 (CB value) AND debt
    below the previous milestone, plus the CUDA device check; single steps may relocate.
-1. **S5 CLOSED 11-14** at dem ba64656 (S4 de67b0b before): colorEdges<EdgeAccessor> merges the full colouring pair;
-   debt 1668.9, brain 10, health 5.15; CUDA check PASS (ctest 303/303, envelope ≤ 1.13×); GPU timing PASS
-   (median base/head 1.006, pairs 0.972–1.022). Incremental pair declined (differs in tie-break/atomics/launch order).
-   Remaining brains: PGSManifoldSweep::solveOne 97 (device inner loop), demSolveContacts 88 (design item),
-   buildContactHierarchy 86, generateSdf 66, solveVelocity 51, hertzWallForces 49, 2× *Incremental, solveVelocityColoredGS, packState.
+1. **dem PAUSED after S6 (11-14)** at dem 6df7eb6: debt 1649.4 (CB 1871.8, −11.9 %), brain 9 (CB 12), 16 steps,
+   all bitwise on host; S6 CUDA check PASS (ctest 303/303, envelope ≤ 1.13×), GPU timing median 0.999 (bench does
+   not run the multilevel path; its kernels are token-identical). Remaining brains are device inner loops
+   (solveOne 97, hertzWallForces 49, generateSdf splat, solveVelocity, solveVelocityColoredGS), packState, the
+   declined *Incremental pair → a device-function recipe would need its own CUDA A/B design (open, not scheduled).
+   **Batch for the user:** dem `code-health` = 17 commits on e375b97 (rename, PecletDeps log, gate config,
+   playbook ×2, 16 steps... see git log 3fd9b93..6df7eb6), push pending the user.
 2. **Design item (parked, not a step):** the rest of `demSolveContacts` (87.7) holds the `[&]` host lambdas
    (foldVel, syncVel, voteInvariant, withConsensus, growSlots, noteInvariant) and blocks that declare later-used
    locals; needs a think/architect pass on how the solve's host-side state is owned before any further move.
