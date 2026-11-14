@@ -24,7 +24,7 @@ is authoritative.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-250 in force, 43 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+251 in force, 43 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -227,6 +227,7 @@ is authoritative.
 - **Chebyshev growth guard tests r·z (M⁻¹-norm), in symmetric and trilinear mode (2026-10-30/31)**. **Rejected:** max|r| growth test (false positives); r·z only in symmetric mode  <sub>flow 60fac53</sub>
 - **Comm-avoiding smoothing defaults off on a device backend, on on a host backend (2026-10-29, USER)**. **Rejected:** on everywhere (H100: CA off 21–39 ms/step faster, bit-identical)  <sub>flow c6c0494</sub>
 - **The VoF momentum flux defaults to 'muscl_phase' (per-phase interface-biased MC slopes + a mass-aware cap); never a slope of the mixed CV velocity without the cap (2026-10-31, USER: iff all gates pass)**. **Rejected:** 'upwind' default (first order); 'muscl_mixed' (wrong limit +3 %, mechanism OPEN after G-D)  <sub>flow `doc/vof_momentum_second_order.md` §12, flow eeb77d0</sub>
+- **The VoF interface viscous stress is the sharp conservative operator by default (staggered): PLIC face-fraction μ on band edges + interface-traction and midsection terms from a kinked LS fit, explicit on uⁿ; AUTO = sharp in scope, else averaged + notice** (2026-10-31 design; default 2026-11-04, USER). Reverses, in the VoF band only, register 272's premise that T is symmetric, and the interim "default averaged until the gates pass". **Rejected:** every single face average (arithmetic, harmonic, geometric, 4-cell, PLIC sub-cell); per-link GFM series; non-conservative own-side ghost fluid; tensorial laminate μ; a GFM pressure jump; 'averaged' as the default  <sub>flow</sub>
 - **TRAP: -DPECLET_FLOW_MREAL_DOUBLE=ON on the cmake command line silently builds float**. **Rejected:** passing -DPECLET_FLOW_MREAL_DOUBLE=ON as a normal cmake cache variable  <sub>defect-correction-campaign.md:45-46</sub>
 - **Telescoping is default on for the pressure MG since 2026-09-02; the velocity solve does not need it**. **Rejected:** telescoping the velocity solve  <sub>momentum-solve-residual-stop.md:18</sub>
 - **Ten-Cate periodic-image bug: periodic images are a union, not independent slabs**. **Rejected:** the earlier CSG-slab-per-image geometry construction (implicitly non-union)  <sub>sdf-scene-campaign.md:131</sub>
@@ -672,7 +673,7 @@ is authoritative.
 
 ## core — decomposition, halo, rebalance
 
-33 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
+34 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
 
 ### In force
 
@@ -709,6 +710,7 @@ is authoritative.
 - **coarsenAlignment bug: natural-max alignment over-constrains ORB; cap alignment at 2^4**. **Rejected:** natural-max alignment for ORB decomposition snapping  <sub>parallel-scaling-study.md:60-64</sub>
 - **peclet-core sdist must vendor its own SuiteNanobind copy, not depend on the umbrella cmake/**. **Rejected:** the core sdist referencing the umbrella's cmake/ directory for SuiteNanobind  <sub>release-workflow-prep.md:93</sub>
 - **toVector must repack a strided device subview to a contiguous buffer before cross-space deep_copy**. **Rejected:** cross-space deep_copy directly on a strided device subview  <sub>dem-cubes-gpu-pyvista.md:30-34</sub>
+- **core host builds compile with -ffp-contract=off (directory-scoped, not exported)**. **Rejected:** loosening the bitEqualF gates; pinning CI to ubuntu-24.04; exporting the flag to every consumer  <sub>core</sub>
 
 ### Superseded — history, do not re-derive the old reading
 
@@ -762,10 +764,11 @@ is authoritative.
 
 ## suite-wide — naming, layout, provisioning
 
-33 in force, 1 superseded — full text in [`decisions/suite-wide.md`](decisions/suite-wide.md)
+34 in force, 1 superseded — full text in [`decisions/suite-wide.md`](decisions/suite-wide.md)
 
 ### In force
 - **USER DIRECTIVE: multi-GPU performance is measured by weak scaling only, at a system size per GPU large enough to fill the GPU**. **Rejected:** strong scaling of small cases on GPUs (S-4: 0.1-0.4M cells per GPU) as a health measure  <sub>suite-wide</sub>
+- **USER DIRECTIVE: paper studies live in their own repositories outside the public suite — private while running, public at submission (4TU snapshot)**. **Rejected:** public study repos from the start; private for good  <sub>suite-wide</sub>
 - **A host backend that does not size itself must be handed the thread budget**. **Rejected:** keeping the "say nothing on an unconstrained machine" policy for every backend (it is  <sub>archive/RELEASE_PREP_1.0-1.1.md</sub>
 - **A solver's internal grid-count threshold is a count, not cell-unit API**. **Rejected:** a physical-length form (wrong: the same length means a different level count at a  <sub>amr</sub>
 - **All coupled methods must share one BlockDecomposer; static-only co-decomposition is rejected**. **Rejected:** "Static-only co-decomposition"  <sub>multiphysics-framework-plan.md:410</sub>

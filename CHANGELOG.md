@@ -6,6 +6,29 @@ All notable changes to the peclet suite are documented here. The format is based
 
 ## [Unreleased]
 
+### `peclet-core` 1.8.0, 1.8.1
+
+#### Added
+
+- **`vof/plic_regions.hpp`** — the PLIC area fractions of the planar MAC stress regions (a face, a
+  shear-link hat kernel, a cell midsection) on the fluid side of a PLIC plane; container-free
+  compositions of `plicVolume`, exact for a plane. Additive header (flow's sharp viscous interface).
+- **Stacked and reduced-depth grid halo** — `GridHalo::init(topo, k, stride)` exchanges k fields
+  stacked at offsets j·stride of one view in ONE exchange (one gather, one message per partner),
+  bitwise k single exchanges; `GridHaloTopology::buildTopology(..., depth)` fills only the ghosts
+  within `depth` cells of the inner block. Defaults leave every caller byte-identical. Gate
+  `grid_halo_stacked_np{1,2,4,8}`.
+
+#### Fixed (1.8.1)
+
+- **Host builds compile with `-ffp-contract=off`** (GNU/Clang, directory-scoped; CUDA/HIP device code
+  untouched). On an FMA-capable target (`-march=x86-64-v3`, which the ubuntu-26.04 GCC uses by default)
+  GCC's `-ffp-contract=fast` fused a*b+c depending on the inlining context, so the scene-tree and
+  direct SDF evaluations — and the VoF region-fraction paths — stopped agreeing bitwise
+  (geom_scene, geom_owner, geom_quadrature, vof_pvcache, vof_plic_regions). Generic x86-64 binaries
+  are byte-identical; a CI job at `-march=x86-64-v3` now guards it. Consumers that build core headers
+  with an FMA-capable `-march` (or on aarch64) need the same flag; flow already has it.
+
 ### `peclet-flow`
 
 #### Added
@@ -21,6 +44,30 @@ All notable changes to the peclet suite are documented here. The format is based
   `diagnostics.last_pressure_true_residual()`. Results are bitwise unchanged.
 
 #### Changed
+
+- **Behaviour change — "sharp viscous interface": the viscous stress at a VoF interface is the
+  sharp conservative operator by default.** `set_vof_viscous_interface("auto" | "sharp" |
+  "averaged")`, default `"auto"`: on the staggered `Solver`, with VoF, a varying μ = LinearMix(C)
+  and the full viscous stress active, and no immersed solid, porous momentum, moving scene or phase
+  change, every band edge takes the row's own PLIC face-fraction viscosity, plus a per-link
+  interface-traction correction from a kinked least-squares fit and the cell-midsection force of
+  the normal-stress jump (explicit on uⁿ). Second order where every average (arithmetic, harmonic,
+  4-cell, sub-cell) is first order on an oblique interface: Hadamard–Rybczynski drag at viscosity
+  ratio 1e2 order 2.14 (averaged 1.08); walled shear gate N32 error 5.8e-3 (averaged 3.2e-2). Outside
+  that scope AUTO keeps `"averaged"` with a one-time stderr notice; `SolverColocated` always does.
+  `"averaged"` reproduces earlier numbers bitwise. **VoF runs with a variable viscosity change
+  numbers**: bubble rise P1 d/h 24 Re 38.0075 (averaged 38.0006). Host step cost 1.11–1.15×.
+  Read-outs `diagnostics.vof_viscous_interface_census()` / `vof_viscous_interface_fit()`. Not yet
+  established: the stability of the predictor + projection composite (a layered periodic case is
+  unstable at D_hi ≥ 100 sharp, ≥ 1 averaged) and the order of one steady along-interface mode (§6.8
+  D of `doc/vof_sharp_viscous_stress.md`, under study). Edge-owner ties are averaged, never broken: each
+  band edge's outputs (face fraction, link fractions, interface traction) are the weighted mean over the
+  candidate cells whose PLIC plane lies within 1e-5 cells of the closest (weight 1 up to 1e-6, a C¹
+  smoothstep to 0 at 1e-5; the closest always weight 1). The operator is then reflection-equivariant
+  (`mirror_symmetry` velocity ≤ 1e-12 in every row, was 3e-5–8e-5) and continuous in the plane
+  distances, so round-off cannot switch an edge's owner; tie-free edges are bitwise unchanged. INFO
+  census keys `tied_edges`, `blended_edges`, `max_tie_spread`, `min_untied_gap`. GPU kernel time on P1
+  d/h 24: 1.08× 'averaged'. Requires peclet-core 1.8.0.
 
 - **Behaviour change — "advection default": momentum advection is ON by default** in `Solver` and
   `SolverColocated` (it was off, so a script that never called `set_advection` solved unsteady
@@ -97,6 +144,15 @@ All notable changes to the peclet suite are documented here. The format is based
   reproduces the old default. Design and gates: flow `doc/vof_momentum_second_order.md` §9, §12.
 
 #### Fixed
+
+- **`redistribute` resets the sharp viscous interface's per-step state with the block.** After a
+  rebalance the sharp band assembly still indexed the old block's colour and plane fields — an
+  out-of-bounds read: a host SEGFAULT in `vof_redistribute_mpi_np{2,4}`, silent on CUDA. The interface
+  now re-decides at the next step.
+- **`VofCurvature::compact`: two redundant bare `Kokkos::fence()` calls after the compaction scans
+  removed** (a scan into a host scalar already waits on its own instance). The sharp interface reaches
+  `compact()` every device step, so they broke the no-global-sync rule (`device_sync_budget` 2.00 →
+  0.00 global fences/step on CUDA). No arithmetic change.
 
 - **A distributed run with comm-avoiding smoothing on a periodic axis of ODD global extent (e.g. nz = 25)
   no longer differs from single rank.** The comm-avoiding red-black pairs (pressure MG coarse levels and

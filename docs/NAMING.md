@@ -296,6 +296,12 @@ identity — `peclet::core`, `peclet/core/...`, the repo and its tags — does *
 
 ## 4. History
 
+- 2026-11-04 — flow `set_vof_viscous_interface("auto" | "sharp" | "averaged")` and its getter
+  `vof_viscous_interface()`, public tier (one string selector, the `set_viscous_stress` pattern);
+  default `"auto"` (USER). The build-time `diagnostics.set_vof_viscous_interface` /
+  `diagnostics.vof_viscous_interface` never shipped and are removed, not aliased (QUALITY_PLAN D2).
+  Read-outs `diagnostics.vof_viscous_interface_census()` / `vof_viscous_interface_fit()` stay on the
+  developer tier. Additive.
 - 2026-11-01 — flow `diagnostics.num_pressure_unconverged_solves` (`num_*` count, §1.3)
   and `diagnostics.last_pressure_true_residual()`, developer tier, additive.
 - 2026-10-22 — **flow cut-cell scalar transport** (scalar-ibm, landed 2026-10-04; first released in

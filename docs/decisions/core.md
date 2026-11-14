@@ -560,3 +560,16 @@ Do not reverse an entry here without recording a new decision that supersedes it
     exact (P-i). 2030 existing decomposer constructions byte-identical vs v1.6.0.
 - rejected: changing core's default (dem/voro/amr/pnm partitions would move without a measured need)
 - why: flow's auto policy needs it; nobody else asked for it.
+
+### core host builds compile with -ffp-contract=off (directory-scoped, not exported)
+- area: core
+- source: core f9e4807 + CI job 00d044f, release v1.8.1 7cec32a; bubble_column_perf/validation/highratio/land/core_gcc15_REPORT.md
+- decided: 2026-11-09 (USER go-ahead; scoping by the coordinator)
+- status: settled
+- quote: |
+    The ubuntu-26.04 runner's GCC targets x86-64-v3; -ffp-contract=fast then fused a*b+c by inlining context, so the same
+    prim::*::eval rounded differently inlined into evalTree than called directly. -ffp-contract=off on host builds:
+    gcc 15 v3/generic, gcc 14, clang 19 22/22; generic binaries byte-identical.
+- rejected: loosening the bitEqualF gates to a tolerance; pinning CI to ubuntu-24.04 (hides it); exporting the flag on
+  peclet_core's INTERFACE to every consumer (forces a flag on dem/pnm/amr/voro/coupling without a measured need)
+- why: same rule as flow's "Host launch rule"; consumers add it when they adopt an FMA-capable -march.

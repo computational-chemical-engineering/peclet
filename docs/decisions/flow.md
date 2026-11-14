@@ -4985,3 +4985,47 @@ Do not reverse an entry here without recording a new decision that supersedes it
   at t60 d/h 16/24/32/48 = 37.443/38.001/38.289/38.523 (pairwise orders 1.62/2.28/3.44 toward 38.60),
   P2 d/h 48 within 0.03 % of upwind with dt_min >= 0.92x upwind's, np 1/2/4 bitwise, device
   fences/allocations equal to upwind's
+
+### The VoF interface viscous stress is SHARP by default on the staggered grid (reverses the interim "default averaged"; register 272's symmetric-T premise does not hold in the VoF band)
+- area: flow
+- source: flow `doc/vof_sharp_viscous_stress.md` (§3–§7, §9, §13; architect passes 1–6);
+  `src/vof/sharp_viscous.hpp`, core `vof/plic_regions.hpp` (1.8.0); AUTO + setter flow 7d90c52;
+  review `bubble_column_perf/validation/highratio/sv_impl/REVIEW_SHARPVISC.md` (fixes F1 b5ef043,
+  F3/F6/F9 + note F4/F5/F7: see the sharpvisc-land log); evidence `validation/highratio/DECISIONS.log`,
+  `sv_impl/INTERIM_VERDICT.md`, `sv_impl/default_checks/`
+- decided: 2026-10-31 (design, 'averaged' default pending gates); default 2026-11-04, USER: "sharp
+  should be the default" (setter on the public tier, coordinator, unopposed)
+- status: settled. `set_vof_viscous_interface("auto")` = sharp on the staggered Solver when VoF is on,
+  μ = LinearMix(C) varies, the full stress is active and no solid / porous momentum / moving scene /
+  phase change is present; else averaged with a one-time notice; SolverColocated averaged; explicit
+  "sharp" raises out of scope. Edge owner (§5.8/§5.9, architect passes 7/7b, 2026-11-04): the
+  weighted mean over the owner set {d ≤ d_min + 1e-5}, weight 1 to 1e-6 then a C¹ ramp to 0; the
+  closest candidate always in the set (a NaN distance must not empty it). OPEN: the §6.8 D steady along mode, G-SV1cP NOT JUDGED (sharp N32→64
+  1.68 / 1.55, local orders rising; averaged 1.27 / 0.45; term split = study follow-up); predictor +
+  projection composite stability unproven for BOTH modes (§6.5, Q23); collocated and solids (next).
+- quote: |
+    Band edges take μ̄ from the PLIC area fraction of the row's own face; a per-link interface-traction
+    correction n_a τ̂_c(1 − μ̄R̄_ac); the midsection correction 2(μ_A−μ_B)(C̄⁽ᶜ⁾−C)(∂_cu_c − D̂_nn).
+    τ̂, D̂_nn from one 9-unknown kinked LS fit per interfacial cell on the low-μ side. 2-D a-priori:
+    Couette and extension exact to round-off, Poiseuille L∞ order 1.93–1.95, ρ(G) ≤ 0.99.
+    3-D gates: G-SV2 Hadamard–Rybczynski k = 1e2 order 2.14 (averaged 1.08); G-SV1W N24/N32 5.8e-3 vs
+    3.2e-2; G-SV9(e) spectral 39 PASS (max ρ 0.999730); G-SV8 5/5; G-SV9(c) 13/13; G-SV10 fallbacks 0;
+    G-SV1P/1dP prelim order 1.91–2.04; P1 d/h 24 Re 38.0075 vs 38.0006 (neutral on P1/P2).
+    G-SV3/G-SV4 MISS shared with 'averaged' (VoF momentum order, not the viscous operator).
+    Host cost 1.11–1.15× (band worklists); np 1 vs 4 at the reduction-order floor (1.1e-13, flat).
+    'averaged' = origin/main f9eb1e0 bitwise (three VoF + variable-μ runs, field SHA-256; state_hash
+    14/14 unchanged). Owner set + ramp: mirror_symmetry ≤ 2e-15 host + CUDA (single owner 3.1e-5 /
+    7.9e-5); reflection 7.2e-15; np 1/2/4 bitwise; study gates move ≤ 4e-5 relative, no verdict flips
+    (G-SV12); GPU kernel time 1.014× the single-owner code, 1.08× 'averaged'.
+- rejected: every single average (arithmetic, harmonic, geometric, 4-cell, PLIC sub-cell: first order,
+  L∞ 0.73–0.96); per-link harmonic / GFM series (Liu–Fedkiw–Kang: first order on stretching);
+  non-conservative own-side ghost fluid (Poiseuille order 0.74); tensorial laminate viscosity; a GFM
+  pressure jump in the projection; a single edge owner by argmin with a fixed tie order (round-off
+  picks the owner at exact and near ties: mirror defect 3e-5–8e-5, not shrinking with h); a hard
+  tolerance owner set without the ramp (set membership flips at gap = τ, where gaps are measured); the midsection term with a face-fraction cell β (ρ(G) 19.7); the
+  4-cell edge β with the new target (ρ(G) 1.007); 'averaged' as the default (USER 2026-11-04)
+- why: the averaged face viscosity is first order at any oblique interface; sharp is second order
+  where measured and beats 'averaged' on every gated quantity; register 272's choices (full stress,
+  explicit conservative transpose on uⁿ, no product form, no Picard placement) stand — only its
+  premise that T is symmetric (component-independent β) fails inside the VoF band, so stability is
+  established by the measured G-SV9 gates there, not by the energy proof.

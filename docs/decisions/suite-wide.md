@@ -495,3 +495,18 @@ Do not reverse an entry here without recording a new decision that supersedes it
     dominates a 17 ms step; the earlier H100 benchmarks (17-57M cells per GPU, steps 0.4-3 s,
     same launch) scaled well. Small-case strong scaling measures latency and transport, not the
     solver. CPU layouts (ranks x threads on one node) are not covered by this entry.
+
+### USER DIRECTIVE: paper studies live in their own repositories outside the public suite — private while running, public at submission
+- area: suite-wide
+- source: user 2026-11-13 (via pnm, relayed by hub); option A signed on the Decision Desk 2026-11-14 (card vof-study-repos)
+- decided: 2026-11-14
+- status: settled
+- quote: |
+    "It would be best to have papers as part of peclet-papers and the corresponding studies as (private)
+    repositories not part of the public peclet suite." (user, 2026-11-13). Signed choice 2026-11-14:
+    "Private while running, public at submission".
+- rejected: (a) a public study repo from the start (the earlier suite/CLAUDE.md text); (b) study repos
+    private for good, with reproducibility resting on the 4TU data deposit alone
+- why: studies are paper material, not suite code, so they stay out of the public peclet repos; at
+    submission the scripts behind the figures must be inspectable, so the repo goes public with a 4TU
+    snapshot. Matches peclet-papers' own rule.
