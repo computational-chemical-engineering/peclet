@@ -36,6 +36,13 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
    declined *Incremental pair → a device-function recipe would need its own CUDA A/B design (open, not scheduled).
    **Batch for the user:** dem `code-health` = 22 commits on e375b97 (rename, PecletDeps log, gate config + guards,
    playbook ×2, 16 steps; `git log e375b97..6df7eb6`), push pending the user.
+   **Relayed via code_health (11-14), not yet from Frank to this session:** dem lands as a PR with full CI after
+   "S5 closes"; finish dem before any next repo. Conflicts with the suite directive "push directly to main, no PR
+   flow"; awaiting Frank's word. Campaign-close findings: `codehealth diff --base 3fd9b93` FAILS on a NEW
+   large_file smell (S6 took solver_multilevel.hpp NLOC 957→1003; the step gate has no file-smell check). Fix =
+   restructure proposal for Frank (no threshold shave): split the hierarchy build (eligible…buildContactHierarchy)
+   from the coarse cycle (MlCoarseSweep…multilevelCoarseCycle). Campaign-cadence gate FAILS forbid/scope on the
+   skill-mandated playbook commit (tool gap, reported). Run-log copy + playbook consolidation: after the decision.
 1b. **pnm onboarded 11-14** (worktree suite/pnm-health, branch code-health off 0ccf947): 49df044 PecletDeps log
    line (as dem 246837a), **CB b65b4a2** (config + playbook with A7 keep-out). Self-test PASS (pore_kernels.hpp:373
    mutation caught by state_hash), smoke 13/13. Baseline: 2642 NLOC, debt 319.3, brain 2, health 6.18. Gate ~15 min
@@ -62,6 +69,7 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
 
 ## Open decisions (default in force)
 - Push `.codehealth/` to dem main → waiting for the user.
+- dem solver_multilevel.hpp large_file → restructure plan `.codehealth/restructure/<id>.toml` is Frank's to commit; default: none, diff stays FAIL.
 - `performance-unnecessary-value-param` (947 hits, mostly `Kokkos::View` by value, which is idiomatic) → leave it, never "fix" it; propose excluding it in dem's `.clang-tidy`.
 
 ## Anchors
