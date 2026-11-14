@@ -3,7 +3,7 @@
 **Objective.** Lower code debt across the peclet suite with behaviour proved unchanged, using
 cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; tool side: session `code_health`.
 
-**Tool pin.** cce-code-health 965de38 (file-smell step check + campaign docs-commit exemption; from 11-14 close; 00b1849 S4–S6; c5ee4df S3, a59effb S1–S2) in `~/.venvs/codehealth` (cpp@0, C++ self-test, same_lines).
+**Tool pin.** cce-code-health 569c85b (restructure gain = size-smell drop; dup note; from S7 step 3; 965de38 file-smell step check; 00b1849 S4–S6; c5ee4df S3, a59effb S1–S2) in `~/.venvs/codehealth` (cpp@0, C++ self-test, same_lines).
 
 ## Where we are (2026-11-13)
 - Repo 1 = **dem** (worktree `suite/dem-health`, branch `code-health`, off main e375b97). Nothing pushed.
