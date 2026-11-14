@@ -32,9 +32,12 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
 1. **S4 CLOSED 11-14** at dem de67b0b: debt 1693.5, brain 12, health 5.08; CUDA check PASS (ctest 303/303; A-vs-B
    ≤ 1.05× within-envelope on every scenario). Next: S5 (WO-7) dedup-colouring, with a GPU timing check added
    (colouring kernels change; S1–S4 moved host orchestration only).
-2. Then: `PGSManifoldSweep::solveOne` 97.4, `buildContactHierarchy` 86.1, solver_velocity.hpp duplication
+2. **Design item (parked, not a step):** the rest of `demSolveContacts` (87.7) holds the `[&]` host lambdas
+   (foldVel, syncVel, voteInvariant, withConsensus, growSlots, noteInvariant) and blocks that declare later-used
+   locals; needs a think/architect pass on how the solve's host-side state is owned before any further move.
+3. Then: `PGSManifoldSweep::solveOne` 97.4, `buildContactHierarchy` 86.1, solver_velocity.hpp duplication
    (dedup-colouring), halo baseline group, dead `haloPack/UnpackVelocityStateB` (removal = separate decision).
-3. Per round end: the CUDA device check (below). Then pnm, flow (after sharpvisc-land), voro last.
+4. Per round end: the CUDA device check (below). Then pnm, flow (after sharpvisc-land), voro last.
 
 ## Gates (dem, measured 11-13 on TRS2 at load ~80)
 | tier | pass criterion | time |
