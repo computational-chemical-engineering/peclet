@@ -19,13 +19,18 @@ Briefs: [briefs/](briefs/). Tool: cce-code-health (`~/.venvs/codehealth`, pin in
 - Never rewrite or force-push; keep paper-pinned commits reachable (flow f9eb1e0, pnm 0ccf947, pnm ea49b3a).
 
 ## Keep-out (re-check with the owner before touching; owners announce changes via hub)
-- flow `src/vof/`, staggered viscous/VoF files, `VofCurvature`, AUTO setter: frozen until vof lands `sharpvisc-land`.
 - voro `include/peclet/voro/lagrangian/*`: frozen (M7); voro goes last.
-- flow: after sharpvisc-land (vof pings when flow main moves, ~11-14/15). Then busy, keep out: src/vof/sharp_viscous.hpp,
-  src/vof/curvature_field.hpp, src/flow_ibm*.hpp (esp. flow_ibm_closures.hpp), the sharp-viscous setters in
-  src/flow_bindings.cpp. Rest of flow free.
-- umbrella: campaign docs live on branch code-health-docs in worktree suite/.claude/worktrees/suite-code-health (moved off shared main 11-14); never push the
-  umbrella from here without the user; vof pushes its own work from a worktree off origin/main, then we `pull --rebase`.
+- flow (vof, 11-15; flow main eed2fa4): keep out of src/vof/sharp_viscous.hpp, src/vof/curvature_field.hpp,
+  src/flow_ibm*.hpp (all 14; vof's solids package will touch flow_ibm_vof.hpp / flow_ibm_core.hpp), the sharp-viscous
+  setters/read-outs in src/flow_bindings.cpp (set_vof_viscous_interface, vof_viscous_interface,
+  diagnostics.vof_viscous_interface_census/_fit), tests/study/sharp_viscous/, doc/vof_sharp_viscous_stress.md,
+  doc/full_viscous_stress.md. Refactors ADJACENT to these (MAC stress elements, VoF band worklists) must be bitwise on
+  state_hash AND a sharp VoF run. Paper-pinned, in main's history: f9eb1e0, 56d115f, 582ac73, 9a5d2dc, a3d1137.
+  vof's live branches (never rebase/delete): sharpvisc-solids, sharpvisc, sharpvisc-perf, sharpvisc-diag, svl-fence,
+  svl-mirror, svl-redist and the detached -base/-perf-ref/-pre5b worktrees. Rest of flow free.
+- umbrella: campaign docs live on branch code-health-docs in worktree suite/.claude/worktrees/suite-code-health. Never
+  push the umbrella from here without the user's explicit OK (MISS 11-15: 3138c71 + 13937f6 were pushed on the dem
+  landing authorization alone; reported to the user). vof pushes its own work from a worktree off origin/main.
 - voro: WAIT (session voronoi, 11-14) until the M7 m7-* branches land (date depends on the user). They modify
   ~30 files (convex_cell, tess_grid, repair, reeval_tessellation, subset_gather, ot_optimizer, params, energy/*,
   voro_bindings*, voro_optimizers.cpp, voro_tessellation.cpp, CMake, CLAUDE.md) and add ~25 lagrangian/ headers.
