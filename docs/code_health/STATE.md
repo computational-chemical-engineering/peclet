@@ -7,7 +7,7 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
 Earlier pins: 569c85b (restructure gain), 965de38 (file-smell step check), 00b1849, c5ee4df, a59effb.
 
 ## Where we are (2026-11-15)
-- **dem** (worktree `suite/dem-health`, branch `code-health` off main e375b97, unpushed). Campaign base CB = 3fd9b93.
+- **dem LANDED 11-15**: PR #13 merged, dem main 2ed8411, umbrella 3138c71. (worktree `suite/dem-health`, branch `code-health`; CB 3fd9b93.)
   - S1–S6 closed (6df7eb6: debt 1649.4, brain 9). S7 closed (5353296 + tidy 43fb299: debt 1505.2, brain 8;
     solveOne 97.4 → 54.9 still brain; demSolveContacts 87.7 → 21.2 out). S8 landed 43fb299..3a65d08:
     hertzWallForces 49.4 → 29.0 (out of brain), solveVelocityColoredGS 42.1 → 30.1 (still brain: dead
@@ -19,10 +19,10 @@ Earlier pins: 569c85b (restructure gain), 965de38 (file-smell step check), 00b18
   setters in flow_bindings.cpp) but WAITS: Frank "finish dem first". **voro** waits for the M7 branches.
 
 ## Next actions
-1. S8 CLOSED 11-15 (c605373: campaign gate 13/13, CUDA 303/303, envelope 1.03, timing 0.974); playbook + run logs 1af98b7.
-2. **dem PR #13** (peclet-dem, full CI, no squash) OPEN, CI running; merge on green (Frank's form, 11-14). Then push
-   this branch (umbrella last). Send code_health the PR link + final numbers.
-3. Then flow onboarding (WO-9 pattern, keep-out above; ping vof first). pnm on A7's ping.
+1. flow onboarding (WO-9 pattern: gate config, playbook with the keep-out above, self-test, baseline); ping vof first.
+2. pnm PR when A7 pings that junction-law landed (Desk pnm-push = B).
+3. Open for Frank (default keep): delete dem's dead shock-propagation block in solveVelocityColoredGS (DECISIONS.md:441).
+4. Housekeeping: remove dem worktrees dem-cudaref / dem-cudahead when no further dem round is planned.
 
 ## Milestone exit rule (pre-registered 11-13)
 A round closes only with dem brain ≤ 12 AND debt below the previous milestone AND the CUDA device check.
