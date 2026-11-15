@@ -25,7 +25,7 @@ Earlier pins: 93a36d8, 569c85b (restructure gain), 965de38 (file-smell step chec
 1. flow F1 = WO-20 RUNNING: mac_cutcell_mg.hpp (initMpi 92.0, solvePCGResident 74.5, buildAmg 59.1); vof GO 11-15 with extra gates (playbook). flow CB 7ddc506 (+ b148fe1 playbook), branch rebased on 0b86f1b. flow landing method (PR vs direct push) to clear with Frank before any flow push.
 2. pnm PR when A7 pings that junction-law landed (Desk pnm-push = B).
 3. dem-s9-land: on VERIFIED A → PR shock-dedup with full CI, merge commit; write executed. Next dem/pnm round: pin core to a detached worktree (shared suite/core moved 11-15 12:49).
-4. flow (a): do the 4 OMP=1 ctest failures predate eed2fa4? check at f9eb1e0 running (scratchpad/flow_a); result → vof.
+4. flow (a) DONE: the 4 OMP=1 failures predate eed2fa4 (same at f9eb1e0); sent to vof as a tolerance question.
 5. Housekeeping: remove dem worktrees dem-cudaref / dem-cudahead when no further dem round is planned.
 
 ## Milestone exit rule (pre-registered 11-13)
