@@ -24,7 +24,7 @@ Earlier pins: 93a36d8, 569c85b (restructure gain), 965de38 (file-smell step chec
   ≈ 40 min (ctest 275 + state_hash + sharp_vof); campaign adds ctest_long, build_cuda, clang_tidy. Keep-out: RULES.md. **voro** waits for the M7 branches.
 
 ## Next actions
-1. flow-f1-land: on VERIFIED → land as the card says; write executed. Next flow round F2: solveFCGAttempt 47.6, solveBiCGStab, pcgAmg in the same file, or the next top-10 outside the keep-out.
+1. flow-f1-land filed (A/B/C, rec A PR): on VERIFIED → land as the card says; write executed. flow F2 = WO-21 RUNNING (Krylov drivers + decomposition, stacked on f1).
 2. pnm PR when A7 pings that junction-law landed (Desk pnm-push = B).
 3. Next dem/pnm round: pin core to a detached worktree (shared suite/core moved 11-15 12:49).
 4. flow (a) DONE: the 4 OMP=1 failures predate eed2fa4 (same at f9eb1e0); sent to vof as a tolerance question.
