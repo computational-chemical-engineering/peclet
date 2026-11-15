@@ -17,12 +17,14 @@ Earlier pins: 93a36d8, 569c85b (restructure gain), 965de38 (file-smell step chec
   - Run logs `dem/.git/codehealth/runs/dem-s1..s8.jsonl` + `dem-s1-base.json`.
 - **pnm** (worktree `suite/pnm-health`, CB b65b4a2): P1 done (debt 319.3 → 299.4, brain 2 → 1). HELD until A7's
   junction-law lands (Desk pnm-push = B), then PR.
-- **flow ONBOARDED 11-15** (worktree `suite/flow-health`, branch code-health, CB 7ddc506 off 0b86f1b (src = eed2fa4); core via
+- **flow F1 CLOSED 11-15** (WO-20, branch f1, 42bdc15..73a6f63, local): CutcellMG buildAmg 59.1→0, initMpi 92.0→19.6,
+  solvePCGResident 74.5→48.1; **flow 5799.4 → 5657.1, brain 48 → 46**; all gates bitwise incl. GPU. Landing = Desk card flow-f1-land.
+- **flow ONBOARDED 11-15** (worktree `suite/flow-health`, branch code-health, CB b148fe1 (src = eed2fa4); core via
   detached `suite/core-health-flowpin` 7cec32a, do not move). Baseline debt 5799.4, brain 48, health 4.5. Step gate
   ≈ 40 min (ctest 275 + state_hash + sharp_vof); campaign adds ctest_long, build_cuda, clang_tidy. Keep-out: RULES.md. **voro** waits for the M7 branches.
 
 ## Next actions
-1. flow F1 = WO-20 RUNNING: mac_cutcell_mg.hpp (initMpi 92.0, solvePCGResident 74.5, buildAmg 59.1); vof GO 11-15 with extra gates (playbook). flow CB 7ddc506 (+ b148fe1 playbook), branch rebased on 0b86f1b. flow landing method (PR vs direct push) to clear with Frank before any flow push.
+1. flow-f1-land: on VERIFIED → land as the card says; write executed. Next flow round F2: solveFCGAttempt 47.6, solveBiCGStab, pcgAmg in the same file, or the next top-10 outside the keep-out.
 2. pnm PR when A7 pings that junction-law landed (Desk pnm-push = B).
 3. Next dem/pnm round: pin core to a detached worktree (shared suite/core moved 11-15 12:49).
 4. flow (a) DONE: the 4 OMP=1 failures predate eed2fa4 (same at f9eb1e0); sent to vof as a tolerance question.
