@@ -7,8 +7,8 @@ cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; 
 Earlier pins: 93a36d8, 569c85b (restructure gain), 965de38 (file-smell step check), 00b1849, c5ee4df, a59effb.
 
 ## Where we are (2026-11-15)
-- **dem S9 CLOSED 11-15** (WO-19, branch shock-dedup 5224f75..256ac4b, local): shock path kept + covered by a new test,
-  shared ShockGate predicate; debt 1475.6 → 1468.3, brain 7. Landing = Desk card **dem-s9-land** (filed; act on VERIFIED A).
+- **dem S9 LANDED 11-15** (WO-19, PR #14, dem main 9c36779): shock path kept + covered by a new test, shared ShockGate
+  predicate; debt 1475.6 → 1468.3, brain 7. Umbrella pointer not bumped (waits for Frank's OK on umbrella pushes).
 - **dem LANDED 11-15**: PR #13 merged, dem main 2ed8411, umbrella 3138c71. (worktree `suite/dem-health`, branch `code-health`; CB 3fd9b93.)
   - S1–S6 closed (6df7eb6: debt 1649.4, brain 9). S7 closed (5353296 + tidy 43fb299: debt 1505.2, brain 8;
     solveOne 97.4 → 54.9 still brain; demSolveContacts 87.7 → 21.2 out). S8 landed 43fb299..3a65d08:
@@ -24,7 +24,7 @@ Earlier pins: 93a36d8, 569c85b (restructure gain), 965de38 (file-smell step chec
 ## Next actions
 1. flow F1 = WO-20 RUNNING: mac_cutcell_mg.hpp (initMpi 92.0, solvePCGResident 74.5, buildAmg 59.1); vof GO 11-15 with extra gates (playbook). flow CB 7ddc506 (+ b148fe1 playbook), branch rebased on 0b86f1b. flow landing method (PR vs direct push) to clear with Frank before any flow push.
 2. pnm PR when A7 pings that junction-law landed (Desk pnm-push = B).
-3. dem-s9-land: on VERIFIED A → PR shock-dedup with full CI, merge commit; write executed. Next dem/pnm round: pin core to a detached worktree (shared suite/core moved 11-15 12:49).
+3. Next dem/pnm round: pin core to a detached worktree (shared suite/core moved 11-15 12:49).
 4. flow (a) DONE: the 4 OMP=1 failures predate eed2fa4 (same at f9eb1e0); sent to vof as a tolerance question.
 5. Housekeeping: remove dem worktrees dem-cudaref / dem-cudahead when no further dem round is planned.
 
