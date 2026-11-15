@@ -21,7 +21,7 @@ Earlier pins: 569c85b (restructure gain), 965de38 (file-smell step check), 00b18
 ## Next actions
 1. flow onboarding WO-18 RUNNING (engineer; worktree suite/flow-health off origin/main eed2fa4; brief briefs/WO-18-flow-onboarding.md). flow landing method (PR vs direct push) to clear with Frank before any flow push.
 2. pnm PR when A7 pings that junction-law landed (Desk pnm-push = B).
-3. Open for Frank (default keep): delete dem's dead shock-propagation block in solveVelocityColoredGS (DECISIONS.md:441) → Desk card dem-shock-block (filed 11-15; act only on VERIFIED).
+3. dem S9 = WO-19 RUNNING (Desk dem-shock-block answered 11-15: KEEP the shock path, cover it with a physics test, dedup it out of solveVelocity + solveVelocityColoredGS; round-off allowed on fma/CUDA only). Landing PR → new Desk card after the gates.
 4. Re-pin the tool to cce-code-health 719092b (log --external-fail, relative gate_json, docs OFF) after WO-18 finishes.
 5. Housekeeping: remove dem worktrees dem-cudaref / dem-cudahead when no further dem round is planned.
 
@@ -38,7 +38,7 @@ A round closes only with dem brain ≤ 12 AND debt below the previous milestone 
 | GPU timing (`scratchpad/cuda_bench.sh`, ABBA bench_step.py np1, 5 pairs) | median base/head ≥ 0.95; 0.90–0.95 → 10 pairs; < 0.90 MISS |
 
 ## Open decisions (default in force)
-- solveVelocityColoredGS dead shock-propagation block: delete? (registered feature, DECISIONS.md:441) → default keep.
+- shock-propagation block: Frank 11-15 KEEP (refactor allowed, round-off OK) → WO-19.
 - solveOne friction channel (A4): stays inline; G-fma-env v2 may reopen it in a later round.
 - solver_multilevel.hpp split: plan committed (ca50b3e), split dropped (no gain); branch split-attempt-2.
 
