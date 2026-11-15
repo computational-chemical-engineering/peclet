@@ -19,13 +19,10 @@ Earlier pins: 569c85b (restructure gain), 965de38 (file-smell step check), 00b18
   setters in flow_bindings.cpp) but WAITS: Frank "finish dem first". **voro** waits for the M7 branches.
 
 ## Next actions
-1. **S8 close** (running: `scratchpad/s8/close.sh`): campaign gate at 3a65d08 vs CB; CUDA ctest 303/303 + envelope
-   vs 5353296 (cuda_s7_*); GPU timing ABBA 5 pairs vs 5353296.
-2. Playbook consolidation (device-split / G-fma findings, launch-params + device-helper recipe for S8) and a docs
-   commit copying the run logs into `.codehealth/runs/`; `codehealth diff --base 3fd9b93`.
-3. **dem PR with full CI (no squash)**; this session opens, watches and merges it (Frank's form, 11-14). Then push
+1. S8 CLOSED 11-15 (c605373: campaign gate 13/13, CUDA 303/303, envelope 1.03, timing 0.974); playbook + run logs 1af98b7.
+2. **dem PR #13** (peclet-dem, full CI, no squash) OPEN, CI running; merge on green (Frank's form, 11-14). Then push
    this branch (umbrella last). Send code_health the PR link + final numbers.
-4. Then flow onboarding (WO-9 pattern, keep-out above; ping vof first). pnm on A7's ping.
+3. Then flow onboarding (WO-9 pattern, keep-out above; ping vof first). pnm on A7's ping.
 
 ## Milestone exit rule (pre-registered 11-13)
 A round closes only with dem brain ≤ 12 AND debt below the previous milestone AND the CUDA device check.
