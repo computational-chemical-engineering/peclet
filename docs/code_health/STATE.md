@@ -3,10 +3,12 @@
 **Objective.** Lower code debt across the peclet suite with behaviour proved unchanged, using
 cce-code-health (debt metrics + base-vs-head gate). Peclet side: this campaign; tool side: session `code_health`.
 
-**Tool pin.** cce-code-health 93a36d8 (clang_tidy ratchet summed per check over touched files) in `~/.venvs/codehealth`.
-Earlier pins: 569c85b (restructure gain), 965de38 (file-smell step check), 00b1849, c5ee4df, a59effb.
+**Tool pin.** cce-code-health 719092b (log --external-fail, relative gate_json, docs OFF) in `~/.venvs/codehealth`, since 11-15.
+Earlier pins: 93a36d8, 569c85b (restructure gain), 965de38 (file-smell step check), 00b1849, c5ee4df, a59effb.
 
 ## Where we are (2026-11-15)
+- **dem S9 CLOSED 11-15** (WO-19, branch shock-dedup 5224f75..256ac4b, local): shock path kept + covered by a new test,
+  shared ShockGate predicate; debt 1475.6 → 1468.3, brain 7. Landing = Desk card **dem-s9-land** (filed; act on VERIFIED A).
 - **dem LANDED 11-15**: PR #13 merged, dem main 2ed8411, umbrella 3138c71. (worktree `suite/dem-health`, branch `code-health`; CB 3fd9b93.)
   - S1–S6 closed (6df7eb6: debt 1649.4, brain 9). S7 closed (5353296 + tidy 43fb299: debt 1505.2, brain 8;
     solveOne 97.4 → 54.9 still brain; demSolveContacts 87.7 → 21.2 out). S8 landed 43fb299..3a65d08:
@@ -15,15 +17,15 @@ Earlier pins: 569c85b (restructure gain), 965de38 (file-smell step check), 00b18
   - Run logs `dem/.git/codehealth/runs/dem-s1..s8.jsonl` + `dem-s1-base.json`.
 - **pnm** (worktree `suite/pnm-health`, CB b65b4a2): P1 done (debt 319.3 → 299.4, brain 2 → 1). HELD until A7's
   junction-law lands (Desk pnm-push = B), then PR.
-- **flow ONBOARDED 11-15** (worktree `suite/flow-health`, branch code-health, CB 7587883 off eed2fa4; core via
+- **flow ONBOARDED 11-15** (worktree `suite/flow-health`, branch code-health, CB 7ddc506 off 0b86f1b (src = eed2fa4); core via
   detached `suite/core-health-flowpin` 7cec32a, do not move). Baseline debt 5799.4, brain 48, health 4.5. Step gate
   ≈ 40 min (ctest 275 + state_hash + sharp_vof); campaign adds ctest_long, build_cuda, clang_tidy. Keep-out: RULES.md. **voro** waits for the M7 branches.
 
 ## Next actions
-1. flow F1: targets in mac_cutcell_mg.hpp (initMpi 92.0, solvePCGResident 74.5, buildAmg 59.1) — asked vof 11-15 whether its live branches touch that file; start on its answer. flow landing method (PR vs direct push) to clear with Frank before any flow push.
+1. flow F1 = WO-20 RUNNING: mac_cutcell_mg.hpp (initMpi 92.0, solvePCGResident 74.5, buildAmg 59.1); vof GO 11-15 with extra gates (playbook). flow CB 7ddc506 (+ b148fe1 playbook), branch rebased on 0b86f1b. flow landing method (PR vs direct push) to clear with Frank before any flow push.
 2. pnm PR when A7 pings that junction-law landed (Desk pnm-push = B).
-3. dem S9 = WO-19 RUNNING (Desk dem-shock-block answered 11-15: KEEP the shock path, cover it with a physics test, dedup it out of solveVelocity + solveVelocityColoredGS; round-off allowed on fma/CUDA only). Landing PR → new Desk card after the gates.
-4. Re-pin the tool to cce-code-health 719092b (log --external-fail, relative gate_json, docs OFF) after WO-19 finishes (it gates with 93a36d8).
+3. dem-s9-land: on VERIFIED A → PR shock-dedup with full CI, merge commit; write executed. Next dem/pnm round: pin core to a detached worktree (shared suite/core moved 11-15 12:49).
+4. flow (a): do the 4 OMP=1 ctest failures predate eed2fa4? check at f9eb1e0 running (scratchpad/flow_a); result → vof.
 5. Housekeeping: remove dem worktrees dem-cudaref / dem-cudahead when no further dem round is planned.
 
 ## Milestone exit rule (pre-registered 11-13)
