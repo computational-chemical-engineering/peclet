@@ -15,14 +15,15 @@ Earlier pins: 569c85b (restructure gain), 965de38 (file-smell step check), 00b18
   - Run logs `dem/.git/codehealth/runs/dem-s1..s8.jsonl` + `dem-s1-base.json`.
 - **pnm** (worktree `suite/pnm-health`, CB b65b4a2): P1 done (debt 319.3 → 299.4, brain 2 → 1). HELD until A7's
   junction-law lands (Desk pnm-push = B), then PR.
-- **flow** freed by vof (keep-out: src/vof/sharp_viscous.hpp, src/vof/curvature_field.hpp, src/flow_ibm*.hpp, sv
-  setters in flow_bindings.cpp) but WAITS: Frank "finish dem first". **voro** waits for the M7 branches.
+- **flow ONBOARDED 11-15** (worktree `suite/flow-health`, branch code-health, CB 7587883 off eed2fa4; core via
+  detached `suite/core-health-flowpin` 7cec32a, do not move). Baseline debt 5799.4, brain 48, health 4.5. Step gate
+  ≈ 40 min (ctest 275 + state_hash + sharp_vof); campaign adds ctest_long, build_cuda, clang_tidy. Keep-out: RULES.md. **voro** waits for the M7 branches.
 
 ## Next actions
-1. flow onboarding WO-18 RUNNING (engineer; worktree suite/flow-health off origin/main eed2fa4; brief briefs/WO-18-flow-onboarding.md). flow landing method (PR vs direct push) to clear with Frank before any flow push.
+1. flow F1: targets in mac_cutcell_mg.hpp (initMpi 92.0, solvePCGResident 74.5, buildAmg 59.1) — asked vof 11-15 whether its live branches touch that file; start on its answer. flow landing method (PR vs direct push) to clear with Frank before any flow push.
 2. pnm PR when A7 pings that junction-law landed (Desk pnm-push = B).
 3. dem S9 = WO-19 RUNNING (Desk dem-shock-block answered 11-15: KEEP the shock path, cover it with a physics test, dedup it out of solveVelocity + solveVelocityColoredGS; round-off allowed on fma/CUDA only). Landing PR → new Desk card after the gates.
-4. Re-pin the tool to cce-code-health 719092b (log --external-fail, relative gate_json, docs OFF) after WO-18 finishes.
+4. Re-pin the tool to cce-code-health 719092b (log --external-fail, relative gate_json, docs OFF) after WO-19 finishes (it gates with 93a36d8).
 5. Housekeeping: remove dem worktrees dem-cudaref / dem-cudahead when no further dem round is planned.
 
 ## Milestone exit rule (pre-registered 11-13)
