@@ -21,7 +21,7 @@ Earlier pins: 569c85b (restructure gain), 965de38 (file-smell step check), 00b18
 ## Next actions
 1. flow onboarding (WO-9 pattern: gate config, playbook with the keep-out above, self-test, baseline); ping vof first.
 2. pnm PR when A7 pings that junction-law landed (Desk pnm-push = B).
-3. Open for Frank (default keep): delete dem's dead shock-propagation block in solveVelocityColoredGS (DECISIONS.md:441).
+3. Open for Frank (default keep): delete dem's dead shock-propagation block in solveVelocityColoredGS (DECISIONS.md:441) → Desk card dem-shock-block (filed 11-15; act only on VERIFIED).
 4. Housekeeping: remove dem worktrees dem-cudaref / dem-cudahead when no further dem round is planned.
 
 ## Milestone exit rule (pre-registered 11-13)
