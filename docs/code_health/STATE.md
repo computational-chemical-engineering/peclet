@@ -26,7 +26,7 @@ Earlier pins: 93a36d8, 569c85b (restructure gain), 965de38 (file-smell step chec
   ≈ 40 min (ctest 275 + state_hash + sharp_vof); campaign adds ctest_long, build_cuda, clang_tidy. Keep-out: RULES.md. **voro** waits for the M7 branches.
 
 ## Next actions
-1. flow F3 CLOSED (WO-22, branch f3 b15a3eb..9ccc338, local): flow 5558.9, brain 42. Landing = Desk card flow-f3-land. Deferred: scalar_krylov.hpp (no owner; heavy gates), cut_cell_ibm.hpp (vof keep-out). Umbrella pointer bumps (dem 9c36779, flow) wait for Frank.
+1. flow F1–F3 LANDED (flow main f5f0b87; 5799.4 → 5558.9, brain 48 → 42). Next flow work blocked/deferred: scalar_krylov.hpp (no owner; vof's heavy gates), cut_cell_ibm.hpp (vof keep-out until the solids design note). Other top-10 are keep-out. No new round started (token budget). Umbrella pointer bumps (dem 9c36779, flow f5f0b87) wait for Frank.
 2. pnm PR when A7 pings that junction-law landed (Desk pnm-push = B).
 3. Next dem/pnm round: pin core to a detached worktree (shared suite/core moved 11-15 12:49).
 4. flow (a) DONE: the 4 OMP=1 failures predate eed2fa4 (same at f9eb1e0); sent to vof as a tolerance question.
