@@ -30,7 +30,7 @@ Earlier pins: 93a36d8, 569c85b (restructure gain), 965de38 (file-smell step chec
 2. pnm PR when A7 pings that junction-law landed (Desk pnm-push = B).
 3. Next dem/pnm round: pin core to a detached worktree (shared suite/core moved 11-15 12:49).
 4. flow (a) DONE: the 4 OMP=1 failures predate eed2fa4 (same at f9eb1e0); sent to vof as a tolerance question.
-5. Re-pin to cce-code-health v0.2.0 (7b8449d) at the start of the next round.
+5. Re-pin at the start of the next round to cce-code-health main ≥ b46d80d (lizard ==1.26.0 pin; 6ab9fd1 now), not plain v0.2.0.
 6. Housekeeping: remove dem worktrees dem-cudaref / dem-cudahead when no further dem round is planned.
 
 ## Milestone exit rule (pre-registered 11-13)
