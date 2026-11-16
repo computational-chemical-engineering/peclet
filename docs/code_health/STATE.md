@@ -18,15 +18,15 @@ Earlier pins: 93a36d8, 569c85b (restructure gain), 965de38 (file-smell step chec
 - **pnm** (worktree `suite/pnm-health`, CB b65b4a2): P1 done (debt 319.3 → 299.4, brain 2 → 1). HELD until A7's
   junction-law lands (Desk pnm-push = B), then PR.
 - **flow F1 CLOSED 11-15** (WO-20, branch f1 42bdc15..73a6f63): CutcellMG buildAmg 59.1→0, initMpi 92.0→19.6,
-  solvePCGResident 74.5→48.1; flow 5799.4 → 5657.1, brain 48 → 46. Desk flow-f1-land A VERIFIED → PR peclet-flow#15 (CI running).
+  solvePCGResident 74.5→48.1; flow 5799.4 → 5657.1, brain 48 → 46. **LANDED 11-16: PR peclet-flow#15, flow main 28e18d1.**
 - **flow F2 CLOSED 11-16** (WO-21, branch f2 off f1, ..97ec11f, local): decomposition 40→1, PCG/FCG/BiCGStab attempts;
-  **flow → 5606.2, brain 43**; all gates bitwise incl. GPU. Landing → new card after #15 merges.
+  **flow → 5606.2, brain 43**; all gates bitwise incl. GPU. Landing = Desk card flow-f2-land (requested 11-16).
 - **flow ONBOARDED 11-15** (worktree `suite/flow-health`, branch code-health, CB b148fe1 (src = eed2fa4); core via
   detached `suite/core-health-flowpin` 7cec32a, do not move). Baseline debt 5799.4, brain 48, health 4.5. Step gate
   ≈ 40 min (ctest 275 + state_hash + sharp_vof); campaign adds ctest_long, build_cuda, clang_tidy. Keep-out: RULES.md. **voro** waits for the M7 branches.
 
 ## Next actions
-1. PR peclet-flow#15 OPEN, CI red = main's pre-existing failures; merge waits for card flow-f1-merge-red (A merge / B hold till main green). Then executed on flow-f1-land. Then card flow-f2-land (f2 PR). Next flow round F3: commRank leftovers + next top-10 outside the keep-out (vof OK needed for files other than mac_cutcell_mg.hpp).
+1. flow-f2-land: on VERIFIED A → push f2 (905831f..97ec11f), PR with full CI, merge commit (also if CI fails only main's own failures then); write executed. Next flow round F3: commRank leftovers + next top-10 outside the keep-out (vof OK needed for files other than mac_cutcell_mg.hpp).
 2. pnm PR when A7 pings that junction-law landed (Desk pnm-push = B).
 3. Next dem/pnm round: pin core to a detached worktree (shared suite/core moved 11-15 12:49).
 4. flow (a) DONE: the 4 OMP=1 failures predate eed2fa4 (same at f9eb1e0); sent to vof as a tolerance question.
