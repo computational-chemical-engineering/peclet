@@ -53,3 +53,12 @@ The model behind each agent lives in its frontmatter. Do not put model names in 
 ## What needs Frank
 Billed cluster time (Snellius), a public name in a pnm release, a change to his constraints, rerunning a bed
 (GPU-days), and pushes on manuscripts with co-authors. Everything else proceeds on defaults and is logged.
+Questions go to session `hub` as a DECISION-REQUEST (Decision Desk); a desk sign-off counts only after
+`decision_desk_verify.py` says VERIFIED for the exact action (~/.claude/CLAUDE.md "Decision Desk sign-offs").
+
+## Milestones and self-reset (USER, 2026-11-16)
+At a milestone (a judgment logged, the next step written down) or past ~150k context, with no subagent of this
+session running: rewrite `A7_STATE.md` — position, next action, open requests (user, hub, peers) and, for every
+running job, its PID, log and what to do when it ends — commit and push it, then as the last action of the turn run
+`python3 ~/.claude/tools/self_reset.py "Resume A7: invoke the learned-pnm skill."` and end the turn.
+After a reset, background shells still notify, but only `A7_STATE.md` says what they were for.
