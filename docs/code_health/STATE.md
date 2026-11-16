@@ -17,14 +17,16 @@ Earlier pins: 93a36d8, 569c85b (restructure gain), 965de38 (file-smell step chec
   - Run logs `dem/.git/codehealth/runs/dem-s1..s8.jsonl` + `dem-s1-base.json`.
 - **pnm** (worktree `suite/pnm-health`, CB b65b4a2): P1 done (debt 319.3 → 299.4, brain 2 → 1). HELD until A7's
   junction-law lands (Desk pnm-push = B), then PR.
-- **flow F1 CLOSED 11-15** (WO-20, branch f1, 42bdc15..73a6f63, local): CutcellMG buildAmg 59.1→0, initMpi 92.0→19.6,
-  solvePCGResident 74.5→48.1; **flow 5799.4 → 5657.1, brain 48 → 46**; all gates bitwise incl. GPU. Landing = Desk card flow-f1-land.
+- **flow F1 CLOSED 11-15** (WO-20, branch f1 42bdc15..73a6f63): CutcellMG buildAmg 59.1→0, initMpi 92.0→19.6,
+  solvePCGResident 74.5→48.1; flow 5799.4 → 5657.1, brain 48 → 46. Desk flow-f1-land A VERIFIED → PR peclet-flow#15 (CI running).
+- **flow F2 CLOSED 11-16** (WO-21, branch f2 off f1, ..97ec11f, local): decomposition 40→1, PCG/FCG/BiCGStab attempts;
+  **flow → 5606.2, brain 43**; all gates bitwise incl. GPU. Landing → new card after #15 merges.
 - **flow ONBOARDED 11-15** (worktree `suite/flow-health`, branch code-health, CB b148fe1 (src = eed2fa4); core via
   detached `suite/core-health-flowpin` 7cec32a, do not move). Baseline debt 5799.4, brain 48, health 4.5. Step gate
   ≈ 40 min (ctest 275 + state_hash + sharp_vof); campaign adds ctest_long, build_cuda, clang_tidy. Keep-out: RULES.md. **voro** waits for the M7 branches.
 
 ## Next actions
-1. flow-f1-land filed (A/B/C, rec A PR): on VERIFIED → land as the card says; write executed. flow F2 = WO-21 RUNNING (Krylov drivers + decomposition, stacked on f1).
+1. PR peclet-flow#15: on green CI merge (merge commit), write executed on flow-f1-land. Then card flow-f2-land (f2 PR). Next flow round F3: commRank leftovers + next top-10 outside the keep-out (vof OK needed for files other than mac_cutcell_mg.hpp).
 2. pnm PR when A7 pings that junction-law landed (Desk pnm-push = B).
 3. Next dem/pnm round: pin core to a detached worktree (shared suite/core moved 11-15 12:49).
 4. flow (a) DONE: the 4 OMP=1 failures predate eed2fa4 (same at f9eb1e0); sent to vof as a tolerance question.
