@@ -26,7 +26,7 @@ Earlier pins: 93a36d8, 569c85b (restructure gain), 965de38 (file-smell step chec
   ≈ 40 min (ctest 275 + state_hash + sharp_vof); campaign adds ctest_long, build_cuda, clang_tidy. Keep-out: RULES.md. **voro** waits for the M7 branches.
 
 ## Next actions
-1. PR peclet-flow#15: on green CI merge (merge commit), write executed on flow-f1-land. Then card flow-f2-land (f2 PR). Next flow round F3: commRank leftovers + next top-10 outside the keep-out (vof OK needed for files other than mac_cutcell_mg.hpp).
+1. PR peclet-flow#15 OPEN, CI red = main's pre-existing failures; merge waits for card flow-f1-merge-red (A merge / B hold till main green). Then executed on flow-f1-land. Then card flow-f2-land (f2 PR). Next flow round F3: commRank leftovers + next top-10 outside the keep-out (vof OK needed for files other than mac_cutcell_mg.hpp).
 2. pnm PR when A7 pings that junction-law landed (Desk pnm-push = B).
 3. Next dem/pnm round: pin core to a detached worktree (shared suite/core moved 11-15 12:49).
 4. flow (a) DONE: the 4 OMP=1 failures predate eed2fa4 (same at f9eb1e0); sent to vof as a tolerance question.
