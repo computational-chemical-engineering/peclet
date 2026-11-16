@@ -5043,3 +5043,17 @@ Do not reverse an entry here without recording a new decision that supersedes it
   failure as a known issue
 - why: an absolute bound on a field of size 5e4 measures the field's scale, not the solver; 1e-12 relative still
   catches any real parallel defect. Applies to the three G-DD2 (a)-bound checks in that test ((a), (f)(a), the G-LR lineChecks).
+
+### vof_blocks G1 production-path bound is a round-off bound (1e-13), not 1e-15: libm-dispatch dependent
+- area: flow
+- source: flow `tests/kokkos/test_vof_blocks.cpp` (prodWorst check), flow ab08e4f; Decision Desk card vof-blocks-prodworst; evidence `bubble_column_perf/validation/highratio/ci26/`
+- decided: 2026-11-16, USER (Decision Desk sign-off, option A)
+- status: settled
+- quote: |
+    flow CI red since 2026-10-29 (ubuntu-latest 24.04 -> 26.04): vof_blocks prodWorst 7.883e-15 vs 1e-15, deterministic.
+    Not GCC 15 (ubuntu:26.04 container, GCC 15.2 on TRS2: 4.337e-19). glibc picks FMA / non-FMA libm variants of
+    acos/cos/cbrt (PLIC inversion) by CPU: GLIBC_TUNABLES=glibc.cpu.hwcaps=-FMA on TRS2 gives 7.438e-15.
+- rejected: (C) leave CI red and list it as an open item; pinning glibc's libm variant in CI (hides the environment
+  dependence and does not pass alone: 7.4e-15 > 1e-15)
+- why: 1e-15 is ~4 ulp of a colour in [0, 1], below what a libm last-bit difference moves; 1e-13 stays 10x below the
+  eps = 1e-12 scale at which a real block-container defect shows.

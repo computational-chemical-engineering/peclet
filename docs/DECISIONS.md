@@ -24,7 +24,7 @@ is authoritative.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-252 in force, 43 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+253 in force, 43 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
@@ -229,6 +229,7 @@ is authoritative.
 - **The VoF momentum flux defaults to 'muscl_phase' (per-phase interface-biased MC slopes + a mass-aware cap); never a slope of the mixed CV velocity without the cap (2026-10-31, USER: iff all gates pass)**. **Rejected:** 'upwind' default (first order); 'muscl_mixed' (wrong limit +3 %, mechanism OPEN after G-D)  <sub>flow `doc/vof_momentum_second_order.md` §12, flow eeb77d0</sub>
 - **The VoF interface viscous stress is the sharp conservative operator by default (staggered): PLIC face-fraction μ on band edges + interface-traction and midsection terms from a kinked LS fit, explicit on uⁿ; AUTO = sharp in scope, else averaged + notice** (2026-10-31 design; default 2026-11-04, USER). Reverses, in the VoF band only, register 272's premise that T is symmetric, and the interim "default averaged until the gates pass". **Rejected:** every single face average (arithmetic, harmonic, geometric, 4-cell, PLIC sub-cell); per-link GFM series; non-conservative own-side ghost fluid; tensorial laminate μ; a GFM pressure jump; 'averaged' as the default  <sub>flow</sub>
 - **The distributed MG np-equality gate G-DD2 (a) is scale-aware: max|x_np − x_1| ≤ max(1e-8, 1e-12·max|x_1|) (2026-11-15, USER, Decision Desk)**. **Rejected:** keep the absolute 1e-8 with an OMP_NUM_THREADS ≥ 2 floor; leave the OMP=1 failure as known  <sub>flow `tests/kokkos_mpi/test_mg_fp32_vcycle_mpi.cpp`, flow 5779e79</sub>
+- **vof_blocks G1 production-path bound is a round-off bound, prodWorst < 1e-13 (libm-dispatch dependent) (2026-11-16, USER, Decision Desk)**. **Rejected:** leave CI red; pin glibc's libm variant in CI  <sub>flow `tests/kokkos/test_vof_blocks.cpp`, flow ab08e4f</sub>
 - **TRAP: -DPECLET_FLOW_MREAL_DOUBLE=ON on the cmake command line silently builds float**. **Rejected:** passing -DPECLET_FLOW_MREAL_DOUBLE=ON as a normal cmake cache variable  <sub>defect-correction-campaign.md:45-46</sub>
 - **Telescoping is default on for the pressure MG since 2026-09-02; the velocity solve does not need it**. **Rejected:** telescoping the velocity solve  <sub>momentum-solve-residual-stop.md:18</sub>
 - **Ten-Cate periodic-image bug: periodic images are a union, not independent slabs**. **Rejected:** the earlier CSG-slab-per-image geometry construction (implicitly non-union)  <sub>sdf-scene-campaign.md:131</sub>
