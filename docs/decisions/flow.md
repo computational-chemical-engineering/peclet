@@ -5029,3 +5029,31 @@ Do not reverse an entry here without recording a new decision that supersedes it
   explicit conservative transpose on uⁿ, no product form, no Picard placement) stand — only its
   premise that T is symmetric (component-independent β) fails inside the VoF band, so stability is
   established by the measured G-SV9 gates there, not by the energy proof.
+
+### The distributed MG np-equality gate G-DD2 (a) is scale-aware: max|x_np − x_1| ≤ max(1e-8, 1e-12·max|x_1|)
+- area: flow
+- source: flow `tests/kokkos_mpi/test_mg_fp32_vcycle_mpi.cpp` (`gdd2aBound`), `doc/vof_projection_distributed_design.md` G-DD2 (a) amendment; Decision Desk card vof-gdd2-tolerance; evidence `bubble_column_perf/validation/highratio/gdd2/`
+- decided: 2026-11-15, USER (Decision Desk sign-off, option A)
+- status: settled
+- quote: |
+    mg_fp32_vcycle_mpi_np2 failed at OMP_NUM_THREADS=1 (pre-existing, also at f9eb1e0): box64, PCG and FCG,
+    max|x_np2 − x_1| 1.360e-8 at max|x| 5.49e4 = 2.5e-13 relative, against an absolute 1e-8. Reduction order
+    changes with the thread count. The bound max(1e-8, 1e-12·max|x_1|) is never tighter than before.
+- rejected: (B) keep the absolute bound and document an OMP_NUM_THREADS ≥ 2 floor for the MPI ctests; (C) leave the
+  failure as a known issue
+- why: an absolute bound on a field of size 5e4 measures the field's scale, not the solver; 1e-12 relative still
+  catches any real parallel defect. Applies to the three G-DD2 (a)-bound checks in that test ((a), (f)(a), the G-LR lineChecks).
+
+### vof_blocks G1 production-path bound is a round-off bound (1e-13), not 1e-15: libm-dispatch dependent
+- area: flow
+- source: flow `tests/kokkos/test_vof_blocks.cpp` (prodWorst check), flow ab08e4f; Decision Desk card vof-blocks-prodworst; evidence `bubble_column_perf/validation/highratio/ci26/`
+- decided: 2026-11-16, USER (Decision Desk sign-off, option A)
+- status: settled
+- quote: |
+    flow CI red since 2026-10-29 (ubuntu-latest 24.04 -> 26.04): vof_blocks prodWorst 7.883e-15 vs 1e-15, deterministic.
+    Not GCC 15 (ubuntu:26.04 container, GCC 15.2 on TRS2: 4.337e-19). glibc picks FMA / non-FMA libm variants of
+    acos/cos/cbrt (PLIC inversion) by CPU: GLIBC_TUNABLES=glibc.cpu.hwcaps=-FMA on TRS2 gives 7.438e-15.
+- rejected: (C) leave CI red and list it as an open item; pinning glibc's libm variant in CI (hides the environment
+  dependence and does not pass alone: 7.4e-15 > 1e-15)
+- why: 1e-15 is ~4 ulp of a colour in [0, 1], below what a libm last-bit difference moves; 1e-13 stays 10x below the
+  eps = 1e-12 scale at which a real block-container defect shows.
