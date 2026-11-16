@@ -27,7 +27,9 @@ Briefs: [briefs/](briefs/). Tool: cce-code-health (`~/.venvs/codehealth`, pin in
   doc/full_viscous_stress.md. Refactors ADJACENT to these (MAC stress elements, VoF band worklists) must be bitwise on
   state_hash AND a sharp VoF run. Paper-pinned, in main's history: f9eb1e0, 56d115f, 582ac73, 9a5d2dc, a3d1137.
   vof's live branches (never rebase/delete): sharpvisc-solids, sharpvisc, sharpvisc-perf, sharpvisc-diag, svl-fence,
-  svl-mirror, svl-redist and the detached -base/-perf-ref/-pre5b worktrees. Rest of flow free.
+  svl-mirror, svl-redist and the detached -base/-perf-ref/-pre5b worktrees. Added 11-16 (vof): src/cut_cell_ibm.hpp
+  until vof's solids design note says which parts it touches. src/scalar_krylov.hpp + cut-cell scalars: no owner
+  (hub asking Frank); refactor only with vof's extra gates (log 11-16) and the owner's OK once there is one. Rest of flow free.
 - umbrella: campaign docs live on branch code-health-docs in worktree suite/.claude/worktrees/suite-code-health. Never
   push the umbrella from here without the user's explicit OK (MISS 11-15: 3138c71 + 13937f6 were pushed on the dem
   landing authorization alone; reported to the user). vof pushes its own work from a worktree off origin/main.
