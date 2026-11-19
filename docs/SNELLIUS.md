@@ -43,6 +43,9 @@ sn status [campaign];  sn cancel <jobid|campaign>     # jobs are named sn-<campa
   writes `runs/<c>/<t>/.stop`. A job that finds a `.stop` exits without running and queues nothing,
   so a successor queued after the cancel's squeue snapshot stops too; `sn run --resume` removes them.
   A plain `scancel` by hand is also caught: a TERM long before the limit ends the chain (below).
+  **With `--time` of 4 min or less, every raw `scancel` counts as walltime**: the whole job lies
+  inside the 240 s window, so the TERM keeps the successor and the chain runs on. Use `sn cancel`,
+  which writes `.stop` and cancels the dependents.
 
 - `push` sends the umbrella at `origin/main` of `~/Codes/suite` with every submodule at the SHA it
   pins, laid out as in the suite (`<tree>/core`, `<tree>/flow`, ..., `<tree>/tools`), by
@@ -165,11 +168,17 @@ target's partition, budget L3) for h100/a100, `genoa` for cpu.
 successor) `.failed`; refuse a build dir without `BUILD_INFO` or with a `BUILD_INFO` whose sha256 is
 not the one `sn` read at submit (passed as a positional: a rebuild since then); source
 `build/.../env.sh`, activate the build's venv, print `BUILD_INFO`'s `MANIFEST` line, on a GPU target
-assert `Cuda` in every device module; only then queue the chain successor, and an EXIT trap cancels it
-on any exit that does not keep the chain going. Then run the driver in `runs/<campaign>/<tag>/<idx>/`
-(`idx` = the array index, 0 without `--array`) and append one line to `summary.tsv`:
+assert `Cuda` in every device module (imported in a 1-task `srun` step, never in the batch shell, where
+an import that initializes MPI or Kokkos can hang under pmix; refused after 120 s; only on the first
+job of a chain, fresh or `--resume`); only then queue the chain successor, and an EXIT trap cancels it
+on any exit that does not keep the chain going (a TERM during that `sbatch` is deferred until the
+successor's id is known, so no successor runs that the job does not know about). Then run the
+driver in `runs/<campaign>/<tag>/<idx>/` (`idx` = the array index, 0 without `--array`) and append
+one line to `summary.tsv`:
 `jobid  array_idx  tree  target  rc  wall_s  <last driver line matching ^CERT >` (rc `TERM` at the
-walltime, `CANCEL` on an early TERM). The driver gets `SN_OUT`, `SN_DONE`, `SN_IDX`, `SN_CASE`,
+walltime, `CANCEL` on an early TERM; both add an 8th field `term_at_s=<t> left_s=<l>`: when the TERM
+came, in s since the job script started and before the `--time` limit, also logged as one
+`[sn] TERM at ...` line in the job's output). The driver gets `SN_OUT`, `SN_DONE`, `SN_IDX`, `SN_CASE`,
 `SN_FRESH`, `SN_TREE`, `SN_BUILD`, `SN_CMAKE_BUILD`, `SN_SRUN`; a driver path relative to the tree is
 taken from the tree, a `.py` driver runs under the venv's python; `--no-srun` runs the driver in the
 batch shell (it launches its own steps with `$SN_SRUN`). `--array cases.txt`: one non-comment line per
@@ -188,7 +197,9 @@ keeps the successor — a walltime end never writes `.failed` and never cancels 
 more than 240 s before the limit is a cancel (`scancel` by hand): `CANCEL`, the successor is
 cancelled, no `.failed`. That the batch shell really gets the signal on Snellius is proven by
 `sn walltime-test <tree>` (1 genoa core, `--time 0:03:00`, chain 2, ~3 SBU; verdict
-`tools/hpc/snellius/walltime_test.sh check <campaign>/<tag>`).
+`tools/hpc/snellius/walltime_test.sh check <campaign>/<tag>`, which quotes `term_at_s` and `left_s`:
+`left_s` near 120 is the asked `@120`; less means Slurm signals against an end beyond `--time`, e.g.
+an OverTimeLimit).
 
 `sn run` refuses an existing `<campaign>/<tag>` unless `--resume`; `--resume` refuses while jobs of
 that tag are queued or running, and unless its `--array` file is byte-identical to the run's

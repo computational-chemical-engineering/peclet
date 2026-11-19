@@ -28,7 +28,9 @@
 # THIS shell. The trap forwards it to the driver (srun forwards it to the tasks) and waits up to
 # SN_GRACE s for it to checkpoint and exit. A walltime end is told apart from a failure by the flag the
 # trap sets, never by the exit code: it keeps the successor and writes no .failed. A TERM long before
-# the limit is a cancel (scancel by hand): it ends the chain, without .failed.
+# the limit is a cancel (scancel by hand): it ends the chain, without .failed. Every TERM is logged as
+# "[sn] TERM at <t> s since the job started, <left> s before the <limit> s limit" and, after a driver
+# ran, as an 8th summary.tsv field "term_at_s=<t> left_s=<left>" (does Snellius add an OverTimeLimit?).
 set -uo pipefail
 SN_MODE="${1:-}"; SN_BIHASH="${2:-}"
 SN_IDX="${SLURM_ARRAY_TASK_ID:-0}"
@@ -40,11 +42,12 @@ mkdir -p "$SN_OUT" || { echo "FATAL(sn): cannot create $SN_OUT" >&2; exit 1; }
 _sn_log="$SN_OUT/driver-$SN_JOB.log"
 _sn_next=""; _sn_keep_next=0
 
-_sn_summary() {  # <rc> <wall_s>: one line in summary.tsv (flock: array tasks append concurrently)
+_sn_summary() {  # <rc> <wall_s> [<term>]: one line in summary.tsv (flock: array tasks append concurrently)
   local cert
   cert=$(grep -E '^CERT ' "$_sn_log" 2>/dev/null | tail -n 1)
   local line
   line=$(printf '%s\t%s\t%s\t%s\t%s\t%s\t%s' "$SN_JOB" "$SN_IDX" "$SN_TREE_NAME" "$SN_TARGET" "$1" "$2" "$cert")
+  [ -z "${3:-}" ] || line="$line"$'\t'"$3"
   echo "SUMMARY $line"
   if command -v flock >/dev/null 2>&1; then
     flock "$SN_RUN/summary.tsv.lock" bash -c 'printf "%s\n" "$1" >> "$2"' _ "$line" "$SN_RUN/summary.tsv"
@@ -97,12 +100,17 @@ source "$SN_BUILD/.venv/bin/activate" || _sn_refuse "$SN_BUILD/.venv"
 for _kv in "${SN_ENVS[@]}"; do export "${_kv?}"; done
 grep -m1 '^MANIFEST ' "$SN_BUILD/BUILD_INFO" || _sn_refuse "no MANIFEST line in $SN_BUILD/BUILD_INFO"
 # GPU target: every device module of the build must run on Cuda (a host-only "h100" build bills GPUs
-# for nothing -- the dem fallback trap of SNELLIUS.md).
+# for nothing -- the dem fallback trap of SNELLIUS.md). The imports run in a 1-task srun step, never in
+# this batch shell: a module that initializes MPI or Kokkos at import can hang or fail outside srun
+# under pmix. Bounded by _sn_imp_timeout s (python -u: the output so far survives a hang). Only the
+# first job of a chain (fresh or resume) checks: a successor runs the very same build (BUILD_INFO hash).
+_sn_imp_timeout=120
 if [ "$SN_TARGET" != cpu ]; then
   _sn_dev=$(sed -n 's/^device_modules //p' "$SN_BUILD/BUILD_INFO" | head -n 1)
-  if [ -n "$_sn_dev" ]; then
-    # shellcheck disable=SC2086  # a word list of module names
-    python - $_sn_dev > "$SN_OUT/.import_check" 2>&1 <<'PY' || _sn_refuse "GPU import check: $(tail -n 2 "$SN_OUT/.import_check" | tr '\n' ' ')"
+  if [ -n "$_sn_dev" ] && [ "$SN_MODE" = chain ]; then
+    echo "[sn] GPU import check: done by the first job of this chain (same BUILD_INFO); skipped"
+  elif [ -n "$_sn_dev" ]; then
+    read -r -d '' _sn_imp_py <<'PY'
 import importlib, sys
 bad = []
 for m in sys.argv[1:]:
@@ -112,6 +120,15 @@ for m in sys.argv[1:]:
         bad.append(f"{m}={sp}")
 sys.exit(f"not Cuda: {' '.join(bad)}" if bad else 0)
 PY
+    # shellcheck disable=SC2086  # a word list of module names
+    timeout -k 10 "$_sn_imp_timeout" srun --job-name=sn-import-check --mpi=pmix --ntasks=1 --gpus-per-task=1 \
+      python -u -c "$_sn_imp_py" $_sn_dev > "$SN_OUT/.import_check" 2>&1
+    _sn_irc=$?
+    case "$_sn_irc" in
+      0) ;;
+      124|137) _sn_refuse "GPU import check: no answer from its srun step in ${_sn_imp_timeout} s (a hang at import? $SN_OUT/.import_check)" ;;
+      *) _sn_refuse "GPU import check (rc $_sn_irc): $(tail -n 2 "$SN_OUT/.import_check" | tr '\n' ' ')" ;;
+    esac
     echo "[sn] GPU import check: $(tr '\n' ' ' < "$SN_OUT/.import_check")"
   fi
 fi
@@ -119,12 +136,20 @@ fi
 # --- 3. chain: queue the successor (wall-bounded-turbulence pattern), only now that the job can run ---
 # The TERM trap first. Walltime = a TERM at most SN_WALLTIME_WINDOW s before the limit (Slurm may send
 # the @120 signal up to 60 s early); an earlier TERM is a cancel (scancel by hand) and ends the chain.
-_sn_pid=""; _sn_walltime=0; _sn_cancelled=0; _sn_trc=""; _sn_left=""
+# A TERM while the successor's sbatch is in flight is deferred (_sn_submitting) until _sn_next holds
+# its id, and sbatch itself ignores TERM: a successor the controller accepted is always known here, so
+# the EXIT trap can cancel it -- never an orphan that runs after this job.
+_sn_pid=""; _sn_walltime=0; _sn_cancelled=0; _sn_trc=""; _sn_left=""; _sn_term_at=""
+_sn_submitting=0; _sn_term_pending=0
 _sn_term() {
-  _sn_left=$((SN_LIMIT_S - SECONDS))
+  if [ -z "$_sn_term_at" ]; then
+    _sn_term_at=$SECONDS; _sn_left=$((SN_LIMIT_S - _sn_term_at))
+    echo "[sn] TERM at ${_sn_term_at} s since the job started, ${_sn_left} s before the ${SN_LIMIT_S} s limit"
+  fi
+  if [ "$_sn_submitting" = 1 ]; then _sn_term_pending=1; return 0; fi
   if [ "$_sn_left" -le "$SN_WALLTIME_WINDOW" ]; then _sn_walltime=1; else _sn_cancelled=1; _sn_why="TERM ${_sn_left} s before the limit (a cancel)"; fi
   if [ -z "$_sn_pid" ]; then echo "[sn] TERM before the driver started" >&2; exit 143; fi
-  echo "[sn] TERM, ${_sn_left} s before the limit: forwarded to the driver, waiting <= ${SN_GRACE} s for it"
+  echo "[sn] TERM forwarded to the driver, waiting <= ${SN_GRACE} s for it"
   kill -TERM "$_sn_pid" 2>/dev/null
   ( sleep "$SN_GRACE"; kill -KILL "$_sn_pid" 2>/dev/null ) &
   local wd=$!
@@ -136,13 +161,16 @@ trap _sn_term TERM
 if [ "$SN_CHAIN" -gt 1 ] && [ "$_sn_n" -lt "$SN_CHAIN" ]; then
   _sn_arr=(); [ "$SN_ARRAY" = 1 ] && _sn_arr=(--array="$SN_IDX")
   # stdout only: SURF's sbatch wrapper writes its notes on stderr
-  if _sn_next=$(sbatch --parsable --dependency=afterany:"$SN_JOB" "${_sn_arr[@]}" "$SN_RUN/job.sh" \
-                  chain "$SN_BIHASH" $((_sn_n + 1)) 2> "$SN_OUT/.sbatch.err"); then
+  _sn_submitting=1
+  if _sn_next=$(trap '' TERM; exec sbatch --parsable --dependency=afterany:"$SN_JOB" "${_sn_arr[@]}" \
+                  "$SN_RUN/job.sh" chain "$SN_BIHASH" $((_sn_n + 1)) 2> "$SN_OUT/.sbatch.err"); then
     _sn_next=$(grep -oE '^[0-9]+' <<< "$_sn_next" | tail -n 1)
     echo "[sn chain] job $_sn_n of at most $SN_CHAIN; successor $_sn_next queued (afterany:$SN_JOB)"
   else
     echo "[sn chain] WARNING: could not queue a successor: $(tail -n 3 "$SN_OUT/.sbatch.err")" >&2; _sn_next=""
   fi
+  _sn_submitting=0
+  [ "$_sn_term_pending" = 1 ] && _sn_term
 elif [ "$SN_CHAIN" -gt 1 ]; then
   echo "[sn chain] job $_sn_n of $SN_CHAIN: the cap; no successor"
 fi
@@ -179,11 +207,11 @@ tail -n 5 "$_sn_log"
 
 # --- 6. classify the end: walltime, done, stopped, crash, or a clean exit that continues ----------
 if [ "$_sn_walltime" = 1 ]; then
-  _sn_summary TERM "$_sn_wall"
+  _sn_summary TERM "$_sn_wall" "term_at_s=$_sn_term_at left_s=$_sn_left"
   echo "[sn] walltime end (driver rc $_sn_rc after TERM): the chain goes on"
   _sn_exit=143
 elif [ "$_sn_cancelled" = 1 ]; then
-  _sn_summary CANCEL "$_sn_wall"; _sn_exit=143
+  _sn_summary CANCEL "$_sn_wall" "term_at_s=$_sn_term_at left_s=$_sn_left"; _sn_exit=143
 else
   _sn_summary "$_sn_rc" "$_sn_wall"
   _sn_exit=$_sn_rc

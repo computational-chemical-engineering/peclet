@@ -6,13 +6,15 @@
 #   walltime_test.sh check <campaign>/<tag>                                              verdict
 # The tree needs a cpu build (`sn build <tree> cpu morton` is the cheapest). The job: genoa-mpi
 # --ranks 1 (one core of a shared node, charged in 24-core units), --time 0:03:00, --chain 2.
-# Expected verdict, one line:
-#   walltime_test: PASS job1 TERM after ~60 s (checkpoint 5 s) -> job2 resumed, .done; no .failed
+# Expected verdict, one line (T + L = 180, on the batch shell's clock against the asked --time; L ~ 120,
+# up to 180 as Slurm may signal 60 s early; L < 120 = Slurm signals against an end beyond --time):
+#   walltime_test: PASS job1 TERM at T s of the job, L s before its 180 s limit (driver: after ~60 s,
+#   checkpoint 5 s) -> job2 resumed, .done; no .failed
 set -uo pipefail
 KIT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SN="$KIT/../sn"
 if [ "${1:-}" != check ]; then
-  [ $# -ge 1 ] || { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+  [ $# -ge 1 ] || { sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
   exec "$SN" walltime-test "$@"
 fi
 ct="${2:?usage: walltime_test.sh check <campaign>/<tag>}"
@@ -22,17 +24,19 @@ s="$d/summary.tsv"
 [ -f "$s" ] || { echo "walltime_test: FAIL no summary.tsv (still running? sn status)"; exit 1; }
 why=""
 [ "$(wc -l < "$s")" = 2 ] || why="$why; $(wc -l < "$s") summary lines, want 2"
-r1=$(sed -n 1p "$s" | cut -f5); c1=$(sed -n 1p "$s" | cut -f7)
+r1=$(sed -n 1p "$s" | cut -f5); c1=$(sed -n 1p "$s" | cut -f7); t1=$(sed -n 1p "$s" | cut -f8)
 r2=$(sed -n 2p "$s" | cut -f5); c2=$(sed -n 2p "$s" | cut -f7)
 [ "$r1" = TERM ] || why="$why; job1 rc '$r1', want TERM"
 [[ "$c1" == "CERT walltime_test checkpoint=1 "* ]] || why="$why; job1 did not checkpoint ('$c1')"
+[[ "$t1" =~ ^term_at_s=([0-9]+)\ left_s=(-?[0-9]+)$ ]] || why="$why; job1 summary has no TERM seconds ('$t1')"
+ta="${BASH_REMATCH[1]:-?}"; tl="${BASH_REMATCH[2]:-?}"
 [ "$r2" = 0 ] || why="$why; job2 rc '$r2', want 0"
 [[ "$c2" == "CERT walltime_test resumed=1 "* ]] || why="$why; job2 did not resume ('$c2')"
 [ -f "$d/0/.done" ] || why="$why; no .done"
 [ ! -e "$d/0/.failed" ] || why="$why; .failed: $(cat "$d/0/.failed")"
 at=$(grep -oE 'term_after_s=[0-9]+' <<< "$c1" | cut -d= -f2)
 if [ -z "$why" ]; then
-  echo "walltime_test: PASS job1 TERM after ${at} s (checkpoint 5 s) -> job2 resumed, .done; no .failed"
+  echo "walltime_test: PASS job1 TERM at ${ta} s of the job, ${tl} s before its $((ta + tl)) s limit (driver: after ${at} s, checkpoint 5 s) -> job2 resumed, .done; no .failed"
 else
   echo "walltime_test: FAIL${why}"; exit 1
 fi

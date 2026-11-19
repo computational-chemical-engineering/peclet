@@ -7,10 +7,12 @@
 # refusals; a generated job script run end to end with a fake SLURM (SLURM_* set, srun/sbatch/scancel
 # stubs): summary.tsv lines, array cases, the chain (successor queued after the checks, stopped and
 # cancelled on .done/.stop/.failed, cap, count positional, resume resets it), the walltime TERM with a
-# checkpointing driver and the grace bound, a cancel-TERM, a requeue, BUILD_INFO refusals, the GPU
-# import check, early-exit cleanup; sn cancel's dependents and .stop files (stub squeue); the real
-# submit path through a stub ssh (Desk verify, ledger before sbatch, override/dirty-kit/--env
-# refusals, --resume and --rebuild guards, --define); the build job's GPU preflight.
+# checkpointing driver and the grace bound, a cancel-TERM, a TERM during the successor's sbatch, the
+# TERM's seconds (log line, summary field 8), a requeue, BUILD_INFO refusals, the GPU import check (in a
+# srun step, first job of a chain only, a hang bounded), early-exit cleanup; sn cancel's dependents
+# and .stop files (stub squeue); the real submit path through a stub ssh (Desk verify, ledger before
+# sbatch, override/dirty-kit/--env refusals, --resume and --rebuild guards, --define); the build job's
+# GPU preflight.
 set -uo pipefail
 KIT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SN="$KIT/../sn"
@@ -198,8 +200,11 @@ echo "srun $*" >> "$SN_STUBLOG"; while [[ "${1:-}" == -* ]]; do shift; done; exe
 EOF
 cat > "$STUB/sbatch" <<'EOF'
 #!/bin/bash
+# SN_STUB_SBATCH_SLOW=s: the call is in flight for s s after it was accepted (pid in $SN_STUBLOG.sbatch)
 echo "sbatch $*" >> "$SN_STUBLOG"; echo "sbatch: Single-node jobs run on a shared node by default." >&2
-echo $(( 900000 + $(grep -c '^sbatch' "$SN_STUBLOG") ))
+_id=$(( 900000 + $(grep -c '^sbatch' "$SN_STUBLOG") ))
+if [ -n "${SN_STUB_SBATCH_SLOW:-}" ]; then echo $$ > "$SN_STUBLOG.sbatch"; sleep "$SN_STUB_SBATCH_SLOW"; fi
+echo "$_id"
 EOF
 cat > "$STUB/scancel" <<'EOF'
 #!/bin/bash
@@ -230,8 +235,13 @@ ok "$(grep -c 'fresh=1' "$R/0/driver-101.log")" 1 job1-fresh
 ok "$(grep -c "cmake=\[$B/cmake\]" "$R/0/driver-101.log")" 1 job1-sn-cmake-build
 ok "$(grep -c 'MANIFEST umbrella:' "$W/job-101.out")" 1 job1-prints-manifest
 ok "$(grep -c 'GPU import check: peclet_fake_cuda Cuda' "$W/job-101.out")" 1 job1-gpu-import-check
+# WO-SN3 #2 the import check runs in a 1-task srun step (never in the batch shell), on the first job only
+nimp() { grep -c '^srun --job-name=sn-import-check --mpi=pmix --ntasks=1 --gpus-per-task=1 python -u -c ' "$SN_STUBLOG"; }
+ok "$(nimp)" 1 job1-import-check-in-srun
 runjob "$R/job.sh" 102 - chain "$BIH" 2; ok $? 0 job2-rc
 ok "$(grep -c 'fresh=0' "$R/0/driver-102.log")" 1 job2-not-fresh
+ok "$(nimp)" 1 job2-chain-no-import-check
+ok "$(grep -c 'GPU import check: done by the first job of this chain' "$W/job-102.out")" 1 job2-import-check-skipped-msg
 ok "$(test -f "$R/0/.done" && echo y)" y job2-done
 ok "$(grep -c '^scancel 900002$' "$SN_STUBLOG")" 1 job2-cancels-successor
 runjob "$R/job.sh" 103 - chain "$BIH" 3; ok $? 0 job3-rc
@@ -246,6 +256,7 @@ ok "$(grep -c 'the cap; no successor' "$W/job-202.out")" 1 cap-message
 # #12 a resume from sn after an exhausted chain starts the count again: it queues a successor
 runjob "$R2/job.sh" 203 - resume "$BIH"
 ok "$(nsb)" 2 resume-resets-count
+ok "$(nimp)" 2 resume-runs-import-check   # 201 fresh + 203 resume; not 202 (chain)
 ok "$(grep -c "afterany:203 $R2/job.sh chain $BIH 2\$" "$SN_STUBLOG")" 1 resume-successor-is-2
 no_ runjob "$R2/job.sh" 204 - chain "$BIH"
 # a crash cancels the successor and leaves .failed; a successor that runs anyway stops on it (#12)
@@ -277,6 +288,11 @@ R5="$P/runs/c1/term"; : > "$SN_STUBLOG"
 emit c1/term gpu1 --chain 3 --time 0:03:00 --emit "$R5/job.sh" -- drv/fake.sh ckpt
 bgjob "$R5/job.sh" 501 fresh "$BIH"; ok $? 143 term-rc
 ok "$(cut -f5 "$R5/summary.tsv")" TERM term-summary
+# WO-SN3 #3 the TERM's time since the job started and before the limit: one job-log line, summary field 8
+_ts=$(sed -nE 's/^\[sn\] TERM at ([0-9]+) s since the job started, (-?[0-9]+) s before the 180 s limit$/\1 \2/p' "$W/job-501.out")
+ok "$(wc -w <<< "$_ts")" 2 term-seconds-log-line
+ok "$(cut -f8 "$R5/summary.tsv")" "term_at_s=${_ts% *} left_s=${_ts#* }" term-seconds-summary
+ok "$(( ${_ts% *} + ${_ts#* } ))" 180 term-seconds-sum-to-limit
 ok "$(cut -f7 "$R5/summary.tsv")" "CERT fake checkpoint=1" term-driver-checkpointed
 ok "$(cat "$R5/0/ckpt" 2>/dev/null)" ckpt term-ckpt-file
 ok "$(grep -c '^scancel' "$SN_STUBLOG")" 0 term-keeps-successor
@@ -295,8 +311,21 @@ R5c="$P/runs/c1/cancel"; : > "$SN_STUBLOG"
 emit c1/cancel gpu1 --chain 3 --time 1:00:00 --emit "$R5c/job.sh" -- drv/fake.sh ckpt
 bgjob "$R5c/job.sh" 521 fresh "$BIH"
 ok "$(cut -f5 "$R5c/summary.tsv")" CANCEL cancel-summary
+ok "$(cut -f8 "$R5c/summary.tsv" | grep -cE '^term_at_s=[0-9]+ left_s=3[0-9]{3}$')" 1 cancel-seconds-summary
 ok "$(grep -c '^scancel 900001$' "$SN_STUBLOG")" 1 cancel-cancels-successor
 ok "$(test -e "$R5c/0/.failed" && echo y || echo n)" n cancel-no-failed
+# WO-SN3 #1 a TERM while the successor's sbatch is in flight (accepted, id not yet back; the TERM goes
+# to the shell and to sbatch, as a scancel's does): the job learns the id and cancels it -- no orphan
+R5d="$P/runs/c1/insubmit"; : > "$SN_STUBLOG"; rm -f "$SN_STUBLOG.sbatch"
+emit c1/insubmit gpu1 --chain 3 --time 1:00:00 --emit "$R5d/job.sh" -- drv/fake.sh
+SN_STUB_SBATCH_SLOW=2 PATH="$STUB:$PATH" SLURM_JOB_ID=531 bash "$R5d/job.sh" fresh "$BIH" > "$W/job-531.out" 2>&1 &
+_jp=$!; for _ in $(seq 100); do [ -s "$SN_STUBLOG.sbatch" ] && break; sleep 0.1; done
+kill -TERM "$_jp" "$(cat "$SN_STUBLOG.sbatch")"; wait "$_jp"; ok $? 143 insubmit-rc
+ok "$(nsb)" 1 insubmit-one-successor
+ok "$(grep -c '^scancel 900001$' "$SN_STUBLOG")" 1 insubmit-cancels-successor
+ok "$(test -e "$R5d/0/calls" && echo y || echo n)" n insubmit-no-driver
+ok "$(grep -c '^\[sn\] TERM at [0-9]* s since the job started' "$W/job-531.out")" 1 insubmit-term-logged
+rm -f "$SN_STUBLOG.sbatch"
 # #4 a requeued job refuses: no driver, no successor, .failed says why
 R8="$P/runs/c1/requeue"; : > "$SN_STUBLOG"
 emit c1/requeue gpu1 --chain 3 --emit "$R8/job.sh" -- drv/fake.sh
@@ -318,6 +347,17 @@ sed -i 's/^device_modules .*/device_modules peclet_fake_cuda peclet_fake_host/' 
 runjob "$R8/job.sh" 806 - fresh "$BIH2"; ok $? 1 gpu-check-rc
 ok "$(grep -c 'not Cuda: peclet_fake_host=OpenMP' "$W/job-806.out")" 1 gpu-check-msg
 ok "$(nsb)" 0 gpu-check-no-successor
+# WO-SN3 #2 an import that hangs (MPI/Kokkos init outside a usable step): bounded, refused, no successor
+echo 'import time; time.sleep(60)' > "$PM/peclet_fake_hang.py"
+sed -i 's/^device_modules .*/device_modules peclet_fake_hang/' "$B/BUILD_INFO"; BIH3=$(sha256sum < "$B/BUILD_INFO" | cut -c1-16)
+R8h="$P/runs/c1/imphang"; : > "$SN_STUBLOG"
+emit c1/imphang gpu1 --chain 3 --emit "$R8h/job.sh" -- drv/fake.sh
+sed -i 's/^_sn_imp_timeout=120$/_sn_imp_timeout=2/' "$R8h/job.sh"
+_t0=$SECONDS; runjob "$R8h/job.sh" 807 - fresh "$BIH3"; _rc=$?; _dt=$((SECONDS - _t0))
+ok "$_rc" 1 import-hang-rc; ok "$([ "$_dt" -lt 20 ] && echo y)" y import-hang-bounded
+ok "$(grep -c 'GPU import check: no answer from its srun step in 2 s' "$R8h/0/.failed")" 1 import-hang-failed-msg
+ok "$(nsb)" 0 import-hang-no-successor
+ok "$(test -e "$R8h/0/calls" && echo y || echo n)" n import-hang-no-driver
 sed -i 's/^device_modules .*/device_modules peclet_fake_cuda/' "$B/BUILD_INFO"
 # #5 .stop: honoured at the start, and one written during the run cancels the successor
 R9="$P/runs/c1/stop"; : > "$SN_STUBLOG"
@@ -338,7 +378,7 @@ ok "$(grep -c "run: srun .* $TR/extra/study/perf/run.sh" "$W/job-701.out")" 1 ex
 R6="$P/runs/c1/nosrun"; : > "$SN_STUBLOG"
 emit c1/nosrun gpu-mpi --gpus 4 --no-srun --emit "$R6/job.sh" -- drv/fake.sh
 runjob "$R6/job.sh" 601 - fresh "$BIH"
-ok "$(grep -c '^srun' "$SN_STUBLOG")" 0 nosrun-no-srun
+ok "$(grep '^srun' "$SN_STUBLOG" | grep -vc 'job-name=sn-import-check')" 0 nosrun-no-srun
 ok "$(grep -c 'srun=\[srun --mpi=pmix --ntasks=4 ' "$R6/0/driver-601.log")" 1 nosrun-gets-srun-line
 
 # --- 9. sn cancel: dependents and .stop files (remote.sh against a stub squeue) -------------------
@@ -500,7 +540,11 @@ _jp=$!; for _ in $(seq 100); do grep -qs 'sleeping until TERM' "$WR/0/driver-110
 kill -TERM "$_jp"; wait "$_jp"; ok $? 143 wt-job1-rc
 ok "$(grep -c "afterany:1101 $WR/job.sh chain $BIHC 2\$" "$SN_STUBLOG")" 1 wt-job1-successor
 runjob "$WR/job.sh" 1102 - chain "$BIHC" 2; ok $? 0 wt-job2-rc
-ok "$(env HOME="$H" PATH="$LS:$PATH" SN_FAKEPROJ="$FP" SN_RSTUB="$RS" "$KR/tools/hpc/snellius/walltime_test.sh" check wt/w1 | cut -c1-29)" "walltime_test: PASS job1 TERM" wt-verdict-pass
+_wv=$(env HOME="$H" PATH="$LS:$PATH" SN_FAKEPROJ="$FP" SN_RSTUB="$RS" "$KR/tools/hpc/snellius/walltime_test.sh" check wt/w1)
+ok "$(cut -c1-29 <<< "$_wv")" "walltime_test: PASS job1 TERM" wt-verdict-pass
+# WO-SN3 #3 the verdict quotes when the TERM came: since the job started, and before the 180 s limit
+_wl=$(cut -f8 "$WR/summary.tsv" | head -n 1); _wa=${_wl#term_at_s=}; _wa=${_wa%% *}; _wb=${_wl##*left_s=}
+ok "$(grep -c "TERM at ${_wa} s of the job, ${_wb} s before its 180 s limit (driver: after [0-9]* s" <<< "$_wv")" 1 wt-verdict-term-seconds
 rm -f "$WR/0/.done"
 ok "$(env HOME="$H" PATH="$LS:$PATH" SN_FAKEPROJ="$FP" SN_RSTUB="$RS" "$KR/tools/hpc/snellius/walltime_test.sh" check wt/w1 | cut -c1-29)" "walltime_test: FAIL; no .done" wt-verdict-fail
 ok "$(xsn walltime-test --print-action tr-00000000 2>/dev/null | sed 's/@[0-9a-f]*,/@H,/')" "sn walltime-test tr-00000000 | time 0:03:00, template genoa-mpi@H, estimate 1.6 SBU" wt-action   # the stub says 16 processors; Snellius charges 24 cores: 2.4
