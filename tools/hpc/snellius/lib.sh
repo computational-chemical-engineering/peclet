@@ -41,12 +41,14 @@ sn_closure() {
 }
 
 # --- Desk action ------------------------------------------------------------------------------
-# The canonical action text of a billed command: "sn <subcommand> <args...>", the exact argument
-# vector with --card/--desk (and their values) removed, single-spaced. This is the string the
-# Decision Desk card must carry and decision_desk_verify.py --action compares. The flags that never
-# reach a real submit (--print-action, --test-only, --emit <file>) are dropped too, so
-# `sn ... --test-only --print-action` prints the text of the submit it previews. Arguments after
-# "--" (the driver's) are kept verbatim.
+# The canonical action text of a billed command starts with "sn <subcommand> <args...>": the exact
+# argument vector with --card/--desk (and their values) removed, each argument quoted losslessly by
+# `printf %q` and joined by single spaces, so two different argument vectors never give the same
+# text (`-- bash -c "a b"` is `-- bash -c a\ b`, `-- bash -c a b` stays three words). sn appends the
+# effective settings that change what is billed (" | time ..., template ..., estimate ... SBU"; see
+# _billed in sn). This is the string the Decision Desk card must carry and decision_desk_verify.py
+# --action compares. The flags that never reach a real submit (--print-action, --test-only,
+# --emit <file>) are dropped too. Arguments after "--" (the driver's) are kept verbatim.
 sn_canonical_action() {
   local out=(sn) skip=0 a verbatim=0 arr=0
   for a in "$@"; do
@@ -61,9 +63,8 @@ sn_canonical_action() {
     esac
     arr=0
   done
-  local s="${out[*]}"
-  # single-spaced: collapse any whitespace runs an argument carried
-  echo "$s" | tr -s '[:space:]' ' ' | sed 's/ $//'
+  local s; s=$(printf '%q ' "${out[@]}")
+  echo "${s% }"
 }
 
 # The cases file of --array as the action names it: "<path>@<first 12 hex of sha256(content)>", so a
@@ -95,11 +96,21 @@ sn_rate() {  # <partition> -> "<rate> <unit>"
   esac
 }
 
-# Walltime "[D-]HH:MM:SS" | "HH:MM" (sbatch minutes:seconds is not accepted here) -> hours (float).
+# Walltime -> hours (float). Accepted: H:MM:SS, D-HH, D-HH:MM, D-HH:MM:SS. Refused: everything else,
+# in particular the two-field "MM:SS" (sbatch reads 30:00 as 30 minutes; "HH:MM" would get 1/60 of
+# the intended limit) and bare minutes.
 sn_hours() {
-  local t="$1" d=0
-  case "$t" in *-*) d="${t%%-*}"; t="${t#*-}" ;; esac
-  awk -v d="$d" -v t="$t" 'BEGIN{n=split(t,a,":"); if(n==3)h=a[1]+a[2]/60+a[3]/3600; else if(n==2)h=a[1]+a[2]/60; else exit 1; printf "%.6f\n", d*24+h}'
+  local t="$1" d=0 h m=0 s=0
+  if [[ "$t" =~ ^([0-9]+):([0-5][0-9]):([0-5][0-9])$ ]]; then
+    h=${BASH_REMATCH[1]}; m=${BASH_REMATCH[2]}; s=${BASH_REMATCH[3]}
+  elif [[ "$t" =~ ^([0-9]+)-([0-9]{1,2})(:([0-5][0-9])(:([0-5][0-9]))?)?$ ]]; then
+    d=${BASH_REMATCH[1]}; h=${BASH_REMATCH[2]}; m=${BASH_REMATCH[4]:-0}; s=${BASH_REMATCH[6]:-0}
+    [ $((10#$h)) -le 23 ] || return 1
+  else
+    return 1
+  fi
+  awk -v d="$((10#$d))" -v h="$((10#$h))" -v m="$((10#$m))" -v s="$((10#$s))" \
+    'BEGIN{x=d*24+h+m/60+s/3600; if (x<=0) exit 1; printf "%.6f\n", x}'
 }
 
 # Estimate = allocation x rate x walltime x array size x chain cap, in SBU (one decimal).
@@ -170,3 +181,15 @@ sn_resolve_extra() {  # <name:path[@ref]>
 
 # Names: campaigns, tags and trees are path components on Snellius and job-name parts.
 sn_valid_name() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; }
+# A campaign never contains ".": it separates campaign and tag in the job name sn-<campaign>.<tag>,
+# so `sn cancel x` matches exactly "sn-x." and never campaign "x-y". "build" is reserved (build jobs
+# are named sn-build.<tree>.<target>); an all-digit name would read as a job id.
+sn_valid_campaign() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]] && [ "$1" != build ] && ! [[ "$1" =~ ^[0-9]+$ ]]; }
+sn_jobname() { echo "sn-$1.$2"; }                         # <campaign> <tag>
+sn_build_jobname() { echo "sn-build.$1.$2"; }             # <tree> <target>
+
+# Packages whose Python module runs Kokkos kernels and reports `execution_space` (core's
+# kokkos_teardown.hpp): on a GPU target each must say Cuda. morton, geom and core (peclet.halo) are
+# host code.
+sn_is_device_pkg() { case "$1" in flow|pnm|dem|voro|amr|coupling) return 0 ;; *) return 1 ;; esac; }
+sn_pkg_module() { case "$1" in core) echo peclet.halo ;; *) echo "peclet.$1" ;; esac; }
