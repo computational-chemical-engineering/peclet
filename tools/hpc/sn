@@ -14,6 +14,7 @@
 #                [--time T] [--env K=V]... [--no-srun] [--resume] -- <driver> <args...>
 #         sn smoke <tree> <target> [--time T]
 #         sn check-gpu-aware <tree> <target> [--time T]
+#         sn walltime-test <tree>        (genoa, 1 core, --time 0:03:00, chain 2: the TERM@120 path)
 #   billed flags: --test-only | --card <id> --desk <dir>;  --print-action (= --test-only, then the
 #   card's action text alone on stdout);  --emit <file> (write the job script locally and stop)
 #   --time: H:MM:SS, D-HH, D-HH:MM or D-HH:MM:SS (never MM:SS).
@@ -423,7 +424,7 @@ cmd_build() {
   rm -f "$job"
 }
 
-# sn run (also the engine of smoke and check-gpu-aware)
+# sn run (also the engine of smoke, check-gpu-aware and walltime-test)
 cmd_run() {
   [ $# -ge 4 ] || die "usage: sn run <tree> <target> <campaign>/<tag> <template> [flags] -- <driver> <args...>"
   local tree="$1" target="$2" ct="$3" tpl="$4"; shift 4; _tree_target "$tree" "$target"
@@ -553,7 +554,20 @@ cmd_check_gpu_aware() {
     bash "$R/check_gpu_aware_mpi.sh" "$SN_PROJ/src/$tree" "$SN_PROJ/build/$tree-$target/env.sh"
 }
 
-usage() { sed -n '2,23p' "$SN_SELF" | sed 's/^# \{0,1\}//'; }
+# The one real test of the walltime path (shakedown card): a 1-core genoa job with --time 0:03:00 and a
+# chain of 2. Job 1's driver sleeps until the TERM (at ~60 s), checkpoints and exits; job 2 finds the
+# checkpoint and ends the chain. walltime_test.sh check <campaign>/<tag> reads the verdict.
+cmd_walltime_test() {
+  [ $# = 1 ] || die "usage: sn walltime-test <tree>   (the tree needs a cpu build: sn build <tree> cpu morton)"
+  local tree="$1"; _tree_target "$tree" cpu
+  local c="${tree%-*}" tag; tag="walltime-$(date +%Y%m%d-%H%M%S)"
+  local R="$SN_PROJ/runs/$c/$tag"
+  SN_UPLOAD_EXTRA="$SN_KIT/walltime_driver.sh:$R/walltime_driver.sh"
+  echo "sn walltime-test: run $c/$tag (verdict: tools/hpc/snellius/walltime_test.sh check $c/$tag)"
+  cmd_run "$tree" cpu "$c/$tag" genoa-mpi --ranks 1 --chain 2 --time 0:03:00 -- bash "$R/walltime_driver.sh"
+}
+
+usage() { sed -n '2,24p' "$SN_SELF" | sed 's/^# \{0,1\}//'; }
 
 [ $# -ge 1 ] || { usage; exit 1; }
 sub="$1"; shift
@@ -567,6 +581,7 @@ case "$sub" in
   run)    cmd_run "$@" ;;
   smoke)  cmd_smoke "$@" ;;
   check-gpu-aware) cmd_check_gpu_aware "$@" ;;
+  walltime-test) cmd_walltime_test "$@" ;;
   -h|--help|help) usage ;;
   *) die "unknown subcommand '$sub' (sn help)" ;;
 esac
