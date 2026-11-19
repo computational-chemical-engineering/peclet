@@ -38,7 +38,7 @@ m1=$'core aaaa pin\numbrella bbbb ref:origin/main\nvoro cccc worktree:/x/voro-m7
 m2=$'voro cccc ref:HEAD\numbrella bbbb pin\ncore aaaa ref:main'
 m3=$'core aaaa pin\numbrella bbbb pin\nvoro dddd pin'
 ok "$(sn_manifest_hash <<< "$m1")" "$(sn_manifest_hash <<< "$m2")" hash-same-sources
-[ "$(sn_manifest_hash <<< "$m1")" != "$(sn_manifest_hash <<< "$m3")" ]; ok $? 0 hash-differs
+if [ "$(sn_manifest_hash <<< "$m1")" != "$(sn_manifest_hash <<< "$m3")" ]; then _d=0; else _d=1; fi; ok $_d 0 hash-differs
 ok "$(sn_manifest_hash <<< "$m1" | wc -c)" 9 hash-8hex
 
 # --- 4. overrides: worktree HEAD, dirty refused, ref, wrong repo refused ------------------------
@@ -175,7 +175,7 @@ R5="$P/runs/c1/term"; mkdir -p "$R5"
 SN_PROJ="$P" "$SN" run fake-00000000 h100 c1/term gpu1 --emit "$R5/job.sh" -- drv/fake.sh hang >/dev/null
 PATH="$STUB:$PATH" SLURM_JOB_ID=501 bash "$R5/job.sh" fresh > "$W/job-501.out" 2>&1 &
 jp=$!; for _ in $(seq 50); do [ -f "$R5/0/calls" ] && break; sleep 0.1; done; sleep 0.3
-kill -TERM "$jp"; wait "$jp"; ok $? 143 term-rc
+kill -TERM "$jp"; wait "$jp"; _t=$?; ok $_t 143 term-rc
 ok "$(cut -f5 "$R5/summary.tsv")" TERM term-summary
 # --no-srun: the driver runs in the batch shell and gets the srun line in SN_SRUN
 R6="$P/runs/c1/nosrun"; mkdir -p "$R6"; : > "$SN_STUBLOG"
