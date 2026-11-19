@@ -5,6 +5,9 @@
 # with every product OUTSIDE the tree:
 #   build/<tree>-<target>/{env.sh,.venv,extern/install/<backend>,cmake/<pkg>,BUILD_INFO,build-*.out}
 # Set by sn above this body: SN_TREE SN_TREE_NAME SN_TARGET SN_BUILD SN_PKGS SN_WHERE SN_TOOLKIT
+#   SN_DEFINES=(<pkg>:<CMAKE_DEFINE>=<value> ...)   from `sn build --define`, passed to that package's CMake
+# Each package's CMake build dir stays at $SN_BUILD/cmake/<pkg> (runs get it as SN_CMAKE_BUILD), with the
+# source copy of a package that has a --define (its test binaries may read their sources).
 set -euo pipefail
 B="$SN_BUILD"; T="$SN_TREE"
 _info() { echo "$*" >> "$B/BUILD_INFO.part"; }
@@ -25,7 +28,38 @@ _info "$(awk 'BEGIN{printf "MANIFEST"} NF>=2{printf " %s:%s", $1, substr($2,1,12
 _info "built_by job ${SLURM_JOB_ID:-none} on $(hostname) where $SN_WHERE at $(date -Iseconds) toolkit $SN_TOOLKIT"
 _info "modules $(module -t list 2>&1 | tr '\n' ' ')"
 
-# --- 2. venv; mpi4py COMPILED against the module's OpenMPI (never a binary wheel) -----------------
+# --- 2. Kokkos (+ArborX) prefix per target, into THIS build dir ----------------------------------
+# bootstrap_deps.sh installs to <its dir>/../extern, so a copy in $B/tools puts the prefix in $B and
+# leaves the read-only tree alone.
+case "$SN_TARGET" in
+  h100) BACKEND=nvidia-cuda; KA=HOPPER90; CA=90 ;;
+  a100) BACKEND=nvidia-cuda; KA=AMPERE80; CA=80 ;;
+  cpu)  BACKEND=host-openmp; KA=; CA= ;;
+  *) echo "FATAL(sn build): target '$SN_TARGET'" >&2; exit 1 ;;
+esac
+# A GPU target must be a CUDA build: nvcc on PATH before anything is built, CUDA in Kokkos_DEVICES
+# after (a host-only "h100" build would bill GPUs for nothing: the dem fallback trap of SNELLIUS.md).
+if [ "$BACKEND" = nvidia-cuda ]; then
+  _nvcc=$(command -v nvcc) || { echo "FATAL(sn build): target $SN_TARGET needs nvcc on PATH (CUDA module not loaded?)" >&2; exit 1; }
+  _info "nvcc $_nvcc ($(nvcc --version 2>&1 | grep -oE 'release [0-9.]+' | head -n 1))"
+fi
+install -D -m 0755 "$T/tools/bootstrap_deps.sh" "$B/tools/bootstrap_deps.sh"
+if [ "$BACKEND" = nvidia-cuda ]; then
+  KOKKOS_ARCH=$KA CUDA_ARCH=$CA CUDA_COMPILER="$_nvcc" "$B/tools/bootstrap_deps.sh" nvidia-cuda
+else
+  "$B/tools/bootstrap_deps.sh" host-openmp
+fi
+PREFIX="$B/extern/install/$BACKEND"
+# KokkosConfigCommon.cmake: "set(Kokkos_DEVICES OPENMP;SERIAL)", "set(Kokkos_ARCH HOPPER90)" (unquoted)
+_kdev=$(sed -nE 's/^set\(Kokkos_DEVICES "?([^")]*)"?\).*/\1/p' "$PREFIX"/lib*/cmake/Kokkos/KokkosConfigCommon.cmake 2>/dev/null | head -1 || true)
+_karch=$(sed -nE 's/^set\(Kokkos_ARCH "?([^")]*)"?\).*/\1/p' "$PREFIX"/lib*/cmake/Kokkos/KokkosConfigCommon.cmake 2>/dev/null | head -1 || true)
+_info "kokkos backend $BACKEND arch ${_karch:-${KA:-host}} devices ${_kdev:-?} prefix $PREFIX"
+if [ "$BACKEND" = nvidia-cuda ] && [[ ";${_kdev};" != *";CUDA;"* ]]; then
+  echo "FATAL(sn build): target $SN_TARGET but Kokkos_DEVICES is '${_kdev:-?}' (no CUDA)" >&2; exit 1
+fi
+
+
+# --- 3. venv; mpi4py COMPILED against the module's OpenMPI (never a binary wheel) -----------------
 python3 -c 'import sys; assert sys.version_info[:2] >= (3, 10), sys.version'
 python3 -m venv "$B/.venv"
 # shellcheck disable=SC1091
@@ -36,27 +70,6 @@ pip install -q --no-binary=mpi4py mpi4py
 [ "$SN_TARGET" = cpu ] || pip install -q cupy-cuda12x
 _info "python $(python -c 'import sys; print(sys.version.split()[0])') $(command -v python)"
 _info "mpi4py $(python -c 'import mpi4py; print(mpi4py.__version__)') built with $(command -v mpicc) ($(mpirun --version 2>&1 | head -n 1))"
-
-# --- 3. Kokkos (+ArborX) prefix per target, into THIS build dir ----------------------------------
-# bootstrap_deps.sh installs to <its dir>/../extern, so a copy in $B/tools puts the prefix in $B and
-# leaves the read-only tree alone.
-case "$SN_TARGET" in
-  h100) BACKEND=nvidia-cuda; KA=HOPPER90; CA=90 ;;
-  a100) BACKEND=nvidia-cuda; KA=AMPERE80; CA=80 ;;
-  cpu)  BACKEND=host-openmp; KA=; CA= ;;
-  *) echo "FATAL(sn build): target '$SN_TARGET'" >&2; exit 1 ;;
-esac
-install -D -m 0755 "$T/tools/bootstrap_deps.sh" "$B/tools/bootstrap_deps.sh"
-if [ "$BACKEND" = nvidia-cuda ]; then
-  KOKKOS_ARCH=$KA CUDA_ARCH=$CA CUDA_COMPILER="$(command -v nvcc)" "$B/tools/bootstrap_deps.sh" nvidia-cuda
-else
-  "$B/tools/bootstrap_deps.sh" host-openmp
-fi
-PREFIX="$B/extern/install/$BACKEND"
-# KokkosConfigCommon.cmake: "set(Kokkos_DEVICES OPENMP;SERIAL)", "set(Kokkos_ARCH HOPPER90)" (unquoted)
-_kdev=$(sed -nE 's/^set\(Kokkos_DEVICES "?([^")]*)"?\).*/\1/p' "$PREFIX"/lib*/cmake/Kokkos/KokkosConfigCommon.cmake 2>/dev/null | head -1 || true)
-_karch=$(sed -nE 's/^set\(Kokkos_ARCH "?([^")]*)"?\).*/\1/p' "$PREFIX"/lib*/cmake/Kokkos/KokkosConfigCommon.cmake 2>/dev/null | head -1 || true)
-_info "kokkos backend $BACKEND arch ${_karch:-${KA:-host}} devices ${_kdev:-?} prefix $PREFIX"
 
 # --- 4. the packages, in dependency order, MPI on, each against the tree's own core ---------------
 # The CMAKE_ARGS traps (SNELLIUS.md): capital-P Python_EXECUTABLE (lowercase is silently ignored),
@@ -78,10 +91,15 @@ _srchash() { (cd "$1" && find $SN_PKGS -type f -print0 | LC_ALL=C sort -z | xarg
 _h1=$(_srchash "$T"); _h2=$(_srchash "$S")
 [ "$_h1" = "$_h2" ] || { echo "FATAL(sn build): the source copy differs from the tree ($_h1 vs $_h2)" >&2; exit 1; }
 _info "src_copy $S = tree ($SN_PKGS) sha256 $_h1"
+# --define <pkg>:<KEY>=<VALUE> -> cmake.define.KEY=VALUE for that package (after sn's own: sn refuses
+# a define of a key it sets itself).
+for _d in "${SN_DEFINES[@]}"; do _info "define ${_d%%:*} ${_d#*:}"; done
 _pip() {  # <pkg-label> <source dir> [--config-settings ...]
-  local p="$1" d="$2"; shift 2
-  echo "== pip install $p ($d) $*"
-  pip install --no-deps --no-build-isolation --config-settings=build-dir="$B/cmake/$p" "$@" "$d"
+  local p="$1" d="$2" x; shift 2
+  local defs=()
+  for x in "${SN_DEFINES[@]}"; do [ "${x%%:*}" = "$p" ] && defs+=("--config-settings=cmake.define.${x#*:}"); done
+  echo "== pip install $p ($d) $* ${defs[*]}"
+  pip install --no-deps --no-build-isolation --config-settings=build-dir="$B/cmake/$p" "$@" "${defs[@]}" "$d"
 }
 for p in $SN_PKGS; do
   case "$p" in
@@ -106,6 +124,10 @@ done
 #     equals the tree's (src_copy line) ---------------------------------------------------------
 # Every -I/-isystem directory in the package's generated build files, resolved; a sibling CMake did
 # not find would have been FetchContent-fetched (_deps/peclet_sib_*) -- that is a FAILURE here.
+# geom: its PecletDeps.cmake "vendors" the core headers at PECLET_CORE_TAG only for the self-contained
+# sdist, when ../../core is ABSENT; in a tree core is always there (sn_build_deps), geom compiles
+# -I <tree>/core/include like every other package, and it gets the SAME check: a vendored fetch or a
+# PECLET_SIBLING_PECLET_CORE elsewhere fails it (verified by a local build of the job, 2026-11-19).
 _bad=0
 for p in $SN_PKGS; do
   d="$B/cmake/$p"; [ -d "$d" ] || continue
@@ -133,19 +155,30 @@ done
 
 # --- 5. import check (on a GPU node for a GPU target; deferred on genoa/cbuild: no libcuda) -------
 pip list 2>/dev/null | awk '/^peclet-/{print "package", $1, $2}' >> "$B/BUILD_INFO.part"
-_mods=""
+pip freeze --all 2>/dev/null | grep -v '^peclet' | sed 's/^/pip /' >> "$B/BUILD_INFO.part"   # the unpinned deps, as installed
+_mods=""; _dev=""
 for p in $SN_PKGS; do
-  case "$p" in core) _mods="$_mods peclet.halo" ;; *) _mods="$_mods peclet.$p" ;; esac
+  _mods="$_mods $(sn_pkg_module "$p")"
+  sn_is_device_pkg "$p" && _dev="$_dev $(sn_pkg_module "$p")"
 done
+_info "import_modules${_mods}"
+_info "device_modules${_dev}"
 if [ "$SN_TARGET" != cpu ] && ! nvidia-smi -L >/dev/null 2>&1; then
   _info "import_check DEFERRED (no GPU on $SN_WHERE; run sn smoke)"
 else
   # shellcheck disable=SC2086
-  if python -W "error:peclet.core:DeprecationWarning" - $_mods > "$B/import_check.txt" 2>&1 <<'PY'
-import importlib, sys
+  if SN_DEV_MODULES="$_dev" SN_TARGET="$SN_TARGET" python -W "error:peclet.core:DeprecationWarning" - $_mods > "$B/import_check.txt" 2>&1 <<'PY'
+import importlib, os, sys
+dev = set(os.environ.get("SN_DEV_MODULES", "").split())
+gpu = os.environ.get("SN_TARGET") != "cpu"
+bad = []
 for m in sys.argv[1:]:
     mod = importlib.import_module(m)
-    print(m, getattr(mod, "__version__", "?"), "space", getattr(mod, "execution_space", "-"), "mpi", getattr(mod, "has_mpi", "-"))
+    sp = str(getattr(mod, "execution_space", "-"))
+    print(m, getattr(mod, "__version__", "?"), "space", sp, "mpi", getattr(mod, "has_mpi", "-"))
+    if gpu and m in dev and "Cuda" not in sp:
+        bad.append(f"{m}={sp}")
+sys.exit(f"GPU target but not Cuda: {' '.join(bad)}" if bad else 0)
 PY
   then _info "import_check OK $(grep '^peclet\.' "$B/import_check.txt" | tr '\n' ';')"
   else cat "$B/import_check.txt"; _info "import_check FAILED (see $B/import_check.txt)"; mv "$B/BUILD_INFO.part" "$B/BUILD_INFO.failed"; exit 1
@@ -153,7 +186,13 @@ PY
 fi
 
 # --- 6. inodes: the Kokkos/ArborX build trees, their download cache and the source copy go ---------
-rm -rf "$B/extern/build" "$B/extern/src" "$S"
+# (the installed prefix and $B/cmake/<pkg> stay; so does the source of a package with a --define)
+rm -rf "$B/extern/build" "$B/extern/src"
+for p in $SN_PKGS; do
+  _keep=0; for _d in "${SN_DEFINES[@]}"; do [ "${_d%%:*}" = "$p" ] && _keep=1; done
+  if [ "$_keep" = 1 ]; then _info "src_kept $S/$p (--define)"; else rm -rf "${S:?}/$p"; fi
+done
+rmdir "$S" 2>/dev/null || true
 
 # --- 7. BUILD_INFO, last: its presence means "built" ----------------------------------------------
 mv "$B/BUILD_INFO.part" "$B/BUILD_INFO"

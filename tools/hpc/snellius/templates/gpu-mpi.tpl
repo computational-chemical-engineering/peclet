@@ -17,3 +17,4 @@ T_SBATCH=(--partition="$T_PART" --nodes="$_nodes" --gpus-per-node="$_gpn" --ntas
 T_LAUNCH=(srun --mpi=pmix --ntasks="$_n" --cpus-per-task="$_cpg" --gpus-per-task=1 --gpu-bind=per_task:1)
 T_ENV=(OMP_NUM_THREADS="$_cpg" OMP_PROC_BIND=false)
 T_ALLOC=$_n
+T_ACCEPTS=(gpus)   # the resource flags this template reads; sn refuses any other (it would sit on the card without effect)

@@ -18,3 +18,4 @@ else
 fi
 T_LAUNCH=(srun --mpi=pmix --ntasks="$_n" --ntasks-per-node="$_rpn" --cpus-per-task=1 --distribution=block:block --cpu-bind=cores)
 T_ENV=(OMP_NUM_THREADS=1)
+T_ACCEPTS=(ranks exclusive)   # the resource flags this template reads; sn refuses any other (it would sit on the card without effect)

@@ -16,3 +16,4 @@ T_SBATCH=(--partition=genoa --nodes="$_nodes" --ntasks-per-node="$_rpn" --cpus-p
 T_LAUNCH=(srun --mpi=pmix --ntasks="$_n" --ntasks-per-node="$_rpn" --cpus-per-task="$_t" --distribution=block:block --cpu-bind=cores)
 T_ENV=(OMP_NUM_THREADS="$_t" OMP_PLACES=cores OMP_PROC_BIND=close)
 T_ALLOC="$((_nodes * 192))"
+T_ACCEPTS=(nodes threads ranks exclusive)   # the resource flags this template reads; sn refuses any other (it would sit on the card without effect)
