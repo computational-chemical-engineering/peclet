@@ -174,7 +174,9 @@ mkdir -p "$TR/drv" "$B/.venv/bin" "$STUB" "$PM"
 ln -s "$(command -v python3)" "$B/.venv/bin/python"
 printf 'export PATH=%q:$PATH PYTHONPATH=%q\n' "$B/.venv/bin" "$PM" > "$B/.venv/bin/activate"
 echo 'execution_space = "Cuda"' > "$PM/peclet_fake_cuda.py"; echo 'execution_space = "OpenMP"' > "$PM/peclet_fake_host.py"
-printf 'MANIFEST umbrella:aaaaaaaaaaaa core:bbbbbbbbbbbb (fake-00000000)\ndevice_modules peclet_fake_cuda\n' > "$B/BUILD_INFO"
+# a package that keeps execution_space on its extension only (as peclet.coupling._coupling does)
+mkdir -p "$PM/peclet_fake_pkg"; : > "$PM/peclet_fake_pkg/__init__.py"; echo 'execution_space = "Cuda"' > "$PM/peclet_fake_pkg/_peclet_fake_pkg.py"
+printf 'MANIFEST umbrella:aaaaaaaaaaaa core:bbbbbbbbbbbb (fake-00000000)\ndevice_modules peclet_fake_cuda peclet_fake_pkg\n' > "$B/BUILD_INFO"
 BIH=$(sha256sum < "$B/BUILD_INFO" | cut -c1-16)
 cat > "$TR/drv/fake.sh" <<'EOF'
 #!/bin/bash
@@ -235,6 +237,7 @@ ok "$(grep -c 'fresh=1' "$R/0/driver-101.log")" 1 job1-fresh
 ok "$(grep -c "cmake=\[$B/cmake\]" "$R/0/driver-101.log")" 1 job1-sn-cmake-build
 ok "$(grep -c 'MANIFEST umbrella:' "$W/job-101.out")" 1 job1-prints-manifest
 ok "$(grep -c 'GPU import check: peclet_fake_cuda Cuda' "$W/job-101.out")" 1 job1-gpu-import-check
+ok "$(grep -c 'peclet_fake_pkg Cuda' "$W/job-101.out")" 1 job1-gpu-import-check-extension
 # WO-SN3 #2 the import check runs in a 1-task srun step (never in the batch shell), on the first job only
 nimp() { grep -c '^srun --job-name=sn-import-check --mpi=pmix --ntasks=1 --gpus-per-task=1 python -u -c ' "$SN_STUBLOG"; }
 ok "$(nimp)" 1 job1-import-check-in-srun
@@ -343,7 +346,7 @@ ok "$(nsb)" 0 early-exits-queue-no-successor
 ok "$(test -e "$R8/0/calls" && echo y || echo n)" n early-exits-no-driver
 no_ runjob "$R8/job.sh" 805 - bogus "$BIH"
 # #7 a GPU target whose module is not Cuda: refused, no successor
-sed -i 's/^device_modules .*/device_modules peclet_fake_cuda peclet_fake_host/' "$B/BUILD_INFO"; BIH2=$(sha256sum < "$B/BUILD_INFO" | cut -c1-16)
+sed -i 's/^device_modules .*/device_modules peclet_fake_cuda peclet_fake_pkg peclet_fake_host/' "$B/BUILD_INFO"; BIH2=$(sha256sum < "$B/BUILD_INFO" | cut -c1-16)
 runjob "$R8/job.sh" 806 - fresh "$BIH2"; ok $? 1 gpu-check-rc
 ok "$(grep -c 'not Cuda: peclet_fake_host=OpenMP' "$W/job-806.out")" 1 gpu-check-msg
 ok "$(nsb)" 0 gpu-check-no-successor
@@ -358,7 +361,7 @@ ok "$_rc" 1 import-hang-rc; ok "$([ "$_dt" -lt 20 ] && echo y)" y import-hang-bo
 ok "$(grep -c 'GPU import check: no answer from its srun step in 2 s' "$R8h/0/.failed")" 1 import-hang-failed-msg
 ok "$(nsb)" 0 import-hang-no-successor
 ok "$(test -e "$R8h/0/calls" && echo y || echo n)" n import-hang-no-driver
-sed -i 's/^device_modules .*/device_modules peclet_fake_cuda/' "$B/BUILD_INFO"
+sed -i 's/^device_modules .*/device_modules peclet_fake_cuda peclet_fake_pkg/' "$B/BUILD_INFO"
 # #5 .stop: honoured at the start, and one written during the run cancels the successor
 R9="$P/runs/c1/stop"; : > "$SN_STUBLOG"
 emit c1/stop gpu1 --chain 3 --emit "$R9/job.sh" -- drv/fake.sh stopme

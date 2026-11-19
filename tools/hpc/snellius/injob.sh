@@ -114,7 +114,13 @@ if [ "$SN_TARGET" != cpu ]; then
 import importlib, sys
 bad = []
 for m in sys.argv[1:]:
-    sp = str(getattr(importlib.import_module(m), "execution_space", "-"))
+    sp = getattr(importlib.import_module(m), "execution_space", None)
+    if sp is None:  # a package that does not re-export it (peclet.coupling): ask its extension _<name>
+        try:
+            sp = getattr(importlib.import_module(f"{m}._{m.rsplit('.', 1)[-1]}"), "execution_space", None)
+        except ImportError:
+            sp = None
+    sp = "-" if sp is None else str(sp)
     print(m, sp)
     if "Cuda" not in sp:
         bad.append(f"{m}={sp}")

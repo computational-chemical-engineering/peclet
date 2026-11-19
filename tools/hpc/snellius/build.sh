@@ -174,7 +174,13 @@ gpu = os.environ.get("SN_TARGET") != "cpu"
 bad = []
 for m in sys.argv[1:]:
     mod = importlib.import_module(m)
-    sp = str(getattr(mod, "execution_space", "-"))
+    sp = getattr(mod, "execution_space", None)
+    if sp is None:  # a package that does not re-export it (peclet.coupling): ask its extension _<name>
+        try:
+            sp = getattr(importlib.import_module(f"{m}._{m.rsplit('.', 1)[-1]}"), "execution_space", None)
+        except ImportError:
+            sp = None
+    sp = "-" if sp is None else str(sp)
     print(m, getattr(mod, "__version__", "?"), "space", sp, "mpi", getattr(mod, "has_mpi", "-"))
     if gpu and m in dev and "Cuda" not in sp:
         bad.append(f"{m}={sp}")
