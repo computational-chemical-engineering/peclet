@@ -1,9 +1,115 @@
 # Running peclet on Snellius (SURF)
 
 Consolidated runbook: the toolchain, how to build, how to queue, and the traps that have actually
-cost time. The authoritative *scripts* are
-`peclet-examples/examples/wall-bounded-turbulence/{snellius_env.sh,install_snellius.sh}` — this
-document explains them and the conventions the benchmark job scripts share.
+cost time. The authoritative *scripts* are in `tools/hpc` — the `sn` toolkit below for campaign
+work, `install_snellius.sh` / `smoke_snellius.slurm` for releases, and the shared `snellius_env.sh`.
+The older `peclet-examples/examples/wall-bounded-turbulence/` scripts are their ancestors and stay
+there as history. This document explains them and the conventions the job scripts share.
+
+## The `sn` toolkit
+
+`tools/hpc/sn` is one bash CLI, run on TRS2, that pushes source to Snellius, builds it, runs jobs on
+it and brings results back, so that no session writes its own Snellius scripts again. Sessions call
+it through the entry skill `.claude/skills/snellius/SKILL.md`. Its job bodies, templates and helpers
+are in `tools/hpc/snellius/`; `tools/hpc/snellius/selftest.sh` checks them locally (no ssh).
+
+**Remote layout** (`/projects/0/prjs1022/peclet/`):
+
+| path | what | written by |
+|---|---|---|
+| `src/<tree>/` | the source, `MANIFEST` (`repo sha source` per line), **read-only** after the push | `sn push` |
+| `build/<tree>-<target>/` | `env.sh` (the tree's `snellius_env.sh`, copied), `.venv`, `extern/install/<backend>`, `cmake/<pkg>`, `BUILD_INFO`, `build-<jobid>.out` | `sn build` |
+| `runs/<campaign>/<tag>/` | `job.sh` (the job, self-contained), `cases.txt`, `slurm-*.out`, `<idx>/` (the driver's cwd and its log), `summary.tsv` | `sn run` |
+
+`<tree>` = `<campaign>-<first 8 hex of sha256 over the manifest's "repo sha" columns>`. The same
+sources give the same tree, which is then reused, never rewritten; a changed repo is a new tree, so a
+job cannot run a mixture of sources (incident 2026-08-31). `extern/` is never pushed.
+
+**Free commands** (no billing):
+
+```bash
+sn budget                                    # per budget line: SBU left; accuse this month; prjs1022 quota
+sn push <campaign> [repo=<worktree|ref> ...] [umbrella=<worktree|ref>] [--only r1,r2]
+sn pull <campaign>[/<tag>] <local dir> [--only 'fields.npz,meta.json,*.log']
+sn status [campaign];  sn cancel <jobid|campaign>     # jobs are named sn-<campaign>-<tag>
+```
+
+- `push` sends the umbrella at `origin/main` of `~/Codes/suite` with every submodule at the SHA it
+  pins, laid out as in the suite (`<tree>/core`, `<tree>/flow`, ..., `<tree>/tools`), by
+  `git archive <sha> | ssh ... tar -x` per repo (no `.git` remote side). `repo=<path>` takes a
+  worktree's HEAD (refused if dirty; untracked files are ignored; a relative path may be relative to
+  the current directory or to the submodule, so `voro=../voro-m7-statics` works from either);
+  `repo=<ref>` takes any commit of the submodule's own repo, also one not on origin. `--only voro`
+  pushes voro plus what it needs to build (core, morton): a sibling missing from the tree would make
+  CMake FetchContent the *pinned tag* from GitHub without an error.
+- `pull` is rsync with an include filter: with `--only`, everything not matching is excluded.
+
+**Billed commands** — each submit needs its own signed Decision Desk card:
+
+```bash
+sn build <tree> <h100|a100|cpu> [packages...] [--where gpu|genoa|cbuild] [--time 03:00:00] [--rebuild]
+sn run <tree> <target> <campaign>/<tag> <template> [--array cases.txt [--array-max P]] [--chain K]
+       [--gpus N] [--ranks N] [--nodes N] [--threads T] [--exclusive] [--time T] [--env K=V]
+       [--no-srun] [--resume] -- <driver> <args...>
+sn smoke <tree> <target>                    # the release 1- vs N-rank certification on an sn build
+sn check-gpu-aware <tree> <h100|a100>       # check_gpu_aware_mpi.sh on 2 GPUs; tests the transport only
+```
+
+- `--test-only` (any billed command) runs `sbatch --test-only` with the script on stdin: it prints the
+  sbatch line, SURF's "charged for" line, the start slot and the cost, and writes and submits nothing.
+- Without `--test-only` a billed command needs `--card <id> --desk <dir>`. `sn` then runs
+  `decision_desk_verify.py <dir> <id> --action "<ACTION>"` and submits only on `VERIFIED`, once per
+  card (a local ledger, `~/.cache/sn/used_cards`, refuses a second use). `<ACTION>` is the argument
+  vector with `--card`/`--desk` (and `--test-only`, `--print-action`) removed, single-spaced:
+  `sn build m7-1a2b3c4d h100 voro`; `sn ... --print-action` prints it. After the submit `sn` prints the
+  job id and `EXECUTED-NOTE: write executed{at,by,result} on card <id>` — the session writes it.
+- **Cost before every submit**: allocation × walltime × array size × chain cap, against what the budget
+  line of that partition has left (`accinfo`); refused if it exceeds it. The allocation is the larger
+  of the request and what `--test-only` reports. Rates, confirmed 2026-11-19 from the `billing=` TRES
+  of past jobs (sacct) against `accuse`: **H100 192 SBU/GPU-h** (job 28537289: `billing=768` for 4
+  GPUs, 236 s → 50.3 SBU), **A100 128 SBU/GPU-h** (28555799: `billing=512`, 184 s → 26.2 SBU),
+  **genoa 1 SBU/core-h** (28535366, 28464076). `cbuild` is assumed 1 SBU per allocated core-h
+  (unconfirmed; sbatch prints no charge line there and gives 32 processors for 16 requested).
+- What `--test-only` showed (2026-11-19): a shared GPU job is "charged for 1 GPUs" (gpu1) or "4 GPUs"
+  (gpu-mpi 4), never the node; a genoa shared job is charged in 24-core units (32 cores → 48,
+  4 ranks → 24); multi-node and `--exclusive` jobs print no charge line (the full nodes are charged).
+
+**Build** (`tools/hpc/snellius/build.sh`, the steps of `install_snellius.sh` from a pushed tree):
+source the tree's `snellius_env.sh` (copied to `build/.../env.sh`, which every run sources); venv with
+`mpi4py` compiled against the module OpenMPI (`--no-binary=mpi4py`); `bootstrap_deps.sh` (a copy in
+the build dir, so the prefix lands there) with HOPPER90/90, AMPERE80/80 or host-openmp; the packages
+in dependency order with `pip install --no-deps --no-build-isolation`, MPI on, the CMAKE_ARGS traps
+below, each in `build/.../cmake/<pkg>`; then the **proof** that each package compiled the tree's own
+core: every `-I` of its generated build files resolved, written to `BUILD_INFO` as
+`core_include <pkg> <path> OK` — a fetched sibling (`_deps/peclet_sib_*`) or another path fails the
+build; the import check (a GPU target built with `--where genoa|cbuild` defers it to `sn smoke`:
+no `libcuda` there); `rm -rf extern/build extern/src` (inodes); `BUILD_INFO` last (its presence means
+built; `sn build` refuses a built dir unless `--rebuild`). Default `--where`: `gpu` (one GPU of the
+target's partition, budget L3) for h100/a100, `genoa` for cpu.
+
+**Templates** (`tools/hpc/snellius/templates/*.tpl`, the srun lines and binding rules of this document):
+
+| template | target | allocation | launch |
+|---|---|---|---|
+| `gpu1` | h100, a100 | 1 node, 1 GPU, 16 (18) cores; billed for 1 GPU | `srun --mpi=pmix --ntasks=1 --gpus-per-task=1 --gpu-bind=per_task:1` |
+| `gpu-mpi` | h100, a100 | `--gpus N` (4): N ≤ 4 on one node, else N/4 nodes × 4 (N a multiple of 4) | one rank per GPU, `--gpus-per-task=1 --gpu-bind=per_task:1` |
+| `genoa-mpi` | cpu | `--ranks N` (192): one shared node below 192, else whole nodes, `--mem=0` when under-filled | `--cpus-per-task=1 --distribution=block:block --cpu-bind=cores`, `OMP_NUM_THREADS=1` |
+| `genoa-hybrid` | cpu | `--nodes N` (1), exclusive, `--mem=0`; `--threads T` ∈ 1, 2, 4, 8 | one rank per CCD × 8 threads, `OMP_PLACES=cores OMP_PROC_BIND=close` |
+| `quiet1` | cpu | one exclusive genoa node, `--mem=0` (timing gates) | 1 × 24 threads on cores 0–23 by default; `--ranks R --threads T` |
+
+**In every job** (`tools/hpc/snellius/injob.sh`): source `build/.../env.sh`, activate the build's venv,
+print `BUILD_INFO`'s `MANIFEST` line, run the driver in `runs/<campaign>/<tag>/<idx>/` (`idx` = the
+array index, 0 without `--array`), append one line to `summary.tsv`:
+`jobid  array_idx  tree  target  rc  wall_s  <last driver line matching ^CERT >` (also on a walltime
+TERM, rc `TERM`). The driver gets `SN_OUT`, `SN_DONE`, `SN_IDX`, `SN_CASE`, `SN_FRESH`, `SN_TREE`,
+`SN_BUILD`, `SN_SRUN`; a driver path relative to the tree is taken from the tree, a `.py` driver runs
+under the venv's python; `--no-srun` runs the driver in the batch shell (it launches its own steps
+with `$SN_SRUN`). `--array cases.txt`: one non-comment line per index, appended to the driver's
+arguments. `--chain K` (the wall-bounded-turbulence pattern): at most K jobs in total per index; each
+queues its successor with `afterany` before running; the driver ends the chain by creating `$SN_DONE`;
+`SN_OUT` stays the same so a successor resumes from the driver's checkpoint; `SN_FRESH=1` only on the
+first submit; a driver that exits non-zero (not a walltime kill) cancels its successor and leaves
+`.failed`. `sn run` refuses an existing `<campaign>/<tag>` unless `--resume`.
 
 ## Coordinates
 
@@ -11,8 +117,8 @@ document explains them and the conventions the benchmark job scripts share.
 |---|---|
 | host | `snellius` (SSH config alias; `int4.local.snellius.surf.nl` etc.) |
 | account | `tes24005` (every `#SBATCH --account`) |
-| project space | `/projects/0/prjs1022/peclet` — the suite lives at `.../peclet/suite` |
-| the venv | `$SUITE/.venv` — **one** venv for everything, as on the workstation |
+| project space | `/projects/0/prjs1022/peclet` — `src/`, `build/`, `runs/` of the `sn` toolkit (above); the old shared `.../peclet/suite` tree was deleted 2026-11-13 |
+| the venv | one per build, `build/<tree>-<target>/.venv` (releases: `$PROJ/suite-<tag>-<backend>/.venv`) |
 | CPU partition | `genoa` — 192 cores/node, 336 GiB; `--exclusive` |
 | GPU partition | `gpu_h100` — 4× H100 94 GB/node, 16 cores/GPU (also `gpu_a100`) |
 
@@ -175,6 +281,9 @@ The releases validated this way are also recorded in [RELEASE_PREP](RELEASE_PREP
 section) by the release procedure ([RELEASE](RELEASE.md) §7).
 
 ## Building the development tree
+
+Superseded for campaign work by `sn build` (above), which builds a pushed, read-only tree instead of
+a shared clone. Kept as the record of the scripts it came from.
 
 ```bash
 cd <peclet-examples>/examples/wall-bounded-turbulence
