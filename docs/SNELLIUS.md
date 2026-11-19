@@ -79,11 +79,13 @@ source the tree's `snellius_env.sh` (copied to `build/.../env.sh`, which every r
 `mpi4py` compiled against the module OpenMPI (`--no-binary=mpi4py`); `bootstrap_deps.sh` (a copy in
 the build dir, so the prefix lands there) with HOPPER90/90, AMPERE80/80 or host-openmp; the packages
 in dependency order with `pip install --no-deps --no-build-isolation`, MPI on, the CMAKE_ARGS traps
-below, each in `build/.../cmake/<pkg>`; then the **proof** that each package compiled the tree's own
-core: every `-I` of its generated build files resolved, written to `BUILD_INFO` as
-`core_include <pkg> <path> OK` — a fetched sibling (`_deps/peclet_sib_*`) or another path fails the
-build; the import check (a GPU target built with `--where genoa|cbuild` defers it to `sn smoke`:
-no `libcuda` there); `rm -rf extern/build extern/src` (inodes); `BUILD_INFO` last (its presence means
+below, each in `build/.../cmake/<pkg>`, from a writable copy `build/.../src` of their repos whose
+sha256 over all files must equal the tree's (`src_copy` in `BUILD_INFO`) — morton's CMake writes its
+`.so` into its own source dir, which the read-only tree refuses (found by a local build of the job,
+2026-11-19); then the **proof** that each package compiled that core: every `-I` of its generated
+build files resolved, written to `BUILD_INFO` as `core_include <pkg> <path> OK` — a fetched sibling
+(`_deps/peclet_sib_*`), another path or no line at all fails the build; the import check (a GPU target built with `--where genoa|cbuild` defers it to `sn smoke`:
+no `libcuda` there); `rm -rf extern/build extern/src src` (inodes); `BUILD_INFO` last (its presence means
 built; `sn build` refuses a built dir unless `--rebuild`). Default `--where`: `gpu` (one GPU of the
 target's partition, budget L3) for h100/a100, `genoa` for cpu.
 
