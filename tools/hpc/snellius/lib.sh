@@ -48,7 +48,7 @@ sn_closure() {
 # `sn ... --test-only --print-action` prints the text of the submit it previews. Arguments after
 # "--" (the driver's) are kept verbatim.
 sn_canonical_action() {
-  local out=(sn) skip=0 a verbatim=0
+  local out=(sn) skip=0 a verbatim=0 arr=0
   for a in "$@"; do
     if [ $verbatim = 1 ]; then out+=("$a"); continue; fi   # after "--": the driver's own arguments
     if [ $skip = 1 ]; then skip=0; continue; fi
@@ -56,12 +56,27 @@ sn_canonical_action() {
       --) verbatim=1; out+=("$a") ;;
       --card|--desk|--emit) skip=1 ;;
       --card=*|--desk=*|--emit=*|--print-action|--test-only) ;;
-      *) out+=("$a") ;;
+      --array) out+=("$a"); arr=1; continue ;;
+      *) if [ "${arr:-0}" = 1 ]; then out+=("$(sn_cases_ref "$a")"); else out+=("$a"); fi ;;
     esac
+    arr=0
   done
   local s="${out[*]}"
   # single-spaced: collapse any whitespace runs an argument carried
   echo "$s" | tr -s '[:space:]' ' ' | sed 's/ $//'
+}
+
+# The cases file of --array as the action names it: "<path>@<first 12 hex of sha256(content)>", so a
+# card covers the exact case list. An "@<hash>" the caller typed is replaced by the recomputed one
+# (sn run refuses a typed hash that does not match). A missing file is left as typed.
+sn_cases_split() {  # <path[@hash]> -> "path hash-or-empty"
+  local v="$1"
+  if [[ "$v" =~ ^(.+)@([0-9a-f]{12})$ ]]; then echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"; else echo "$v "; fi
+}
+sn_cases_hash() { sha256sum < "$1" | cut -c1-12; }
+sn_cases_ref() {
+  local p h; read -r p h <<< "$(sn_cases_split "$1")"
+  if [ -f "$p" ]; then echo "$p@$(sn_cases_hash "$p")"; else echo "$1"; fi
 }
 
 # --- cost -------------------------------------------------------------------------------------
@@ -130,6 +145,27 @@ sn_resolve() {  # <suite> <repo> <value>
   sha=$(git -C "$base" rev-parse --verify -q "$val^{commit}") \
     || { echo "sn: $repo=$val: neither a worktree of $repo nor a commit in $base" >&2; return 1; }
   echo "$sha ref:$val"
+}
+
+# An extra repo for the tree: "extra=<name>:<repo-path>[@ref]" -> "<name> <sha> extra:<abs toplevel>@<ref>".
+# Any local git repo (a study repo, peclet-papers) at a ref, default HEAD; a dirty HEAD is refused
+# (untracked files ignored), a plain directory too: drivers must be committed. It lands in
+# <tree>/extra/<name> and its MANIFEST line "extra/<name> <sha> ..." enters the tree hash.
+sn_resolve_extra() {  # <name:path[@ref]>
+  local spec="$1" name path ref dir sha
+  [[ "$spec" == *:* ]] || { echo "sn: extra=$spec: want extra=<name>:<repo-path>[@ref]" >&2; return 1; }
+  name="${spec%%:*}"; path="${spec#*:}"; ref=HEAD
+  if [[ "$path" == *@* ]]; then ref="${path##*@}"; path="${path%@*}"; fi
+  sn_valid_name "$name" || { echo "sn: extra: bad name '$name'" >&2; return 1; }
+  case "$path" in /*) ;; *) path="$PWD/$path" ;; esac
+  [ -d "$path" ] && git -C "$path" rev-parse --is-inside-work-tree >/dev/null 2>&1     || { echo "sn: extra=$spec: $path is not a git work tree (drivers must be committed)" >&2; return 1; }
+  dir="$(cd "$path" && git rev-parse --show-toplevel)"
+  sha=$(git -C "$dir" rev-parse --verify -q "$ref^{commit}") \
+    || { echo "sn: extra=$spec: no commit '$ref' in $dir" >&2; return 1; }
+  if [ "$ref" = HEAD ] && [ -n "$(git -C "$dir" status --porcelain --untracked-files=no)" ]; then
+    echo "sn: extra=$spec: $dir is dirty (commit first; untracked files are ignored)" >&2; return 1
+  fi
+  echo "$name $sha extra:$dir@$ref"
 }
 
 # Names: campaigns, tags and trees are path components on Snellius and job-name parts.

@@ -21,7 +21,8 @@ submitting and anomaly sections). Read the section your task touches; do not wor
 ## The billed step, every time
 1. `sn <billed command> ... --test-only` -> read its three lines: the sbatch line, SURF's "charged for" line
    and slot, the SBU estimate against the budget line. `sn budget` for the whole picture.
-2. `sn <same command> --print-action` -> the exact action text.
+2. `sn <same command> --print-action` -> the exact action text (an `--array` file appears with its content
+   hash, `cases.txt@<sha12>`: edit the file after this and the card no longer matches).
 3. Send hub a DECISION-REQUEST with that action text and the estimate (the user's directive: decisions for
    the user go through session `hub` to the Decision Desk). Do not idle: switch to unblocked work.
 4. When the card is signed: fetch it with ArtifactData into a dir D (`get decisions/<id>`, `list keys`),
@@ -37,7 +38,8 @@ sn build m7-<hash> h100 voro                                  # billed (card)
 sn run m7-<hash> h100 m7/phaseB gpu1 --array cases.txt --chain 4 --time 02:00:00 -- <driver in the tree>
 sn status m7;  sn pull m7/phaseB ~/Codes/.../results/phaseB --only '*.summary,*.npz,summary.tsv'
 ```
-The driver must be in the pushed tree (path relative to the tree) or already on Snellius; it ends a chain
+A driver from a study repo or peclet-papers comes in with the push: `extra=m7:~/Codes/peclet-papers` (committed;
+then `-- extra/m7/work/M7/.../driver.py`). The driver must be in the pushed tree (path relative to the tree); it ends a chain
 by creating `$SN_DONE` and resumes from its own checkpoint in `$SN_OUT`.
 
 **pnm / A7** (gpu-mpi arrays, CERT line, restarts):

@@ -29,7 +29,7 @@ job cannot run a mixture of sources (incident 2026-08-31). `extern/` is never pu
 
 ```bash
 sn budget                                    # per budget line: SBU left; accuse this month; prjs1022 quota
-sn push <campaign> [repo=<worktree|ref> ...] [umbrella=<worktree|ref>] [--only r1,r2]
+sn push <campaign> [repo=<worktree|ref> ...] [umbrella=<worktree|ref>] [--only r1,r2] [extra=<name>:<repo-path>[@ref] ...]
 sn pull <campaign>[/<tag>] <local dir> [--only 'fields.npz,meta.json,*.log']
 sn status [campaign];  sn cancel <jobid|campaign>     # jobs are named sn-<campaign>-<tag>
 ```
@@ -42,6 +42,10 @@ sn status [campaign];  sn cancel <jobid|campaign>     # jobs are named sn-<campa
   `repo=<ref>` takes any commit of the submodule's own repo, also one not on origin. `--only voro`
   pushes voro plus what it needs to build (core, morton): a sibling missing from the tree would make
   CMake FetchContent the *pinned tag* from GitHub without an error.
+- `extra=<name>:<repo-path>[@ref]` adds any committed local git repo (a study repo, peclet-papers) at a
+  ref (default HEAD; a dirty HEAD and a plain directory are refused) as `<tree>/extra/<name>`, with a
+  MANIFEST line `extra/<name> <sha> ...` that enters the tree hash. A job then runs e.g.
+  `-- extra/<name>/perf/s2/run_chunked.sh` (driver paths resolve relative to the tree).
 - `pull` is rsync with an include filter: with `--only`, everything not matching is excluded.
 
 **Billed commands** — each submit needs its own signed Decision Desk card:
@@ -61,7 +65,10 @@ sn check-gpu-aware <tree> <h100|a100>       # check_gpu_aware_mpi.sh on 2 GPUs; 
   `decision_desk_verify.py <dir> <id> --action "<ACTION>"` and submits only on `VERIFIED`, once per
   card (a local ledger, `~/.cache/sn/used_cards`, refuses a second use). `<ACTION>` is the argument
   vector with `--card`/`--desk` (and `--test-only`, `--print-action`) removed, single-spaced:
-  `sn build m7-1a2b3c4d h100 voro`; `sn ... --print-action` prints it. After the submit `sn` prints the
+  `sn build m7-1a2b3c4d h100 voro`; `sn ... --print-action` prints it. `--array cases.txt` appears as
+  `--array cases.txt@<sha256[:12] of its content>`, so a card covers the exact case list: `sn`
+  recomputes the hash at submit (a changed file no longer matches the card) and refuses a typed
+  `@hash` that does not match the file. After the submit `sn` prints the
   job id and `EXECUTED-NOTE: write executed{at,by,result} on card <id>` — the session writes it.
 - **Cost before every submit**: allocation × walltime × array size × chain cap, against what the budget
   line of that partition has left (`accinfo`); refused if it exceeds it. The allocation is the larger

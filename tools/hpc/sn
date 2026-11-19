@@ -4,10 +4,11 @@
 #
 # Free:   sn budget | sn status [campaign] | sn cancel <jobid|campaign>
 #         sn push <campaign> [repo=<worktree|ref> ...] [umbrella=<worktree|ref>] [--only r1,r2]
+#                [extra=<name>:<repo-path>[@ref] ...]      (any committed git repo -> <tree>/extra/<name>)
 #         sn pull <campaign>[/<tag>] <local dir> [--only 'p1,p2,...']
 # Billed (each submit needs a Decision Desk card; --test-only shows line, cost and slot, submits nothing):
 #         sn build <tree> <h100|a100|cpu> [packages...] [--where gpu|genoa|cbuild] [--time T] [--rebuild]
-#         sn run <tree> <target> <campaign>/<tag> <template> [--array cases.txt [--array-max P]]
+#         sn run <tree> <target> <campaign>/<tag> <template> [--array cases.txt[@sha12] [--array-max P]]
 #                [--chain K] [--gpus N] [--ranks N] [--nodes N] [--threads T] [--exclusive]
 #                [--time T] [--env K=V]... [--no-srun] [--resume] -- <driver> <args...>
 #         sn smoke <tree> <target> [--time T]
@@ -107,11 +108,12 @@ cmd_push() {
   [ $# -ge 1 ] || die "usage: sn push <campaign> [repo=<worktree|ref> ...] [--only r1,r2]"
   local campaign="$1"; shift
   sn_valid_name "$campaign" || die "bad campaign name '$campaign'"
-  local -A ovr=(); local only="" a
+  local -A ovr=(); local only="" a extras=()
   while [ $# -gt 0 ]; do
     case "$1" in
       --only) only="${2:?--only needs a list}"; shift 2 ;;
       --only=*) only="${1#--only=}"; shift ;;
+      extra=*) extras+=("${1#extra=}"); shift ;;
       *=*) a="${1%%=*}"; { [ "$a" = umbrella ] || sn_is_repo "$a"; } || die "unknown repo '$a'"; ovr[$a]="${1#*=}"; shift ;;
       *) die "push: unexpected argument '$1'" ;;
     esac
@@ -142,7 +144,15 @@ cmd_push() {
       || die "$r ${sha[$r]:0:12} is not in ${dir[$r]} (git -C ${dir[$r]} fetch origin)"
   done
   local manifest
-  manifest=$(for r in umbrella $repos; do echo "$r ${sha[$r]} ${src[$r]}"; done | LC_ALL=C sort)
+  local -A xdir=(); local xn xs xsrc x
+  for x in "${extras[@]+"${extras[@]}"}"; do
+    read -r xn xs xsrc <<< "$(sn_resolve_extra "$x")" || exit 1
+    [ -n "$xn" ] || exit 1
+    [ -z "${xdir[$xn]:-}" ] || die "extra name '$xn' given twice"
+    sha[extra/$xn]="$xs"; src[extra/$xn]="$xsrc"; xdir[$xn]="${xsrc#extra:}"; xdir[$xn]="${xdir[$xn]%@*}"
+  done
+  local keys="umbrella $repos"; for xn in "${!xdir[@]}"; do keys="$keys extra/$xn"; done
+  manifest=$(for r in $keys; do echo "$r ${sha[$r]} ${src[$r]}"; done | LC_ALL=C sort)
   local name; name="$campaign-$(sn_manifest_hash <<< "$manifest")"
   local S="$SN_PROJ/src" T="$SN_PROJ/src/$name"
 
@@ -168,11 +178,15 @@ cmd_push() {
     git -C "${dir[$r]}" archive --format=tar "${sha[$r]}" | _ssh "mkdir -p $tmp/$r && tar -x -C $tmp/$r" \
       || die "$r archive failed"
   done
+  for xn in "${!xdir[@]}"; do
+    git -C "${xdir[$xn]}" archive --format=tar "${sha[extra/$xn]}" | _ssh "mkdir -p $tmp/extra/$xn && tar -x -C $tmp/extra/$xn" \
+      || die "extra $xn archive failed"
+  done
   _ssh "cat > $tmp/MANIFEST" <<< "$manifest"
   _ssh "chmod -R a-w $tmp && mv -T $tmp $T" || die "could not seal $T"
   trap - EXIT
   local du nin; read -r du nin <<< "$(_ssh "du -sh --apparent-size $T | cut -f1; find $T | wc -l" | tr '\n' ' ')"
-  echo "sn push: TREE $name new, read-only (umbrella + $(wc -w <<< "$repos") repos; $du; $nin inodes)"
+  echo "sn push: TREE $name new, read-only (umbrella + $(wc -w <<< "$repos") repos + ${#xdir[@]} extra; $du; $nin inodes)"
   awk '{printf "  %-9s %s %s\n", $1, substr($2,1,12), $3}' <<< "$manifest"
 }
 
@@ -310,7 +324,7 @@ cmd_build() {
   local manifest
   manifest=$(_ssh "cat $T/MANIFEST 2>/dev/null" || true)
   [ -n "$manifest" ] || die "no tree $T (sn push first)"
-  local have; have=$(awk '$1!="umbrella"{print $1}' <<< "$manifest" | tr '\n' ' ')
+  local have; have=$(awk '$1!="umbrella" && $1 !~ /^extra\//{print $1}' <<< "$manifest" | tr '\n' ' ')
   [ ${#pk[@]} -gt 0 ] || read -r -a pk <<< "$have"
   local pkgs; pkgs=$(sn_closure "${pk[@]}") || exit 1
   local p
@@ -372,8 +386,17 @@ cmd_run() {
   local T="$SN_PROJ/src/$tree" B="$SN_PROJ/build/$tree-$target" R="$SN_PROJ/runs/$campaign/$tag"
   local asz=1 casesf="" opts=("${T_SBATCH[@]}") out="$R/slurm-%j.out" isarr=0
   if [ -n "$cases" ]; then
-    [ -f "$cases" ] || die "no cases file '$cases'"
-    casesf=$(mktemp); grep -vE '^[[:space:]]*(#|$)' "$cases" > "$casesf" || true
+    local cpath chash raw
+    read -r cpath chash <<< "$(sn_cases_split "$cases")"
+    [ -f "$cpath" ] || die "no cases file '$cpath'"
+    # the card names the content: read it once, hash what is read, and refuse if it is not what
+    # the action text (and a typed @hash) says
+    raw=$(mktemp); cp "$cpath" "$raw"
+    [ -z "$chash" ] || [ "$chash" = "$(sn_cases_hash "$raw")" ] \
+      || { rm -f "$raw"; die "--array $cases: the file's sha256 is $(sn_cases_hash "$raw"), not $chash"; }
+    [[ "$ACTION" == *" --array $cpath@$(sn_cases_hash "$raw")"* ]] \
+      || { rm -f "$raw"; die "--array $cpath changed while sn ran"; }
+    casesf=$(mktemp); grep -vE '^[[:space:]]*(#|$)' "$raw" > "$casesf" || true; rm -f "$raw"
     asz=$(wc -l < "$casesf"); [ "$asz" -ge 1 ] || die "cases file '$cases' has no case lines"
     opts+=("--array=0-$((asz - 1))${amax:+%$amax}"); out="$R/slurm-%A_%a.out"; isarr=1
   fi

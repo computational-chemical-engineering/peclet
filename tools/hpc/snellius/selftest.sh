@@ -63,6 +63,36 @@ git -C "$W/other" -c user.email=t@t -c user.name=t commit -q --allow-empty -m o
 no_ sn_resolve "$S" core "$W/other"
 no_ sn_resolve "$S" core no-such-ref
 
+# --- 4b. extra repos: committed git repos only, at HEAD or a ref; they enter the tree hash ------
+X="$W/study"; mkdir -p "$X/perf"; git init -q "$X"; echo 'echo hi' > "$X/perf/d.sh"; git -C "$X" add perf/d.sh
+git -C "$X" -c user.email=t@t -c user.name=t commit -q -m d; x1=$(git -C "$X" rev-parse HEAD)
+git -C "$X" tag v1
+ok "$(sn_resolve_extra "st:$X")" "st $x1 extra:$X@HEAD" extra-head
+ok "$(cd "$W" && sn_resolve_extra "st:study/perf@v1")" "st $x1 extra:$X@v1" extra-rel-subdir-ref
+echo more >> "$X/perf/d.sh"
+no_ sn_resolve_extra "st:$X"
+ok "$(sn_resolve_extra "st:$X@v1" | cut -d' ' -f2)" "$x1" extra-dirty-ok-at-explicit-ref
+git -C "$X" checkout -q perf/d.sh
+mkdir -p "$W/plain"; no_ sn_resolve_extra "pl:$W/plain"
+no_ sn_resolve_extra "bad/name:$X"
+no_ sn_resolve_extra "$X"
+no_ sn_resolve_extra "st:$X@nosuchref"
+mx="$m1"$'\n'"extra/st $x1 extra:$X@HEAD"
+if [ "$(sn_manifest_hash <<< "$m1")" != "$(sn_manifest_hash <<< "$mx")" ]; then _d=0; else _d=1; fi; ok $_d 0 extra-in-hash
+
+# --- 4c. the cases file in the action text: path@sha256[:12], refused on a mismatch -------------
+CF="$W/cases-a.txt"; printf 'a 1\nb 2\n' > "$CF"; ch=$(sha256sum < "$CF" | cut -c1-12)
+ok "$(sn_canonical_action run t h100 c/t gpu1 --array "$CF" -- d.py)" "sn run t h100 c/t gpu1 --array $CF@$ch -- d.py" action-cases-hash
+ok "$(sn_canonical_action run t h100 c/t gpu1 --array "$CF@000000000000" -- d.py)" "sn run t h100 c/t gpu1 --array $CF@$ch -- d.py" action-cases-rehash
+ok "$(sn_canonical_action run t h100 c/t gpu1 -- d.py --array "$CF")" "sn run t h100 c/t gpu1 -- d.py --array $CF" action-cases-driver-verbatim
+ok "$(SN_HOST=nohost.invalid "$SN" run t h100 c/t gpu1 --array "$CF" --print-action -- d.py)" "sn run t h100 c/t gpu1 --array $CF@$ch -- d.py" action-cases-cli
+yes_ env SN_HOST=nohost.invalid "$SN" run t h100 c/t gpu1 --array "$CF@$ch" --emit "$W/e1.sh" -- d.py
+no_ env SN_HOST=nohost.invalid "$SN" run t h100 c/t gpu1 --array "$CF@000000000000" --emit "$W/e2.sh" -- d.py
+printf 'a 1\nc 3\n' > "$CF"
+no_ env SN_HOST=nohost.invalid "$SN" run t h100 c/t gpu1 --array "$CF@$ch" --emit "$W/e3.sh" -- d.py
+if [ "$(sn_canonical_action run t h100 c/t gpu1 --array "$CF" -- d.py)" != "sn run t h100 c/t gpu1 --array $CF@$ch -- d.py" ]; then _d=0; else _d=1; fi
+ok $_d 0 action-cases-content-changes-text
+
 # --- 5. closure -------------------------------------------------------------------------------
 ok "$(sn_closure voro)" "morton core voro" closure-voro
 ok "$(sn_closure coupling)" "morton core flow dem coupling" closure-coupling
@@ -177,6 +207,13 @@ PATH="$STUB:$PATH" SLURM_JOB_ID=501 bash "$R5/job.sh" fresh > "$W/job-501.out" 2
 jp=$!; for _ in $(seq 50); do [ -f "$R5/0/calls" ] && break; sleep 0.1; done; sleep 0.3
 kill -TERM "$jp"; wait "$jp"; _t=$?; ok $_t 143 term-rc
 ok "$(cut -f5 "$R5/summary.tsv")" TERM term-summary
+# a driver from an extra repo, named relative to the tree
+mkdir -p "$TR/extra/study/perf"; cp "$TR/drv/fake.sh" "$TR/extra/study/perf/run.sh"
+R7="$P/runs/c1/extra"; mkdir -p "$R7"
+SN_PROJ="$P" "$SN" run fake-00000000 h100 c1/extra gpu1 --emit "$R7/job.sh" -- extra/study/perf/run.sh >/dev/null
+runjob "$R7/job.sh" fresh 701; _t=$?; ok $_t 0 extra-driver-rc
+ok "$(cut -f7 "$R7/summary.tsv")" "CERT fake call=1 idx=0" extra-driver-cert
+ok "$(grep -c "run: srun .* $TR/extra/study/perf/run.sh" "$W/job-701.out")" 1 extra-driver-resolved
 # --no-srun: the driver runs in the batch shell and gets the srun line in SN_SRUN
 R6="$P/runs/c1/nosrun"; mkdir -p "$R6"; : > "$SN_STUBLOG"
 SN_PROJ="$P" "$SN" run fake-00000000 h100 c1/nosrun gpu-mpi --gpus 4 --no-srun --emit "$R6/job.sh" -- drv/fake.sh >/dev/null
