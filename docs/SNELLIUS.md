@@ -31,14 +31,24 @@ job cannot run a mixture of sources (incident 2026-08-31). `extern/` is never pu
 sn budget                                    # per budget line: SBU left; accuse this month; prjs1022 quota
 sn push <campaign> [repo=<worktree|ref> ...] [umbrella=<worktree|ref>] [--only r1,r2] [extra=<name>:<repo-path>[@ref] ...]
 sn pull <campaign>[/<tag>] <local dir> [--only 'fields.npz,meta.json,*.log']
-sn status [campaign];  sn cancel <jobid|campaign>     # jobs are named sn-<campaign>-<tag>
+sn status [campaign];  sn cancel <jobid|campaign>     # jobs are named sn-<campaign>.<tag>
 ```
+
+- Names: a campaign is letters, digits, `_` and `-` (never `.`, never `build`, not all digits); a
+  tag may also hold `.`. Run jobs are named `sn-<campaign>.<tag>`, build jobs
+  `sn-build.<tree>.<target>`, so `sn status x` / `sn cancel x` match campaign `x` exactly, never `x-y`.
+- `cancel <jobid>` (a job, an array task `A_i` or a whole array `A`) also cancels every job that
+  depends on it, transitively (the chain successor, queued `afterany`, would otherwise run), and
+  first writes `runs/<c>/<t>/<idx>/.stop`; `cancel <campaign>` cancels all its run and build jobs and
+  writes `runs/<c>/<t>/.stop`. A job that finds a `.stop` exits without running and queues nothing,
+  so a successor queued after the cancel's squeue snapshot stops too; `sn run --resume` removes them.
+  A plain `scancel` by hand is also caught: a TERM long before the limit ends the chain (below).
 
 - `push` sends the umbrella at `origin/main` of `~/Codes/suite` with every submodule at the SHA it
   pins, laid out as in the suite (`<tree>/core`, `<tree>/flow`, ..., `<tree>/tools`), by
   `git archive <sha> | ssh ... tar -x` per repo (no `.git` remote side). `repo=<path>` takes a
   worktree's HEAD (refused if dirty; untracked files are ignored; a relative path may be relative to
-  the current directory or to the submodule, so `voro=../voro-m7-statics` works from either);
+  the current directory or to the submodule, so `voro=../voro-ale-s0` works from either);
   `repo=<ref>` takes any commit of the submodule's own repo, also one not on origin. `--only voro`
   pushes voro plus what it needs to build (core, morton): a sibling missing from the tree would make
   CMake FetchContent the *pinned tag* from GitHub without an error.
@@ -52,24 +62,43 @@ sn status [campaign];  sn cancel <jobid|campaign>     # jobs are named sn-<campa
 
 ```bash
 sn build <tree> <h100|a100|cpu> [packages...] [--where gpu|genoa|cbuild] [--time 03:00:00] [--rebuild]
+         [--define <pkg>:<CMAKE_DEFINE>=<value>]...
 sn run <tree> <target> <campaign>/<tag> <template> [--array cases.txt [--array-max P]] [--chain K]
        [--gpus N] [--ranks N] [--nodes N] [--threads T] [--exclusive] [--time T] [--env K=V]
        [--no-srun] [--resume] -- <driver> <args...>
 sn smoke <tree> <target>                    # the release 1- vs N-rank certification on an sn build
 sn check-gpu-aware <tree> <h100|a100>       # check_gpu_aware_mpi.sh on 2 GPUs; tests the transport only
+sn walltime-test <tree>                     # the walltime/chain path for real (tools/hpc/snellius/walltime_test.sh)
 ```
 
 - `--test-only` (any billed command) runs `sbatch --test-only` with the script on stdin: it prints the
-  sbatch line, SURF's "charged for" line, the start slot and the cost, and writes and submits nothing.
+  sbatch line, SURF's "charged for" line, the start slot, the cost, the refusals a real submit would
+  hit (`note:`) and the card's action text, and writes and submits nothing. `--print-action` is the
+  same run with the action text alone on stdout (everything else on stderr).
+- `--time`: `H:MM:SS`, `D-HH`, `D-HH:MM` or `D-HH:MM:SS` only. A two-field `30:00` is refused (sbatch
+  reads minutes:seconds; `02:00` meant as hours would get 1/60 of the limit).
 - Without `--test-only` a billed command needs `--card <id> --desk <dir>`. `sn` then runs
   `decision_desk_verify.py <dir> <id> --action "<ACTION>"` and submits only on `VERIFIED`, once per
-  card (a local ledger, `~/.cache/sn/used_cards`, refuses a second use). `<ACTION>` is the argument
-  vector with `--card`/`--desk` (and `--test-only`, `--print-action`) removed, single-spaced:
-  `sn build m7-1a2b3c4d h100 voro`; `sn ... --print-action` prints it. `--array cases.txt` appears as
-  `--array cases.txt@<sha256[:12] of its content>`, so a card covers the exact case list: `sn`
-  recomputes the hash at submit (a changed file no longer matches the card) and refuses a typed
-  `@hash` that does not match the file. After the submit `sn` prints the
-  job id and `EXECUTED-NOTE: write executed{at,by,result} on card <id>` — the session writes it.
+  card. `<ACTION>` = the argument vector with `--card`/`--desk` (and `--test-only`, `--print-action`)
+  removed, each argument `printf %q`-quoted (lossless: `-- bash -c "a b"` is `-- bash -c a\ b`),
+  single-spaced, then ` | time <T>, template <name>@<sha256[:12] of the .tpl>, estimate <X> SBU`
+  (`build`: `where <W>` in place of the template):
+  `sn build m7-1a2b3c4d h100 voro | time 03:00:00, where gpu, estimate 576.0 SBU`. The effective
+  `--time` (also a default), the template's content and the cost are on the card. `--array cases.txt`
+  appears as `--array cases.txt@<sha256[:12] of its content>`, so a card covers the exact case list:
+  `sn` recomputes the hash at submit (a changed file no longer matches the card) and refuses a typed
+  `@hash` that does not match the file.
+- **A real submit refuses** (none of this is on the card, so none of it may vary): the environment
+  overrides `SN_HOST`, `SN_PROJ`, `SN_ACCOUNT`, `SN_VERIFY`, `SN_LEDGER` (they exist for the selftest
+  and `--test-only`); a toolkit (`tools/hpc/sn`, `tools/hpc/snellius/`) with uncommitted changes —
+  the job script and `BUILD_INFO` record its commit; `--env PYTHONPATH=…` and `--env LD_*=…` (code
+  that is not the build's); a template flag the template does not read (`--exclusive` on `gpu1` or
+  `gpu-mpi`, `--ranks` on `gpu1`, …: refused always).
+- **The card is the lock.** `sn` appends the card id to a local ledger, `~/.cache/sn/used_cards`,
+  right after `VERIFIED` and *before* the upload and `sbatch`, and refuses a card it finds there; a
+  submit that then fails spends the card (ask for a new one). The ledger is per host, so the real
+  lock is `executed: {at, by, result}` on the card, which the session writes right after the submit:
+  `sn` prints the job id and `EXECUTED-NOTE: write executed{at,by,result} on card <id> now`.
 - **Cost before every submit**: allocation × walltime × array size × chain cap, against what the budget
   line of that partition has left (`accinfo`); refused if it exceeds it. The allocation is the larger
   of the request and what `--test-only` reports. Rates, confirmed 2026-11-19 from the `billing=` TRES
@@ -96,6 +125,31 @@ no `libcuda` there); `rm -rf extern/build extern/src src` (inodes); `BUILD_INFO`
 built; `sn build` refuses a built dir unless `--rebuild`). Default `--where`: `gpu` (one GPU of the
 target's partition, budget L3) for h100/a100, `genoa` for cpu.
 
+- **A GPU target is a CUDA build or no build**: h100/a100 fail before anything is built when `nvcc`
+  is not on `PATH`, and after the Kokkos bootstrap (which now runs *before* the venv, so this costs
+  minutes, not the pip installs) when `Kokkos_DEVICES` has no `CUDA`; the import check (on a GPU
+  node) fails when a device module (flow, pnm, dem, voro, amr, coupling) does not report a `Cuda`
+  `execution_space`. `BUILD_INFO` lists `import_modules` and `device_modules`; every GPU job repeats
+  the `Cuda` check at its start (a host-only "h100" build would bill GPUs for nothing — the dem
+  fallback trap below).
+- `BUILD_INFO` also records `pip freeze` (the unpinned deps as installed, `pip <pkg>==<ver>`), the
+  toolkit commit and every `--define`.
+- `--define <pkg>:<KEY>=<VALUE>` (repeatable; on the card as typed) passes
+  `cmake.define.<KEY>=<VALUE>` to that package's CMake — e.g. `voro:PECLET_VORO_BUILD_TESTS=ON` for
+  the C++ test executables. Keys `sn` sets itself (`PECLET_*_MPI`, the voro engine switches, the
+  Python/MPI executables, `CMAKE_PREFIX_PATH`) are refused; a define that moves core
+  (`PECLET_SIBLING_PECLET_CORE`, `PECLET_VENDOR_DEPS`) fails the include proof. Each package's CMake
+  build dir stays at `build/<tree>-<target>/cmake/<pkg>` (jobs get it as `SN_CMAKE_BUILD`), and the
+  source copy of a package with a define is kept (`src_kept` in `BUILD_INFO`): its test binaries
+  may read their sources.
+- **geom** "vendors" core's geom headers at `PECLET_CORE_TAG` only as the self-contained sdist,
+  when `../../core` is absent. In a tree core is always present (push adds it), geom compiles
+  `-I <tree>/core/include` and gets the same `core_include` check as every other package: a fetched
+  or foreign core fails it (local build of the job, 2026-11-19: `core_include geom ... OK`).
+- `--rebuild` refuses while a build job of that dir or any queued/running `sn run` job whose
+  `job.sh` names that build dir exists (`sn status`, `sn cancel` first); a second build of one dir
+  is refused too.
+
 **Templates** (`tools/hpc/snellius/templates/*.tpl`, the srun lines and binding rules of this document):
 
 | template | target | allocation | launch |
@@ -106,19 +160,39 @@ target's partition, budget L3) for h100/a100, `genoa` for cpu.
 | `genoa-hybrid` | cpu | `--nodes N` (1), exclusive, `--mem=0`; `--threads T` ∈ 1, 2, 4, 8 | one rank per CCD × 8 threads, `OMP_PLACES=cores OMP_PROC_BIND=close` |
 | `quiet1` | cpu | one exclusive genoa node, `--mem=0` (timing gates) | 1 × 24 threads on cores 0–23 by default; `--ranks R --threads T` |
 
-**In every job** (`tools/hpc/snellius/injob.sh`): source `build/.../env.sh`, activate the build's venv,
-print `BUILD_INFO`'s `MANIFEST` line, run the driver in `runs/<campaign>/<tag>/<idx>/` (`idx` = the
-array index, 0 without `--array`), append one line to `summary.tsv`:
-`jobid  array_idx  tree  target  rc  wall_s  <last driver line matching ^CERT >` (also on a walltime
-TERM, rc `TERM`). The driver gets `SN_OUT`, `SN_DONE`, `SN_IDX`, `SN_CASE`, `SN_FRESH`, `SN_TREE`,
-`SN_BUILD`, `SN_SRUN`; a driver path relative to the tree is taken from the tree, a `.py` driver runs
-under the venv's python; `--no-srun` runs the driver in the batch shell (it launches its own steps
-with `$SN_SRUN`). `--array cases.txt`: one non-comment line per index, appended to the driver's
-arguments. `--chain K` (the wall-bounded-turbulence pattern): at most K jobs in total per index; each
-queues its successor with `afterany` before running; the driver ends the chain by creating `$SN_DONE`;
-`SN_OUT` stays the same so a successor resumes from the driver's checkpoint; `SN_FRESH=1` only on the
-first submit; a driver that exits non-zero (not a walltime kill) cancels its successor and leaves
-`.failed`. `sn run` refuses an existing `<campaign>/<tag>` unless `--resume`.
+**In every job** (`tools/hpc/snellius/injob.sh`), in this order: refuse a requeue
+(`SLURM_RESTART_COUNT > 0`; every job is also `--no-requeue`); stop on `.done`, `.stop` or (a chain
+successor) `.failed`; refuse a build dir without `BUILD_INFO` or with a `BUILD_INFO` whose sha256 is
+not the one `sn` read at submit (passed as a positional: a rebuild since then); source
+`build/.../env.sh`, activate the build's venv, print `BUILD_INFO`'s `MANIFEST` line, on a GPU target
+assert `Cuda` in every device module; only then queue the chain successor, and an EXIT trap cancels it
+on any exit that does not keep the chain going. Then run the driver in `runs/<campaign>/<tag>/<idx>/`
+(`idx` = the array index, 0 without `--array`) and append one line to `summary.tsv`:
+`jobid  array_idx  tree  target  rc  wall_s  <last driver line matching ^CERT >` (rc `TERM` at the
+walltime, `CANCEL` on an early TERM). The driver gets `SN_OUT`, `SN_DONE`, `SN_IDX`, `SN_CASE`,
+`SN_FRESH`, `SN_TREE`, `SN_BUILD`, `SN_CMAKE_BUILD`, `SN_SRUN`; a driver path relative to the tree is
+taken from the tree, a `.py` driver runs under the venv's python; `--no-srun` runs the driver in the
+batch shell (it launches its own steps with `$SN_SRUN`). `--array cases.txt`: one non-comment line per
+index, appended to the driver's arguments.
+
+**Chains** (`--chain K`, the wall-bounded-turbulence pattern): at most K jobs in total per index per
+submit from `sn`. The job script takes `fresh <bi>` (first submit), `resume <bi>` (`sn run
+--resume`: the count starts again at 1) or `chain <bi> <n>` (a successor, carrying its count). Each
+job queues its successor `afterany`; the driver ends the chain by creating `$SN_DONE`; `SN_OUT` stays
+the same so a successor resumes from the driver's checkpoint; `SN_FRESH=1` only on the first submit.
+A driver that exits non-zero cancels its successor and leaves `.failed` (a successor that runs
+anyway stops on it). **Walltime:** every job asks `--signal=B:TERM@120`, so 120 s before the limit
+(Slurm may send it up to 60 s early) the batch shell gets TERM; the trap forwards it to the driver
+(through `srun` to the tasks), waits up to 90 s for it to checkpoint and exit, records `TERM` and
+keeps the successor — a walltime end never writes `.failed` and never cancels the chain. A TERM
+more than 240 s before the limit is a cancel (`scancel` by hand): `CANCEL`, the successor is
+cancelled, no `.failed`. That the batch shell really gets the signal on Snellius is proven by
+`sn walltime-test <tree>` (1 genoa core, `--time 0:03:00`, chain 2, ~3 SBU; verdict
+`tools/hpc/snellius/walltime_test.sh check <campaign>/<tag>`).
+
+`sn run` refuses an existing `<campaign>/<tag>` unless `--resume`; `--resume` refuses while jobs of
+that tag are queued or running, and unless its `--array` file is byte-identical to the run's
+`cases.txt` (an array run needs the same `--array`; the indices map onto the old checkpoints).
 
 ## Coordinates
 

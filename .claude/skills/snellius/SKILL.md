@@ -19,28 +19,40 @@ submitting and anomaly sections). Read the section your task touches; do not wor
   read-only by design; never `chmod` it back.
 
 ## The billed step, every time
-1. `sn <billed command> ... --test-only` -> read its three lines: the sbatch line, SURF's "charged for" line
-   and slot, the SBU estimate against the budget line. `sn budget` for the whole picture.
-2. `sn <same command> --print-action` -> the exact action text (an `--array` file appears with its content
-   hash, `cases.txt@<sha12>`: edit the file after this and the card no longer matches).
+0. Commit any toolkit edit first: a real submit refuses a dirty `tools/hpc/sn`/`tools/hpc/snellius`, the
+   `SN_HOST`/`SN_PROJ`/`SN_ACCOUNT`/`SN_VERIFY`/`SN_LEDGER` overrides, and `--env PYTHONPATH|LD_*`.
+1. `sn <billed command> ... --test-only` -> read its lines: the sbatch line, SURF's "charged for" line
+   and slot, the SBU estimate against the budget line, any `note:` (a refusal the real submit would hit:
+   fix it now), the action text. `sn budget` for the whole picture.
+2. `sn <same command> --print-action` -> the exact action text, alone on stdout: the quoted argument
+   vector plus `| time ..., template <tpl>@<sha12> (build: where ...), estimate <X> SBU`. An `--array`
+   file appears as `cases.txt@<sha12>`: edit the file (or the template) after this and the card no
+   longer matches.
 3. Send hub a DECISION-REQUEST with that action text and the estimate (the user's directive: decisions for
    the user go through session `hub` to the Decision Desk). Do not idle: switch to unblocked work.
 4. When the card is signed: fetch it with ArtifactData into a dir D (`get decisions/<id>`, `list keys`),
    then `sn <same command> --card <id> --desk D`. `sn` verifies the card itself and submits only on
    VERIFIED; a card covers one submit.
-5. Write `executed: {at, by, result}` (the job id) on the card, as `sn`'s `EXECUTED-NOTE` line says.
+5. Write `executed: {at, by, result}` (the job id) on the card right away, as `sn`'s `EXECUTED-NOTE` line
+   says: `executed` is the real lock (sn's own ledger, which it writes before the sbatch, is per host). A
+   submit that failed after VERIFIED has spent the card: ask for a new one.
 
 ## Use cases
-**voronoi / voronoi_fable** (one tree shared by both; gpu1 arrays from local commits):
+**voronoi / voronoi_fable** (one tree shared by both; gpu1 arrays from local commits). The M7 ALE ladder
+runs C++ test executables, so the build turns the voro tests on; its core is `../core-ale-amg` at
+**9e0f881** (= origin/amgpar), NOT the rejected ale-amg experiment 62155c6:
 ```bash
-sn push m7 voro=../voro-m7-statics core=../core-amgpar      # prints TREE m7-<hash>; reused if unchanged
-sn build m7-<hash> h100 voro                                  # billed (card)
-sn run m7-<hash> h100 m7/phaseB gpu1 --array cases.txt --chain 4 --time 02:00:00 -- <driver in the tree>
-sn status m7;  sn pull m7/phaseB ~/Codes/.../results/phaseB --only '*.summary,*.npz,summary.tsv'
+sn push m7 voro=../voro-ale-s0 core=../core-ale-amg extra=m7:~/Codes/peclet-papers   # TREE m7-<hash>; reused if unchanged
+sn build m7-<hash> h100 voro --define voro:PECLET_VORO_BUILD_TESTS=ON                 # billed (card)
+sn run m7-<hash> h100 m7/ladder gpu1 --array cases.txt --chain 4 --time 2:00:00 --env OMP_NUM_THREADS=1 \
+    -- extra/m7/work/M7/<driver>     # the driver runs "$SN_CMAKE_BUILD"/voro/<test binary> on its case line
+sn status m7;  sn pull m7/ladder ~/Codes/.../results/ladder --only '*.summary,*.npz,summary.tsv'
 ```
 A driver from a study repo or peclet-papers comes in with the push: `extra=m7:~/Codes/peclet-papers` (committed;
 then `-- extra/m7/work/M7/.../driver.py`). The driver must be in the pushed tree (path relative to the tree); it ends a chain
-by creating `$SN_DONE` and resumes from its own checkpoint in `$SN_OUT`.
+by creating `$SN_DONE` and resumes from its own checkpoint in `$SN_OUT`; at the walltime it gets TERM ~120 s
+before the limit and has 90 s to checkpoint (the chain goes on). `sn cancel <jobid>` also cancels the
+chain's successor; `--resume` restarts a stopped or exhausted chain (same `--array` file, nothing queued).
 
 **pnm / A7** (gpu-mpi arrays, CERT line, restarts):
 ```bash
