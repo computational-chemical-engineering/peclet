@@ -1,0 +1,449 @@
+#!/bin/bash
+# sn -- build peclet on Snellius from TRS2, run jobs there and bring the results back.
+# Runbook and traps: docs/SNELLIUS.md ("The sn toolkit"); entry skill: .claude/skills/snellius.
+#
+# Free:   sn budget | sn status [campaign] | sn cancel <jobid|campaign>
+#         sn push <campaign> [repo=<worktree|ref> ...] [umbrella=<worktree|ref>] [--only r1,r2]
+#         sn pull <campaign>[/<tag>] <local dir> [--only 'p1,p2,...']
+# Billed (each submit needs a Decision Desk card; --test-only shows line, cost and slot, submits nothing):
+#         sn build <tree> <h100|a100|cpu> [packages...] [--where gpu|genoa|cbuild] [--time T] [--rebuild]
+#         sn run <tree> <target> <campaign>/<tag> <template> [--array cases.txt [--array-max P]]
+#                [--chain K] [--gpus N] [--ranks N] [--nodes N] [--threads T] [--exclusive]
+#                [--time T] [--env K=V]... [--no-srun] [--resume] -- <driver> <args...>
+#         sn smoke <tree> <target> [--time T]
+#         sn check-gpu-aware <tree> <target> [--time T]
+#   billed flags: --test-only | --card <id> --desk <dir>;  --print-action;  --emit <file> (write the
+#   job script locally and stop)
+# Remote layout under $SN_PROJ: src/<tree>/ (read-only, MANIFEST), build/<tree>-<target>/ (venv,
+# Kokkos prefix, BUILD_INFO), runs/<campaign>/<tag>/ (job.sh, logs, <idx>/, summary.tsv).
+set -euo pipefail
+
+SN_SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+SN_KIT="$(dirname "$SN_SELF")/snellius"
+# shellcheck source=snellius/lib.sh
+source "$SN_KIT/lib.sh"
+
+# Site constants (overridable for the local selftest only; none of them changes a result).
+SN_HOST="${SN_HOST:-snellius}"
+SN_PROJ="${SN_PROJ:-/projects/0/prjs1022/peclet}"
+SN_ACCOUNT="${SN_ACCOUNT:-tes24005}"
+SN_SUITE="${SN_SUITE:-$HOME/Codes/suite}"                 # the umbrella whose pins `push` reads
+SN_UMBRELLA_REF="${SN_UMBRELLA_REF:-origin/main}"
+SN_VERIFY="${SN_VERIFY:-$HOME/.claude/tools/decision_desk_verify.py}"
+SN_LEDGER="${SN_LEDGER:-$HOME/.cache/sn/used_cards}"
+
+die() { echo "sn: $*" >&2; exit 1; }
+_ssh() { ssh -o BatchMode=yes "$SN_HOST" "$@"; }
+_kit_sha() { (cd "$SN_KIT" && cat lib.sh build.sh injob.sh templates/*.tpl | sha256sum | cut -c1-12); }
+
+# ---------------------------------------------------------------------------------------------------
+# global flags (before "--" only): --test-only --card --desk --print-action --emit
+SN_ARGV=("$@")
+TESTONLY=0; CARD=""; DESK=""; PRINTACTION=0; EMIT=""
+_rest=(); _seen_dd=0; _i=0
+while [ $_i -lt $# ]; do
+  a="${SN_ARGV[$_i]}"
+  if [ $_seen_dd = 1 ]; then _rest+=("$a"); _i=$((_i + 1)); continue; fi
+  case "$a" in
+    --) _seen_dd=1; _rest+=("$a") ;;
+    --test-only) TESTONLY=1; _rest+=("$a") ;;            # part of the action text: a card never names it
+    --print-action) PRINTACTION=1 ;;
+    --card) _i=$((_i + 1)); CARD="${SN_ARGV[$_i]:-}" ;;
+    --card=*) CARD="${a#--card=}" ;;
+    --desk) _i=$((_i + 1)); DESK="${SN_ARGV[$_i]:-}" ;;
+    --desk=*) DESK="${a#--desk=}" ;;
+    --emit) _i=$((_i + 1)); EMIT="${SN_ARGV[$_i]:-}" ;;
+    *) _rest+=("$a") ;;
+  esac
+  _i=$((_i + 1))
+done
+set -- "${_rest[@]+"${_rest[@]}"}"
+# drop --test-only from the positional view (kept in SN_ARGV for the action text)
+_rest=(); _seen_dd=0
+for a in "$@"; do
+  if [ $_seen_dd = 0 ] && [ "$a" = --test-only ]; then continue; fi
+  [ "$a" = -- ] && _seen_dd=1; _rest+=("$a")
+done
+set -- "${_rest[@]+"${_rest[@]}"}"
+ACTION="$(sn_canonical_action "${SN_ARGV[@]+"${SN_ARGV[@]}"}")"
+
+# ---------------------------------------------------------------------------------------------------
+cmd_budget() {
+  local out
+  out=$(_ssh "accinfo 2>&1; echo '#SN-ACCUSE'; accuse -s 01-$(date +%m-%Y) --sbu 2>&1; echo '#SN-QUOTA'; myquota --autodetect 2>&1") \
+    || die "ssh $SN_HOST failed"
+  awk -v me="$(_ssh whoami)" -v month="$(date +%Y-%m)" '
+    /^#SN-ACCUSE/ {sec="acc"; next} /^#SN-QUOTA/ {sec="quota"; next}
+    sec=="" && /^Budget name/ {b=$NF} sec=="" && /^Budget expiry/ {e=$NF}
+    sec=="" && /^Remaining budget/ {r=$(NF-1); sub(/:.*/,"",r)}
+    sec=="" && /^Products/ {sub(/^Products *: */,""); gsub(/ /,""); printf "budget %-18s left %9s SBU  expires %s  (%s)\n", b, r, e, $0}
+    sec=="acc" && $1==month {tot+=$4; if ($3==me) mine+=$4}
+    sec=="quota" && /^prjs/ {q=$1; sub(/@.*/,"",q); getline; getline; sz=$1" "$2; pu=$5; getline; iu=$5}
+    END {
+      printf "accuse %s: %s %.1f SBU, account tes24005 %.1f SBU\n", month, me, mine, tot
+      if (q!="") printf "quota %s: %s of %s, inodes %s\n", q, pu, sz, iu
+    }' <<< "$out"
+}
+
+cmd_status() {
+  local fmt='%.10i %.32j %.9P %.8T %.10M %.10l %.5D %R'
+  if [ $# -ge 1 ]; then _ssh "squeue --me -h -o '$fmt' | awk '\$2 ~ /^sn-$1-/ || \$2 ~ /^sn-build-$1-/'"
+  else _ssh "squeue --me -o '$fmt'"; fi
+}
+
+cmd_cancel() {
+  [ $# = 1 ] || die "usage: sn cancel <jobid|campaign>"
+  if [[ "$1" =~ ^[0-9]+(_[0-9]+)?$ ]]; then _ssh "scancel $1" && echo "sn cancel: $1"; return; fi
+  sn_valid_name "$1" || die "bad campaign '$1'"
+  local ids
+  ids=$(_ssh "squeue --me -h -o '%i %j' | awk '\$2 ~ /^sn-$1-/ {print \$1}'" | tr '\n' ' ')
+  [ -n "${ids// /}" ] || { echo "sn cancel: no jobs named sn-$1-*"; return; }
+  # shellcheck disable=SC2029
+  _ssh "scancel $ids" && echo "sn cancel: $ids"
+}
+
+# ---------------------------------------------------------------------------------------------------
+cmd_push() {
+  [ $# -ge 1 ] || die "usage: sn push <campaign> [repo=<worktree|ref> ...] [--only r1,r2]"
+  local campaign="$1"; shift
+  sn_valid_name "$campaign" || die "bad campaign name '$campaign'"
+  local -A ovr=(); local only="" a
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --only) only="${2:?--only needs a list}"; shift 2 ;;
+      --only=*) only="${1#--only=}"; shift ;;
+      *=*) a="${1%%=*}"; { [ "$a" = umbrella ] || sn_is_repo "$a"; } || die "unknown repo '$a'"; ovr[$a]="${1#*=}"; shift ;;
+      *) die "push: unexpected argument '$1'" ;;
+    esac
+  done
+  local repos
+  if [ -n "$only" ]; then local _o; IFS=', ' read -r -a _o <<< "$only"; repos=$(sn_closure "${_o[@]}") || exit 1
+  else repos="${SN_REPOS[*]}"; fi
+  for a in "${!ovr[@]}"; do
+    [ "$a" = umbrella ] || [[ " $repos " == *" $a "* ]] || die "$a=... given but $a is not pushed (--only)"
+  done
+  # umbrella first: it carries the pins
+  local -A sha=() src=() dir=()
+  local r v
+  if [ -n "${ovr[umbrella]:-}" ]; then v=$(sn_resolve "$SN_SUITE" umbrella "${ovr[umbrella]}") || exit 1
+  else v="$(git -C "$SN_SUITE" rev-parse --verify -q "$SN_UMBRELLA_REF^{commit}") ref:$SN_UMBRELLA_REF" || die "no $SN_UMBRELLA_REF in $SN_SUITE"; fi
+  sha[umbrella]="${v%% *}"; src[umbrella]="${v#* }"
+  dir[umbrella]="$SN_SUITE"; [[ "${src[umbrella]}" == worktree:* ]] && dir[umbrella]="${src[umbrella]#worktree:}"
+  for r in $repos; do
+    if [ -n "${ovr[$r]:-}" ]; then v=$(sn_resolve "$SN_SUITE" "$r" "${ovr[$r]}") || exit 1
+    else
+      v=$(git -C "${dir[umbrella]}" ls-tree "${sha[umbrella]}" "$r" | awk '$2=="commit"{print $3}')
+      [ -n "$v" ] || die "umbrella ${sha[umbrella]:0:12} pins no submodule $r"
+      v="$v pin"
+    fi
+    sha[$r]="${v%% *}"; src[$r]="${v#* }"
+    dir[$r]="$SN_SUITE/$r"; [[ "${src[$r]}" == worktree:* ]] && dir[$r]="${src[$r]#worktree:}"
+    git -C "${dir[$r]}" cat-file -e "${sha[$r]}^{commit}" 2>/dev/null \
+      || die "$r ${sha[$r]:0:12} is not in ${dir[$r]} (git -C ${dir[$r]} fetch origin)"
+  done
+  local manifest
+  manifest=$(for r in umbrella $repos; do echo "$r ${sha[$r]} ${src[$r]}"; done | LC_ALL=C sort)
+  local name; name="$campaign-$(sn_manifest_hash <<< "$manifest")"
+  local S="$SN_PROJ/src" T="$SN_PROJ/src/$name"
+
+  local remote
+  remote=$(_ssh "cat $T/MANIFEST 2>/dev/null || true")
+  if [ -n "$remote" ]; then
+    if [ "$(sn_manifest_hash <<< "$remote")" = "$(sn_manifest_hash <<< "$manifest")" ] \
+       && [ "$(awk '{print $1,$2}' <<< "$remote" | LC_ALL=C sort)" = "$(awk '{print $1,$2}' <<< "$manifest" | LC_ALL=C sort)" ]; then
+      echo "sn push: TREE $name reused (same manifest; not rewritten)"; return 0
+    fi
+    die "$T exists with a DIFFERENT manifest (hash collision?) -- refusing to touch it"
+  fi
+  local tmp="$S/.$name.partial.$$"
+  # shellcheck disable=SC2064
+  trap "_ssh 'chmod -R u+w $tmp 2>/dev/null; rm -rf $tmp' || true" EXIT
+  _ssh "mkdir -p $tmp" || die "cannot create $tmp"
+  git -C "${dir[umbrella]}" archive --format=tar "${sha[umbrella]}" | _ssh "tar -x -C $tmp" \
+    || die "umbrella archive failed"
+  local gone=""                     # submodules not pushed: no empty gitlink dirs (absent means absent)
+  for r in "${SN_REPOS[@]}"; do [[ " $repos " == *" $r "* ]] || gone="$gone $tmp/$r"; done
+  [ -z "$gone" ] || _ssh "rmdir$gone 2>/dev/null || true"
+  for r in $repos; do
+    git -C "${dir[$r]}" archive --format=tar "${sha[$r]}" | _ssh "mkdir -p $tmp/$r && tar -x -C $tmp/$r" \
+      || die "$r archive failed"
+  done
+  _ssh "cat > $tmp/MANIFEST" <<< "$manifest"
+  _ssh "chmod -R a-w $tmp && mv -T $tmp $T" || die "could not seal $T"
+  trap - EXIT
+  local du nin; read -r du nin <<< "$(_ssh "du -sh --apparent-size $T | cut -f1; find $T | wc -l" | tr '\n' ' ')"
+  echo "sn push: TREE $name new, read-only (umbrella + $(wc -w <<< "$repos") repos; $du; $nin inodes)"
+  awk '{printf "  %-9s %s %s\n", $1, substr($2,1,12), $3}' <<< "$manifest"
+}
+
+cmd_pull() {
+  [ $# -ge 2 ] || die "usage: sn pull <campaign>[/<tag>] <local dir> [--only 'p1,p2']"
+  local what="$1" dest="$2"; shift 2
+  local c="${what%%/*}" t=""; [[ "$what" == */* ]] && t="${what#*/}"
+  sn_valid_name "$c" || die "bad campaign '$c'"; [ -z "$t" ] || sn_valid_name "$t" || die "bad tag '$t'"
+  local only=""
+  while [ $# -gt 0 ]; do
+    case "$1" in --only) only="${2:?}"; shift 2 ;; --only=*) only="${1#--only=}"; shift ;; *) die "pull: unexpected '$1'" ;; esac
+  done
+  local filt=() p
+  if [ -n "$only" ]; then
+    filt=(--include='*/')
+    IFS=',' read -r -a _pats <<< "$only"
+    for p in "${_pats[@]}"; do filt+=(--include="$p"); done
+    filt+=(--exclude='*' --prune-empty-dirs)
+  fi
+  mkdir -p "$dest"
+  local n
+  n=$(rsync -a "${filt[@]}" --out-format='%n' -e "ssh -o BatchMode=yes" \
+        "$SN_HOST:$SN_PROJ/runs/$c/${t:+$t/}" "$dest/" | grep -vc '/$' || true)
+  echo "sn pull: $n files from runs/$c/${t:+$t/} into $dest"
+}
+
+# ---------------------------------------------------------------------------------------------------
+# job scripts
+_q() { printf '%q' "$1"; }
+_qarr() { local s="" x; for x in "$@"; do s+="$(printf '%q' "$x") "; done; echo "${s% }"; }
+
+# Shared tail of every billed command: test-only on Snellius (the script on stdin, nothing written),
+# cost against the budget line, then -- only with a VERIFIED Desk card -- upload and submit.
+#   $1 kind  $2 local job script  $3 remote dir  $4 remote script name  $5 partition  $6 own alloc units
+#   $7 array size  $8 chain cap  $9 walltime  $10 submit positional ("" | fresh | resume)
+#   SN_PRE_REAL: remote shell run (and required to succeed) before the real submit
+#   SN_UPLOAD:   "local:remote" pairs copied before the real submit
+#   SN_CHECK:    remote shell printing "SN-REFUSE <why>" (refused for real, a warning in test-only)
+_billed() {
+  local kind="$1" job="$2" rdir="$3" rname="$4" part="$5" own="$6" asz="$7" ck="$8" wt="$9" pos="${10}"
+  local rate unit; read -r rate unit <<< "$(sn_rate "$part")" || die "no SBU rate for partition $part"
+  local out
+  out=$(_ssh "${SN_CHECK:-true}; sbatch --test-only 2>&1; echo SN-RC=\$?; echo '#SN-ACCINFO'; accinfo 2>&1" < "$job") \
+    || die "ssh $SN_HOST failed"
+  local trc; trc=$(grep -oE '^SN-RC=[0-9]+' <<< "$out" | cut -d= -f2)
+  local charged procs start
+  charged=$(grep -oE 'charged for [0-9]+ (GPUs|CPUs)' <<< "$out" | head -1 || true)
+  procs=$(grep -oE 'using [0-9]+ processors' <<< "$out" | grep -oE '[0-9]+' | head -1 || true)
+  start=$(grep -oE 'to start at [^ ]+ .*' <<< "$out" | sed -E 's/to start at ([^ ]+) a? ?using [0-9]+ processors on nodes ([^ ]+).*/\1 on \2/' | head -1 || true)
+  echo "sn $kind: sbatch $(grep -E '^#SBATCH' "$job" | sed 's/^#SBATCH //' | grep -vE '^--(output|chdir|account)=' | tr '\n' ' ')${pos}"
+  if [ "${trc:-1}" != 0 ]; then
+    sed -n '/^#SN-ACCINFO/q;p' <<< "$out" | grep -v '^SN-RC=' >&2
+    die "sbatch --test-only rejected the job (above)"
+  fi
+  # allocation: what SURF says it charges; multi-node / exclusive jobs print no "charged for" line,
+  # so the processors (GPU partitions: per 16 or 18 cores = one GPU) and the request bound it too.
+  local alloc="$own" n
+  if [ -n "$charged" ]; then n=$(grep -oE '[0-9]+' <<< "$charged"); [ "$n" -gt "$alloc" ] && alloc=$n; fi
+  if [ -n "$procs" ]; then
+    case "$part" in gpu_h100) n=$(( (procs + 15) / 16 )) ;; gpu_a100) n=$(( (procs + 17) / 18 )) ;; *) n=$procs ;; esac
+    [ "$n" -gt "$alloc" ] && alloc=$n
+  fi
+  local cost; cost=$(sn_cost "$alloc" "$rate" "$wt" "$asz" "$ck")
+  local line left
+  line=$(sed -n '/^#SN-ACCINFO/,$p' <<< "$out" | awk -v p="$part" '
+      /^Budget name/ {b=$NF} /^Remaining budget/ {r=$(NF-1); sub(/:.*/,"",r)}
+      /^Products/ {sub(/^Products *: */,""); n=split($0,a,/, */); for(i=1;i<=n;i++) if(a[i]==p){print b, r; exit}}')
+  left="${line#* }"; line="${line%% *}"
+  [ -n "$line" ] || die "no budget line of account $SN_ACCOUNT lists partition $part"
+  echo "  slurm: ${charged:-no charge line} | ${procs:-?} processors | start ${start:-?}"
+  echo "  cost: $alloc $unit x $rate SBU/$unit-h x $(sn_hours "$wt" | awk '{printf "%.2f", $1}') h x array $asz x chain $ck = $cost SBU; budget $line left $left SBU"
+  grep -oE '^SN-REFUSE .*' <<< "$out" | sed 's/^SN-REFUSE /  note: /' || true
+  awk -v c="$cost" -v l="$left" 'BEGIN{exit !(c > l)}' && die "estimate $cost SBU exceeds what $line has left ($left SBU)"
+  if [ "$TESTONLY" = 1 ]; then echo "  test-only: nothing submitted"; return 0; fi
+  grep -q '^SN-REFUSE ' <<< "$out" && die "refused (see note above)"
+
+  # --- the real submit: Decision Desk card first ---------------------------------------------
+  [ -n "$CARD" ] && [ -n "$DESK" ] || die "billed: needs --card <id> --desk <dir> (or --test-only)"
+  mkdir -p "$(dirname "$SN_LEDGER")"; touch "$SN_LEDGER"
+  grep -qxF "$CARD" "$SN_LEDGER" && die "card $CARD was already used by sn on this host; a card covers one submit"
+  local v
+  v=$(python3 "$SN_VERIFY" "$DESK" "$CARD" --action "$ACTION" 2>&1) && [[ "$v" == VERIFIED* ]] \
+    || die "Desk card $CARD not verified for action \"$ACTION\": $v"
+  echo "  desk: $v"
+  _ssh "set -e; ${SN_PRE_REAL:-true}; mkdir -p $rdir; cat > $rdir/$rname; chmod u+x $rdir/$rname" < "$job" || die "upload failed"
+  local up
+  for up in ${SN_UPLOAD:-}; do _ssh "cat > ${up#*:}" < "${up%%:*}" || die "upload ${up%%:*} failed"; done
+  local jid
+  jid=$(_ssh "cd $rdir && { sbatch --parsable $rname $pos 2> .sbatch.err || { cat .sbatch.err >&2; exit 1; }; }") || die "sbatch failed"
+  jid=$(grep -oE '^[0-9]+' <<< "$jid" | tail -n 1)
+  echo "$CARD" >> "$SN_LEDGER"
+  echo "sn $kind: submitted job $jid ($rdir)"
+  echo "EXECUTED-NOTE: write executed{at,by,result} on card $CARD"
+}
+
+_header() {  # <job-name> <output> <chdir> <time> <sbatch opts...>
+  local jn="$1" o="$2" cd="$3" t="$4" x; shift 4
+  echo "#!/bin/bash"
+  echo "#SBATCH --job-name=$jn"
+  echo "#SBATCH --account=$SN_ACCOUNT"
+  echo "#SBATCH --time=$t"
+  echo "#SBATCH --output=$o"
+  echo "#SBATCH --chdir=$cd"
+  for x in "$@"; do echo "#SBATCH $x"; done
+}
+
+_billed_flags_ok() {
+  [ "$TESTONLY" = 1 ] || [ -n "$EMIT" ] || { [ -n "$CARD" ] && [ -n "$DESK" ]; } \
+    || die "billed command: needs --card <id> --desk <dir>, or --test-only (cost, nothing submitted); card text: sn ... --print-action"
+}
+
+_tree_target() {  # validate <tree> <target>
+  sn_valid_name "$1" || die "bad tree name '$1'"
+  case "$2" in h100|a100|cpu) ;; *) die "target must be h100, a100 or cpu" ;; esac
+}
+
+# ---------------------------------------------------------------------------------------------------
+cmd_build() {
+  [ $# -ge 2 ] || die "usage: sn build <tree> <h100|a100|cpu> [packages...] [--where gpu|genoa|cbuild] [--time T] [--rebuild]"
+  local tree="$1" target="$2"; shift 2; _tree_target "$tree" "$target"
+  local where="" wt="03:00:00" rebuild=0 pk=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --where) where="${2:?}"; shift 2 ;; --time) wt="${2:?}"; shift 2 ;; --rebuild) rebuild=1; shift ;;
+      --*) die "build: unknown flag $1" ;; *) IFS=', ' read -r -a _p <<< "$1"; pk+=("${_p[@]}"); shift ;;
+    esac
+  done
+  # Default: a GPU target builds on one GPU of its own partition (budget L3; the import check runs on
+  # the device); cpu builds on genoa. DESIGN.md decision (2): --where genoa|cbuild moves a CUDA build to
+  # L1 (nvcc needs no GPU; the import check is then deferred to sn smoke).
+  [ -n "$where" ] || { [ "$target" = cpu ] && where=genoa || where=gpu; }
+  sn_hours "$wt" >/dev/null || die "bad --time '$wt' (HH:MM:SS)"
+  _billed_flags_ok
+  local T="$SN_PROJ/src/$tree" B="$SN_PROJ/build/$tree-$target"
+  local manifest
+  manifest=$(_ssh "cat $T/MANIFEST 2>/dev/null" || true)
+  [ -n "$manifest" ] || die "no tree $T (sn push first)"
+  local have; have=$(awk '$1!="umbrella"{print $1}' <<< "$manifest" | tr '\n' ' ')
+  [ ${#pk[@]} -gt 0 ] || read -r -a pk <<< "$have"
+  local pkgs; pkgs=$(sn_closure "${pk[@]}") || exit 1
+  local p
+  for p in $pkgs; do [[ " $have " == *" $p "* ]] || die "package $p (needed by: ${pk[*]}) is not in tree $tree -- push it"; done
+  local part opts own
+  case "$where" in
+    gpu)
+      case "$target" in a100) part=gpu_a100; opts=(--cpus-per-task=18) ;; *) part=gpu_h100; opts=(--cpus-per-task=16) ;; esac
+      opts=(--partition="$part" --nodes=1 --gpus-per-node=1 --ntasks=1 "${opts[@]}"); own=1 ;;
+    genoa)  part=genoa;  opts=(--partition=genoa --ntasks=1 --cpus-per-task=48); own=48 ;;   # 24-core charge units
+    cbuild) part=cbuild; opts=(--partition=cbuild --ntasks=1 --cpus-per-task=16); own=16 ;;
+    *) die "--where must be gpu, genoa or cbuild" ;;
+  esac
+  local job; job=$(mktemp)
+  {
+    _header "sn-build-$tree-$target" "$B/build-%j.out" "$B" "$wt" "${opts[@]}"
+    echo "# generated by sn (toolkit $(_kit_sha)) $(date -Iseconds): $ACTION"
+    echo "SN_TREE=$(_q "$T") SN_TREE_NAME=$(_q "$tree") SN_TARGET=$target SN_BUILD=$(_q "$B")"
+    echo "SN_PKGS=$(_q "$pkgs") SN_WHERE=$where SN_TOOLKIT=$(_kit_sha)"
+    cat "$SN_KIT/build.sh"
+  } > "$job"
+  if [ -n "$EMIT" ]; then cp "$job" "$EMIT"; rm -f "$job"; echo "sn build: job script -> $EMIT"; return 0; fi
+  SN_CHECK="test -f $B/BUILD_INFO && echo 'SN-REFUSE $B is already built (--rebuild wipes it)' || true"
+  [ "$rebuild" = 1 ] && SN_CHECK="test -f $B/BUILD_INFO && echo '  (rebuild: $B will be wiped)' || true"
+  SN_PRE_REAL=""; [ "$rebuild" = 1 ] && SN_PRE_REAL="rm -rf $B"
+  echo "sn build: tree $tree target $target packages: $pkgs (where $where)"
+  _billed build "$job" "$B" build-job.sh "$part" "$own" 1 1 "$wt" ""
+  rm -f "$job"
+}
+
+# sn run (also the engine of smoke and check-gpu-aware)
+cmd_run() {
+  [ $# -ge 4 ] || die "usage: sn run <tree> <target> <campaign>/<tag> <template> [flags] -- <driver> <args...>"
+  local tree="$1" target="$2" ct="$3" tpl="$4"; shift 4; _tree_target "$tree" "$target"
+  local campaign="${ct%%/*}" tag="${ct#*/}"
+  if ! { [[ "$ct" == */* ]] && sn_valid_name "$campaign" && sn_valid_name "$tag"; }; then die "need <campaign>/<tag>, got '$ct'"; fi
+  [ -f "$SN_KIT/templates/$tpl.tpl" ] || die "no template '$tpl' ($(cd "$SN_KIT/templates" && ls -- *.tpl | sed 's/\.tpl//' | tr '\n' ' '))"
+  local cases="" amax="" chain=1 wt="01:00:00" nosrun=0 resume=0 envs=()
+  L_GPUS=""; L_RANKS=""; L_NODES=""; L_THREADS=""; L_EXCLUSIVE=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --) shift; break ;;
+      --array) cases="${2:?}"; shift 2 ;; --array-max) amax="${2:?}"; shift 2 ;;
+      --chain) chain="${2:?}"; shift 2 ;; --time) wt="${2:?}"; shift 2 ;;
+      --gpus) L_GPUS="${2:?}"; shift 2 ;; --ranks) L_RANKS="${2:?}"; shift 2 ;;
+      --nodes) L_NODES="${2:?}"; shift 2 ;; --threads) L_THREADS="${2:?}"; shift 2 ;;
+      --exclusive) L_EXCLUSIVE=1; shift ;; --no-srun) nosrun=1; shift ;; --resume) resume=1; shift ;;
+      --env) [[ "${2:-}" == [A-Za-z_]*=* ]] || die "--env K=V"; envs+=("$2"); shift 2 ;;
+      *) die "run: unknown flag '$1' (the driver goes after --)" ;;
+    esac
+  done
+  [ $# -ge 1 ] || die "run: no driver (sn run ... -- <driver> <args>)"
+  [[ "$chain" =~ ^[1-9][0-9]*$ ]] || die "--chain K: K >= 1 jobs in total"
+  sn_hours "$wt" >/dev/null || die "bad --time '$wt' (HH:MM:SS)"
+  _billed_flags_ok
+  local SN_TARGET="$target" T_PART T_SBATCH T_LAUNCH T_ENV T_ALLOC
+  # shellcheck disable=SC1090
+  source "$SN_KIT/templates/$tpl.tpl" || exit 1
+  local T="$SN_PROJ/src/$tree" B="$SN_PROJ/build/$tree-$target" R="$SN_PROJ/runs/$campaign/$tag"
+  local asz=1 casesf="" opts=("${T_SBATCH[@]}") out="$R/slurm-%j.out" isarr=0
+  if [ -n "$cases" ]; then
+    [ -f "$cases" ] || die "no cases file '$cases'"
+    casesf=$(mktemp); grep -vE '^[[:space:]]*(#|$)' "$cases" > "$casesf" || true
+    asz=$(wc -l < "$casesf"); [ "$asz" -ge 1 ] || die "cases file '$cases' has no case lines"
+    opts+=("--array=0-$((asz - 1))${amax:+%$amax}"); out="$R/slurm-%A_%a.out"; isarr=1
+  fi
+  local job; job=$(mktemp)
+  {
+    _header "sn-$campaign-$tag" "$out" "$R" "$wt" "${opts[@]}"
+    echo "# generated by sn (toolkit $(_kit_sha)) $(date -Iseconds): $ACTION"
+    echo "SN_TREE=$(_q "$T") SN_TREE_NAME=$(_q "$tree") SN_TARGET=$target SN_BUILD=$(_q "$B")"
+    echo "SN_RUN=$(_q "$R") SN_CAMPAIGN=$(_q "$campaign") SN_TAG=$(_q "$tag") SN_CHAIN=$chain SN_NOSRUN=$nosrun SN_ARRAY=$isarr"
+    echo "SN_LAUNCH=($(_qarr "${T_LAUNCH[@]}"))"
+    echo "SN_DRIVER=($(_qarr "$@"))"
+    echo "SN_ENVS=($(_qarr "${T_ENV[@]}" "${envs[@]+"${envs[@]}"}"))"
+    cat "$SN_KIT/injob.sh"
+  } > "$job"
+  if [ -n "$EMIT" ]; then
+    cp "$job" "$EMIT"; [ -n "$casesf" ] && cp "$casesf" "$(dirname "$EMIT")/cases.txt"
+    echo "sn run: job script -> $EMIT${casesf:+ (+ cases.txt)}"; rm -f "$job" "$casesf"; return 0
+  fi
+  SN_CHECK="test -f $B/BUILD_INFO || echo 'SN-REFUSE $B is not built (sn build $tree $target)'"
+  if [ "$resume" = 1 ]; then SN_CHECK="$SN_CHECK; test -d $R || echo 'SN-REFUSE --resume: no run $R'"
+  else SN_CHECK="$SN_CHECK; test -e $R && echo 'SN-REFUSE $R exists (new tag, or --resume)' || true"; fi
+  SN_UPLOAD="${SN_UPLOAD_EXTRA:-}"; [ -n "$casesf" ] && SN_UPLOAD="$SN_UPLOAD $casesf:$R/cases.txt"
+  SN_PRE_REAL=""
+  echo "sn run: $tree $target $campaign/$tag $tpl: ${asz} case(s), chain $chain, $T_ALLOC unit(s) per job"
+  local pos=fresh; [ "$resume" = 1 ] && pos=resume
+  _billed run "$job" "$R" job.sh "$T_PART" "$T_ALLOC" "$asz" "$chain" "$wt" "$pos"
+  rm -f "$job" "$casesf"
+}
+
+cmd_smoke() {
+  [ $# -ge 2 ] || die "usage: sn smoke <tree> <target> [--time T]"
+  local tree="$1" target="$2"; shift 2; _tree_target "$tree" "$target"
+  local wt="00:20:00"; [ "${1:-}" = --time ] && wt="${2:?}"
+  local c="${tree%-*}" tag; tag="smoke-$target-$(date +%Y%m%d-%H%M%S)"
+  local R="$SN_PROJ/runs/$c/$tag"
+  SN_UPLOAD_EXTRA="$SN_KIT/smoke_driver.sh:$R/smoke_driver.sh"
+  if [ "$target" = cpu ]; then set -- genoa-mpi --ranks 4
+  else set -- gpu-mpi --gpus 4; fi
+  cmd_run "$tree" "$target" "$c/$tag" "$@" --time "$wt" --no-srun -- bash "$R/smoke_driver.sh"
+}
+
+cmd_check_gpu_aware() {
+  [ $# -ge 2 ] || die "usage: sn check-gpu-aware <tree> <h100|a100> [--time T]"
+  local tree="$1" target="$2"; shift 2; _tree_target "$tree" "$target"
+  [ "$target" != cpu ] || die "check-gpu-aware needs a GPU target"
+  local wt="00:15:00"; [ "${1:-}" = --time ] && wt="${2:?}"
+  local c="${tree%-*}" tag; tag="gpuaware-$target-$(date +%Y%m%d-%H%M%S)"
+  local R="$SN_PROJ/runs/$c/$tag"
+  SN_UPLOAD_EXTRA="$SN_KIT/check_gpu_aware_mpi.sh:$R/check_gpu_aware_mpi.sh"
+  cmd_run "$tree" "$target" "$c/$tag" gpu-mpi --gpus 2 --time "$wt" --no-srun -- \
+    bash "$R/check_gpu_aware_mpi.sh" "$SN_PROJ/src/$tree" "$SN_PROJ/build/$tree-$target/env.sh"
+}
+
+usage() { sed -n '2,20p' "$SN_SELF" | sed 's/^# \{0,1\}//'; }
+
+[ $# -ge 1 ] || { usage; exit 1; }
+sub="$1"; shift
+case "$sub" in   # the card text of a billed command, before any check or ssh
+  build|run|smoke|check-gpu-aware) [ "$PRINTACTION" = 1 ] && { echo "$ACTION"; exit 0; } ;;
+esac
+case "$sub" in
+  budget) cmd_budget "$@" ;;
+  status) cmd_status "$@" ;;
+  cancel) cmd_cancel "$@" ;;
+  push)   cmd_push "$@" ;;
+  pull)   cmd_pull "$@" ;;
+  build)  cmd_build "$@" ;;
+  run)    cmd_run "$@" ;;
+  smoke)  cmd_smoke "$@" ;;
+  check-gpu-aware) cmd_check_gpu_aware "$@" ;;
+  -h|--help|help) usage ;;
+  *) die "unknown subcommand '$sub' (sn help)" ;;
+esac
