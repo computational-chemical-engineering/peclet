@@ -198,7 +198,12 @@ EOF
 chmod +x "$TR/drv/fake.sh"
 cat > "$STUB/srun" <<'EOF'
 #!/bin/bash
-echo "srun $*" >> "$SN_STUBLOG"; while [[ "${1:-}" == -* ]]; do shift; done; exec "$@"
+# like the real srun: a TERM to srun itself ends the step at once (SIGKILL to the task); the task's
+# pid goes to $SN_STUBLOG.task, where the scancel stub signals it as Slurm signals a step's tasks
+echo "srun $*" >> "$SN_STUBLOG"; while [[ "${1:-}" == -* ]]; do shift; done
+"$@" & c=$!; echo "$c" > "$SN_STUBLOG.task"
+trap 'echo "srun: forcing job termination" >&2; kill -KILL $c 2>/dev/null' TERM
+while :; do wait "$c"; rc=$?; kill -0 "$c" 2>/dev/null || exit "$rc"; done
 EOF
 cat > "$STUB/sbatch" <<'EOF'
 #!/bin/bash
@@ -210,6 +215,8 @@ echo "$_id"
 EOF
 cat > "$STUB/scancel" <<'EOF'
 #!/bin/bash
+# scancel --signal=TERM <job>: Slurm signals the job's steps (the tasks), not the batch shell
+if [ "${1:-}" = --signal=TERM ]; then echo "signal-steps TERM ${2:-}" >> "$SN_STUBLOG"; kill -TERM "$(cat "$SN_STUBLOG.task")" 2>/dev/null; exit 0; fi
 echo "scancel $*" >> "$SN_STUBLOG"
 EOF
 chmod +x "$STUB"/*
@@ -217,7 +224,7 @@ export SN_STUBLOG="$W/stub.log"; : > "$SN_STUBLOG"
 runjob() {  # <job.sh> <jobid> <array idx|-> <positional...>
   local j="$1" id="$2" ix="$3"; shift 3
   ( export PATH="$STUB:$PATH" SLURM_JOB_ID="$id"; [ "$ix" = - ] || export SLURM_ARRAY_TASK_ID="$ix"
-    bash "$j" "$@" ) > "$W/job-$id.out" 2>&1
+    timeout -k 5 120 bash "$j" "$@" ) > "$W/job-$id.out" 2>&1   # bounded: a regression fails, never hangs
 }
 emit() {  # <campaign/tag> <sn run flags and driver...>: job.sh in the run dir
   local ct="$1"; shift; mkdir -p "$P/runs/$ct"
@@ -298,6 +305,8 @@ ok "$(cut -f8 "$R5/summary.tsv")" "term_at_s=${_ts% *} left_s=${_ts#* }" term-se
 ok "$(( ${_ts% *} + ${_ts#* } ))" 180 term-seconds-sum-to-limit
 ok "$(cut -f7 "$R5/summary.tsv")" "CERT fake checkpoint=1" term-driver-checkpointed
 ok "$(cat "$R5/0/ckpt" 2>/dev/null)" ckpt term-ckpt-file
+ok "$(grep -c '^signal-steps TERM 501$' "$SN_STUBLOG")" 1 term-via-steps-not-srun
+ok "$(grep -c 'forcing job termination' "$W/job-501.out" "$R5/0/driver-501.log" | awk -F: '{s+=$2} END {print s}')" 0 term-srun-not-signalled
 ok "$(grep -c '^scancel' "$SN_STUBLOG")" 0 term-keeps-successor
 ok "$(nsb)" 1 term-successor-queued
 ok "$(test -e "$R5/0/.failed" && echo y || echo n)" n term-no-failed

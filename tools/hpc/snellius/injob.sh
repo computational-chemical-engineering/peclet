@@ -156,8 +156,11 @@ _sn_term() {
   if [ "$_sn_left" -le "$SN_WALLTIME_WINDOW" ]; then _sn_walltime=1; else _sn_cancelled=1; _sn_why="TERM ${_sn_left} s before the limit (a cancel)"; fi
   if [ -z "$_sn_pid" ]; then echo "[sn] TERM before the driver started" >&2; exit 143; fi
   echo "[sn] TERM forwarded to the driver, waiting <= ${SN_GRACE} s for it"
-  kill -TERM "$_sn_pid" 2>/dev/null
-  ( sleep "$SN_GRACE"; kill -KILL "$_sn_pid" 2>/dev/null ) &
+  # To the job's steps through Slurm, NEVER to srun: srun answers a TERM of its own by ending the step
+  # (SIGKILL to the tasks at once; shakedown 11-19, jobs 29476790/29476798). scancel --signal without
+  # --batch/--full reaches the steps only, not this shell. After the grace: TERM to srun = end the step.
+  scancel --signal=TERM "$SLURM_JOB_ID" 2>/dev/null || kill -TERM "$_sn_pid" 2>/dev/null
+  ( sleep "$SN_GRACE"; kill -TERM "$_sn_pid" 2>/dev/null; sleep 40; kill -KILL "$_sn_pid" 2>/dev/null ) &
   local wd=$!
   wait "$_sn_pid"; _sn_trc=$?
   kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
