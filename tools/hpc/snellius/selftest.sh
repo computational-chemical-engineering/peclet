@@ -581,5 +581,11 @@ ok "$(grep -c "Kokkos_DEVICES is 'OPENMP;SERIAL' (no CUDA)" "$W/bj2.out")" 1 bui
 ok "$(test -e "$BT/build/tb-00000000-h100/.venv" && echo y || echo n)" n build-preflight-before-venv
 unset -f module
 
+# --- 12. smoke_driver's k= parse: the real np1 line of the 11-20 shakedown ("rank=0" ends in k=0 too)
+eval "$(sed -n '/^_k() /p' "$KIT/smoke_driver.sh")"
+echo "np=1: rank=0 size=1  k=5.845422163491e+00  div=8.290e-14  block(rank0)=origin[0, 0, 0] size[32, 32, 32]" > "$W/np1.txt"
+ok "$(_k "$W/np1.txt")" 5.845422163491e+00 smoke-k-parse
+echo "np=4: rank=0 size=4 div=1e-13" > "$W/npx.txt"; ok "$(_k "$W/npx.txt")" "" smoke-k-absent
+
 echo "selftest: $([ $fail = 0 ] && echo PASS || echo FAIL) $pass/$((pass + fail))"
 [ $fail = 0 ]

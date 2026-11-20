@@ -25,7 +25,9 @@ grep -q '^package peclet-flow ' "$SN_BUILD/BUILD_INFO" || { echo "CERT smoke flo
 echo "== 2. flow distributed solve: np=1 vs np=$N must print the same k"
 (cd "$SN_TREE/flow" && "${ONE[@]}" "$PY" scripts/verify_mpi_spheres_sdflow.py) | tee np1.txt
 (cd "$SN_TREE/flow" && "${SRUN[@]}" "$PY" scripts/verify_mpi_spheres_sdflow.py) | tee "np$N.txt"
-k1=$(grep -m1 -oE 'k=[^ ]+' np1.txt | cut -d= -f2); kN=$(grep -m1 -oE 'k=[^ ]+' "np$N.txt" | cut -d= -f2)
+# the k= field only: "rank=0" ends in k=0 too, so k= must start a word
+_k() { grep -m1 -oE '(^|[[:space:]])k=[^[:space:]]+' "$1" | head -n 1 | sed 's/.*k=//'; }
+k1=$(_k np1.txt); kN=$(_k "np$N.txt")
 match=no; [ -n "$k1" ] && [ "$k1" = "$kN" ] && match=yes
 
 echo "== 3. weak-scaling tile, $N ranks (timing only)"
