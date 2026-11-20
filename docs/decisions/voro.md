@@ -1245,3 +1245,36 @@ Do not reverse an entry here without recording a new decision that supersedes it
 - why: a silent wrong partition violates valid-by-construction (Sugihara–Iri directive); cost is recoverable
   (follow-up: reuse the horizon-collection determinant, measure GPU FP32 occupancy first). Do not remove the
   orientation test for speed.
+
+### Power cells with an outside seed (negative facet height) are built and repaired correctly, not emptied
+- area: voro
+- source: peclet-papers work/M7/DECISIONS_LOG.md (2026-11-16…20); voro 3e968d4 (WO-0…WO-OS6), docs/DESIGN_NOTE_OUTSIDE_SEED.md (7f321b8)
+- decided: 2026-11-16 (the user, Desk card voro-outside-seed A); landed 2026-11-20 (card voro-repair-det-land A)
+- status: settled
+- quote: |
+    The cold build and buildConvexCell<Power> marked any cell with a negative-height candidate as empty, and the
+    repair rebuilt such a cell cold, which emptied it, although a power cell whose seed lies outside it can be
+    non-empty. Fix: sign-safe power planes (the foot point and half-space follow sign(nn)), non-empty outside-seed
+    cells in the cold build and the repair, a §10 certificate for them, and an empty-cell guard. The all-positive path
+    (Voronoi, and power cells with every d > 0) executes the legacy expressions unchanged: G6 is bit-identical to the
+    previous main on host and CUDA (1108/1108); cost G8 ≤ max(1.02, base-vs-base).
+- rejected: keeping the defect documented until the M7 landing (card option B); pinning products with mulRn on the
+  all-positive path to make CUDA match (it would change main's CUDA numbers); flat 1e-12 h³ gain bar in
+  test_repair_vanishing (replaced by max(1e-12, ε(dist/size)³)·V_cold)
+- why: correctness of main for every weighted user (ALE with fixed weights hits it; NHV-W does not). Recorded misses:
+  G9 FD check at δ 1e-6 (truncation). Known, not fixed: CUDA clip-vs-certify FMA roundoff; facet area vectors wrong at
+  first order at the default 1e-4 h certificate tolerance; gather window kSearchWindow 4 with no per-cell completeness
+  status in the repair.
+
+### Repair and publish are bitwise deterministic across thread counts
+- area: voro
+- source: peclet-papers work/M7/DECISIONS_LOG.md (2026-11-16…20); voro f1a478e, e325f24, 4cb5715 (in 3e968d4)
+- decided: 2026-11-16 (the user, Desk card voro-repair-determinism A); landed 2026-11-20 (card voro-repair-det-land A)
+- status: settled
+- quote: |
+    Repair and publish were bitwise identical only at OMP 1: at OMP 8 the Voronoi publish differed between runs and
+    the repair depended on the thread schedule. Fix: bins sorted after the atomic scatter, sorted face lists, the cold
+    facet CSR in cell order. Gate G7: repair and publish hashes identical at OMP 8/4/1 (W 0.15 and W 1.0, full store).
+- rejected: accepting thread-count dependence and testing the repair only at OMP 1 (card option B)
+- why: the suite standard is serial–parallel bit-exactness; a schedule-dependent repair makes every downstream result
+  irreproducible.

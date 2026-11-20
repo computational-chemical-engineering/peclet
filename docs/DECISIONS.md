@@ -24,13 +24,17 @@ is authoritative.
 
 ## flow — Navier-Stokes, IBM, pressure/velocity solve
 
-253 in force, 43 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
+282 in force, 45 superseded — full text in [`decisions/flow.md`](decisions/flow.md)
 
 ### In force
 
 - **"Hand the stopping level to GraphAMG" telescoping idea is retired**. **Rejected:** handing the MG-telescoping stopping level to GraphAMG  <sub>mg-decomposition-alignment.md:75</sub>
+- **'auto' V-cycle precision means FP32 where eligible on device backends only; host 'auto' is 'fp64'**.  <sub>flow</sub>
 - **(1,2) mixed closure order is the recommended default going forward**. **Rejected:** binary-M lagging (divergent, ρ=1.087) and linear-everywhere (1,1) (worse pointwise near the IB)  <sub>flow-ghost-projection.md:50</sub>
+- **A MAC face field's HIGH-side domain face is kept across every ghost fill**. **Rejected:** reordering the fill and bcCorrectOutflow (the fill overwrites the plane whatever ran first); restoring outflow faces only (a high-side INFLOW face is   <sub>flow</sub>
 - **A masked solid cell is not a fluid sample**.  <sub>sdf-scene-campaign.md:44</sub>
+- **A pressure-solver change is judged on the divergence contract, not on a per-step divergence ratio**. **Rejected:** the per-step max-norm ratio <= 2 (measures where the last iteration landed, not the projection); a  <sub>flow</sub>
+- **A scalar's advective inflow state is the prescribed value, and cOld's ghosts are filled first**. **Rejected:** upwinding the Dirichlet reflection 2v - c_inner (right for diffusion, wrong as an upwind state); changing c's own ghost (breaks the diffusion row); th  <sub>flow</sub>
 - **API/ordering: x-fastest is fixed; PyVista/VTK [x,y,z] + F-contiguous convention**. **Rejected:** order='F' as the user-facing default and [z,y,x] indexing  <sub>suite-distributed-status.md:177-184</sub>
 - **Agglomerated redundant coarse solve deferred pending multi-rank hardware**. **Rejected:** shipping the agglomerated coarse solve untested at np<=4  <sub>suite-distributed-status.md:296-299</sub>
 - **Agglomerated/"auto" bottom solve default is gated to the singular (mean-removed) path only, not enabled universally**. **Rejected:** enabling "auto" bottom solve on Dirichlet-anchored/outflow operators  <sub>agglomerated-bottom-ibm-fix.md:45</sub>
@@ -49,20 +53,23 @@ is authoritative.
 - **Boiling scope addition did not resurrect transported-φ CLSVOF**. **Rejected:** transported-φ CLSVOF  <sub>vof-campaign.md:101-106</sub>
 - **Bubble-column benchmark case runs at pressure rtol 1e-8; the solver default stays 1e-10**. **Rejected:** 1e-6 (iterations 7.49, but a systematic gas-volume drift 1.5e-9 per 2000 steps —  <sub>USER</sub>
 - **Byte-identical gating is unmeasurable for atomic-add paths — gate against the path's own run-to-run spread instead**. **Rejected:** a byte-identical regression gate for atomic-add code paths  <sub>defect-correction-campaign.md:55-57</sub>
-- **C0's gain is unproven on the workstation; the genoa S-3 run decides it** (2026-10-16: KEPT, genoa reductions 8.8 -> 2.2 ms/step). **Rejected:** reverting C0 on the workstation timing (C1-C4 are built and gated on its order)  <sub>flow</sub>
+- **C0's gain is unproven on the workstation; the genoa S-3 run decides it**. **Rejected:** reverting C0 on the workstation timing (C1-C4 are built and gated on its order)  <sub>`bubble_column_perf/gate_proj/DECISIONS_PROJ.log`</sub>
 - **CA (event-halving) smoothing ships default ON with an env kill switch**.  <sub>comm-scaling-plan.md:23</sub>
 - **CSF force is exact; curvature error is the real budget — improve κ, never the force**. **Rejected:** arithmetic cell-force interpolation (set_csf_mode(1)); improving the force term to chase lower Ca  <sub>vof-campaign.md:430-444</sub>
 - **CUDA wheel dependency name: nvidia-cuda-runtime, not the deprecated -cu13 suffix**. **Rejected:** depending on the `nvidia-cuda-runtime-cu13` package name  <sub>peclet-cuda-wheel-feasible.md:28-30</sub>
 - **Cell-average IBM scheme, not point-value, for Poiseuille validation**. **Rejected:** point-value scheme (ibmFillEntry<0>)  <sub>cuda-kokkos-migration.md:285-287</sub>
 - **Channel DNS IC must seed streamwise rolls/streaks in wall units, not cold random noise**. **Rejected:** cold random-noise initial condition; perturbation cutoff specified in cycles/cell  <sub>channel-dns-isotropic-grid.md:46</sub>
+- **Chebyshev bounds under the symmetric V-cycle: cold λmax by Lanczos, broadband seed, margin on the lmin shift, ratchet**. **Rejected:** bracketing λmax with a larger upper margin on the power estimate (needs ≥ 1.13: +9.6 % Chebyshev  <sub>flow</sub>
 - **Chebyshev pressure bounds re-estimated from a warm start after a coefficient rebuild (D3)**. **Rejected:** the cold 15 + 15 estimate every step (30 of 44 V-cycles per step); warm-starting from a  <sub>flow</sub>
 - **Chebyshev pressure driver's apparent win was a placement artifact, not a real gain**. **Rejected:** adopting the Chebyshev pressure driver based on the uncontrolled 36% win  <sub>momentum-solve-residual-stop.md:39</sub>
 - **Clean-fluid-interior mask required on both restriction and prolongation for IBM velocity-MG correctness**. **Rejected:** θ-weighting the diagonal's identity (I) term; coupling the coarse grid at cut/solid cells (masking cut cells only, not solid cells, was tried and stil  <sub>velocity-mg-design.md:54-64</sub>
-- ~~**Coarse-first decomposition ships opt-in, legacy remains the default**~~ (superseded in part 2026-10-22). **Rejected:** making coarse-first decomposition the default  <sub>mg-decomposition-alignment.md:22</sub>
 - **Collocated AUTO default = ghost projection (2026-08-25), superseding "ghost as production is a dead end"**. **Rejected:** gauge-exact (ex mode 9) as the unconditional collocated default, chosen by the 2026-08-18 A/B; the 2026-08-20 verdict's "ghost as production" dead end  <sub>flow</sub>
 - **Collocated momentum advection uses the PROJECTED divergence-free face field, not the cell→face average**. **Rejected:** the un-projected cell→face average ½(u_i+u_j) as the collocated advecting velocity  <sub>flow/doc/uf_advection.md;</sub>
 - **Collocated pressure coupling is the ABC (MAC) approximate projection, NOT Rhie–Chow**. **Rejected:** Rhie–Chow interpolation as the collocated coupling  <sub>sdflow-collocated-solver.md:37-39</sub>
 - **Collocated variable density (V8): the mass-adjoint ABC pair; the face-acceleration form is retired**. **Rejected:** face acceleration after the viscous solve (non-incremental; unstable with the rotational  <sub>flow</sub>
+- **Comm-avoiding red-black smoothing defaults off on a device backend, on on a host backend**. **Rejected:** on everywhere  <sub>flow</sub>
+- **Comm-avoiding red-black smoothing is off across a periodic axis of ODD global extent**. **Rejected:** fixing the ring parity inside the CA kernels  <sub>flow</sub>
+- **Communication-avoiding coarse smoothing with walls (WO-K2) is NOT adopted; measured neutral to harmful on genoa**. **Rejected:** merging K2; narrowing "Domain-BC paths stay blocking" for it (the entry stays as it was)  <sub>flow</sub>
 - **Conjugate scalar transport is two fields on one grid in ψ = c/K, with the series-resistance 2×2 elimination at the fluid and solid probes (P2F)**. **Rejected:** Peters' directional one-field scheme (min-curvature T_ξ; Maxwell disc at d/h = 128, L1/L∞: DIRc 6.7e-5/6.0e-3, 5.7e-6/4.0e-4, 7.9e-6/4.3e-4, 1.9e-4/8.  <sub>flow</sub>
 - **Constant-coefficient (Dodd–Ferrante) pressure driver PARKED: fails the static-balance gate**. **Rejected:** merging it as opt-in despite the failed gate; a third design round (uncertain, the  <sub>USER</sub>
 - **Container slab half-extent must equal L/2 + wall thickness, never more (periodic-image rule)**. **Rejected:** an oversized slab half-extent  <sub>advective-cutwall-flux-plan.md:57</sub>
@@ -70,12 +77,15 @@ is authoritative.
 - **Coupling partial/cut+solid cells to the coarse grid fails regardless of coarsening depth — capping depth cannot fix it**. **Rejected:** capping coarsening depth as a fix for partial-cell coupling divergence  <sub>velocity-mg-design.md:118-135</sub>
 - **Crank-Nicolson ported then reverted; backward-Euler is the right default**. **Rejected:** Crank-Nicolson (θ=0.5) time integration with the plain explicit Laplacian  <sub>suite-distributed-status.md:320-324</sub>
 - **Cut-cell C convention: liquid fraction of fluid volume, openness-weighted**.  <sub>vof-campaign.md:98-100</sub>
+- **Cut-cell scalar transport ships opt-in as `add_scalar(..., cutcell=True)`; its three pre-release names follow the canon**. **Rejected:** another opt-in spelling (e.g. `discretization='cutcell'`; `cutcell=` already matches `set_solid(..., cutcell_pressure=)`); cut-cell as the default in   <sub>flow</sub>
 - **Cut-cell scalar transport stores κ (the fluid fraction) in storage and sources**. **Rejected:** unit storage, i.e. the legacy scalar's (first order; the Neumann eigenvalue 11 % off at 32 cells per diameter; 2–12 % mass loss under advection)  <sub>flow</sub>
 - **Cut-cell scalars refuse the ghost projection (collocated 'ghost', staggered set_ghost_projection) and, for now, collocated open faces**. **Rejected:** advecting with the ghost projection's face field under its binary openness `oxb_` (divergence 4.3e-2 of max|F|) or the geometric `ox_` (2.0e-2): a con  <sub>rulings</sub>
 - **Deferred correction is not viable as an undamped fallback**. **Rejected:** undamped deferred correction as the C/F / ghost solve fallback  <sub>flow-ghost-projection.md:29</sub>
 - **Design constraints for any collocated-plateau fix**. **Rejected:** Basilisk's dt·a face event and both embed-note salvage approaches (ruled out by C2); any fix that fragments the CG graph (ruled out by C4)  <sub>collocated-second-order-verdict.md:51-55</sub>
+- **Device VoF block statistics reduce over fixed 512-cell tiles in fixed tile order (recorded diagnostics-order change); no lazy evaluation**. **Rejected:** (b) lazy statistics computed only when read; one team per job (the old device schedule); tile sizes 256/1024/4096  <sub>flow</sub>
 - **Device pressure bottom: block-tridiagonal FP32 direct factor preconditioning FP64 FCG ('direct', the GPU default)**. **Rejected:** B1's single-team V-cycle preconditioner (measured +5.3 ms/step, ~1250 dependent phases  <sub>flow</sub>
 - **Distributed cut-cell MG coarse levels must be nested, not independently re-decomposed**. **Rejected:** independent per-level BlockDecomposer ORB for MG coarse levels  <sub>channel-dns-isotropic-grid.md:52</sub>
+- **Distributed host 'auto' bottom = 'direct' at any thread count; no thread-count cost term**. **Rejected:** choosing 'algebraic' when threads per rank are few and the bottom is large  <sub>flow</sub>
 - **DistributedNS declared canonical; clean API; periodic BCs only; MPI a true build option**. **Rejected:** keeping pnm_backend API compatibility; a halo-BC system for future boundary conditions  <sub>suite-distributed-status.md:247-251</sub>
 - **DistributedNS solves in physical units (ρ, dynamic μ, force/volume), not kinematic ν**. **Rejected:** the kinematic (ρ≡1, single-ν) formulation as the solved system  <sub>sdflow-dt-divided-convention.md:46-59</sub>
 - **DistributedStokes renamed to DistributedNS**.  <sub>suite-distributed-status.md:14-18</sub>
@@ -86,14 +96,14 @@ is authoritative.
 - **Domain-BC paths stay blocking, following the VelocityMG precedent**. **Rejected:** applying halo-compute overlap to domain-BC paths  <sub>comm-scaling-plan.md:22</sub>
 - **Double operator storage is the DEFAULT (SCALING_ISSUES #1 closed by decision)**. **Rejected:** (a) leaving float as the default and documenting the limitation — rejected because the  <sub>flow/CMakeLists.txt:48-72</sub>
 - **Drag must be included in bcStencilPath() whenever advection is off**.  <sub>porous-cfddem-cuda-two-bugs.md:14</sub>
-- **E2 resolved: the aspect coarsening rule alone fixes MG-PCG stall on stretched grids — no auto-FCG/symmetric-V-cycle decision needed** *(partly superseded 2026-10-30: the V-cycle is now symmetric)*. **Rejected:** needing a separate symmetric-V-cycle-under-aniso or auto-FCG-on-aniso decision  <sub>physical-units-phase2-aniso.md:28-31</sub>
+- **E2 resolved: the aspect coarsening rule alone fixes MG-PCG stall on stretched grids — no auto-FCG/symmetric-V-cycle decision needed**. **Rejected:** needing a separate symmetric-V-cycle-under-aniso or auto-FCG-on-aniso decision  <sub>physical-units-phase2-aniso.md:28-31</sub>
 - **Earlier "slow convergence / non-converged" worry was a multiplied-dt float-precision artifact, fixed by the divided-dt engine convention**. **Rejected:** the multiplied-dt momentum-operator convention  <sub>ringbed-cfd-surrogate.md:63</sub>
 - **Embed momentum + mode-3 projection (mode 5) does not converge — over-drags**. **Rejected:** mode 5 (embed momentum + mode-3 projection) as a viable configuration  <sub>embed-port-progress.md:23</sub>
 - **Escalation rule: a twice-failed gate stops the work order, never gets its numerics tweaked to pass**. **Rejected:** tweaking numerics to force a failing gate to pass  <sub>vof-campaign.md:495-496</sub>
 - **Every VoF consumer is TOLD what a pure cell is; none decides on its own**. **Rejected:** |  <sub>this</sub>
 - **Every κ > 0 scalar cell with an open face is its own unknown; slivers are never merged or linked**. **Rejected:** cell merging or linking of slivers (the H-k / Hf-1 link schemes: Neumann limit −4.2e-3 at order 1.0, against −6.2e-5 at order 2.0 for κ-FV with every   <sub>flow</sub>
 - **Exact-crossing openness overrides must be masked to 0 at solid velocity points**. **Rejected:** unmasked exact apertures at solid-velocity-point faces  <sub>flow-ghost-projection.md:61</sub>
-- **F4 (a persistent host team for the coarse tail) is deferred, with the §10 re-evaluation rule**. **Rejected:** F4 in this package  <sub>design</sub>
+- **F4 (a persistent host team for the coarse tail) is deferred, with the §10 re-evaluation rule**. **Rejected:** F4 in this package  <sub>`doc/vof_projection_cost_design.md`</sub>
 - **FFT pressure solver (Dodd–Ferrante option E2(b)) DROPPED — no FFT driver in flow**. **Rejected:** an FFT Poisson solver (new dependency) behind the constant-coefficient driver  <sub>USER</sub>
 - **FV viscous operator confirmed 2nd-order-consistent — "face-flux placement" hypothesis refuted; barrier is the pressure coupling**. **Rejected:** the "face-flux placement" hypothesis; the wall-pressure-term-on-momentum-force fix (both signs)  <sub>sdflow-collocated-solver.md:152-166</sub>
 - **Face-primary uf reconstruction (mode 8) attempted and reverted — incompatible with flow's divided time convention**. **Rejected:** mode 8 (face-primary uf via Basilisk's acceleration-event reconstruction) under flow's current divided momentum-operator convention  <sub>embed-port-progress.md:33</sub>
@@ -105,7 +115,7 @@ is authoritative.
 - **Free-variable fix: pin phi=0 at decoupled cells after the solve**. **Rejected:** leaving free variables (solid-centered / BC_ONLY rows) unpinned after the Krylov solve  <sub>flow-ghost-projection-mpi-plan.md:19</sub>
 - **Fresh (newly-uncovered) cells must be seeded with the local wall velocity, not inherit the solid value**. **Rejected:** inheriting the solid's prior value in a freshly-uncovered cell  <sub>sdf-scene-campaign.md:97</sub>
 - **Fused periodic wrap in smoother / residual / matvec; device-resident Krylov scalars; no copies around the preconditioner**. **Rejected:** fill-then-sweep with CUDA graph capture; lagged stop checks (not bitwise)  <sub>flow</sub>
-- **G-D3 rulings: the health criterion is relative, the gates are scoped to where FP64 converges, no contrast bound in eligibility**. **Rejected:** the absolute health median <= 1e-2 (unattainable by the FP64 V-cycle itself); a looser factor than 1.1; WO-D4c, the resident FCG (the host-loop FCG fa  <sub>flow</sub>
+- **G-D3 rulings: the health criterion is relative, the gates are scoped to where FP64 converges, no contrast bound in eligibility**. **Rejected:** the absolute health median <= 1e-2 (unattainable by the FP64 V-cycle itself); a looser factor than 1.1; WO-D4c, the resident FCG (the host-loop FCG fa  <sub>`bubble_column_perf/gate_proj/DECISIONS_PROJ.log`</sub>
 - **GPU binding must let SLURM cgroup-isolate; manual CUDA_VISIBLE_DEVICES remap fights SLURM**. **Rejected:** PECLET_BIND_GPU=1 manual remap  <sub>channel-dns-isotropic-grid.md:45</sub>
 - **GPU-aware MPI is not the shipped default on Snellius 2024a due to a toolchain conflict**. **Rejected:** building the solver against the GPU-aware-validated CUDA 12.1.1 stack  <sub>channel-dns-isotropic-grid.md:44</sub>
 - **Geometric const-coeff + masking are the validated defaults; Galerkin/CG is opt-in**. **Rejected:** making Galerkin/CG the default  <sub>suite-distributed-status.md:98-100</sub>
@@ -117,9 +127,11 @@ is authoritative.
 - **Grid-dimension convention: MG per-axis coarsening depends on factors of two; always check halvings before proposing a grid**. **Rejected:** choosing benchmark grid dimensions without checking per-axis halving depth (led to a "WORSE" refine ladder caught before burning GPU hours)  <sub>channel-scaling-rebenchmark.md:182-200</sub>
 - **Guidance: ghost for resolved/smooth IBM geometry, cutcell aperture for tight-throat porous media**. **Rejected:** using ghost projection for under-resolved tight-throat porous media  <sub>flow-ghost-projection.md:86</sub>
 - **Height-function columns stay 7 cells; longer (Popinet/TBFsolver-style) column walks are rejected**. **Rejected:** 9- and 11-cell columns to cut tier-3 work  <sub>`doc/vof_curvature_cost_design.md`</sub>
+- **Host 'direct' bottom solve: one thread, lane-scheduled M (rows as SIMD lanes), bitwise; H-6 replication kept**. **Rejected:** subset agglomeration or a rank-0 solve plus broadcast (no critical-path gain at equal T); a cooperative on-node factor (complexity for ~2 ms; deferred  <sub>flow</sub>
 - **Host Krylov reduction fusion (C1-C4) is host single-rank only, bitwise vs C0**. **Rejected:** device fusion of the Krylov reductions (Q-P12: ~ -0.5 ms on the GPU for a device re-baseline)  <sub>flow</sub>
 - **Host Krylov sum reductions in CutcellMG use 4 x-lanes per row (C0, recorded, host only)**. **Rejected:** keeping the 1-lane add chain (3.4 cycles/cell at OMP 1, latency-bound)  <sub>flow</sub>
 - **Host backends use the 'direct' pressure bottom where eligible (reverses §13 D-5's host clause and Q-D6's default)**. **Rejected:** GraphAMG kept for host bitwise; GraphAMG at tau = 1e-5; GraphAMG setup reuse  <sub>flow</sub>
+- **Host box shells run serially only if cells + 8 x-runs < 8192 (WO-A, bitwise)**. **Rejected:** lowering the cutoff globally (moves every small level); restructuring ccBoxShellRuns (P-shell, only if WO-T shows > 15 %)  <sub>flow</sub>
 - **Host launch rule: pencils on host, MDRange on device, one cell body; -ffp-contract=off on host, -march opt-in**. **Rejected:** host MDRange in hot paths (2.4x); rebuilding the shared Kokkos prefix with Kokkos_ARCH  <sub>flow</sub>
 - **Host list-driven batch kernels launch over exact counts with a dynamic schedule; host region kernels iterate rows**. **Rejected:** upper-bound launches under GCC's contiguous static schedule (idle threads on the  <sub>flow</sub>
 - **Host wrap kernels peel the row ends (S), bitwise**.  <sub>flow</sub>
@@ -154,9 +166,11 @@ is authoritative.
 - **Momentum-advection kernels must use the actual wall velocity field, not maskVelocity's solid zeros**. **Rejected:** reading maskVelocity's solid-zero convention as the wall velocity for a moving wall  <sub>advective-cutwall-flux-plan.md:15</sub>
 - **Multiphysics assembly is runtime-dispatched flags on existing kernels, not a Solver<Grid,Props> template**. **Rejected:** a templated Solver<Grid,Props> design  <sub>multiphysics-framework-plan.md:403</sub>
 - **Must re-mask solid velocity after grad(phi) correction**. **Rejected:** skipping the re-mask  <sub>cuda-kokkos-migration.md:354-355</sub>
-- **No numeric-only GraphAMG refresh; the per-step rebuild leaves the production path with the depth rule**. **Rejected:** a numeric-only GraphAMG refresh (fixed aggregates, new Galerkin values)  <sub>flow `doc/mg_depth_policy.md`</sub>
+- **No VoF weights in the default partition; CCD/L3 placement is documentation plus an init-time warning**. **Rejected:** static VoF weights (~4 ms at 24x1, lowest payoff); a placement-weighted partition (results would depend on the scheduler's placement); warning at np 1  <sub>flow</sub>
+- **No numeric-only GraphAMG refresh; the per-step rebuild leaves the production path with the depth rule**. **Rejected:** a numeric-only GraphAMG refresh (fixed aggregates, new Galerkin values)  <sub>flow</sub>
 - **Non-incremental Chorin projection gives wrong steady Z&H drag — incremental-rotational required**. **Rejected:** non-incremental Chorin projection (−40% error, splitting-error); the warm-detector convergence protocol  <sub>embed-port-progress.md:21-22</sub>
 - **Old single-GPU CFDSolver reference retired; pnm_backend is pore-network extraction only**. **Rejected:** keeping the CFDSolver single-GPU reference implementation; pnm_backend carrying a CFD solver  <sub>sdflow-dt-divided-convention.md:29-38</sub>
+- **On device, step() holds no global synchronization; guarded by the ctest device_sync_budget**. **Rejected:** bare Kokkos::fence() or exec-less deep_copy inside step(); an exact pinned count of combined fences (iteration-dependent)  <sub>flow</sub>
 - **On host, the 'direct' bottom FCG's reductions are single-lane in index order (bits independent of T_host and of the thread count)**. **Rejected:** team reductions on host (order depends on the team size)  <sub>flow</sub>
 - **On the collocated variable-density path set_body_force is a mean pressure gradient (face form)**. **Rejected:** f_const at the cell value (periodic hydrostatic box: cell 20.5 after 30 steps at  <sub>flow</sub>
 - **One-rank benchmarks run without init_mpi; init_mpi at size 1 stays on the distributed path**. **Rejected:** a silent single-rank switch inside init_mpi  <sub>flow</sub>
@@ -165,13 +179,10 @@ is authoritative.
 - **P1 passed: double-diagonal fallback retired as measurably worse, not merely unnecessary**. **Rejected:** the double-diagonal fallback (converges to the float-face operator, not the true one)  <sub>defect-correction-campaign.md:33-38</sub>
 - **PCG selector fixed; Chebyshev stays varRho/porous default (S0/S1 outcome)**. **Rejected:** PCG as the varRho/porous default driver  <sub>vof-campaign.md:172-201</sub>
 - **PV curvature fallback: one team per target cell, canonical-order accumulation (core pvFitTerm / pvFitAccum)**. **Rejected:** a warp reduction of the normal equations (changes the summation order); one team per  <sub>core</sub>
-- **On-node halo exchange by MPI-3 shared windows with sequence flags (GridHalo, host memory only)**. **Rejected:** eager-limit tuning (btl_sm_eager_limit / UCX_RNDV_THRESH) as the fix — site- and version-specific, two copies; an MPI progress thread / MPI_THREAD_MULTIPLE — fr  <sub>core</sub>
-- **GridHalo on host: one gather launch, calling-thread copies below kHaloSerialCopy, persistent requests**. **Rejected:** separate self-copy and pack launches; Isend/Irecv per exchange; merging unpack into the shell sweep; MPI_Neighbor_alltoallv (blocking completion, no gain on one  <sub>core</sub>
-- **GridHalo fences only where MPI needs it**. **Rejected:** unconditional fences in exchangeBegin and exchangeEnd  <sub>core</sub>
-- **core SplitAxis::Balanced is opt-in; Longest stays core's default ORB split rule**. **Rejected:** changing core's default  <sub>core</sub>
 - **Pairing lesson: stability needs (G,D) structural match, accuracy needs closure-value consistency — only the ghost architecture has both**. **Rejected:** Design B (star) — "SPD-but-scheme-unstable"; B+ gates ("dead")  <sub>collocated-attractor-campaign.md:35</sub>
 - **Part II phase-change architecture: Robin IHTR, PLIC plane-shift regression, transported-φ CLSVOF stays dead**. **Rejected:** hard T_sat interface condition; volume-source-in-C interface regression; transported-φ CLSVOF  <sub>vof-campaign.md:115-125</sub>
 - **Part III bubbly-flow container reuses V0–V4 kernels; Dodd–Ferrante FFT not needed**. **Rejected:** Dodd–Ferrante constant-coefficient FFT pressure solve  <sub>vof-campaign.md:107-114</sub>
+- **Partition guard: an AUTO candidate must cut the same axes as legacy unless legacy max/mean >= 5/4 (WO-D)**. **Rejected:** an imbalance threshold alone (np 3 and np 12 share legacy max/mean 1.125 but gain 6.3 % vs lose 8.3 %); a depth/telescope rule (hierarchies identical)  <sub>flow</sub>
 - **Per-kernel space.fence() removed — default-exec-space kernels are stream-ordered**. **Rejected:** per-kernel fence() calls  <sub>cuda-kokkos-migration.md:534-539</sub>
 - **Phase B/C explicitly must not touch GP_THETA_MIN, the sliver branch, or the preconditioner scaling**. **Rejected:** touching GP_THETA_MIN, the sliver branch, or the preconditioner scaling in phases B/C  <sub>ghost-hardening-plan.md:60-64</sub>
 - **Porous pressure correction must use drag-consistent relaxation (SIMPLE/PISO-with-implicit-drag), not a drag-free coefficient**. **Rejected:** the drag-free pressure-correction coefficient (open*eps) used against a drag-loaded momentum diagonal  <sub>multiphysics-framework-plan.md:381</sub>
@@ -181,9 +192,11 @@ is authoritative.
 - **Precision policy rule: identity-bearing quantities stored in the precision the identity is asserted; ship double-diagonal, not fp64 default**. **Rejected:** full fp64 default operator storage  <sub>vof-campaign.md:307-312</sub>
 - **Pressure MG operator stored in face form {AC, AFX, AFY, AFZ} with the band sign**. **Rejected:** seven bands (bytes); AC recomputed on the fly (not provably bitwise under FMA  <sub>flow</sub>
 - **Pressure solve must be PCG (Krylov), not RB-GS, for cut-cell IBM**. **Rejected:** RB-GS for pressure; rotational pressure-update variant  <sub>cuda-kokkos-migration.md:352-358</sub>
+- **Pressure-MG levels with a blocked strong axis get zebra line relaxation along it**. **Rejected:** aspect cap on the depth, plane cap as remedy, depth 4 for the class, more sweeps, lagged periodic wraps,  <sub>flow</sub>
+- **Pressure-MG stencil exchanges use a faces-only halo with rank-local periodic axes read in-kernel**. **Rejected:** 26-neighbour fills for 7-point stencils; routing np 1 to the single-rank engines (§14 Q-H2)  <sub>doc/vof_distributed_host_comm_design.md</sub>
 - **Public API renames: pressure_potential() → pressure() (returns physical pressure)**. **Rejected:** the name pressure_potential() for the physical-pressure accessor  <sub>sdflow-dt-divided-convention.md:36-38</sub>
 - **Published parallel-scaling iteration count is 4.0, not the earlier 12.2**. **Rejected:** the e861010 figures (12.2), which predate the stale-ghost V-cycle residual fix  <sub>parallel-scaling-study.md:119</sub>
-- **Q11 bounded: under PCG/FCG with a double operator a warm start cannot amplify the error**.  <sub>design</sub>
+- **Q11 bounded: under PCG/FCG with a double operator a warm start cannot amplify the error**.  <sub>`doc/vof_projection_cost_design.md`</sub>
 - **Random-array drag deviation is a genuine method difference, not finite-size or arrangement effects**. **Rejected:** finite-size effects and arrangement/crystallization as explanations for the deviation  <sub>ibm-accuracy-sphere-validation.md:57-64</sub>
 - **Reaction torque leak fix is a closed-form cut-cell moment; adding the pressure moment term makes it worse**. **Rejected:** adding the pressure moment Σ r×grad(pi) to close the torque gap  <sub>sdf-scene-campaign.md:70</sub>
 - **Reduced-precision operators are stored as face weights; the diagonal is derived, never stored; FP32 arithmetic uses the flux form**. **Rejected:** the AC (stored-diagonal) form in FP32 — the retired float storage's failure mode, a non-Laplacian diagonal perturbation of relative size u*kappa(A) on  <sub>flow</sub>
@@ -205,6 +218,7 @@ is authoritative.
 - **Sealed scalar cells (fluid or solid) are not unknowns; they are gated on their VOLUME, not their count**. **Rejected:** a "0 sealed" count gate (impossible: the corner slivers whose faces all snap to 0 at the 1e-3 floor grow like (R/h)², 0–11 / 38–46 / 154–159 at R/h 8   <sub>flow</sub>
 - **Sequencing: "VoF vs multiphysics first" dissolves — VoF is the next multiphysics phase**.  <sub>vof-campaign.md:480-484</sub>
 - **Sign convention: closed divergence of the corrected field equals Aφ − b = −residual**.  <sub>flow-ghost-projection.md:43</sub>
+- **Single-rank device mean removal uses a per-level device fluid count; no per-iteration reduction has two results**. **Rejected:** `{sum, count}` reductions into device Views every iteration  <sub>flow</sub>
 - **Sliver mask must pin only cells with cs<1e-6, not every cell with sdf(center)<0**. **Rejected:** the mode-0-style mask (zero every cell with sdf(center)<0, including solid-centred cut cells) for embed mode  <sub>embed-port-progress.md:27</sub>
 - **Solid cutting an OPEN domain face is FIXED, not rejected — but a sealed inlet pocket IS rejected**. **Rejected:** (a) rejecting the configuration outright, which the work order allowed; (b) fixing only  <sub>SCALING_ISSUES</sub>
 - **SolverColocated is the ABC approximate projection, NOT Rhie–Chow — user correction**. **Rejected:** describing SolverColocated's coupling as Rhie–Chow  <sub>vof-campaign.md:485-489</sub>
@@ -218,35 +232,26 @@ is authoritative.
 - **Steady scalar advection is preconditioned by a V-cycle on the ADVECTIVE surrogate (Amendment A2)**. **Rejected:** the symmetric lumped surrogate for steady advection (preconditioned spread β ≈ Pe_h N/2π; 3-D 13 → 40 → 89 iterations at Pe_h 0 / 0.1 / 0.3 and no con  <sub>flow</sub>
 - **Steady state after acceleration: velocity-residual handover, a 12-block certification budget with an early slow exit, and a stagnation fallback (rev 1 + review R1)**. **Rejected:** requiring plain-march reachability as well (Q18: a plain verification tail costs plain steps exactly where acceleration matters — the dense bed at dt   <sub>flow</sub>
 - **Strict staggered bit-identical guard must be held through every change; AMR must work for both velocity placements or be explicitly scoped**.  <sub>sdflow-octree-amr-next.md:19-20</sub>
-- **The pressure MG depth is derived: the shallowest D >= 4 whose global coarsest grid the bottom engine admits**. **Rejected:** fixed depth 4; a per-rank coarsest extent; the deepest coarsening; a cost model; backend-specific depths; for blocked axes (A2) an aspect-capped depth or holding AUTO for line relaxation  <sub>flow `doc/mg_depth_policy.md`</sub>
-- **A pressure-solver change is judged on the divergence contract (max|div u| <= rtol r0 every step; worst-over-run ratio <= 2 at rtol 1e-13), not on a per-step divergence ratio** (2026-10-25, USER). **Rejected:** per-step max-norm ratio <= 2; worst-over-run ratio at the production tolerance  <sub>flow</sub>
-- **Pressure-MG levels with a blocked strong axis get zebra line relaxation along it (2026-10-29)**. **Rejected:** aspect cap on the depth; plane cap; depth 4 for the class; more sweeps; lagged periodic wraps; Galerkin coarse operators; odd-grid coarsening/padding  <sub>flow `doc/mg_depth_policy.md` A2</sub>
-- **Comm-avoiding red-black smoothing is off across a periodic axis of ODD global extent (2026-10-27)**. **Rejected:** fixing the ring parity inside the CA kernels  <sub>flow `doc/vof_distributed_host_comm_design.md` §5.3</sub>
-- **The pressure V-cycle is symmetric: P = c·Rᵀ piecewise-constant prolongation, palindromic smoothed bottom (2026-10-30)**. **Rejected:** FCG / AUTO-FCG default; trilinear P + full-weighting R; constant P on thin axes only; symmetric bottom only; Galerkin operators  <sub>flow `doc/mg_depth_policy.md` A3</sub>
-- **Chebyshev bounds (symmetric V-cycle): cold λmax = top Ritz value of a short PCG run, broadband np-independent seed, 1.15 margin on the lmin shift, bounds ratchet (2026-10-29/30)**. **Rejected:** bracketing λmax with a ≥ 1.13 upper margin (+9.6 % V-cycles); the power-iteration Rayleigh quotient alone (safety 0.9997)  <sub>flow `doc/mg_depth_policy_log.md` 2026-10-31</sub>
-- **Chebyshev growth guard tests r·z (M⁻¹-norm), in symmetric and trilinear mode (2026-10-30/31)**. **Rejected:** max|r| growth test (false positives); r·z only in symmetric mode  <sub>flow 60fac53</sub>
-- **Comm-avoiding smoothing defaults off on a device backend, on on a host backend (2026-10-29, USER)**. **Rejected:** on everywhere (H100: CA off 21–39 ms/step faster, bit-identical)  <sub>flow c6c0494</sub>
-- **The VoF momentum flux defaults to 'muscl_phase' (per-phase interface-biased MC slopes + a mass-aware cap); never a slope of the mixed CV velocity without the cap (2026-10-31, USER: iff all gates pass)**. **Rejected:** 'upwind' default (first order); 'muscl_mixed' (wrong limit +3 %, mechanism OPEN after G-D)  <sub>flow `doc/vof_momentum_second_order.md` §12, flow eeb77d0</sub>
-- **The VoF interface viscous stress is the sharp conservative operator by default (staggered): PLIC face-fraction μ on band edges + interface-traction and midsection terms from a kinked LS fit, explicit on uⁿ; AUTO = sharp in scope, else averaged + notice** (2026-10-31 design; default 2026-11-04, USER). Reverses, in the VoF band only, register 272's premise that T is symmetric, and the interim "default averaged until the gates pass". **Rejected:** every single face average (arithmetic, harmonic, geometric, 4-cell, PLIC sub-cell); per-link GFM series; non-conservative own-side ghost fluid; tensorial laminate μ; a GFM pressure jump; 'averaged' as the default  <sub>flow</sub>
-- **The distributed MG np-equality gate G-DD2 (a) is scale-aware: max|x_np − x_1| ≤ max(1e-8, 1e-12·max|x_1|) (2026-11-15, USER, Decision Desk)**. **Rejected:** keep the absolute 1e-8 with an OMP_NUM_THREADS ≥ 2 floor; leave the OMP=1 failure as known  <sub>flow `tests/kokkos_mpi/test_mg_fp32_vcycle_mpi.cpp`, flow 5779e79</sub>
-- **vof_blocks G1 production-path bound is a round-off bound, prodWorst < 1e-13 (libm-dispatch dependent) (2026-11-16, USER, Decision Desk)**. **Rejected:** leave CI red; pin glibc's libm variant in CI  <sub>flow `tests/kokkos/test_vof_blocks.cpp`, flow ab08e4f</sub>
 - **TRAP: -DPECLET_FLOW_MREAL_DOUBLE=ON on the cmake command line silently builds float**. **Rejected:** passing -DPECLET_FLOW_MREAL_DOUBLE=ON as a normal cmake cache variable  <sub>defect-correction-campaign.md:45-46</sub>
 - **Telescoping is default on for the pressure MG since 2026-09-02; the velocity solve does not need it**. **Rejected:** telescoping the velocity solve  <sub>momentum-solve-residual-stop.md:18</sub>
 - **Ten-Cate periodic-image bug: periodic images are a union, not independent slabs**. **Rejected:** the earlier CSG-slab-per-image geometry construction (implicitly non-union)  <sub>sdf-scene-campaign.md:131</sub>
 - **The Anderson steady-march accelerator has no instability guard; stability evidence comes only from plain steps (rev 2)**. **Rejected:** a Ritz-radius guard with a higher floor, a higher threshold, a longer consecutive count; the fall-back-to-plain consequence; a diagnostic-only radius;  <sub>flow</sub>
+- **The Chebyshev cold-solve growth guard tests r·z (the M⁻¹-norm), in symmetric AND trilinear mode**. **Rejected:** max|r| growth test (false positives on healthy bracketed solves: ×5.7 at iteration 1 in multiphysics,  <sub>flow</sub>
 - **The FP32 V-cycle preconditioner (D) runs below the exact FP64 PCG/FCG; opt-in ('fp64' default, 'fp32' forced, 'auto' where eligible)**. **Rejected:** float band storage with a stored or independently rounded diagonal (u*kappa on near-null modes, §4.2 P4); FP32 faces with FP64 arithmetic ('D-lite': d  <sub>flow</sub>
 - **The FP32 V-cycle's input is scaled by an exact power of two (2^-e, e = ilogb max|r|)**.  <sub>flow</sub>
 - **The PV normal equations accumulate only their lower triangle and diagonal**. **Rejected:** the full 6×6 accumulation (dead work)  <sub>flow</sub>
+- **The VoF interface viscous stress is SHARP by default on the staggered grid (reverses the interim "default averaged"; register 272's symmetric-T premise does not hold in the VoF band)**. **Rejected:** every single average (arithmetic, harmonic, geometric, 4-cell, PLIC sub-cell: first order,  <sub>flow</sub>
+- **The VoF momentum flux defaults to 'muscl_phase'; never a slope of the mixed CV velocity without the cap**. **Rejected:** 'upwind' as the default (first order: P1 Re 35.33 at d/h 16, 36.41 at d/h 24 vs 38.60);  <sub>flow</sub>
 - **The agglomerated-bottom MG anomaly required a per-fluid-component null-space projector, a double row-sum, and a looser inner tolerance**. **Rejected:** projecting the all-cell mean (rather than per-connected-fluid-component); leaving MG coefficients in single-precision row sums uncorrected; an inner t  <sub>agglomerated-bottom-ibm-fix.md:15</sub>
 - **The balanced-force projection is an option on both grids, default ON on collocated variable-rho (V8), OFF elsewhere**. **Rejected:** always-on (the user asked for an option); default off on V8 (loses the settled  <sub>flow</sub>
+- **The default level-0 decomposition is the AUTO policy (legacy when exact, else balance-aware coarse-first); levels=1 = legacy, levels>=2 unchanged**. **Rejected:** legacy as is (24x1 imbalance 2.000, ~-15 ms genoa); plain coarse-first default (12x2 +3.4 ms local); Balanced for explicit levels >= 2 (moved publishe  <sub>flow</sub>
 - **The defect-correction rule: Krylov matvec/residual must be the exact double operator in flux form; preconditioners below may stay float**.  <sub>defect-correction-campaign.md:14-17</sub>
-- **The distributed host 'direct' bottom runs redundantly on every rank, from the allgathered bottom openness (WO-H6, landed 2026-10-18)**. **Rejected:** a rank-0 solve plus broadcast; GraphAMG  <sub>flow</sub>
-- **Distributed host 'auto' bottom = 'direct' at any thread count; no thread-count cost term**. **Rejected:** choosing 'algebraic' at 1 thread/rank near the size cap (faster there, but results would depend on OMP_NUM_THREADS)  <sub>flow</sub>
-- **Device VoF block statistics reduce over fixed 512-cell tiles in fixed tile order (recorded diagnostics-order change); no lazy evaluation**. **Rejected:** lazy statistics on read; one team per job  <sub>flow</sub>
-- **Single-rank device mean removal uses a per-level device fluid count; no per-iteration reduction has two results**. **Rejected:** `{sum, count}` reductions every iteration  <sub>flow</sub>
-- **On device, step() holds no global synchronization; guarded by the ctest device_sync_budget**. **Rejected:** bare `Kokkos::fence()` / exec-less `deep_copy` in the step  <sub>flow</sub>
-- **Variable-rho single-rank device: bottom 'direct' factor on a side execution instance right after updateProperties()**. **Rejected:** lazy factor at the first bottom solve; CUDA graphs; native events  <sub>flow</sub>
-- **The device bottom factor stays in the global-memory schedule; the team-shared-memory schedule (F1) is rejected on measurement**. **Rejected:** shared-memory factor (saved 0.03-0.08 ms < 0.5); B2 bottom FCG v2  <sub>flow</sub>
+- **The device bottom factor stays in the global-memory schedule; the team-shared-memory schedule (F1) is rejected on measurement**. **Rejected:** shared-memory Σ -> L -> W factor (R-2); B2 bottom FCG v2 (R-1) in this package  <sub>design</sub>
+- **The distributed FP32 V-cycle runs in the host-scalar PCG/FCG with one GridHalo<float> per FP32 level, FP64 from the first telescope point down**.  <sub>flow</sub>
+- **The distributed MG np-equality gate G-DD2 (a) is scale-aware: max|x_np − x_1| ≤ max(1e-8, 1e-12·max|x_1|)**. **Rejected:** (B) keep the absolute bound and document an OMP_NUM_THREADS ≥ 2 floor for the MPI ctests; (C) leave the  <sub>flow</sub>
+- **The distributed host 'direct' bottom runs redundantly on every rank, from the allgathered bottom openness (WO-H6, landed 2026-10-18)**. **Rejected:** a rank-0 solve plus broadcast; GraphAMG  <sub>design</sub>
+- **The distributed host PCG runs C2-C4 with unchanged MPI calls (design §12 entry 4)**. **Rejected:** C1 (p.Ap in the matvec: the box matvec splits rows interior/shell, the lane order cannot be kept);  <sub>doc/vof_distributed_host_comm_design.md</sub>
+- **The distributed projected guess allreduces its Gram packet; its history resets on init_mpi and every redistribute**.  <sub>flow</sub>
 - **The float-operator guard also flags float template arguments and defaults**.  <sub>flow</sub>
 - **The host pressure-bottom factor runs a bitwise host-only schedule, with its own team constant (6)**. **Rejected:** running the device team algorithm on the host; sharing kBottomHostTeam = 8; the provisional value 2 (workstation-chosen)  <sub>flow</sub>
 - **The immersed scalar wall flux is never a two-point / series-resistance flux over the cut cell's centroid distance**. **Rejected:** the centroid two-point wall flux and the series-resistance (GFM, Liu–Fedkiw–Kang) wall and interface flux (first order; at the Maxwell disc, d/h = 128  <sub>flow</sub>
@@ -254,6 +259,8 @@ is authoritative.
 - **The momentum stop residual is one max-reduction at the live site, the RB-GS sweep loop (F-1)**. **Rejected:** applying it in VelocityMG::solve, as the design named (the bubble column's momentum never reaches it)  <sub>flow</sub>
 - **The np>1 VoF colour parity gates gate conservation, not the pointwise field**. **Rejected:** (a) loosening 1e-11 to a number above today's 3.174e-09 — it would have been fitted to  <sub>tests/kokkos_mpi/test_vof_bc_mpi.cpp,</sub>
 - **The porous "non-finite preconditioner" was a 0/0 in the bottom CG, not float storage (evidence correction)**. **Rejected:** attributing the porous non-finite preconditioner to float operator storage (the evidence cited in "Double operator storage is the DEFAULT", QUALITY_PL  <sub>flow</sub>
+- **The pressure MG depth is derived: the shallowest D >= 4 whose global coarsest grid the bottom engine admits**. **Rejected:** fixed depth 4 (the bottom grows as N: host GraphAMG 84 % of the step at 192^3, 155.6 vs 81.1 ms/step quiet RTX 5080); a per-rank coarsest extent (the   <sub>flow</sub>
+- **The pressure V-cycle is symmetric: piecewise-constant prolongation P = c·Rᵀ, palindromic smoothed bottom**. **Rejected:** FCG default / AUTO-FCG (symptom; FCG(trilinear) ≥ PCG(constant) everywhere: 12 vs 10, 143 vs 10, 247 vs 80);  <sub>flow</sub>
 - **The projected initial guess (E): A-norm projection onto the last one or two solutions, stop relative to the zero-guess residual, Krylov drivers only, opt-in**. **Rejected:** x0 = phi^n with an r0-relative stop; unprojected 2 phi^n - phi^(n-1); Fischer L > 2 under per-step operator rebuilds; warm starts under Chebyshev, the  <sub>flow</sub>
 - **The resident PCG honours the stop reference stopRef_ (X1, recorded)**.  <sub>flow</sub>
 - **The rotational (Timmermans) pressure update must be restored, not the non-rotational Goda form substituted**. **Rejected:** non-rotational Goda pressure update form; diagonal-preconditioned CG in place of geometric MG/MG-PCG; double-precision pressure operator storage  <sub>migration-faithful-port.md:61</sub>
@@ -263,33 +270,19 @@ is authoritative.
 - **The scalar-transport and phase-change energy API is physical under an armed extent, converted at the boundary**. **Rejected:** documenting the scalar/energy surface as internal (cell) units — "silently wrong" is the failure class U3's four missed setters already showed; conver  <sub>flow</sub>
 - **The standalone V-cycle pressure driver does not honor set_pressure_solver_params(n) and is ~30x slower at small grids**.  <sub>flow-thermal-convection-validated.md:25</sub>
 - **The transient ScalarMG level rule switches to the full table at κ_A = 1 + 4 dt'D'Σw_a ≥ 25 (Amendment A3, ruling D-WO9-3)**. **Rejected:** κ_A = 13, the design's value, kept by D-WO9-2 only because level 0 there took 11 iterations on one cold first step against G-iter's ≤ 10; κ_A ≈ 49 (co  <sub>flow</sub>
-- **The velocity MG stays FP64**. **Rejected:** an FP32 velocity V-cycle (levels >= 1 only would save <= 0.4 ms)  <sub>design</sub>
+- **The velocity MG stays FP64**. **Rejected:** an FP32 velocity V-cycle (levels >= 1 only would save <= 0.4 ms)  <sub>`doc/vof_projection_cost_design.md`</sub>
 - **Tier-3 PV fit: each interfacial cell's PLIC polygon is built once per curvature pass (per-cell cache), never once per target**. **Rejected:** rebuilding the polygon per target (15.6 builds per cell per pass, plicPolygon 50.0 of 81.2 ms of tier 3); a dense per-cell cache over the extended blo  <sub>flow</sub>
 - **Tier-3 PV terms come from per-cell polygon area moments, accumulated entry-parallel on the device (recorded round-off change)**. **Rejected:** per-target Green's-theorem moments (2.6× slower, FP64-heavy); a centroid point fit; a smaller support; one lane accumulating all 42 entries (FP64-issu  <sub>flow</sub>
 - **UCX_RNDV_THRESH tuning is falsified as an explanation for the np8 anomaly — leave UCX defaults**. **Rejected:** tuning UCX_RNDV_THRESH=256k  <sub>comm-scaling-plan.md:57</sub>
-- ~~**USER: the FP32 V-cycle and the projected initial guess stay opt-in; the pressure-solve defaults do not change**~~ (V-cycle half superseded 2026-10-19). **Rejected:** 'auto' as the default on device backends (37f8f5f, reverted): single-rank-only fast paths as defaults break serial <-> np=1 bit-exactness, and under '  <sub>user</sub>
-- **USER: the pressure V-cycle precision defaults to 'auto' (FP32 on device where eligible, FP64 restart); the initial guess stays 'zero'** (2026-10-19). **Rejected:** keeping 'fp64' on device; a single-rank-only flip; flipping E too  <sub>flow</sub>
-- **The distributed host PCG runs C2-C4 with unchanged MPI calls (design §12 entry 4)**. **Rejected:** C1 (p.Ap in the matvec: the box matvec splits rows interior/shell, the lane order cannot be kept); merging max|r| into the {sum, count} Allreduce (needs a user   <sub>flow</sub>
-- **Pressure-MG stencil exchanges use a faces-only halo with rank-local periodic axes read in-kernel**. **Rejected:** 26-neighbour fills for 7-point stencils; routing np 1 to the single-rank engines (§14 Q-H2)  <sub>flow</sub>
-- **Communication-avoiding coarse smoothing with walls (WO-K2) is NOT adopted; measured neutral to harmful on genoa**. **Rejected:** merging K2 (k2/new 0.995-1.055)  <sub>flow</sub>
-- **Host 'direct' bottom solve: one thread, lane-scheduled M (rows as SIMD lanes), bitwise; H-6 replication kept**. **Rejected:** subset agglomeration / rank-0 solve + broadcast; cooperative on-node factor; a thread-count 'algebraic' rule  <sub>flow</sub>
-- **The default level-0 decomposition is the AUTO policy (legacy when exact, else balance-aware coarse-first); levels=1 = legacy, levels>=2 unchanged** (2026-10-22). **Rejected:** legacy as is (24x1 2:1); plain coarse-first default; Balanced for explicit levels>=2  <sub>flow</sub>
-- **No VoF weights in the default partition; CCD/L3 placement is documentation plus an init-time warning**. **Rejected:** static VoF weights; a placement-weighted partition; warning at np 1  <sub>flow</sub>
-- **Host box shells run serially only if cells + 8 x-runs < 8192 (WO-A, bitwise)**. **Rejected:** lowering the cutoff globally; restructuring the shell runs  <sub>flow</sub>
-- **Partition guard: an AUTO candidate must cut the same axes as legacy unless legacy max/mean >= 5/4 (WO-D)** (2026-10-22). **Rejected:** imbalance threshold alone; depth rule; a case list  <sub>flow</sub>
-- **USER DIRECTIVE — momentum advection is ON by default; never reintroduce a default off** (`set_advection(False)` for Stokes; inert under `enable_vof_momentum`). **Rejected:** `advect_ = false` as the default (ran case A and the bubble-column benchmark as unsteady Stokes)  <sub>user, 2026-10-23; flow `09d80db`</sub>
-- **Cut-cell scalar transport ships opt-in as `add_scalar(..., cutcell=True)`; `set_scalar_residual_tolerance`, `max_iter`, `num_mg_levels`** (USER 2026-10-22). **Rejected:** another opt-in spelling; cut-cell default in 1.4.0; the old names; aliases  <sub>flow</sub>
-- **A MAC face field's high-side domain face is kept across every ghost fill**. **Rejected:** reordering fill and outflow correction; outflow faces only; full transverse extent  <sub>flow</sub>
-- **A scalar's advective inflow state is the prescribed value; cOld's ghosts are filled first** (trade: first interior face gh/6 on smooth profiles). **Rejected:** upwinding the Dirichlet reflection; changing c's own ghost; constant ghost at walls  <sub>flow</sub>
-- **Variable viscosity uses the full deviatoric stress (staggered): explicit conservative MAC transpose term on uⁿ; AUTO = full, except with immersed solids** (2026-10-22; default since 2026-10-23, USER; solids excluded 2026-10-25, review B1). **Rejected:** product form (∇μ)·(∇u)ᵀ; transpose on the Picard iterate; excess-viscosity form; implicit/coupled variants; harmonic + full (v1); full stress under AUTO with staircase solids  <sub>flow</sub>
-- **Under the FP32 V-cycle the non-bottom FP64 V-cycle data are built on demand (D5), bitwise**.  <sub>flow</sub>
+- **USER DIRECTIVE — momentum advection is ON by default; never reintroduce a default off**. **Rejected:** `advect_ = false` as the default (Stokes unless the script opts in) — it silently ran case A and the bubble-column gallery benchmark as unsteady Stoke  <sub>user,</sub>
+- **USER: the pressure V-cycle precision defaults to 'auto' (FP32 on device where eligible, FP64 restart); the initial guess stays 'zero'**. **Rejected:** keeping 'fp64' as the device default; a single-rank-only flip (S-4: auto/fp64 <= 1 at np 1/2/4/8); flipping E (initial guess) as well (E1 failed its o  <sub>USER</sub>
 - **Under 'auto' a non-converged FP32 PCG/FCG attempt is re-solved cold with the FP64 V-cycle, and FP64 is latched for the run**.  <sub>flow</sub>
-- **'auto' V-cycle precision means FP32 where eligible on device backends only; host 'auto' is 'fp64'**.  <sub>flow</sub>
-- **The distributed FP32 V-cycle runs in the host-scalar PCG/FCG with one GridHalo<float> per FP32 level, FP64 from the first telescope point down**.  <sub>flow</sub>
-- **The distributed projected guess allreduces its Gram packet; its history resets on init_mpi and every redistribute**.  <sub>flow</sub>
+- **Under the FP32 V-cycle the non-bottom FP64 V-cycle data are built on demand (D5), bitwise**.  <sub>flow</sub>
 - **User decision: port Basilisk embed.h, not Trebotich–Graves, for 2nd-order collocated walls**. **Rejected:** Trebotich–Graves/EBChombo as the primary port target  <sub>sdflow-collocated-solver.md:186-191</sub>
 - **User directive: ghost-cell IBM must become production-grade (it generalizes to AMR better than cut-cell)**.  <sub>ghost-hardening-plan.md:11-14</sub>
 - **V-cycle stale-ghost bug made MG convergence decomposition-dependent; fixed, now iteration count is decomposition-independent**. **Rejected:** reading stale ghosts in the V-cycle residual  <sub>channel-scaling-rebenchmark.md:67-73</sub>
+- **Variable viscosity uses the full deviatoric stress (staggered): explicit conservative MAC transpose term on uⁿ**. **Rejected:** product form (∇μ)·(∇u)ᵀ; excess-viscosity form with global μ_ref; transpose on the Picard  <sub>flow</sub>
+- **Variable-rho single-rank device: bottom 'direct' factor on a side execution instance right after updateProperties()**. **Rejected:** lazy factor at the first bottom solve (serial, ~3 ms on the critical path); CUDA graphs in this package; native CUDA events  <sub>flow</sub>
 - **Variable-viscosity rotational correction stays incremental (constant-μ) under varProps, not full pointwise**. **Rejected:** 'full' pointwise variable-μ rotational correction  <sub>multiphysics-framework-plan.md:397</sub>
 - **Velocity domain BCs must be applied before divergence in project()**. **Rejected:** applying divergence before the velocity domain BCs  <sub>cuda-kokkos-migration.md:332-335</sub>
 - **Velocity masking must be OFF with the cut-cell pressure operator**. **Rejected:** masking velocity with the cut-cell operator active  <sub>suite-distributed-status.md:94-95</sub>
@@ -315,6 +308,7 @@ is authoritative.
 - **set_face_interp(9) hybrid (aperture projection + gpCenterGrad) is the throat-safe collocated scheme**. **Rejected:** pure collocated ghost projection (mode-0 with gpCenterGrad only) for tight-throat porous media — it inherits the throat defect  <sub>flow-ghost-projection.md:115</sub>
 - **set_ghost_projection(True) must be called before set_solid**.  <sub>flow-ghost-projection.md:33</sub>
 - **set_pressure_warmstart(True) diverges on the steady Stokes march; bench default is WARMSTART=0**. **Rejected:** set_pressure_warmstart(True) as a benchmark default  <sub>porous-scaling-benchmark.md:106-109</sub>
+- **vof_blocks G1 production-path bound is a round-off bound (1e-13), not 1e-15: libm-dispatch dependent**. **Rejected:** (C) leave CI red and list it as an open item; pinning glibc's libm variant in CI (hides the environment  <sub>flow</sub>
 - **⚠️ UNRESOLVED — interstitial vs superficial drag normalisation**. **Rejected:** nothing — these two statements in the SAME note assign Zick-Homsy and vdH to OPPOSITE  <sub>ibm-accuracy-sphere-validation.md:45-50</sub>
 
 ### Superseded — history, do not re-derive the old reading
@@ -323,12 +317,13 @@ is authoritative.
 - "No portable GPU wheel" was a policy choice, not a hard limit — single-GPU CUDA wheels are feasible.  <sub>peclet-cuda-wheel-feasible.md:10-13</sub>
 - (superseded) fp32-floor-explains-everything hypothesis.  <sub>vof-campaign.md:366-381</sub>
 - (superseded) precision-vs-indefiniteness verdict corrected — S3 indefiniteness is real and separate from the float-storage floor.  <sub>vof-campaign.md:346-347</sub>
-- ~~**Coarse-level solve policy default stays "smoother", not "auto", because auto regresses the cut-cell IBM path**~~ (superseded 2026-08-14 by the singular-path "auto" bottom default). **Rejected:** making "auto" the default coarse-level solve policy  <sub>mg-decomposition-alignment.md:28</sub>
 - 1/2-1/2 constraint truncation exonerated as the plateau cause — a previously-published claim was wrong.  <sub>collocated-second-order-verdict.md:29-34</sub>
 - 2nd order finally resolved by ghost-cell projection FD family, not the full Basilisk embed rewrite.  <sub>sdflow-collocated-solver.md:10-27</sub>
 - Agreed IBM velocity-MG coarse-op scheme: volume-fraction Helmholtz, coarse-only solid masking, masked volume-weighted transfers.  <sub>velocity-mg-design.md:37-52</sub>
 - Aperture weighting (A1) is not indicated as a fix for the confined finite-Re deficit.  <sub>advective-cutwall-flux-plan.md:26</sub>
 - Area fractions (proper face α, not min(θ)) extend the stable dt ceiling for the (now-removed) area-fraction coarse op.  <sub>velocity-mg-design.md:118-124</sub>
+- Coarse-first decomposition ships opt-in, legacy remains the default.  <sub>mg-decomposition-alignment.md:22</sub>
+- Coarse-level solve policy default stays "smoother", not "auto", because auto regresses the cut-cell IBM path.  <sub>mg-decomposition-alignment.md:28</sub>
 - Correction/supersession: plan §9.3 U5 was wrong about VoF spacing.  <sub>physical-units-plan.md:32</sub>
 - Correction: §9.3 U3's setter list was incomplete, causing silent physical errors.  <sub>physical-units-plan.md:35</sub>
 - Defect-correction proposal: float hierarchy demoted to pure preconditioner, evaluate before double-diagonal.  <sub>vof-campaign.md:293-306</sub>
@@ -355,6 +350,7 @@ is authoritative.
 - The ten-cate confined-flow deficit was a geometry (oversized periodic slab) bug, not a solver/advection defect.  <sub>advective-cutwall-flux-plan.md:49</sub>
 - The velocity V-cycle is the DEFAULT momentum solver, at every rank count and every block size.  <sub>user</sub>
 - The ~0.3% collocated accuracy "plateau" is not a truncation ceiling — it is an instability + an invisible pressure-subspace attractor family.  <sub>collocated-attractor-campaign.md:11</sub>
+- USER: the FP32 V-cycle and the projected initial guess stay opt-in; the pressure-solve defaults do not change.  <sub>USER</sub>
 - Wall-band "1/h amplitude growth" was a unit artifact, not a real localization signal.  <sub>collocated-second-order-verdict.md:36-39</sub>
 - Weak-scaling ladder must refine a fixed physical box, not grow box length at fixed cross-section (methodology correction).  <sub>channel-scaling-rebenchmark.md:156-168</sub>
 - get_ox/oy/oz are openness fields, not origin aliases — NAMING.md correction.  <sub>suite-quality-plan-1-0-0.md:101-102</sub>
@@ -491,7 +487,7 @@ is authoritative.
 
 ## voro — tessellation, ConvexCell, mesh optimizer
 
-82 in force, 8 superseded — full text in [`decisions/voro.md`](decisions/voro.md)
+83 in force, 9 superseded — full text in [`decisions/voro.md`](decisions/voro.md)
 
 ### In force
 
@@ -516,9 +512,8 @@ is authoritative.
 - **ConvexCell geometry decoupled from plane-definition: calculus is a function of {n_k} only**. **Rejected:** 4×T fused kernels (one kernel per geometry-tier × cell-type combination); inlining plane-from-dofs into the hot geometry kernel  <sub>vorflow-convexcell-geometry-split.md:10-17</sub>
 - **Convexity certificate alone is insufficient — propagation to neighbours is essential**. **Rejected:** independent local repair without propagation (S3 alone)  <sub>vorflow-dynamic-update-strategy-study.md:52-55</sub>
 - **Cooperative/warp-parallel half-edge cut is a dead end — do not re-attempt**. **Rejected:** cooperative/warp-parallel half-edge cut (team-per-cell intra-cut parallelism)  <sub>vorflow-kokkos-migration.md:1181-1192</sub>
-- **Cospherical cuts: topology rule in ConvexCell::clip (orientation-reversed corners kept on-plane, disk cut region), kept at +4.5–7 % host build cost**. **Rejected:** an on-plane tolerance band (moves the failure to band-sized jitter); removing the orientation test for speed  <sub>peclet-papers DECISIONS_LOG 2026-11-08</sub>
+- **Cospherical cuts: topology rule in ConvexCell::clip, kept at +4.5–7 % host build cost**. **Rejected:** an on-plane tolerance band on the cut test (measured: moves the failure to band-sized jitter, ΣV off 3e-3  <sub>peclet-papers</sub>
 - **DEC viscous term shelved — first-order on skewed meshes, unstable explicitly**. **Rejected:** DEC viscous term as an explicit covolume viscous operator  <sub>voronoi-methods-plan.md:174-179</sub>
-- ~~**Device Power/Laguerre diagrams dropped — no ConvexCell radical-plane geometry yet**~~ (superseded 2026-07: device Power policy, small-weight d > 0 regime; A2b/A2c open). **Rejected:** device Power/Laguerre diagrams under the current ConvexCell foot-point half-space representation  <sub>vorflow-scratchcell-retired-dynamic-cells-next.md:33-37</sub>
 - **Device kernel must scalarize small dynamically-indexed arrays to registers via #pragma unroll, not leave them local-memory**. **Rejected:** naive analytic dAreaTri implementation with dynamically-indexed local arrays (2.4x slower on GPU)  <sub>vorflow-convexcell-geometry-split.md:68-72</sub>
 - **Distributed cold build: only build cells for original-index < nBuild; ghosts stay candidates only**. **Rejected:** tessellating ghost cells that get discarded  <sub>vorflow-worklist-into-tessellator.md:38-45</sub>
 - **Dynamic cell-update study scoped to topology+geometry only, no physics**. **Rejected:** including physics/forces/dynamics in this study  <sub>vorflow-dynamic-update-strategy-study.md:12-13</sub>
@@ -548,9 +543,11 @@ is authoritative.
 - **Per-sub-position rmin worklist gather replaces the adaptive shell-offset walk, on the host build path**. **Rejected:** the adaptive shell-offset walk  <sub>vorflow-worklist-into-tessellator.md:14-19</sub>
 - **Phase-3 gate: churn thresholds and dilate() default**.  <sub>vorflow-dynamic-updater-phase01.md:61</sub>
 - **Plan of record §12 rulings (approved 2026-09-03)**. **Rejected:** an OpenFOAM writer; picking only one of covolume/collocated; picking only one moving-cell integrator up front  <sub>voronoi-methods-plan.md:8-13</sub>
+- **Power cells with an outside seed (negative facet height) are built and repaired correctly, not emptied**. **Rejected:** keeping the defect documented until the M7 landing (card option B); pinning products with mulRn on the  <sub>peclet-papers</sub>
 - **Power-cell solver physics deliberately not built yet — user wants it brainstormed first**. **Rejected:** building the solver physics before the design is brainstormed  <sub>vorflow-power-cells-deferred.md:10</sub>
 - **Production dynamic-update strategy is S5: persistent Verlet skin-list + propagating repair**. **Rejected:** S3/S4 (which re-gather the grid every step) as the production strategy  <sub>vorflow-dynamic-update-strategy-study.md:80-88</sub>
 - **Reconstructing the clipped cell externally for dV/dn was unnecessary — use the tessellator's published facet areas**. **Rejected:** externally reconstructing the clipped cell (buildConvexCell/initBox+clip) to get dV/dn  <sub>voro-mesh-optimizer-wall-force.md:53-56</sub>
+- **Repair and publish are bitwise deterministic across thread counts**. **Rejected:** accepting thread-count dependence and testing the repair only at OMP 1 (card option B)  <sub>peclet-papers</sub>
 - **Robustness approach: topology-oriented (Sugihara), valid-by-construction, NOT exact predicates**. **Rejected:** exact-arithmetic predicates for robustness  <sub>vorflow-gpu-voronoi-build-engine.md:232-233</sub>
 - **SDF wall force uses Option A (exact flat / first-order curved), user's choice**. **Rejected:** an alternative (presumably higher-order curved) SDF wall-force option, not detailed in the note  <sub>vorflow-power-cells-deferred.md:16</sub>
 - **SDF wall term still stalls the optimizer — diagnosed as the approximate wall-gradient's first-order error, not the objective**.  <sub>voro-mesh-optimizer-wall-force.md:92-97</sub>
@@ -583,6 +580,7 @@ is authoritative.
 - C1 gate metric was wrong: cellwise-residual "2nd order" is not the right convergence gate.  <sub>voronoi-methods-plan.md:85-88</sub>
 - C3 wall Poiseuille is not exact to round-off; the plan's claim was wrong.  <sub>voronoi-methods-plan.md:128-130</sub>
 - Convexity certificate replaced by local-Delaunay (4-poke) test.  <sub>vorflow-dynamic-updater-phase01.md:106</sub>
+- Device Power/Laguerre diagrams dropped — no ConvexCell radical-plane geometry yet.  <sub>vorflow-scratchcell-retired-dynamic-cells-next.md:33-37</sub>
 - Inline reshape repair: tried, reverted as marginal, but the local-Delaunay certificate is retained.  <sub>vorflow-dynamic-updater-phase01.md:122</sub>
 - Per-vertex flag/divergence geometry (sort-free, adjacency-free) adopted as the default re-eval kernel, superseding the atan2 and stored-adjacency paths.  <sub>vorflow-gpu-voronoi-build-engine.md:190-229</sub>
 - Reframe: the neighbour-query GATHER, not the topology decision/repair, is the core problem to solve next.  <sub>vorflow-dynamic-update-strategy-study.md:92-94</sub>
@@ -653,6 +651,7 @@ is authoritative.
 - **The C/F scheme DEFAULT is cf=1 (quadratic); cf=0 is the legacy path**. **Rejected:** keeping cf=0 as the default for backward compatibility  <sub>amr/docs/amr_graded_convergence.md</sub>
 - **The advected value at a 2:1 seam is reconstructed from the UPWIND side with level-aware probes, the tangential sample applied ONCE**. **Rejected:** Martin-Colella's quadratic NORMAL fill (mixes downstream fine cells into the seam value — amplitude and the dt = 1e20 stability margin); minmod-limite  <sub>amr/docs/amr_cf_convective.md</sub>
 - **The coarsest-grid extent stays at 4 — the depth dependence was measured and is ~1 iteration, not 4**. **Rejected:** flipping the default to extent 8 on the single-sample evidence; escalating the deepest-level observation to a design pass  <sub>amr/docs/amr_mg_depth.md</sub>
+- **USER DIRECTIVE — AmrFlow momentum advection is ON by default (as flow); never reintroduce a default off**. **Rejected:** `advect_ = false` in `AmrFlow` / `oracle::AmrFlow` (Stokes unless the caller opts in) — the default flow dropped on 2026-10-23  <sub>user,</sub>
 - **Volume-weighted superficial velocity is required on graded meshes**. **Rejected:** non-volume-weighted superficial velocity on graded meshes  <sub>amr-ghost-collocated-ns-plan.md:57</sub>
 - **What remains at a 2:1 seam is the JUMP in the flux-error constant, and the lever is MATCHING the two sides, not maximising either**. **Rejected:** chasing the residual graded-vs-coarse penalty with a better sub-face reconstruction  <sub>amr/docs/amr_cf_convective.md</sub>
 - **Zero pressure after finish_adapt rather than carry the accumulated pressure through coarsening**. **Rejected:** carrying the transferred/accumulated pressure through a coarsening adapt event  <sub>amr-ghost-collocated-ns-plan.md:121</sub>
@@ -664,18 +663,17 @@ is authoritative.
 - **transferField prolongation gradients must be halo-completed, not block-local**. **Rejected:** block-local prolongation gradients  <sub>amr-distributed-flow-campaign.md:47</sub>
 - **κ-restrict re-tested on Dirichlet: floor gone but still no win over plain — plain stays default**. **Rejected:** κ-weighted restriction as default (confirmed again)  <sub>amr-octree-status.md:899-910</sub>
 - **κ-weighted MG restriction evaluated and rejected as default; plain volume-average stays default**. **Rejected:** κ-weighted restriction as the default MG restriction operator  <sub>amr-octree-status.md:888-898</sub>
-- **USER DIRECTIVE — AmrFlow momentum advection is ON by default (as flow); never reintroduce a default off** (`setAdvection(false)` / `set_advection(False)` for Stokes). **Rejected:** `advect_ = false` in `AmrFlow` and the oracle  <sub>user, 2026-10-23; amr `9205762`</sub>
 
 ### Superseded — history, do not re-derive the old reading
 
-- setGhostProjection default is AUTO (tri-state), not always-on or always-off — superseded 2026-08-25 (AUTO = ghost unconditionally).  <sub>amr-ghost-collocated-ns-plan.md:98</sub>
 - G.2 decision changed: the whole core/amr tree becomes its own package peclet-amr, depending on core alone.  <sub>suite-quality-plan-1-0-0.md:68-80</sub>
 - Graded-mesh flow requires ALL flow operators (momentum, divergence/gradient, advection) to be C/F-consistent — momentum-only fix insufficient.  <sub>amr-octree-status.md:947-958</sub>
 - cfDiv/cfGrad row gate must be rowRegular, not rowFluid.  <sub>amr-mixed-level-cut-band-plan.md:70</sub>
+- setGhostProjection default is AUTO (tri-state), not always-on or always-off.  <sub>amr-ghost-collocated-ns-plan.md:98</sub>
 
 ## core — decomposition, halo, rebalance
 
-34 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
+38 in force, 1 superseded — full text in [`decisions/core.md`](decisions/core.md)
 
 ### In force
 
@@ -689,12 +687,15 @@ is authoritative.
 - **Device-vs-host numerical comparison policy: bit-exact assembly, tolerance-based apply on CUDA/HIP**. **Rejected:** requiring bit-exact apply/V-cycle results on CUDA/HIP (impossible given FMA contraction)  <sub>kokkos-cuda-constexpr-required.md:27-30</sub>
 - **GPU-aware MPI auto-detection uses query + checksum loopback probe, never blind probing**. **Rejected:** blind device-pointer probing to auto-detect CUDA-aware MPI  <sub>suite-mpi-gpu-campaign.md:16</sub>
 - **Gate the CUDA-aware MPI device path on an explicit env var, not the MPI query API**. **Rejected:** relying on MPIX_Query_cuda_support() to detect CUDA-aware MPI  <sub>suite-distributed-status.md:353</sub>
+- **GridHalo fences only where MPI needs it**. **Rejected:** unconditional fences in exchangeBegin and exchangeEnd  <sub>bubble_column_perf/gpu_diag/MGPU_REPORT.md</sub>
+- **GridHalo on host: one gather launch, calling-thread copies below kHaloSerialCopy, persistent requests**. **Rejected:** separate self-copy and pack launches; Isend/Irecv per exchange; merging unpack into the shell sweep;  <sub>flow</sub>
 - **Halo topology vs exchange split: topology stays host MPI plumbing, exchange is the device kernel**.  <sub>device-naming-retirement.md:32-40</sub>
 - **Kokkos CUDA installs MUST set Kokkos_ENABLE_CUDA_CONSTEXPR=ON**. **Rejected:** building the nvidia-cuda Kokkos install without Kokkos_ENABLE_CUDA_CONSTEXPR  <sub>kokkos-cuda-constexpr-required.md:10-22</sub>
 - **NBX consecutive rounds must use distinct message tags**. **Rejected:** sharing tag 0 across NBX request/reply rounds  <sub>amr-octree-status.md:786-791</sub>
 - **NBX inter-round tag race fixed by rotating the tag per round; buildTopology now verifies promised==requested cells**. **Rejected:** running consecutive NBX consensus rounds on one communicator with a single fixed tag  <sub>nbx-round-tag-race.md:17-19</sub>
 - **NBX tag interaction: two standing rules for wire tags**.  <sub>amr-march-distributed-campaign.md:66-77</sub>
 - **No silent `if(MPI_FOUND)` guard on the core Python bindings; the stopgap is a loud opt-in**. **Rejected:** the silent guard  <sub>docs/CORE_BOUNDARY.md</sub>
+- **On-node halo exchange by MPI-3 shared windows with sequence flags (GridHalo, host memory only)**. **Rejected:** eager-limit tuning (btl_sm_eager_limit / UCX_RNDV_THRESH) as the fix — site- and version-specific,  <sub>flow</sub>
 - **ParticleHalo gather() throws on capacity overflow instead of silently truncating**. **Rejected:** silent truncation of ghost count on overflow  <sub>cuda-kokkos-migration.md:627-629</sub>
 - **ParticleHalo periodic self-ghosts default OFF for byte-identical compatibility**. **Rejected:** making periodic self-ghosts on by default  <sub>cuda-kokkos-migration.md:618-621</sub>
 - **Periodic axis needs >=2 ranks**.  <sub>suite-distributed-status.md:27-28</sub>
@@ -710,9 +711,10 @@ is authoritative.
 - **`peclet-core` becomes a pure-Python compatibility shell, frozen at its last 1.x with a `<2` ceiling**. **Rejected:** a code-free 2.0.0 depending on the new packages  <sub>docs/CORE_BOUNDARY.md</sub>
 - **block_decomposer retired/archived, replaced by transport-core (core)**.  <sub>cuda-kokkos-migration.md:57-58</sub>
 - **coarsenAlignment bug: natural-max alignment over-constrains ORB; cap alignment at 2^4**. **Rejected:** natural-max alignment for ORB decomposition snapping  <sub>parallel-scaling-study.md:60-64</sub>
+- **core SplitAxis::Balanced is opt-in; Longest stays core's default ORB split rule**. **Rejected:** changing core's default (dem/voro/amr/pnm partitions would move without a measured need)  <sub>core</sub>
+- **core host builds compile with -ffp-contract=off (directory-scoped, not exported)**. **Rejected:** loosening the bitEqualF gates to a tolerance; pinning CI to ubuntu-24.04 (hides it); exporting the flag on  <sub>core</sub>
 - **peclet-core sdist must vendor its own SuiteNanobind copy, not depend on the umbrella cmake/**. **Rejected:** the core sdist referencing the umbrella's cmake/ directory for SuiteNanobind  <sub>release-workflow-prep.md:93</sub>
 - **toVector must repack a strided device subview to a contiguous buffer before cross-space deep_copy**. **Rejected:** cross-space deep_copy directly on a strided device subview  <sub>dem-cubes-gpu-pyvista.md:30-34</sub>
-- **core host builds compile with -ffp-contract=off (directory-scoped, not exported)**. **Rejected:** loosening the bitEqualF gates; pinning CI to ubuntu-24.04; exporting the flag to every consumer  <sub>core</sub>
 
 ### Superseded — history, do not re-derive the old reading
 
@@ -769,8 +771,7 @@ is authoritative.
 34 in force, 1 superseded — full text in [`decisions/suite-wide.md`](decisions/suite-wide.md)
 
 ### In force
-- **USER DIRECTIVE: multi-GPU performance is measured by weak scaling only, at a system size per GPU large enough to fill the GPU**. **Rejected:** strong scaling of small cases on GPUs (S-4: 0.1-0.4M cells per GPU) as a health measure  <sub>suite-wide</sub>
-- **USER DIRECTIVE: paper studies live in their own repositories outside the public suite — private while running, public at submission (4TU snapshot)**. **Rejected:** public study repos from the start; private for good  <sub>suite-wide</sub>
+
 - **A host backend that does not size itself must be handed the thread budget**. **Rejected:** keeping the "say nothing on an unconstrained machine" policy for every backend (it is  <sub>archive/RELEASE_PREP_1.0-1.1.md</sub>
 - **A solver's internal grid-count threshold is a count, not cell-unit API**. **Rejected:** a physical-length form (wrong: the same length means a different level count at a  <sub>amr</sub>
 - **All coupled methods must share one BlockDecomposer; static-only co-decomposition is rejected**. **Rejected:** "Static-only co-decomposition"  <sub>multiphysics-framework-plan.md:410</sub>
@@ -796,6 +797,8 @@ is authoritative.
 - **No `Device*`/`*Kokkos` class names for exposed kernels; host code is an unexposed oracle only**. **Rejected:** class names containing `Device*` or `*Kokkos`; exposing host-only kernel code to Python  <sub>device-naming-retirement.md:10-14</sub>
 - **Provisioning via shared install prefix + find_package, not FetchContent**. **Rejected:** FetchContent  <sub>cuda-kokkos-migration.md:105-109</sub>
 - **Suite-wide migration from pybind11 to nanobind + scikit-build-core, on a shared zero-copy bridge**. **Rejected:** pybind11 as the binding framework  <sub>nanobind-zero-copy-migration.md:11-13</sub>
+- **USER DIRECTIVE: multi-GPU performance is measured by weak scaling only, at a system size per GPU large enough to fill the GPU**. **Rejected:** strong scaling of small cases on GPUs (e.g. S-4: the 0.79M-cell bubble column split  <sub>user</sub>
+- **USER DIRECTIVE: paper studies live in their own repositories outside the public suite — private while running, public at submission**. **Rejected:** (a) a public study repo from the start (the earlier suite/CLAUDE.md text); (b) study repos  <sub>user</sub>
 - **USER DIRECTIVE: peclet must match/exceed SOTA massively-parallel-code performance in every component, including setup**. **Rejected:** judging performance only by the per-step solve/march, ignoring setup-path cost  <sub>performance-sota-yardstick.md:11-22</sub>
 - **USER DIRECTIVE: peclet.flow is the reference for shared-method design elsewhere in the suite, not Basilisk or the literature**. **Rejected:** taking Basilisk (or a paper) as the reference for a shared method design; the Basilisk face-acceleration form for the collocated projection  <sub>flow-is-the-method-reference.md:8-19</sub>
 - **USER DIRECTIVE: quality is the prime objective; next release is a clean-break 1.0.0, API-breaking allowed; AMR preserved not deleted**. **Rejected:** preserving backward compatibility / a minor version bump  <sub>suite-quality-plan-1-0-0.md:11-13</sub>
